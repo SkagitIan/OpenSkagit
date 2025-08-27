@@ -217,7 +217,7 @@
     const nlMsg  = document.getElementById('nl-msg');
 
     async function loadStarters(){
-      if(chats.length !== 0 || !hasAPIKey()) return;
+      if(chats.length !== 0 || !(await hasAPIKey())) return;
       try {
         const prompts = await getStarters();
         if(prompts.length){
