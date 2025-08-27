@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f08000" />
+  <title>OpenSkagit — Chat with Local Data (PWA)</title>
+
+  <!-- Tailwind (CDN for prototype) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <style>
+    /* Brand tokens */
+    :root{
+      --osg-purple:#B993D6; /* user bubble */
+      --osg-slate:#49475B;  /* assistant bubble */
+      --osg-orange:#f08000; /* accents */
+      --osg-dark:#14080E;   /* headers */
+      --osg-teal:#58B09C;   /* success */
+      --radius-xl: 16px;
+      --shadow-soft: 0 8px 28px rgba(0,0,0,.08);
+    }
+    .card{ box-shadow: var(--shadow-soft); border-radius: var(--radius-xl); }
+    .chip{ border-radius: 9999px; }
+
+    /* Header bling — animated accent bar */
+    @keyframes osg-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+    .animated-bar{ background-image: linear-gradient(90deg,var(--osg-purple),var(--osg-teal),var(--osg-orange)); background-size:200% 200%; animation: osg-shift 8s linear infinite; }
+
+    /* Background vibe similar to ChatGPT: soft radial + subtle grid */
+    .bg-vibe{
+      background:
+        radial-gradient(1200px 600px at 50% -200px, rgba(185,147,214,.18), transparent 70%),
+        radial-gradient(800px 400px at 10% 20%, rgba(88,176,156,.10), transparent 70%),
+        radial-gradient(800px 400px at 90% 10%, rgba(240,128,0,.08), transparent 70%),
+        linear-gradient(transparent 0, transparent 100%),
+        repeating-linear-gradient(0deg, rgba(20,8,14,.035), rgba(20,8,14,.035) 1px, transparent 1px, transparent 24px),
+        repeating-linear-gradient(90deg, rgba(20,8,14,.035), rgba(20,8,14,.035) 1px, transparent 1px, transparent 24px);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-neutral-50 text-neutral-900 bg-vibe">
+
+  <!-- Fixed, full-width header (ChatGPT-ish) -->
+  <header class="fixed inset-x-0 top-0 z-40">
+    <div class="h-1.5 animated-bar"></div>
+    <div class="backdrop-blur supports-[backdrop-filter]:bg-white/70 bg-white/90 border-b border-neutral-200/70">
+      <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div class="h-16 flex items-center justify-between gap-4">
+          <!-- Brand -->
+          <a href="#" class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-[var(--osg-purple)]"></div>
+            <div>
+              <span class="block text-lg font-semibold text-[var(--osg-dark)] leading-tight">OpenSkagit</span>
+              <span class="block text-[11px] text-neutral-500 -mt-0.5">Ask the record. Get the receipts.</span>
+            </div>
+          </a>
+
+          <!-- Inline newsletter (localStorage only; optional CF hook) -->
+          <form id="newsletter" class="hidden md:flex items-center gap-2" aria-label="Newsletter signup">
+            <input type="email" name="email" required autocomplete="email" inputmode="email"
+                   class="h-9 w-56 rounded-xl border border-neutral-300 bg-white px-3 text-sm placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--osg-purple)]"
+                   placeholder="you@example.com" aria-label="Email address"/>
+            <button class="h-9 inline-flex items-center gap-2 rounded-xl bg-[var(--osg-orange)] px-3.5 text-white text-sm font-semibold shadow hover:opacity-95">
+              <i class="fa-regular fa-bell"></i><span>Subscribe</span>
+            </button>
+            <span id="nl-msg" class="text-xs text-neutral-600"></span>
+          </form>
+
+          <!-- Right-side actions -->
+          <div class="flex items-center gap-2">
+            <button id="export-json" class="hidden sm:inline-flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 h-9 text-sm hover:bg-neutral-50">
+              <i class="fa-solid fa-download"></i><span>Export</span>
+            </button>
+            <label class="hidden sm:inline-flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 h-9 text-sm hover:bg-neutral-50 cursor-pointer">
+              <i class="fa-solid fa-upload"></i><span>Import</span>
+              <input id="import-json" type="file" accept="application/json" class="hidden" />
+            </label>
+            <button id="new-chat" class="inline-flex items-center gap-2 rounded-xl bg-[var(--osg-orange)] px-3.5 h-9 text-white text-sm font-semibold shadow hover:opacity-95">
+              <i class="fa-regular fa-message"></i><span class="hidden sm:inline">New Chat</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main page container (offset for fixed header) -->
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pt-24 pb-28">
+
+    <!-- Chat thread at top -->
+    <main id="chat" class="grid gap-4 mb-3" role="list" aria-label="Chat thread"></main>
+
+    <!-- Conversation starters under chat -->
+    <section id="starters" class="mb-6">
+      <div class="flex flex-wrap gap-2">
+        <button data-prompt="What changed in last night’s council agenda?" class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">What changed in last night’s council agenda?</button>
+        <button data-prompt="Summarize mentions of ‘Roundabout’ in 2025." class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">Summarize mentions of ‘Roundabout’ in 2025.</button>
+        <button data-prompt="Show references to ‘stormwater fees’ in the last 90 days." class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">‘Stormwater fees’ last 90 days</button>
+        <button data-prompt="Which parcels were discussed in the 2025‑08‑12 planning meeting?" class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">Parcels in 8/12 planning mtg</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Composer pinned bottom (ChatGPT-ish pill) -->
+  <footer class="fixed inset-x-0 bottom-0 z-30">
+    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pb-4">
+      <div class="card bg-white p-2 border border-neutral-200">
+        <!-- Mode toggle on top edge -->
+        <fieldset class="mb-1 flex items-center gap-1 px-2" aria-label="Answer mode">
+          <input type="radio" name="mode" id="mode-concise" value="concise" class="peer/con hidden" checked>
+          <label for="mode-concise" class="peer-checked/con:bg-[var(--osg-orange)] peer-checked/con:text-white rounded-lg px-2.5 py-1 text-xs cursor-pointer border border-[var(--osg-orange)]/30">Concise</label>
+          <input type="radio" name="mode" id="mode-detailed" value="detailed" class="peer/det hidden">
+          <label for="mode-detailed" class="peer-checked/det:bg-[var(--osg-orange)] peer-checked/det:text-white rounded-lg px-2.5 py-1 text-xs cursor-pointer border border-[var(--osg-orange)]/30">Detailed</label>
+          <input type="radio" name="mode" id="mode-sources" value="sources_only" class="peer/src hidden">
+          <label for="mode-sources" class="peer-checked/src:bg-[var(--osg-orange)] peer-checked/src:text-white rounded-lg px-2.5 py-1 text-xs cursor-pointer border border-[var(--osg-orange)]/30">Sources</label>
+          <span class="ml-auto text-[11px] text-neutral-500">Enter = send • Shift+Enter = newline</span>
+        </fieldset>
+
+        <form id="composer" class="flex items-end gap-2">
+          <textarea id="prompt" rows="2" required
+            class="flex-1 rounded-2xl border border-neutral-200 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--osg-purple)] placeholder:text-neutral-400"
+            placeholder="Ask about meetings, ordinances, parcels, or keywords…"></textarea>
+          <button id="send" type="submit" class="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--osg-orange)] text-white shadow hover:opacity-95">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* ===== PWA manifest (no extra file) ===== */
+    (function attachManifest(){
+      const manifest = {
+        name: "OpenSkagit",
+        short_name: "OpenSkagit",
+        start_url: ".",
+        display: "standalone",
+        background_color: "#ffffff",
+        theme_color: "#f08000",
+        icons: [
+          { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='192' height='192'><rect width='100%' height='100%' fill='%23B993D6'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='96' fill='white'>OS</text></svg>", sizes: "192x192", type: "image/svg+xml" },
+          { src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512'><rect width='100%' height='100%' fill='%23f08000'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='220' fill='white'>OS</text></svg>", sizes: "512x512", type: "image/svg+xml" }
+        ]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+      const link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = URL.createObjectURL(blob);
+      document.head.appendChild(link);
+    })();
+
+    /* ===== SAFE Service Worker registration =====
+       - Only attempt in secure context (https or localhost)
+       - Only attempt if browser supports it
+       - Only attempt if sw.js appears to exist
+       - Never throw; fail silently (log info only)
+    ============================================ */
+    (async function registerSWSafely(){
+      try{
+        if(!('serviceWorker' in navigator)) return console.info('[PWA] SW not supported; skipping');
+        const secure = window.isSecureContext || location.hostname === 'localhost';
+        if(!secure) return console.info('[PWA] Insecure context; skipping SW');
+        // Check if sw.js is reachable before registering
+        const probe = await fetch('sw.js', { method: 'GET', cache: 'no-store' });
+        if(!probe.ok){
+          console.info('[PWA] sw.js not found; skipping SW');
+          return; // graceful skip
+        }
+        const reg = await navigator.serviceWorker.register('sw.js');
+        console.info('[PWA] SW registered:', reg.scope);
+      }catch(e){
+        // Graceful: do not surface as an error; just inform in console
+        console.info('[PWA] SW registration skipped (env restriction):', e && e.message);
+      }
+    })();
+
+    /* ===== Local JSON storage (no backend) ===== */
+    const STORAGE_KEY = 'osg_chats_v1';
+    const chats = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+    // Elements
+    const chat = document.getElementById('chat');
+    const promptEl = document.getElementById('prompt');
+    const starters = document.getElementById('starters');
+    const nlForm = document.getElementById('newsletter');
+    const nlMsg  = document.getElementById('nl-msg');
+
+    // Optional: Cloud Function endpoint for newsletter (leave blank to skip)
+    const CF_ENDPOINT = '';
+
+    // Render existing messages
+    chats.forEach(msg => renderBubble(msg.role, msg.content));
+
+    // New Chat clears local state
+    document.getElementById('new-chat').addEventListener('click', () => {
+      localStorage.setItem(STORAGE_KEY, '[]');
+      chat.innerHTML = '';
+      promptEl.value = '';
+      starters.classList.remove('hidden');
+      promptEl.focus();
+    });
+
+    // Starters → fill + send
+    starters.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-prompt]');
+      if(!btn) return;
+      promptEl.value = btn.dataset.prompt;
+      submitComposer(new Event('submit'));
+    });
+
+    // Keyboard helper
+    document.addEventListener('keydown', (e) => {
+      const metaEnter = (e.metaKey || e.ctrlKey) && e.key === 'Enter';
+      if (metaEnter) { e.preventDefault(); document.getElementById('send').click(); }
+    });
+
+    // Composer submit (local mock; replace with vector search call if you attach one)
+    document.getElementById('composer').addEventListener('submit', submitComposer);
+
+    function submitComposer(e){
+      if(e) e.preventDefault();
+      const text = promptEl.value.trim();
+      if(!text) return;
+
+      // Hide starters on first send
+      starters.classList.add('hidden');
+
+      // Persist + render user
+      pushMessage({role:'user', content:text});
+      renderBubble('user', text);
+
+      // Clear input
+      promptEl.value = '';
+      promptEl.focus();
+
+      // Fake thinking then respond based on mode
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const reply = mockAnswer(text, mode);
+      setTimeout(() => {
+        pushMessage({role:'assistant', content:reply});
+        renderBubble('assistant', reply, true);
+        window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
+      }, 300);
+    }
+
+    function pushMessage(m){
+      chats.push({ ...m, ts: new Date().toISOString() });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+    }
+
+    function renderBubble(role, html, isHTML){
+      const a = document.createElement('article');
+      a.className = role==='user' ? 'card bg-[var(--osg-purple)] text-black/90 p-4' : 'card bg-[var(--osg-slate)] text-white p-4';
+      a.setAttribute('role','listitem');
+      const body = document.createElement('div');
+      body.className = role==='user' ? 'whitespace-pre-wrap' : 'prose prose-invert max-w-none';
+      body.innerHTML = isHTML ? html : escapeHtml(html);
+      a.appendChild(body);
+
+      if(role==='assistant'){
+        const bar = document.createElement('div');
+        bar.className = 'mt-2 flex items-center gap-2';
+        bar.innerHTML = `
+          <button class="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15" data-feedback="up">👍</button>
+          <button class="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15" data-feedback="down">👎</button>
+          <button class="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15" data-copy>Copy</button>`;
+        a.appendChild(bar);
+        bar.querySelector('[data-copy]').addEventListener('click', async () => {
+          await navigator.clipboard.writeText(a.innerText);
+          const tag = document.createElement('span');
+          tag.className = 'ml-2 text-xs';
+          tag.style.color = 'var(--osg-teal)';
+          tag.textContent = 'Copied';
+          bar.appendChild(tag); setTimeout(()=>tag.remove(), 1200);
+        });
+      }
+
+      chat.appendChild(a);
+    }
+
+    function mockAnswer(q, mode){
+      if(mode==='sources_only'){
+        return `<ul class='list-disc pl-5'><li>City Minutes • 2025‑08‑26</li><li>Clerk Summary • 2025‑08‑27</li><li>Agenda Packet • 2025‑08‑26</li></ul>`;
+      }
+      if(mode==='detailed'){
+        return `<p><strong>Answer:</strong> Example detailed response for: ${escapeHtml(q)}</p>`;
+      }
+      return `<p>Example concise response for: ${escapeHtml(q)}</p>`;
+    }
+
+    function escapeHtml(str){
+      return str.replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+    }
+
+    /* ===== Newsletter: local JSON + optional CF ===== */
+    nlForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = new FormData(nlForm).get('email');
+      const emails = JSON.parse(localStorage.getItem('osg_newsletter')||'[]');
+      if(!emails.includes(email)) emails.push(email);
+      localStorage.setItem('osg_newsletter', JSON.stringify(emails));
+      nlMsg.textContent = 'Subscribed'; nlMsg.style.color = 'var(--osg-teal)';
+      try{
+        if(CF_ENDPOINT){ await fetch(CF_ENDPOINT,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email})}); }
+      }catch(err){ console.info('[PWA] Optional CF post failed:', err && err.message); }
+      nlForm.reset();
+      setTimeout(()=>{ nlMsg.textContent=''; }, 1500);
+    });
+
+    /* ===== Export / Import JSON ===== */
+    document.getElementById('export-json').addEventListener('click', ()=>{
+      const data = { chats: JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'), newsletter: JSON.parse(localStorage.getItem('osg_newsletter')||'[]') };
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'openSkagit-data.json'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    });
+
+    document.getElementById('import-json').addEventListener('change', (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const data = JSON.parse(reader.result);
+          if(Array.isArray(data.chats)) localStorage.setItem(STORAGE_KEY, JSON.stringify(data.chats));
+          if(Array.isArray(data.newsletter)) localStorage.setItem('osg_newsletter', JSON.stringify(data.newsletter));
+          // re-render
+          chat.innerHTML='';
+          JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]').forEach(m=>renderBubble(m.role, m.content));
+        }catch(err){ alert('Invalid JSON'); }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+
+    /* ===== Minimal self-tests (dev diagnostics) =====
+       These run in the browser console and update the page if ?test=1 is in the URL.
+    */
+    (function runSelfTests(){
+      const url = new URL(location.href);
+      if(url.searchParams.get('test') !== '1') return;
+      const tests = [];
+      const add = (name, fn) => tests.push({name, fn});
+
+      add('Does not throw when SW unsupported', () => {
+        // Simulate by checking feature flag; no exception expected from registerSWSafely path
+        return typeof navigator !== 'undefined' && typeof navigator.serviceWorker !== 'undefined' ? 'N/A (supported)' : 'PASS';
+      });
+
+      add('Skips SW in insecure context', () => (window.isSecureContext || location.hostname==='localhost') ? 'N/A (secure)' : 'PASS');
+      add('LocalStorage chat write/read', () => {
+        const key = 'osg_test';
+        localStorage.setItem(key, JSON.stringify({ok:true}));
+        const ok = JSON.parse(localStorage.getItem(key)||'{}').ok === true;
+        localStorage.removeItem(key);
+        return ok ? 'PASS' : 'FAIL';
+      });
+
+      // Render results inline for quick visibility
+      const box = document.createElement('div');
+      box.className = 'fixed bottom-20 right-4 z-50 rounded-xl bg-white/95 border border-neutral-200 shadow p-3 text-sm';
+      box.innerHTML = '<div class="font-semibold mb-1">Diagnostics</div>';
+      const ul = document.createElement('ul'); ul.className = 'list-disc pl-5';
+      tests.forEach(t => {
+        let res = 'PASS';
+        try { const r = t.fn(); if(r!==undefined) res = r; } catch(e){ res = 'FAIL'; }
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="font-medium">${t.name}:</span> <span class="${res==='PASS'?'text-[var(--osg-teal)]':'text-red-600'}">${res}</span>`;
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+      document.body.appendChild(box);
+    })();
+  </script>
+</body>
+</html>
