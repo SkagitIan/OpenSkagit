@@ -1,3 +1,5 @@
+console.info('[openai-service] module loaded');
+
 import OpenAI from 'https://cdn.jsdelivr.net/npm/openai@latest/dist/index.min.js';
 
 const API_KEY_URL = 'https://openai-proxy-810345357173.us-west1.run.app';
