@@ -205,35 +205,81 @@
     const PROXY_URL = 'https://openai-proxy-810345357173.us-west1.run.app';
 
     async function loadStarters(){
-      if(chats.length !== 0) return;
-      try{
-        const res = await fetch(PROXY_URL,{
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json'
+      if (chats.length !== 0) return;
+      try {
+        console.log("[loadStarters] sending request to", PROXY_URL);
+    
+        const body = {
+          model: "gpt-4o-mini",
+          input: "List four short example questions a citizen might ask about local government data."
+        };
+        console.log("[loadStarters] request body:", body);
+    
+        const res = await fetch(PROXY_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
           },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            input: 'List four short example questions a citizen might ask about local government data.'
-          })
+          body: JSON.stringify(body)
         });
-        const data = await res.json();
-        const text = data.output_text || '';
-        const prompts = text.split('\n').map(s=>s.replace(/^[\s\d\-\*\.]+/,'').trim()).filter(Boolean).slice(0,4);
-        if(prompts.length){
-          const box = starters.querySelector('div');
-          box.innerHTML='';
-          prompts.forEach(p=>{
-            const b=document.createElement('button');
-            b.dataset.prompt=p;
-            b.className='chip bg-gradient-to-r from-[var(--osg-purple)]/20 via-[var(--osg-teal)]/20 to-[var(--osg-orange)]/20 border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:opacity-80';
-            b.textContent=p;
+    
+        console.log("[loadStarters] raw response object:", res);
+    
+        // log status + headers
+        console.log("[loadStarters] status:", res.status, res.statusText);
+        res.headers.forEach((v, k) => console.log("[loadStarters] header:", k, "=", v));
+    
+        let dataText;
+        try {
+          dataText = await res.text(); // capture raw body first
+          console.log("[loadStarters] raw response text:", dataText);
+        } catch (e) {
+          console.error("[loadStarters] error reading response text:", e);
+        }
+    
+        let data = {};
+        try {
+          data = JSON.parse(dataText);
+        } catch (e) {
+          console.error("[loadStarters] error parsing JSON:", e);
+        }
+    
+        console.log("[loadStarters] parsed JSON:", data);
+    
+        const text = data.output_text || "";
+        console.log("[loadStarters] output_text field:", text);
+    
+        const prompts = text
+          .split("\n")
+          .map(s => s.replace(/^[\s\d\-\*\.]+/, "").trim())
+          .filter(Boolean)
+          .slice(0, 4);
+    
+        console.log("[loadStarters] extracted prompts:", prompts);
+    
+        if (prompts.length) {
+          const box = starters.querySelector("div");
+          if (!box) {
+            console.error("[loadStarters] no div inside #starters found");
+            return;
+          }
+          box.innerHTML = "";
+          prompts.forEach(p => {
+            const b = document.createElement("button");
+            b.dataset.prompt = p;
+            b.className =
+              "chip bg-gradient-to-r from-[var(--osg-purple)]/20 via-[var(--osg-teal)]/20 to-[var(--osg-orange)]/20 border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:opacity-80";
+            b.textContent = p;
             box.appendChild(b);
           });
+        } else {
+          console.warn("[loadStarters] no prompts extracted from output_text");
         }
-      }catch(err){ console.error('starter fetch failed', err); }
+      } catch (err) {
+        console.error("[loadStarters] unexpected exception:", err);
+      }
     }
-    loadStarters();
+
 
     // Optional: Cloud Function endpoint for newsletter (leave blank to skip)
     const CF_ENDPOINT = '';
