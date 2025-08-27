@@ -1,25 +1,34 @@
-const OPENAI_API_KEY = (typeof process !== 'undefined' ? process.env.OPENAI_API_KEY : '')
-  || globalThis.OPENAI_API_KEY || '';
+import OpenAI from 'https://cdn.jsdelivr.net/npm/openai@latest/dist/index.min.js';
 
-export function hasAPIKey(){
-  return !!OPENAI_API_KEY;
+const API_KEY_URL = 'https://openai-proxy-810345357173.us-west1.run.app';
+let clientPromise;
+
+async function getClient(){
+  if(!clientPromise){
+    clientPromise = fetch(API_KEY_URL)
+      .then(r => r.text())
+      .then(key => new OpenAI({ apiKey: key.trim(), dangerouslyAllowBrowser: true }));
+  }
+  return clientPromise;
+}
+
+export async function hasAPIKey(){
+  try {
+    await getClient();
+    return true;
+  } catch (e) {
+    console.error('Error fetching API key:', e);
+    return false;
+  }
 }
 
 export async function getStarters(){
-  if(!OPENAI_API_KEY) return [];
-  const res = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      input: 'List four short example questions a citizen might ask about local government data.'
-    })
+  const client = await getClient();
+  const res = await client.responses.create({
+    model: 'gpt-4o-mini',
+    input: 'List four short example questions a citizen might ask about local government data.'
   });
-  const data = await res.json();
-  const text = data.output_text || '';
+  const text = res.output_text || '';
   return text
     .split('\n')
     .map(s => s.replace(/^[\s\d\-\*\.]+/, '').trim())
@@ -28,17 +37,7 @@ export async function getStarters(){
 }
 
 export async function sendChat(messages){
-  if(!OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY');
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({ model: 'gpt-4o-mini', messages })
-  });
-  const data = await res.json();
-  return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-    ? data.choices[0].message.content.trim()
-    : '';
+  const client = await getClient();
+  const res = await client.responses.create({ model: 'gpt-4o-mini', messages });
+  return res.output_text ? res.output_text.trim() : '';
 }
