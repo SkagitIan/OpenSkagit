@@ -267,7 +267,7 @@
     // Composer submit (local mock; replace with vector search call if you attach one)
     document.getElementById('composer').addEventListener('submit', submitComposer);
 
-    function submitComposer(e){
+    async function submitComposer(e){
       if(e) e.preventDefault();
       const text = promptEl.value.trim();
       if(!text) return;
@@ -285,14 +285,52 @@
       promptEl.value = '';
       promptEl.focus();
 
-      // Fake thinking then respond based on mode
       const mode = document.querySelector('input[name="mode"]:checked').value;
-      const reply = mockAnswer(text, mode, instructions);
-      setTimeout(() => {
+
+      // If no API key, fall back to mock answers
+      if(!OPENAI_API_KEY){
+        const reply = mockAnswer(text, mode, instructions);
+        setTimeout(() => {
+          pushMessage({role:'assistant', content:reply});
+          renderBubble('assistant', reply, true);
+          window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
+        }, 300);
+        return;
+      }
+
+      // Show placeholder while fetching
+      const placeholder = renderBubble('assistant', '…');
+      const body = placeholder.querySelector('div');
+      window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
+
+      try{
+        const history = chats.map(({role, content}) => ({role, content}));
+        const messages = [...history];
+
+        // Apply mode + custom instructions
+        let modeInstruction = '';
+        if(mode === 'detailed') modeInstruction = 'Provide a detailed answer.';
+        else if(mode === 'sources_only') modeInstruction = 'Only list relevant sources. Do not answer the question.';
+        else modeInstruction = 'Provide a concise answer.';
+        if(modeInstruction) messages.unshift({role:'system', content: modeInstruction});
+        if(instructions) messages.unshift({role:'system', content: instructions});
+
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization':`Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({model:'gpt-4o-mini', messages})
+        });
+        const data = await res.json();
+        const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content.trim() : '';
+
         pushMessage({role:'assistant', content:reply});
-        renderBubble('assistant', reply, true);
-        window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
-      }, 300);
+        body.textContent = reply || '[No response]';
+      }catch(err){
+        body.textContent = `Error: ${err.message}`;
+      }
     }
 
     function pushMessage(m){
@@ -328,6 +366,7 @@
       }
 
       chat.appendChild(a);
+      return a;
     }
 
     function mockAnswer(q, mode, instructions){
