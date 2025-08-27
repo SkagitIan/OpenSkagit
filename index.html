@@ -41,10 +41,10 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-neutral-50 text-neutral-900 bg-vibe">
+<body class="min-h-screen bg-gradient-to-br from-purple-50 via-teal-50 to-orange-50 text-neutral-900 bg-vibe">
 
   <!-- Fixed, full-width header (ChatGPT-ish) -->
-  <header class="fixed inset-x-0 top-0 z-40">
+  <header class="mb-8">
     <div class="h-1.5 animated-bar"></div>
     <div class="backdrop-blur supports-[backdrop-filter]:bg-white/70 bg-white/90 border-b border-neutral-200/70">
       <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
@@ -70,17 +70,10 @@
           </form>
 
           <!-- Right-side actions -->
-          <div class="flex items-center gap-2">
-            <button id="settings-btn" aria-label="Settings" class="grid h-9 w-9 place-items-center rounded-xl border border-neutral-300 bg-white text-sm hover:bg-neutral-50">
+          <div class="flex items-center gap-2"><button id="settings-btn" aria-label="Settings" class="grid h-9 w-9 place-items-center rounded-xl border border-neutral-300 bg-white text-sm hover:bg-neutral-50">
               <i class="fa-solid fa-gear"></i>
             </button>
-            <button id="export-json" class="hidden sm:inline-flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 h-9 text-sm hover:bg-neutral-50">
-              <i class="fa-solid fa-download"></i><span>Export</span>
-            </button>
-            <label class="hidden sm:inline-flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 h-9 text-sm hover:bg-neutral-50 cursor-pointer">
-              <i class="fa-solid fa-upload"></i><span>Import</span>
-              <input id="import-json" type="file" accept="application/json" class="hidden" />
-            </label>
+            
             <button id="new-chat" class="inline-flex items-center gap-2 rounded-xl bg-[var(--osg-orange)] px-3.5 h-9 text-white text-sm font-semibold shadow hover:opacity-95">
               <i class="fa-regular fa-message"></i><span class="hidden sm:inline">New Chat</span>
             </button>
@@ -90,27 +83,14 @@
     </div>
   </header>
 
-  <!-- Main page container (offset for fixed header) -->
-  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pt-24 pb-28">
+  <!-- Main page container (centered composer) -->
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 min-h-screen flex flex-col justify-center">
 
     <!-- Chat thread at top -->
-    <main id="chat" class="grid gap-4 mb-3" role="list" aria-label="Chat thread"></main>
+    <main id="chat" class="grid gap-4 mb-6" role="list" aria-label="Chat thread"></main>
 
-    <!-- Conversation starters under chat -->
-    <section id="starters" class="mb-6">
-      <div class="flex flex-wrap gap-2">
-        <button data-prompt="What changed in last night’s council agenda?" class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">What changed in last night’s council agenda?</button>
-        <button data-prompt="Summarize mentions of ‘Roundabout’ in 2025." class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">Summarize mentions of ‘Roundabout’ in 2025.</button>
-        <button data-prompt="Show references to ‘stormwater fees’ in the last 90 days." class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">‘Stormwater fees’ last 90 days</button>
-        <button data-prompt="Which parcels were discussed in the 2025‑08‑12 planning meeting?" class="chip bg-white border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:bg-[var(--osg-orange)]/5">Parcels in 8/12 planning mtg</button>
-      </div>
-    </section>
-
-  </div>
-
-  <!-- Composer pinned bottom (ChatGPT-ish pill) -->
-  <footer class="fixed inset-x-0 bottom-0 z-30">
-    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pb-4">
+    <!-- Composer centered -->
+    <footer>
       <div class="card bg-white p-2 border border-neutral-200">
         <!-- Mode toggle on top edge -->
         <fieldset class="mb-1 flex items-center gap-1 px-2" aria-label="Answer mode">
@@ -132,8 +112,19 @@
           </button>
         </form>
       </div>
-    </div>
-  </footer>
+    </footer>
+
+    <!-- Conversation starters under chat box -->
+    <section id="starters" class="mt-6">
+      <div class="flex flex-wrap gap-2 justify-center">
+        <button data-prompt="What changed in last night’s council agenda?" class="chip bg-gradient-to-r from-[var(--osg-purple)]/20 via-[var(--osg-teal)]/20 to-[var(--osg-orange)]/20 border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:opacity-80">What changed in last night’s council agenda?</button>
+        <button data-prompt="Summarize mentions of ‘Roundabout’ in 2025." class="chip bg-gradient-to-r from-[var(--osg-purple)]/20 via-[var(--osg-teal)]/20 to-[var(--osg-orange)]/20 border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:opacity-80">Summarize mentions of ‘Roundabout’ in 2025.</button>
+        <button data-prompt="Show references to ‘stormwater fees’ in the last 90 days." class="chip bg-gradient-to-r from-[var(--osg-purple)]/20 via-[var(--osg-teal)]/20 to-[var(--osg-orange)]/20 border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:opacity-80">‘Stormwater fees’ last 90 days</button>
+        <button data-prompt="Which parcels were discussed in the 2025‑08‑12 planning meeting?" class="chip bg-gradient-to-r from-[var(--osg-purple)]/20 via-[var(--osg-teal)]/20 to-[var(--osg-orange)]/20 border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:opacity-80">Parcels in 8/12 planning mtg</button>
+      </div>
+    </section>
+
+  </div>
 
   <!-- Settings Modal -->
   <div id="settings-modal" class="fixed inset-0 z-50 hidden">
@@ -209,6 +200,40 @@
     const starters = document.getElementById('starters');
     const nlForm = document.getElementById('newsletter');
     const nlMsg  = document.getElementById('nl-msg');
+
+    const OPENAI_API_KEY = globalThis.OPENAI_API_KEY || '';
+
+    async function loadStarters(){
+      if(chats.length !== 0 || !OPENAI_API_KEY) return;
+      try{
+        const res = await fetch('https://api.openai.com/v1/responses',{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization':`Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            input: 'List four short example questions a citizen might ask about local government data.'
+          })
+        });
+        const data = await res.json();
+        const text = data.output_text || '';
+        const prompts = text.split('\n').map(s=>s.replace(/^[\s\d\-\*\.]+/,'').trim()).filter(Boolean).slice(0,4);
+        if(prompts.length){
+          const box = starters.querySelector('div');
+          box.innerHTML='';
+          prompts.forEach(p=>{
+            const b=document.createElement('button');
+            b.dataset.prompt=p;
+            b.className='chip bg-gradient-to-r from-[var(--osg-purple)]/20 via-[var(--osg-teal)]/20 to-[var(--osg-orange)]/20 border border-[var(--osg-orange)]/30 text-[var(--osg-dark)] px-3 py-1.5 text-sm hover:opacity-80';
+            b.textContent=p;
+            box.appendChild(b);
+          });
+        }
+      }catch(err){ console.error('starter fetch failed', err); }
+    }
+    loadStarters();
 
     // Optional: Cloud Function endpoint for newsletter (leave blank to skip)
     const CF_ENDPOINT = '';
@@ -333,32 +358,6 @@
       }catch(err){ console.info('[PWA] Optional CF post failed:', err && err.message); }
       nlForm.reset();
       setTimeout(()=>{ nlMsg.textContent=''; }, 1500);
-    });
-
-    /* ===== Export / Import JSON ===== */
-    document.getElementById('export-json').addEventListener('click', ()=>{
-      const data = { chats: JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'), newsletter: JSON.parse(localStorage.getItem('osg_newsletter')||'[]') };
-      const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'openSkagit-data.json'; a.click();
-      setTimeout(()=>URL.revokeObjectURL(url), 5000);
-    });
-
-    document.getElementById('import-json').addEventListener('change', (e)=>{
-      const file = e.target.files[0]; if(!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try{
-          const data = JSON.parse(reader.result);
-          if(Array.isArray(data.chats)) localStorage.setItem(STORAGE_KEY, JSON.stringify(data.chats));
-          if(Array.isArray(data.newsletter)) localStorage.setItem('osg_newsletter', JSON.stringify(data.newsletter));
-          // re-render
-          chat.innerHTML='';
-          JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]').forEach(m=>renderBubble(m.role, m.content));
-        }catch(err){ alert('Invalid JSON'); }
-      };
-      reader.readAsText(file);
-      e.target.value = '';
     });
 
     // ===== Settings =====
