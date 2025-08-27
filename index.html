@@ -201,16 +201,16 @@
     const nlForm = document.getElementById('newsletter');
     const nlMsg  = document.getElementById('nl-msg');
 
-    const OPENAI_API_KEY = globalThis.OPENAI_API_KEY || '';
+    // Cloud Function proxy for OpenAI requests
+    const PROXY_URL = 'https://openai-proxy-810345357173.us-west1.run.app';
 
     async function loadStarters(){
-      if(chats.length !== 0 || !OPENAI_API_KEY) return;
+      if(chats.length !== 0) return;
       try{
-        const res = await fetch('https://api.openai.com/v1/responses',{
+        const res = await fetch(PROXY_URL,{
           method:'POST',
           headers:{
-            'Content-Type':'application/json',
-            'Authorization':`Bearer ${OPENAI_API_KEY}`
+            'Content-Type':'application/json'
           },
           body: JSON.stringify({
             model: 'gpt-4o-mini',
@@ -264,7 +264,7 @@
       if (metaEnter) { e.preventDefault(); document.getElementById('send').click(); }
     });
 
-    // Composer submit (local mock; replace with vector search call if you attach one)
+    // Composer submit (calls Cloud Function proxy)
     document.getElementById('composer').addEventListener('submit', submitComposer);
 
     async function submitComposer(e){
@@ -287,17 +287,6 @@
 
       const mode = document.querySelector('input[name="mode"]:checked').value;
 
-      // If no API key, fall back to mock answers
-      if(!OPENAI_API_KEY){
-        const reply = mockAnswer(text, mode, instructions);
-        setTimeout(() => {
-          pushMessage({role:'assistant', content:reply});
-          renderBubble('assistant', reply, true);
-          window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
-        }, 300);
-        return;
-      }
-
       // Show placeholder while fetching
       const placeholder = renderBubble('assistant', '…');
       const body = placeholder.querySelector('div');
@@ -315,11 +304,10 @@
         if(modeInstruction) messages.unshift({role:'system', content: modeInstruction});
         if(instructions) messages.unshift({role:'system', content: instructions});
 
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        const res = await fetch(PROXY_URL, {
           method:'POST',
           headers:{
-            'Content-Type':'application/json',
-            'Authorization':`Bearer ${OPENAI_API_KEY}`
+            'Content-Type':'application/json'
           },
           body: JSON.stringify({model:'gpt-4o-mini', messages})
         });
@@ -367,17 +355,6 @@
 
       chat.appendChild(a);
       return a;
-    }
-
-    function mockAnswer(q, mode, instructions){
-      if(instructions) console.info('[LLM instructions]', instructions);
-      if(mode==='sources_only'){
-        return `<ul class='list-disc pl-5'><li>City Minutes • 2025‑08‑26</li><li>Clerk Summary • 2025‑08‑27</li><li>Agenda Packet • 2025‑08‑26</li></ul>`;
-      }
-      if(mode==='detailed'){
-        return `<p><strong>Answer:</strong> Example detailed response for: ${escapeHtml(q)}</p>`;
-      }
-      return `<p>Example concise response for: ${escapeHtml(q)}</p>`;
     }
 
     function escapeHtml(str){
