@@ -306,14 +306,18 @@
 
         const res = await fetch(PROXY_URL, {
           method:'POST',
-          headers:{
-            'Content-Type':'application/json'
-          },
-          body: JSON.stringify({model:'gpt-4o-mini', messages})
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            input: [
+              ...history.map(h => ({role: h.role, content: h.content})),
+              {role: "user", content: text}
+            ]
+          })
         });
-        const data = await res.json();
-        const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content.trim() : '';
 
+        const data = await res.json();
+        const reply = data.output?.[0]?.content?.[0]?.text?.trim() || "";
         pushMessage({role:'assistant', content:reply});
         body.textContent = reply || '[No response]';
       }catch(err){
