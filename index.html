@@ -14,15 +14,29 @@
   <style>
     /* Brand tokens */
     :root{
-      --osg-purple:#B993D6; /* user bubble */
-      --osg-slate:#49475B;  /* assistant bubble */
-      --osg-orange:#f08000; /* accents */
-      --osg-dark:#14080E;   /* headers */
-      --osg-teal:#58B09C;   /* success */
+      /* Darker palette for stronger contrast */
+      --osg-purple:#8A63A5; /* user bubble */
+      --osg-slate:#2E2B3A;  /* assistant bubble */
+      --osg-orange:#D16900; /* accents */
+      --osg-dark:#0E050C;   /* headers */
+      --osg-teal:#2C8C7A;   /* success */
       --radius-xl: 16px;
       --shadow-soft: 0 8px 28px rgba(0,0,0,.08);
     }
-    .card{ box-shadow: var(--shadow-soft); border-radius: var(--radius-xl); }
+    /* Global typography */
+    html{ font-size:18px; }
+    body{
+      font-size:1rem;
+      line-height:1.7;
+      letter-spacing:0.015em;
+      color:var(--osg-dark);
+    }
+    p,li{ margin-bottom:1em; }
+    input,button,textarea{ font-size:1rem; line-height:1.5; }
+    .text-sm{ font-size:1rem !important; }
+    .text-xs,[class*="text-[11px]"]{ font-size:0.875rem !important; }
+    #chat{ gap:1.5rem !important; }
+    .card{ box-shadow: var(--shadow-soft); border-radius: var(--radius-xl); padding:1.25rem !important; }
     .chip{ border-radius: 9999px; }
 
     /* Header bling — animated accent bar */
