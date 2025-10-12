@@ -1,0 +1,37 @@
+{% load humanize %}
+{% if query %}
+    {% if results %}
+        <div class="border border-slate-800 bg-slate-950/80 rounded-xl divide-y divide-slate-800 shadow-lg shadow-slate-950/40">
+            {% for parcel in results %}
+                <button
+                    type="button"
+                    class="w-full text-left px-4 py-3 hover:bg-slate-800/60 transition flex items-center justify-between gap-4"
+                    hx-get="{% url 'cma-detail' parcel.parcel_number %}"
+                    hx-target="#cma-analysis-panel"
+                    hx-swap="innerHTML"
+                    hx-push-url="true"
+                    hx-on::afterRequest="document.getElementById('parcel-search').value='{{ parcel.parcel_number|escapejs }}';document.getElementById('cma-parcel-results').innerHTML='';"
+                >
+                    <div>
+                        <p class="text-sm font-semibold text-slate-100">{{ parcel.address|default:"Address unavailable" }}</p>
+                        <p class="text-xs text-slate-400 uppercase tracking-wide">Parcel {{ parcel.parcel_number }}</p>
+                    </div>
+                    <div class="text-right text-xs text-slate-500 space-y-1">
+                        {% if parcel.sale_price %}
+                            <p>${{ parcel.sale_price|floatformat:0|intcomma }}</p>
+                        {% endif %}
+                        {% if parcel.sale_date %}
+                            <p>{{ parcel.sale_date|date:"M j, Y" }}</p>
+                        {% endif %}
+                    </div>
+                </button>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-sm text-rose-300 bg-rose-500/10 border border-rose-500/40 rounded-xl px-4 py-3">
+            No parcels matched “{{ query }}”. Try refining the parcel number or street name.
+        </div>
+    {% endif %}
+{% else %}
+    <div class="text-sm text-slate-400">Start typing to locate a subject parcel.</div>
+{% endif %}

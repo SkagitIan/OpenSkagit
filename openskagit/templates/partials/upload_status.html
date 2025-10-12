@@ -1,0 +1,11 @@
+<div class="space-y-2 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-[var(--ap-ink)] shadow-sm">
+  <p class="font-semibold">Queued {{ filenames|length }} document{{ filenames|length|pluralize }} for processing:</p>
+  <ul class="list-disc space-y-1 pl-5 text-xs text-neutral-600">
+    {% for name in filenames %}
+      <li>{{ name }}</li>
+    {% endfor %}
+  </ul>
+  <p class="text-xs text-neutral-500">
+    Files are ready for chunking and embedding. Run <code>{{ next_command }}</code> or feed them into your ingestion worker to store embeddings in Postgres.
+  </p>
+</div>

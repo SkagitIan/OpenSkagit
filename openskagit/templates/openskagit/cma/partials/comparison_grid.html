@@ -1,0 +1,97 @@
+{% load humanize %}
+{% if comparables %}
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-slate-800 text-sm text-slate-200">
+        <thead class="bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+            <tr>
+                <th class="px-4 py-3 text-left">Include</th>
+                <th class="px-4 py-3 text-left">
+                    <button
+                        class="flex items-center gap-1 text-slate-300 hover:text-white transition"
+                        hx-get="{% url 'cma-comparison-grid' parcel_number %}?sort_field=gpa&sort_direction={% if sort_field == 'gpa' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#cma-comparison-grid"
+                        hx-include="#cma-filter-form"
+                    >
+                        GPA
+                        {% if sort_field == "gpa" %}
+                            {% if sort_direction == "asc" %}
+                                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M5 12l5-5 5 5H5z"></path></svg>
+                            {% else %}
+                                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8l5 5 5-5H5z"></path></svg>
+                            {% endif %}
+                        {% endif %}
+                    </button>
+                </th>
+                <th class="px-4 py-3 text-left">
+                    <button
+                        class="flex items-center gap-1 text-slate-300 hover:text-white transition"
+                        hx-get="{% url 'cma-comparison-grid' parcel_number %}?sort_field=sale_price&sort_direction={% if sort_field == 'sale_price' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#cma-comparison-grid"
+                        hx-include="#cma-filter-form"
+                    >
+                        Sale Price
+                        {% if sort_field == "sale_price" %}
+                            {% if sort_direction == "asc" %}
+                                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M5 12l5-5 5 5H5z"></path></svg>
+                            {% else %}
+                                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8l5 5 5-5H5z"></path></svg>
+                            {% endif %}
+                        {% endif %}
+                    </button>
+                </th>
+                <th class="px-4 py-3 text-left">Subject vs. Comp</th>
+                <th class="px-4 py-3 text-left">Adjustments</th>
+                <th class="px-4 py-3 text-left">Manual Inputs</th>
+                <th class="px-4 py-3 text-left">
+                    <button
+                        class="flex items-center gap-1 text-slate-300 hover:text-white transition"
+                        hx-get="{% url 'cma-comparison-grid' parcel_number %}?sort_field=adjusted_price&sort_direction={% if sort_field == 'adjusted_price' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#cma-comparison-grid"
+                        hx-include="#cma-filter-form"
+                    >
+                        Adjusted Price
+                        {% if sort_field == "adjusted_price" %}
+                            {% if sort_direction == "asc" %}
+                                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M5 12l5-5 5 5H5z"></path></svg>
+                            {% else %}
+                                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M5 8l5 5 5-5H5z"></path></svg>
+                            {% endif %}
+                        {% endif %}
+                    </button>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+            {% for comp in comparables %}
+                {% include "openskagit/cma/partials/comparable_row.html" with comparable=comp subject=subject parcel_number=parcel_number %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+    <div class="p-6 text-sm text-slate-400">
+        No comparables passed the current filters. Adjust the filters or map viewport to expand the comp set.
+    </div>
+{% endif %}
+
+{% if excluded %}
+    <div class="px-6 py-4 border-t border-slate-800 bg-slate-900/40">
+        <p class="text-xs uppercase tracking-wide text-slate-500 mb-2">Excluded comps</p>
+        <div class="flex flex-wrap gap-2">
+            {% for parcel in excluded %}
+                <button
+                    class="text-xs bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-1 text-slate-300 hover:text-white transition"
+                    hx-post="{% url 'cma-toggle-comp' parcel_number parcel %}"
+                    hx-include="#cma-filter-form"
+                    hx-target="#cma-comparison-grid"
+                >
+                    Restore {{ parcel }}
+                </button>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+{{ markers|json_script:"cma-map-data" }}
+<input type="hidden" id="cma-sort-field" name="sort_field" value="{{ sort_field }}" hx-swap-oob="true">
+<input type="hidden" id="cma-sort-direction" name="sort_direction" value="{{ sort_direction }}" hx-swap-oob="true">

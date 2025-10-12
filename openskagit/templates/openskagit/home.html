@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Appertivo • Property Copilot</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://unpkg.com/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
+  <style>
+    :root{
+      --ap-purple:#B993D6;
+      --ap-orange:#f08000;
+      --ap-teal:#58B09C;
+      --ap-ink:#49475B;
+      --ap-black:#14080E;
+    }
+    [x-cloak]{display:none!important;}
+    .thin-scroll::-webkit-scrollbar{width:8px;height:8px}
+    .thin-scroll::-webkit-scrollbar-thumb{background:rgba(73,71,91,.25);border-radius:9999px}
+    .msg pre{white-space:pre-wrap;word-break:break-word}
+  </style>
+</head>
+<body x-data="{ sidebarOpen:false }"
+      class="min-h-screen bg-neutral-100 text-neutral-900 selection:bg-[var(--ap-teal)]/20 selection:text-[var(--ap-black)]">
+
+  <!-- Top navigation -->
+  <header class="sticky top-0 z-40 border-b border-neutral-200 bg-white/95 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4">
+      <div class="flex items-center gap-2 text-lg font-semibold tracking-tight text-[var(--ap-ink)]">
+        <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--ap-purple)]/60 bg-[var(--ap-purple)]/10 text-sm font-bold uppercase text-[var(--ap-purple)]">Ap</span>
+        <span>Appertivo Property Copilot</span>
+      </div>
+      <div class="ml-auto flex items-center gap-3 text-sm text-neutral-500">
+        <span class="hidden sm:inline">pgvector retrieval + OpenAI Responses</span>
+        <button type="button"
+                class="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-1 text-sm font-medium text-[var(--ap-ink)] hover:border-[var(--ap-purple)] hover:text-[var(--ap-purple)] md:hidden"
+                @click="sidebarOpen = true">
+          <span class="h-2 w-2 rounded-full bg-[var(--ap-purple)]"></span>
+          History
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="relative mx-auto flex w-full max-w-7xl flex-1 flex-col md:flex-row">
+    <!-- Overlay -->
+    <div x-show="sidebarOpen"
+         x-cloak
+         class="fixed inset-0 z-40 bg-[var(--ap-black)]/40 backdrop-blur-sm md:hidden"
+         @click="sidebarOpen = false"
+         x-transition.opacity></div>
+
+    <!-- Sidebar -->
+    <aside x-cloak
+           class="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-white shadow-xl ring-1 ring-black/5 transition-transform duration-200 md:static md:z-0 md:translate-x-0 md:shadow-none"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
+           @keydown.escape.window="sidebarOpen = false">
+      <div class="flex h-full flex-col">
+        <div class="border-b border-neutral-200 px-4 py-4">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Conversations</h2>
+            <!-- Starts a fresh thread via HTMX -->
+            <form hx-post="/chat/new"
+                  hx-target="#messages"
+                  hx-swap="innerHTML"
+                  @submit="sidebarOpen = false"
+                  class="inline">
+              {% csrf_token %}
+              <button type="submit" class="rounded-full bg-[var(--ap-purple)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--ap-purple)]/90">
+                New
+              </button>
+            </form>
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto thin-scroll px-4 py-4">
+          <div id="history"
+               class="space-y-1 text-sm"
+               hx-get="/history/"
+               hx-trigger="load, revealed, reload-history"
+               hx-swap="innerHTML">
+            <div class="text-neutral-400">Loading history…</div>
+          </div>
+
+          <div class="mt-8 space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <div class="flex items-center gap-2 text-sm font-semibold text-[var(--ap-ink)]">
+              <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ap-teal)]/20 text-[var(--ap-teal)]">⇪</span>
+              Staff document upload
+            </div>
+            <p class="text-xs text-neutral-500">
+              Upload PDFs or CSVs and we’ll chunk, embed, and store them in Postgres with pgvector.
+            </p>
+            <form hx-post="/documents/upload/"
+                  hx-target="#upload-status"
+                  hx-swap="innerHTML"
+                  hx-encoding="multipart/form-data"
+                  hx-indicator="#upload-indicator"
+                  class="space-y-3">
+              {% csrf_token %}
+              <div>
+                <label class="sr-only" for="doc-file">Select documents</label>
+                <input id="doc-file"
+                       name="documents"
+                       type="file"
+                       multiple
+                       class="w-full text-sm text-neutral-600 file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--ap-teal)]/25 file:px-3 file:py-2 file:text-sm file:font-medium file:text-[var(--ap-ink)] hover:file:bg-[var(--ap-teal)]/35" />
+              </div>
+              <button type="submit"
+                      class="w-full rounded-lg bg-[var(--ap-teal)] px-3 py-2 text-sm font-semibold text-[var(--ap-black)] hover:bg-[var(--ap-teal)]/90">
+                Process &amp; embed
+              </button>
+            </form>
+            <div id="upload-indicator" class="htmx-indicator text-xs text-neutral-500">Uploading…</div>
+            <div id="upload-status" class="text-xs text-neutral-500">
+              Awaiting upload.
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <main class="ml-auto flex w-full flex-1 flex-col bg-neutral-100 md:min-h-[calc(100vh-80px)]">
+      <section id="messages-wrap" class="flex-1 overflow-y-auto px-4 py-6 md:px-10 md:py-10 thin-scroll">
+        <div class="mx-auto w-full max-w-3xl space-y-4" id="messages">
+          {% if messages %}
+            {% for m in messages %}
+              {% include "partials/message.html" with role=m.role content=m.content sources=m.sources %}
+            {% endfor %}
+          {% else %}
+            {% include "partials/empty_state.html" %}
+          {% endif %}
+        </div>
+        <div id="loading" class="htmx-indicator pointer-events-none sticky bottom-6 z-30 flex w-full justify-center">
+          <div class="flex items-center gap-2 rounded-full bg-[var(--ap-ink)] px-4 py-2 text-sm font-medium text-white shadow-lg shadow-black/10">
+            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span>Thinking…</span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="border-t border-neutral-200 bg-white/90 backdrop-blur">
+        <div class="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4">
+          <form id="chat-form"
+                hx-post="/chat/"
+                hx-target="#messages"
+                hx-swap="beforeend"
+                hx-indicator="#loading"
+                hx-include="[name='conversation_id']"
+                class="flex items-end gap-3 rounded-3xl border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+            {% csrf_token %}
+            {% if conversation_id %}
+              <input type="hidden" name="conversation_id" value="{{ conversation_id }}">
+            {% endif %}
+            <div class="flex-1">
+              <label class="sr-only" for="prompt">Ask a question</label>
+              <textarea id="prompt"
+                        name="prompt"
+                        rows="1"
+                        placeholder="Ask about parcels, comps, or uploaded PDFs…"
+                        class="w-full resize-none bg-transparent px-3 py-2 text-sm text-[var(--ap-ink)] focus:outline-none focus:ring-0"
+                        oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"
+                        required></textarea>
+            </div>
+            <button type="submit"
+                    class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--ap-orange)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ap-orange)]/90 focus:outline-none focus:ring-2 focus:ring-[var(--ap-orange)]/40 focus:ring-offset-2">
+              <span>Send</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
+                <path d="M5 12h14"></path>
+                <path d="M12 5l7 7-7 7"></path>
+              </svg>
+            </button>
+          </form>
+          <p class="px-3 pb-2 text-xs text-neutral-500">
+            Prompts are embedded with SentenceTransformers, matched against assessor records via pgvector, and answered with OpenAI Responses.
+          </p>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('htmx:afterSwap', (event) => {
+      if (event.target && event.target.id === 'messages') {
+        const wrap = document.getElementById('messages-wrap');
+        window.requestAnimationFrame(() => {
+          wrap.scrollTo({ top: wrap.scrollHeight, behavior: 'smooth' });
+        });
+      }
+    });
+
+    document.addEventListener('htmx:afterRequest', (event) => {
+      if (event.detail?.target?.id === 'messages') {
+        const promptField = document.getElementById('prompt');
+        if (promptField) {
+          promptField.value = '';
+          promptField.style.height = 'auto';
+          promptField.focus({ preventScroll: true });
+        }
+      }
+    });
+
+    document.body.addEventListener('set-conversation', (event) => {
+      const conversationId = event.detail?.id;
+      const form = document.getElementById('chat-form');
+      if (!form) return;
+      let hiddenInput = form.querySelector("input[name='conversation_id']");
+      if (!conversationId) {
+        if (hiddenInput) {
+          hiddenInput.remove();
+        }
+        return;
+      }
+      if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'conversation_id';
+        form.prepend(hiddenInput);
+      }
+      hiddenInput.value = conversationId;
+    });
+  </script>
+</body>
+</html>

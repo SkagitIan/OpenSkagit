@@ -1,0 +1,35 @@
+{% load humanize %}
+<div class="msg flex items-start gap-3" data-role="{{ role }}">
+  {% if role == "user" %}
+    <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--ap-orange)]/20 font-semibold text-[var(--ap-orange)]">U</div>
+    <div class="flex-1 rounded-3xl bg-white px-4 py-3 text-sm text-[var(--ap-ink)] shadow-sm">
+      {{ content|linebreaksbr }}
+    </div>
+  {% else %}
+    <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--ap-teal)]/25 font-semibold text-[var(--ap-teal)]">A</div>
+    <div class="flex-1 rounded-3xl bg-white px-4 py-3 text-sm text-[var(--ap-ink)] shadow-sm">
+      {{ content|safe }}
+      {% if sources %}
+        <div class="mt-3 border-t border-dashed border-neutral-200 pt-2 text-xs text-neutral-500">
+          <span class="font-semibold text-[var(--ap-ink)]">Sources:</span>
+          {% for s in sources %}
+            <span class="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-1 text-[11px] text-neutral-600">
+              <span>#{{ forloop.counter }}</span>
+              {% if s.parcel_number %}
+                <span>{{ s.parcel_number }}</span>
+              {% endif %}
+              {% if s.address %}
+                <span class="truncate max-w-[10rem]">{{ s.address }}</span>
+              {% endif %}
+              {% if s.distance is not None %}
+                <span>dist: {{ s.distance }}</span>
+              {% endif %}
+            </span>
+          {% empty %}
+            <span>No related parcels returned.</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>

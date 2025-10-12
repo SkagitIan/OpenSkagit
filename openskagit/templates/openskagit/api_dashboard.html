@@ -1,0 +1,520 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>API Dashboard | OpenSkagit</title>
+    <link rel="stylesheet" href="{% static 'openskagit/home.css' %}">
+    <style>
+        :root {
+            color-scheme: light;
+        }
+        body { font-family: "Inter", system-ui, sans-serif; margin: 0; background: #f4f7fb; color: #1f2933; }
+        header { background: linear-gradient(135deg, #0f172a, #2563eb); color: #fff; padding: 3rem 1.5rem 2.5rem; }
+        header h1 { margin: 0 0 0.5rem; font-size: 2.5rem; font-weight: 700; }
+        header p { margin: 0.35rem 0; font-size: 1.05rem; max-width: 640px; }
+        header a { color: #bbdefb; text-decoration: underline; }
+        main { max-width: 1200px; margin: -2rem auto 0; padding: 0 1.5rem 3rem; }
+        section { background: #fff; border-radius: 18px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08); padding: 2rem; margin-bottom: 2rem; }
+        h2 { margin-top: 0; font-size: 1.6rem; color: #102a43; }
+        h3 { margin-top: 2rem; font-size: 1.25rem; color: #1f2937; }
+        label { font-weight: 600; display: block; margin-bottom: 0.5rem; color: #334155; }
+        select, textarea, input { width: 100%; border-radius: 10px; border: 1px solid #cbd5f5; padding: 0.75rem; font-size: 0.95rem; font-family: "Inter", system-ui, sans-serif; background: #f8fafc; }
+        textarea { min-height: 140px; resize: vertical; }
+        .horizontal { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border-radius: 10px; padding: 0.75rem 1.4rem; font-weight: 600; cursor: pointer; border: none; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-secondary { background: #e2e8f0; color: #1f2937; }
+        .btn-text { background: transparent; border: none; color: #2563eb; font-weight: 600; cursor: pointer; }
+        .pill { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.75rem; border-radius: 999px; border: 1px solid rgba(37,99,235,0.25); background: rgba(37,99,235,0.06); color: #1f3261; font-size: 0.85rem; margin: 0.25rem 0.35rem 0 0; cursor: pointer; }
+        pre { background: #0f172a; color: #f8fafc; padding: 1.25rem; border-radius: 14px; overflow-x: auto; font-size: 0.92rem; line-height: 1.45; margin: 0; }
+        .response-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; font-size: 0.9rem; color: #475569; }
+        .response-meta span { display: inline-flex; align-items: center; gap: 0.35rem; }
+        .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 12px; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; margin-bottom: 0.75rem; }
+        .history-item button { margin-left: 0.75rem; }
+        .note { font-size: 0.9rem; color: #475569; margin-top: 0.35rem; }
+        .status-chip { padding: 0.35rem 0.65rem; border-radius: 999px; font-weight: 600; font-size: 0.8rem; }
+        .status-ok { background: rgba(16,185,129,0.15); color: #047857; }
+        .status-error { background: rgba(239,68,68,0.15); color: #b91c1c; }
+        .inline-input { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+        .inline-input input { flex: 1; }
+        @media (max-width: 768px) {
+            section { padding: 1.5rem; }
+            header { padding: 2.5rem 1rem 2rem; }
+            header h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>API Dashboard</h1>
+        <p>Staff-only playground for testing parcel data APIs, generating snippets, and sharing quick insights.</p>
+        <p><a href="{% url 'api-docs' %}">← Back to documentation</a></p>
+    </header>
+    <main>
+        <section>
+            <h2>API Playground</h2>
+            <p class="note">Choose an endpoint, tweak parameters, and execute a request. Responses are formatted automatically.</p>
+
+            <div class="horizontal" style="margin-top: 1.5rem;">
+                <div>
+                    <label for="endpointSelect">Endpoint</label>
+                    <select id="endpointSelect"></select>
+                </div>
+                <div>
+                    <label for="methodDisplay">HTTP Method</label>
+                    <input id="methodDisplay" type="text" readonly>
+                </div>
+                <div>
+                    <label for="urlPreview">Request URL</label>
+                    <input id="urlPreview" type="text" readonly>
+                </div>
+            </div>
+
+            <div id="pathParamsBlock" style="margin-top: 1.5rem; display:none;">
+                <label>Path Parameters</label>
+                <div id="pathParamsContainer"></div>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <label for="queryInput">Query String</label>
+                <textarea id="queryInput" placeholder="key=value&another=123"></textarea>
+                <p class="note">Leave blank to omit. Values are URL encoded automatically.</p>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <label for="bodyInput">Request Body</label>
+                <textarea id="bodyInput" placeholder="{ &quot;query&quot;: &quot;...&quot; }"></textarea>
+                <p class="note">Applicable for POST endpoints. JSON is validated before sending.</p>
+            </div>
+
+            <div style="margin-top: 1.5rem; display:flex; gap: 0.75rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="sendRequestBtn">Send Request</button>
+                <button class="btn btn-secondary" id="resetFormBtn">Reset to Default</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>Response Viewer</h2>
+            <div class="response-meta">
+                <span id="statusDisplay">Status: <em>—</em></span>
+                <span id="latencyDisplay">Latency: <em>—</em></span>
+                <span id="sizeDisplay">Size: <em>—</em></span>
+            </div>
+            <pre id="responseOutput">{}</pre>
+        </section>
+
+        <section>
+            <h2>cURL Builder &amp; Snippets</h2>
+            <div class="split">
+                <div>
+                    <h3>Generated cURL</h3>
+                    <pre id="curlOutput"></pre>
+                    <button class="btn btn-secondary" id="copyCurlBtn" style="margin-top:0.75rem;">Copy cURL</button>
+                </div>
+                <div>
+                    <h3>JavaScript Fetch</h3>
+                    <pre id="fetchOutput"></pre>
+                    <button class="btn btn-secondary" id="copyFetchBtn" style="margin-top:0.75rem;">Copy Fetch Snippet</button>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Quick Presets</h2>
+            <p class="note">Apply frequently used queries with a single click. Handy for QA passes and demonstrations.</p>
+            <div id="presetContainer"></div>
+        </section>
+
+        <section>
+            <h2>Request History</h2>
+            <p class="note">The five most recent requests are stored locally for each staff user.</p>
+            <div id="historyList"></div>
+            <button class="btn btn-text" id="clearHistoryBtn">Clear History</button>
+        </section>
+    </main>
+
+    <script>
+        const ENDPOINTS = JSON.parse('{{ endpoints_json|escapejs }}');
+        const PRESETS = JSON.parse('{{ presets_json|escapejs }}');
+
+        const endpointSelect = document.getElementById('endpointSelect');
+        const methodDisplay = document.getElementById('methodDisplay');
+        const urlPreview = document.getElementById('urlPreview');
+        const queryInput = document.getElementById('queryInput');
+        const bodyInput = document.getElementById('bodyInput');
+        const pathParamsBlock = document.getElementById('pathParamsBlock');
+        const pathParamsContainer = document.getElementById('pathParamsContainer');
+        const sendRequestBtn = document.getElementById('sendRequestBtn');
+        const resetFormBtn = document.getElementById('resetFormBtn');
+        const responseOutput = document.getElementById('responseOutput');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const latencyDisplay = document.getElementById('latencyDisplay');
+        const sizeDisplay = document.getElementById('sizeDisplay');
+        const curlOutput = document.getElementById('curlOutput');
+        const fetchOutput = document.getElementById('fetchOutput');
+        const copyCurlBtn = document.getElementById('copyCurlBtn');
+        const copyFetchBtn = document.getElementById('copyFetchBtn');
+        const presetContainer = document.getElementById('presetContainer');
+        const historyList = document.getElementById('historyList');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+        const HISTORY_KEY = 'openskagit_api_history';
+        let currentEndpoint = ENDPOINTS[0];
+
+        function initEndpointOptions() {
+            ENDPOINTS.forEach((endpoint) => {
+                const option = document.createElement('option');
+                option.value = endpoint.key;
+                option.textContent = `${endpoint.method} ${endpoint.path}`;
+                endpointSelect.appendChild(option);
+            });
+        }
+
+        function getEndpointByKey(key) {
+            return ENDPOINTS.find((endpoint) => endpoint.key === key) || ENDPOINTS[0];
+        }
+
+        function extractPathPlaceholders(path) {
+            const matches = path.match(/{(.*?)}/g);
+            if (!matches) {
+                return [];
+            }
+            return matches.map((match) => match.replace(/[{}]/g, ''));
+        }
+
+        function renderPathInputs(endpoint) {
+            const placeholders = extractPathPlaceholders(endpoint.path);
+            pathParamsContainer.innerHTML = '';
+            if (!placeholders.length) {
+                pathParamsBlock.style.display = 'none';
+                return;
+            }
+            pathParamsBlock.style.display = 'block';
+            placeholders.forEach((placeholder) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'inline-input';
+                const label = document.createElement('span');
+                label.textContent = placeholder;
+                label.style.minWidth = '120px';
+                const input = document.createElement('input');
+                input.dataset.param = placeholder;
+                input.value = endpoint.default_path_params?.[placeholder] || '';
+                input.addEventListener('input', updatePreview);
+                wrapper.appendChild(label);
+                wrapper.appendChild(input);
+                pathParamsContainer.appendChild(wrapper);
+            });
+        }
+
+        function resolvePath(endpoint) {
+            let path = endpoint.path;
+            const inputs = pathParamsContainer.querySelectorAll('input[data-param]');
+            inputs.forEach((input) => {
+                const value = input.value || '';
+                path = path.replace(`{${input.dataset.param}}`, encodeURIComponent(value));
+            });
+            return path;
+        }
+
+        function updatePreview() {
+            const path = resolvePath(currentEndpoint);
+            const query = queryInput.value.trim();
+            const queryString = query ? `?${query}` : '';
+            const baseUrl = window.location.origin;
+
+            const url = `${baseUrl}${path}${queryString}`;
+            methodDisplay.value = currentEndpoint.method;
+            urlPreview.value = url;
+
+            buildCurlSnippet(url);
+            buildFetchSnippet(url);
+        }
+
+        function buildCurlSnippet(url) {
+            const method = currentEndpoint.method;
+            const parts = [`curl -X ${method} "${url}"`];
+            let bodyPayload = '';
+
+            if (method !== 'GET') {
+                const parsed = tryParseJSON(bodyInput.value.trim());
+                if (parsed !== null) {
+                    bodyPayload = JSON.stringify(parsed);
+                    parts.push(`  -H "Content-Type: application/json"`);
+                    parts.push(`  -d '${bodyPayload}'`);
+                }
+            }
+
+            curlOutput.textContent = parts.join(' \\\n');
+        }
+
+        function buildFetchSnippet(url) {
+            const method = currentEndpoint.method;
+            const options = {
+                method,
+                headers: {}
+            };
+
+            if (method !== 'GET') {
+                const parsed = tryParseJSON(bodyInput.value.trim());
+                if (parsed !== null) {
+                    options.headers['Content-Type'] = 'application/json';
+                    options.body = JSON.stringify(parsed, null, 2);
+                }
+                options.credentials = 'same-origin';
+            }
+
+            const snippetLines = [
+                'fetch("' + url + '", ' + JSON.stringify(options, null, 2) + ')',
+                '  .then(res => res.json())',
+                '  .then(console.log)',
+                '  .catch(console.error);'
+            ];
+            fetchOutput.textContent = snippetLines.join('\n');
+        }
+
+        function tryParseJSON(text) {
+            if (!text) {
+                return null;
+            }
+            try {
+                return JSON.parse(text);
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function applyEndpointDefaults(endpoint) {
+            currentEndpoint = endpoint;
+            endpointSelect.value = endpoint.key;
+            queryInput.value = endpoint.default_querystring || '';
+            bodyInput.value = endpoint.default_body || '';
+            renderPathInputs(endpoint);
+            updatePreview();
+        }
+
+        function handleEndpointChange(event) {
+            const selectedKey = event.target.value;
+            const endpoint = getEndpointByKey(selectedKey);
+            applyEndpointDefaults(endpoint);
+        }
+
+        function getCsrfToken() {
+            const name = 'csrftoken=';
+            const decoded = decodeURIComponent(document.cookie);
+            const cookies = decoded.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name)) {
+                    return cookie.substring(name.length);
+                }
+            }
+            return '';
+        }
+
+        async function executeRequest() {
+            const path = resolvePath(currentEndpoint);
+            if (path.includes('{')) {
+                alert('Please fill in all path parameters.');
+                return;
+            }
+            const qs = queryInput.value.trim();
+            const baseUrl = window.location.origin;
+            const url = `${path}${qs ? '?' + qs : ''}`;
+            const requestBodyText = bodyInput.value.trim();
+
+            const options = {
+                method: currentEndpoint.method,
+                headers: {},
+                credentials: 'same-origin'
+            };
+
+            if (currentEndpoint.method !== 'GET') {
+                const parsed = tryParseJSON(requestBodyText);
+                if (parsed === null) {
+                    alert('Request body must be valid JSON.');
+                    return;
+                }
+                options.headers['Content-Type'] = 'application/json';
+                options.headers['X-CSRFToken'] = getCsrfToken();
+                options.body = JSON.stringify(parsed);
+            }
+
+            const start = performance.now();
+            let response;
+            let responseBody;
+            try {
+                response = await fetch(url, options);
+                const text = await response.text();
+                try {
+                    responseBody = JSON.parse(text);
+                    responseOutput.textContent = JSON.stringify(responseBody, null, 2);
+                } catch (error) {
+                    responseOutput.textContent = text || '<empty>';
+                }
+                const latency = performance.now() - start;
+                updateMetrics(response, latency, responseBody);
+                addToHistory({
+                    method: currentEndpoint.method,
+                    url: `${baseUrl}${url}`,
+                    status: response.status,
+                    latency: latency.toFixed(1),
+                    timestamp: new Date().toISOString(),
+                    query: qs,
+                    body: currentEndpoint.method === 'GET' ? '' : requestBodyText
+                });
+            } catch (error) {
+                responseOutput.textContent = `Request failed: ${error.message}`;
+                statusDisplay.innerHTML = `Status: <span class="status-chip status-error">Network error</span>`;
+                latencyDisplay.innerHTML = 'Latency: —';
+                sizeDisplay.innerHTML = 'Size: —';
+            }
+        }
+
+        function updateMetrics(response, latency, body) {
+            const statusClass = response.ok ? 'status-ok' : 'status-error';
+            statusDisplay.innerHTML = `Status: <span class="status-chip ${statusClass}">${response.status} ${response.statusText}</span>`;
+            latencyDisplay.innerHTML = `Latency: <strong>${latency.toFixed(1)} ms</strong>`;
+            const size = body ? new TextEncoder().encode(JSON.stringify(body)).length : 0;
+            sizeDisplay.innerHTML = `Size: <strong>${(size / 1024).toFixed(2)} KB</strong>`;
+        }
+
+        function renderPresets() {
+            presetContainer.innerHTML = '';
+            PRESETS.forEach((preset) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'pill';
+                button.innerHTML = `<strong>${preset.label}</strong>`;
+                button.title = preset.description;
+                button.addEventListener('click', () => {
+                    const endpoint = getEndpointByKey(preset.endpoint);
+                    applyEndpointDefaults(endpoint);
+                    queryInput.value = preset.query || endpoint.default_querystring || '';
+                    bodyInput.value = preset.body || endpoint.default_body || '';
+                    updatePreview();
+                });
+                presetContainer.appendChild(button);
+            });
+        }
+
+        function pathMatches(endpointPath, pathname) {
+            const normalizedEndpointPath = endpointPath.replace(/\/+$/, '');
+            const normalizedPathname = pathname.replace(/\/+$/, '');
+            const regexString = '^' + normalizedEndpointPath
+                .replace(/\//g, '\\/')
+                .replace(/\{.*?\}/g, '[^/]+') + '\\/?$';
+            const regex = new RegExp(regexString);
+            return regex.test(normalizedPathname);
+        }
+
+        function populatePathParamsFromUrl(endpoint, urlObj) {
+            const placeholders = extractPathPlaceholders(endpoint.path);
+            if (!placeholders.length) {
+                updatePreview();
+                return;
+            }
+            const patternParts = endpoint.path.split('/').filter(Boolean);
+            const urlParts = urlObj.pathname.split('/').filter(Boolean);
+            const inputs = pathParamsContainer.querySelectorAll('input[data-param]');
+            inputs.forEach((input) => {
+                const param = input.dataset.param;
+                const index = patternParts.findIndex(part => part === `{${param}}`);
+                if (index !== -1 && typeof urlParts[index] !== 'undefined') {
+                    input.value = decodeURIComponent(urlParts[index]);
+                }
+            });
+            updatePreview();
+        }
+
+        function loadHistory() {
+            try {
+                const history = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+                return Array.isArray(history) ? history : [];
+            } catch {
+                return [];
+            }
+        }
+
+        function saveHistory(history) {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        }
+
+        function addToHistory(entry) {
+            const history = loadHistory();
+            history.unshift(entry);
+            if (history.length > 5) {
+                history.splice(5);
+            }
+            saveHistory(history);
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const history = loadHistory();
+            historyList.innerHTML = '';
+            if (!history.length) {
+                historyList.innerHTML = '<p class="note">No requests yet.</p>';
+                return;
+            }
+            history.forEach((item, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'history-item';
+                const left = document.createElement('div');
+                left.innerHTML = `<strong>${item.method}</strong> ${item.url}<div class="note">Status ${item.status} · ${item.latency} ms · ${new Date(item.timestamp).toLocaleString()}</div>`;
+                const right = document.createElement('div');
+                const replayBtn = document.createElement('button');
+                replayBtn.className = 'btn btn-secondary';
+                replayBtn.textContent = 'Load';
+                replayBtn.addEventListener('click', () => {
+                    const url = new URL(item.url);
+                    const endpoint = ENDPOINTS.find(ep => pathMatches(ep.path, url.pathname));
+                    if (endpoint) {
+                        applyEndpointDefaults(endpoint);
+                        queryInput.value = item.query || url.searchParams.toString();
+                        bodyInput.value = item.body || endpoint.default_body || '';
+                        populatePathParamsFromUrl(endpoint, url);
+                    }
+                });
+                right.appendChild(replayBtn);
+                wrapper.appendChild(left);
+                wrapper.appendChild(right);
+                historyList.appendChild(wrapper);
+            });
+        }
+
+        function clearHistory() {
+            localStorage.removeItem(HISTORY_KEY);
+            renderHistory();
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard.');
+            }).catch(() => {
+                alert('Unable to copy. Try manually selecting the text.');
+            });
+        }
+
+        function init() {
+            initEndpointOptions();
+            renderPresets();
+            renderHistory();
+            applyEndpointDefaults(ENDPOINTS[0]);
+        }
+
+        endpointSelect.addEventListener('change', handleEndpointChange);
+        sendRequestBtn.addEventListener('click', executeRequest);
+        resetFormBtn.addEventListener('click', () => applyEndpointDefaults(getEndpointByKey(currentEndpoint.key)));
+        copyCurlBtn.addEventListener('click', () => copyToClipboard(curlOutput.textContent));
+        copyFetchBtn.addEventListener('click', () => copyToClipboard(fetchOutput.textContent));
+        clearHistoryBtn.addEventListener('click', clearHistory);
+        queryInput.addEventListener('input', updatePreview);
+        bodyInput.addEventListener('input', updatePreview);
+
+        init();
+    </script>
+</body>
+</html>

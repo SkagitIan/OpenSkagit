@@ -1,0 +1,164 @@
+{% load humanize %}
+<tr class="hover:bg-slate-900/60 transition">
+    <td class="px-4 py-4 align-top">
+        <button
+            class="inline-flex items-center gap-2 text-xs text-rose-300 hover:text-rose-200 bg-rose-500/10 border border-rose-500/30 px-3 py-1 rounded-lg transition"
+            hx-post="{% url 'cma-toggle-comp' parcel_number comparable.snapshot.parcel_number %}"
+            hx-include="#cma-filter-form"
+            hx-target="#cma-comparison-grid"
+        >
+            Remove
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+        <p class="text-[11px] text-slate-500 mt-2 uppercase tracking-wide">Rank {{ comparable.inclusion_rank }}</p>
+        {% if comparable.distance_miles %}
+            <p class="text-[11px] text-slate-400 mt-1">{{ comparable.distance_miles }} mi away</p>
+        {% endif %}
+    </td>
+    <td class="px-4 py-4 align-top">
+        <p class="text-sm font-semibold text-white">{{ comparable.snapshot.address }}</p>
+        <p class="text-xs text-slate-500 uppercase tracking-wide">Parcel {{ comparable.snapshot.parcel_number }}</p>
+        {% if comparable.sale_date %}
+            <p class="text-xs text-slate-500 mt-1">Sold {{ comparable.sale_date|date:"M j, Y" }}</p>
+        {% endif %}
+        <span class="mt-2 inline-flex items-center gap-1 text-xs text-slate-400 bg-slate-800/60 border border-slate-700 px-2 py-1 rounded-lg">
+            GPA {{ comparable.gross_percentage_adjustment }}%
+        </span>
+    </td>
+    <td class="px-4 py-4 align-top">
+        <p class="text-sm font-semibold text-white">${{ comparable.sale_price|floatformat:0|intcomma }}</p>
+        <p class="text-xs text-slate-500">Gross adj: ${{ comparable.gross_adjustment_total|floatformat:0|intcomma }}</p>
+    </td>
+    <td class="px-4 py-4 align-top">
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+            <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.living_area %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
+                <p class="uppercase text-[10px] tracking-wide">Living area</p>
+                <p class="font-semibold">
+                    {% if subject.living_area %}{{ subject.living_area|floatformat:0|intcomma }}{% else %}—{% endif %}
+                    /
+                    {% if comparable.snapshot.living_area %}{{ comparable.snapshot.living_area|floatformat:0|intcomma }}{% else %}—{% endif %}
+                </p>
+            </div>
+            <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.bedrooms %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
+                <p class="uppercase text-[10px] tracking-wide">Beds</p>
+                <p class="font-semibold">
+                    {% if subject.bedrooms %}{{ subject.bedrooms|floatformat:0 }}{% else %}—{% endif %}
+                    /
+                    {% if comparable.snapshot.bedrooms %}{{ comparable.snapshot.bedrooms|floatformat:0 }}{% else %}—{% endif %}
+                </p>
+            </div>
+            <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.bathrooms %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
+                <p class="uppercase text-[10px] tracking-wide">Baths</p>
+                <p class="font-semibold">
+                    {% if subject.bathrooms %}{{ subject.bathrooms|floatformat:1 }}{% else %}—{% endif %}
+                    /
+                    {% if comparable.snapshot.bathrooms %}{{ comparable.snapshot.bathrooms|floatformat:1 }}{% else %}—{% endif %}
+                </p>
+            </div>
+            <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.garage_sqft %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
+                <p class="uppercase text-[10px] tracking-wide">Garage</p>
+                <p class="font-semibold">
+                    {% if subject.garage_sqft %}{{ subject.garage_sqft|floatformat:0|intcomma }}{% else %}—{% endif %}
+                    /
+                    {% if comparable.snapshot.garage_sqft %}{{ comparable.snapshot.garage_sqft|floatformat:0|intcomma }}{% else %}—{% endif %}
+                </p>
+            </div>
+            <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.acres %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
+                <p class="uppercase text-[10px] tracking-wide">Lot size</p>
+                <p class="font-semibold">
+                    {% if subject.acres %}{{ subject.acres|floatformat:2 }}{% else %}—{% endif %}
+                    /
+                    {% if comparable.snapshot.acres %}{{ comparable.snapshot.acres|floatformat:2 }}{% else %}—{% endif %}
+                </p>
+            </div>
+            <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.year_built %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
+                <p class="uppercase text-[10px] tracking-wide">Year built</p>
+                <p class="font-semibold">
+                    {% if subject.year_built %}{{ subject.year_built }}{% else %}—{% endif %}
+                    /
+                    {% if comparable.snapshot.year_built %}{{ comparable.snapshot.year_built }}{% else %}—{% endif %}
+                </p>
+            </div>
+        </div>
+    </td>
+    <td class="px-4 py-4 align-top">
+        <ul class="space-y-1 text-xs">
+            {% for adj in comparable.auto_adjustments %}
+                <li class="flex items-center justify-between gap-4">
+                    <span class="text-slate-400">{{ adj.label }}</span>
+                    <span class="{% if adj.amount > 0 %}text-emerald-300{% elif adj.amount < 0 %}text-rose-300{% else %}text-slate-300{% endif %}">
+                        {% if adj.amount > 0 %}+{% endif %}${{ adj.amount|floatformat:0|intcomma }}
+                    </span>
+                </li>
+            {% empty %}
+                <li class="text-slate-500">No automated adjustments</li>
+            {% endfor %}
+            {% for key, value in comparable.manual_adjustments.items %}
+                <li class="flex items-center justify-between gap-4">
+                    <span class="text-slate-300 capitalize">{{ key }} input</span>
+                    <span class="{% if value > 0 %}text-emerald-300{% elif value < 0 %}text-rose-300{% else %}text-slate-300{% endif %}">
+                        {% if value > 0 %}+{% endif %}${{ value|floatformat:0|intcomma }}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    </td>
+    <td class="px-4 py-4 align-top">
+        <div class="space-y-3">
+            <div>
+                <label class="text-xs uppercase tracking-wide text-slate-500">Condition Adj ($)</label>
+                <input
+                    type="number"
+                    name="value"
+                    step="100"
+                    value="{{ comparable.manual_adjustments.condition|default_if_none:'' }}"
+                    class="w-full mt-1 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
+                    hx-post="{% url 'cma-manual-adjustment' parcel_number comparable.snapshot.parcel_number %}"
+                    hx-trigger="change delay:300ms"
+                    hx-include="#cma-filter-form"
+                    hx-vals='{"field": "condition"}'
+                    hx-target="closest tr"
+                    hx-swap="outerHTML"
+                >
+            </div>
+            <div>
+                <label class="text-xs uppercase tracking-wide text-slate-500">View Adj ($)</label>
+                <input
+                    type="number"
+                    name="value"
+                    step="100"
+                    value="{{ comparable.manual_adjustments.view|default_if_none:'' }}"
+                    class="w-full mt-1 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
+                    hx-post="{% url 'cma-manual-adjustment' parcel_number comparable.snapshot.parcel_number %}"
+                    hx-trigger="change delay:300ms"
+                    hx-include="#cma-filter-form"
+                    hx-vals='{"field": "view"}'
+                    hx-target="closest tr"
+                    hx-swap="outerHTML"
+                >
+            </div>
+            <div>
+                <label class="text-xs uppercase tracking-wide text-slate-500">Other Adj ($)</label>
+                <input
+                    type="number"
+                    name="value"
+                    step="100"
+                    value="{{ comparable.manual_adjustments.other|default_if_none:'' }}"
+                    class="w-full mt-1 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
+                    hx-post="{% url 'cma-manual-adjustment' parcel_number comparable.snapshot.parcel_number %}"
+                    hx-trigger="change delay:300ms"
+                    hx-include="#cma-filter-form"
+                    hx-vals='{"field": "other"}'
+                    hx-target="closest tr"
+                    hx-swap="outerHTML"
+                >
+            </div>
+        </div>
+    </td>
+    <td class="px-4 py-4 align-top">
+        <p class="text-lg font-semibold text-white">${{ comparable.adjusted_price|floatformat:0|intcomma }}</p>
+        <p class="text-xs text-slate-500">Difference vs. sale: ${{ (comparable.adjusted_price - comparable.sale_price)|floatformat:0|intcomma }}</p>
+    </td>
+</tr>

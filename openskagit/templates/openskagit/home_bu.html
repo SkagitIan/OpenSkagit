@@ -1,0 +1,186 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenSkagit | Developer Command Center</title>
+    <link rel="stylesheet" href="{% static 'openskagit/home.css' %}">
+</head>
+<body>
+    <header class="topbar" role="banner">
+        <div class="topbar__brand">
+            <span class="topbar__mark" aria-hidden="true"></span>
+            <span>OpenSkagit</span>
+            <span class="topbar__beta">beta</span>
+        </div>
+        <nav class="topbar__nav" aria-label="Primary">
+            <a href="#chat">Assistant</a>
+            <a href="#api">API &amp; SDK</a>
+            <a href="#data">Data Signals</a>
+            <a href="#roadmap">Roadmap</a>
+            <a class="topbar__cta" href="/api/docs/">View Docs</a>
+        </nav>
+    </header>
+
+    <main class="page">
+        <section class="hero" id="hero">
+            <div class="hero__headline">
+                <h1>Build with Skagit Valley parcel intelligence.</h1>
+                <p>OpenSkagit unifies parcels, valuations, and community activity into one developer platform. Pair the assistant with your own RAG workflows and deliver tools faster.</p>
+                <div class="hero__meta">
+                    <div>
+                        <strong>80k+</strong>
+                        <span>Parcels normalized</span>
+                    </div>
+                    <div>
+                        <strong>12 hr</strong>
+                        <span>Data refresh cadence</span>
+                    </div>
+                    <div>
+                        <strong>&lt;200 ms</strong>
+                        <span>Median API latency</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hero__capabilities">
+                <h2>Platform capabilities</h2>
+                <ul>
+                    {% for capability in capabilities %}
+                        <li>
+                            <h3>{{ capability.title }}</h3>
+                            <p>{{ capability.description }}</p>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </section>
+
+        <section class="workspace" id="chat">
+            <div class="workspace__chat" role="region" aria-label="Chat assistant">
+                <div class="chat-panel">
+                    <header class="chat-panel__header">
+                        <div>
+                            <span class="chat-panel__status"></span>
+                            <span>OpenSkagit Assistant</span>
+                        </div>
+                        <span class="chat-panel__subtitle">Connected to OpenAI API</span>
+                    </header>
+                    <div class="chat-panel__transcript" id="chat-transcript" aria-live="polite" aria-label="Conversation history">
+                        <div class="chat-bubble chat-bubble--bot">
+                            <span class="chat-bubble__label">OpenSkagit</span>
+                            <p>Welcome! Ask about parcels, valuations, or spatial trends across the Skagit Valley.</p>
+                        </div>
+                        <div class="chat-suggestions" role="list" aria-label="Suggested prompts">
+                            {% for example in chat_examples %}
+                                <button type="button" class="chat-suggestions__item" data-example="{{ example }}">{{ example }}</button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <form class="chat-panel__composer" id="chat-form" autocomplete="off">
+                        <label class="sr-only" for="chat-input">Message the assistant</label>
+                        <input id="chat-input" name="message" type="text" placeholder="Ask about zoning, sales comps, or build an API call…" required>
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
+            </div>
+            <aside class="workspace__sidebar" aria-label="Quick links and data">
+                <section class="sidebar-block">
+                    <h2>Quick links</h2>
+                    <ul class="quick-links">
+                        {% for link in quick_links %}
+                            <li>
+                                <a href="{{ link.href }}">
+                                    <span class="quick-links__title">{{ link.title }}</span>
+                                    <span class="quick-links__meta">{{ link.description }}</span>
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+                <section class="sidebar-block sidebar-block--bordered">
+                    <h2>SDK resources</h2>
+                    <ul class="sdk-list">
+                        {% for resource in sdk_resources %}
+                            <li>
+                                <span class="sdk-list__label">{{ resource.label }}</span>
+                                <span class="sdk-list__meta">{{ resource.description }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            </aside>
+        </section>
+
+        <section class="api" id="api">
+            <div class="api__header">
+                <h2>API &amp; SDK</h2>
+                <p>Everything in the assistant is powered by the same secure APIs and SDKs. Compose parcel intelligence into your workflows in minutes.</p>
+            </div>
+            <div class="api__grid">
+                <div class="api__highlights">
+                    <ul>
+                        {% for feature in api_highlights %}
+                            <li>
+                                <h3>{{ feature.title }}</h3>
+                                <p>{{ feature.description }}</p>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="api__code">
+                    <header>
+                        <span class="api__verb">GET</span>
+                        <code class="api__path">/v1/parcel/P12345/</code>
+                    </header>
+                    <pre><code>{{ api_sample_json|safe }}</code></pre>
+                    <footer>
+                        <span>p50 latency: 132 ms</span>
+                        <span>Status: 200 OK</span>
+                    </footer>
+                </div>
+            </div>
+        </section>
+
+        <section class="data" id="data">
+            <header>
+                <h2>Leverage our data</h2>
+                <p>Bring parcel, permitting, and valuation intelligence into your stack with confidence.</p>
+            </header>
+            <div class="data__grid">
+                {% for signal in data_signals %}
+                    <article>
+                        <h3>{{ signal.title }}</h3>
+                        <p>{{ signal.description }}</p>
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="roadmap" id="roadmap" aria-labelledby="roadmap-title">
+            <header>
+                <h2 id="roadmap-title">Roadmap</h2>
+                <p>We are building with and for the Skagit community. Tell us what should launch next.</p>
+            </header>
+            <ol class="roadmap__items">
+                {% for item in roadmap %}
+                    <li>
+                        <span class="roadmap__dot" aria-hidden="true"></span>
+                        <p>{{ item }}</p>
+                    </li>
+                {% endfor %}
+            </ol>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div>
+            <h2>Ready to build?</h2>
+            <p>Request API access, bring your RAG stack, and accelerate community tools for the valley.</p>
+        </div>
+        <a class="footer__cta" href="mailto:hello@openskagit.com">Contact the team</a>
+    </footer>
+
+    <script src="{% static 'openskagit/home.js' %}"></script>
+</body>
+</html>

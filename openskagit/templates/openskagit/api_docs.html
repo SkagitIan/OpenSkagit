@@ -1,0 +1,78 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenSkagit API Reference</title>
+    <link rel="stylesheet" href="{% static 'openskagit/home.css' %}">
+    <style>
+        body { font-family: "Inter", system-ui, sans-serif; margin: 0; background: #f4f7fb; color: #1f2933; }
+        header { background: linear-gradient(135deg, #1f3c88, #39a0ff); color: #fff; padding: 3rem 1.5rem; }
+        header h1 { margin: 0 0 0.5rem; font-size: 2.5rem; font-weight: 700; }
+        main { padding: 2rem 1.5rem 3rem; max-width: 1100px; margin: -2rem auto 0; }
+        section { background: #fff; border-radius: 18px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08); margin-bottom: 2rem; padding: 2rem 2.5rem; }
+        h2 { margin-top: 0; font-size: 1.6rem; color: #102a43; }
+        pre { background: #0f172a; color: #f8fafc; padding: 1.25rem; border-radius: 14px; overflow-x: auto; font-size: 0.95rem; line-height: 1.45; }
+        code.path { font-size: 0.95rem; display: inline-block; padding: 0.35rem 0.6rem; border-radius: 0.5rem; background: #0ea5e9; color: #fff; margin-left: 0.5rem; }
+        span.method { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.12em; color: #0ea5e9; font-weight: 700; }
+        article.endpoint { border: 1px solid #e5e7eb; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.5rem; background: #f9fbff; }
+        details { margin-top: 1rem; }
+        summary { cursor: pointer; font-weight: 600; color: #2563eb; }
+        ul.notes { list-style: disc; margin-left: 1.5rem; }
+        @media (max-width: 768px) {
+            section { padding: 1.5rem; }
+            header { padding: 2.5rem 1rem; }
+            header h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>OpenSkagit Internal API</h1>
+        <p>Authenticated staff can use these endpoints to power the frontend applications.</p>
+        <p><a href="{% url 'api-dashboard' %}" style="color:#fff;text-decoration:underline;">Open the API Dashboard ↗</a></p>
+    </header>
+    <main>
+        <section>
+            <h2>Schema Introspection</h2>
+            <p>Use this query to inspect available tables and columns in the Postgres schema.</p>
+            <pre><code>{{ schema_sql }}</code></pre>
+        </section>
+
+        <section>
+            <h2>Endpoints</h2>
+            {% for endpoint in endpoints %}
+                <article class="endpoint">
+                    <header>
+                        <span class="method">{{ endpoint.method }}</span>
+                        <code class="path">{{ endpoint.display_path|default:endpoint.path }}</code>
+                    </header>
+                    <p>{{ endpoint.description }}</p>
+                    {% if endpoint.payload_json %}
+                        <details>
+                            <summary>Sample Payload</summary>
+                            <pre><code>{{ endpoint.payload_json }}</code></pre>
+                        </details>
+                    {% endif %}
+                    {% if endpoint.sample_json %}
+                        <details>
+                            <summary>Sample Response</summary>
+                            <pre><code>{{ endpoint.sample_json }}</code></pre>
+                        </details>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        </section>
+
+        <section>
+            <h2>Implementation Notes</h2>
+            <ul class="notes">
+                {% for note in notes %}
+                    <li>{{ note }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+    </main>
+</body>
+</html>

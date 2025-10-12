@@ -1,0 +1,64 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenSkagit CMA — Sales Comparison Approach</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="{% static 'openskagit/cma.js' %}"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-8 space-y-6">
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-semibold text-white">OpenSkagit Professional CMA</h1>
+                <p class="text-slate-300 max-w-2xl">
+                    Execute a defensible Sales Comparison Approach workflow with PostGIS-backed comp selection,
+                    HTMX-driven adjustments, and audit-ready reconciliation.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/" class="text-sm text-slate-300 hover:text-white transition">Back to Home</a>
+                {% if shared_analysis %}
+                    <span class="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-400/40 px-3 py-1 text-sm text-emerald-200">
+                        Shared analysis
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </span>
+                {% endif %}
+            </div>
+        </header>
+
+        <section class="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-xl shadow-slate-950/40 p-6 space-y-4">
+            <label for="parcel-search" class="block text-sm font-semibold text-slate-300 uppercase tracking-wide">
+                Locate subject parcel
+            </label>
+            <input
+                id="parcel-search"
+                name="q"
+                type="text"
+                placeholder="Search by parcel number or address"
+                value=""
+                class="w-full bg-slate-950/70 border border-slate-800 focus:border-slate-500 focus:ring-slate-500 rounded-xl px-4 py-3 text-slate-100 placeholder:text-slate-500 transition"
+                hx-get="{% url 'cma-parcel-search' %}"
+                hx-target="#cma-parcel-results"
+                hx-trigger="keyup changed delay:300ms"
+                hx-indicator="#search-indicator"
+                autocomplete="off"
+            >
+            <div id="search-indicator" class="htmx-indicator text-xs text-slate-400">Querying parcels…</div>
+            <div id="cma-parcel-results" class="space-y-2"></div>
+        </section>
+
+        <section id="cma-analysis-panel" class="space-y-6" hx-target="this">
+            {% include "openskagit/cma/partials/dashboard_content.html" %}
+        </section>
+    </div>
+    <div id="cma-map-payload" class="hidden"></div>
+</body>
+</html>
