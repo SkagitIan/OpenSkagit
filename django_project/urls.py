@@ -47,4 +47,8 @@ urlpatterns = [
     path("cma/share/<uuid:share_uuid>/", openskagit_views.cma_share, name="cma-share"),
     path("cma/<str:parcel_number>/", openskagit_views.cma_dashboard_view, name="cma-detail"),
     path("api/", include("openskagit.api.urls")),
+    # Citizen Appeal Helper
+    path("appeal/", openskagit_views.appeal_home, name="appeal-home"),
+    path("appeal/parcel-search/", openskagit_views.appeal_parcel_search, name="appeal-parcel-search"),
+    path("appeal/result/<str:parcel_number>/", openskagit_views.appeal_result, name="appeal-result"),
 ]

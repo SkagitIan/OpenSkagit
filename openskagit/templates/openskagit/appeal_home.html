@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skagit Appeal Helper</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-white text-slate-900">
+  <main class="max-w-3xl mx-auto px-4 py-10 space-y-8">
+    <header class="space-y-2">
+      <h1 class="text-3xl font-bold tracking-tight">Property Tax Appeal Helper</h1>
+      <p class="text-lg text-slate-600">Simple check to see if an appeal is worth your time. No jargon.</p>
+    </header>
+
+    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <label for="appeal-search" class="block text-sm font-semibold text-slate-700">Step 1 — Enter your address or parcel</label>
+      <input id="appeal-search"
+             name="q"
+             type="text"
+             placeholder="e.g., 101 Main St or P12345"
+             class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg placeholder:text-slate-400 focus:border-slate-500 focus:outline-none"
+             hx-get="{% url 'appeal-parcel-search' %}"
+             hx-target="#appeal-results"
+             hx-trigger="keyup changed delay:300ms"
+             autocomplete="off">
+      <div id="appeal-results" class="mt-3"></div>
+    </section>
+
+    <section id="appeal-detail" class="space-y-6"></section>
+
+    <footer class="text-sm text-slate-500">
+      <p>Tip: An increasing assessment alone does not mean higher taxes. What matters is whether you rose more than similar homes nearby.</p>
+    </footer>
+  </main>
+</body>
+</html>
+

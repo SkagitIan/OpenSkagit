@@ -1,0 +1,122 @@
+{% load humanize %}
+<section class="space-y-6">
+  <header class="space-y-1">
+    <h2 class="text-2xl font-bold">Step 2 — Results</h2>
+    <p class="text-slate-600">We found your property and nearby recent sales.</p>
+  </header>
+
+  <div class="grid gap-4 md:grid-cols-3">
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 md:col-span-2">
+      <h3 class="text-lg font-semibold">Your Property</h3>
+      <p class="text-slate-600">{{ subject.address|default:"Address unavailable" }}</p>
+      <p class="text-sm text-slate-500">Parcel {{ subject.parcel_number }}</p>
+      {% if subject.metadata.assessed_value %}
+        <p class="mt-2 text-xl">Assessed value: <span class="font-semibold">${{ subject.metadata.assessed_value|floatformat:0|intcomma }}</span></p>
+      {% endif %}
+    </div>
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+      <h3 class="text-lg font-semibold">Appeal Likelihood</h3>
+      <div class="mt-2 flex items-end justify-between">
+        <div class="text-4xl font-bold">{{ score }}<span class="text-xl">%</span></div>
+        <div class="rounded-full border px-2 py-1 text-sm">{{ rating }}</div>
+      </div>
+      <div class="mt-3 h-3 w-full overflow-hidden rounded-full bg-slate-100">
+        <div class="h-full" style="width: {{ score }}%; background-color: {% if score >= 65 %}#16a34a{% elif score >= 50 %}#f59e0b{% else %}#dc2626{% endif %}"></div>
+      </div>
+      <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
+        {% for reason in reasons %}
+          <li>{{ reason }}</li>
+        {% empty %}
+          <li>We use comparable sales, neighborhood stats, and consistency (COD) to score.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="rounded-2xl border border-slate-200 bg-white p-4">
+    <h3 class="text-lg font-semibold">Neighborhood Context</h3>
+    <div class="mt-2 grid gap-4 md:grid-cols-4">
+      <div>
+        <p class="text-sm text-slate-500">Neighborhood</p>
+        <p class="font-medium">{{ neighborhood.name|default:neighborhood.code|default:"Unknown" }}</p>
+      </div>
+      <div>
+        <p class="text-sm text-slate-500">Average change</p>
+        <p class="font-medium">{% if neighborhood.avg_increase_pct %}{{ neighborhood.avg_increase_pct|floatformat:1 }}%{% else %}—{% endif %}</p>
+      </div>
+      <div>
+        <p class="text-sm text-slate-500">COD (consistency)</p>
+        <p class="font-medium">{% if neighborhood.cod %}{{ neighborhood.cod|floatformat:1 }}{% else %}—{% endif %}</p>
+      </div>
+      <div>
+        <p class="text-sm text-slate-500">Reliability</p>
+        <p class="font-medium">{{ neighborhood.reliability|default:"Unknown" }}</p>
+      </div>
+    </div>
+    {% if neigh_diff_pct is not None %}
+      <p class="mt-2 text-slate-700">Your change vs neighborhood: <span class="font-semibold">{{ neigh_diff_pct|floatformat:1 }}%</span></p>
+    {% else %}
+      <p class="mt-2 text-slate-500 text-sm">We could not calculate your change vs neighborhood without prior-year assessed value.</p>
+    {% endif %}
+  </div>
+
+  <div class="rounded-2xl border border-slate-200 bg-white p-4">
+    <h3 class="text-lg font-semibold">Comparable Sales (3–5)</h3>
+    <div class="mt-3 space-y-3">
+      {% for comp in comparables %}
+        <div class="rounded-xl border border-slate-200 p-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-medium">{{ comp.snapshot.address|default:"Address unavailable" }}</p>
+              <p class="text-xs text-slate-500">{{ comp.distance_miles }} mi • {{ comp.sale_date|date:"M j, Y" }}</p>
+            </div>
+            <div class="text-right text-sm">
+              <p>Sold: <span class="font-semibold">${{ comp.sale_price|floatformat:0|intcomma }}</span></p>
+              <p class="text-slate-500">Adjusted: ${{ comp.adjusted_price|floatformat:0|intcomma }}</p>
+            </div>
+          </div>
+          <p class="mt-2 text-sm text-slate-600">Why this matters: Similar home nearby sold on {{ comp.sale_date|date:"M j, Y" }} for {{ comp.sale_price|floatformat:0|intcomma }}. Adjustments account for size, beds, baths, year, and lot.</p>
+          <div class="mt-2 text-xs text-slate-500">Beds {{ comp.snapshot.bedrooms|default:"?" }}, Baths {{ comp.snapshot.bathrooms|default:"?" }}, {{ comp.snapshot.living_area|default:"?"|intcomma }} sq ft</div>
+        </div>
+      {% empty %}
+        <p class="text-slate-600">We didn’t find enough nearby recent sales. Appeals are harder without 3+ comps.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if soft_stop %}
+    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <h3 class="text-lg font-semibold text-amber-900">Soft Stop</h3>
+      <p class="mt-1 text-amber-900">Your case looks marginal right now. Consider waiting for more data next year.</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+        {% for r in soft_reasons %}
+          <li>{{ r }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+      <div>
+        <h3 class="text-lg font-semibold text-emerald-900">Looks worth pursuing</h3>
+        <p class="text-sm text-emerald-900">Download a simple report and follow county instructions.</p>
+      </div>
+      <a href="#" onclick="window.print(); return false;" class="rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">Download PDF</a>
+    </div>
+  {% endif %}
+
+  <div class="rounded-2xl border border-slate-200 bg-white p-4">
+    <h3 class="text-lg font-semibold">What to Know (RCW 84.48)</h3>
+    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+      <li>Appeals must be filed by <strong>July 1</strong>.</li>
+      <li>You need <strong>clear, cogent, and convincing evidence</strong>.</li>
+      <li>Provide comparable sales at least <strong>21 days</strong> before the hearing.</li>
+      <li>The assessor’s value is presumed correct — bring documentation.</li>
+    </ul>
+  </div>
+
+  <div class="text-sm text-slate-500">
+    <p>Disclaimer: This tool is for guidance only. Verify all data and consult county resources when filing.</p>
+  </div>
+</section>
+

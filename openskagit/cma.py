@@ -7,9 +7,10 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 from django.db.models.expressions import RawSQL
+from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
-from .models import Assessor
+from .models import Assessor, Sales
 
 
 DEFAULT_COMPARABLE_LIMIT = 16
@@ -272,11 +273,18 @@ def load_subject(parcel_number: str) -> PropertySnapshot:
     if assessor.geom is None:
         raise ValueError("Subject property does not have geospatial coordinates.")
 
+    # Prefer SALES table for last sale details; fall back to assessor if missing
+    sale_row = None
+    try:
+        sale_row = Sales.objects.get(parcel_number=assessor.parcel_number)
+    except Sales.DoesNotExist:
+        sale_row = None
+
     return PropertySnapshot(
         parcel_number=assessor.parcel_number,
         address=assessor.address or "Unknown address",
-        sale_price=_to_decimal(assessor.sale_price),
-        sale_date=_safe_date(assessor.sale_date),
+        sale_price=_to_decimal(sale_row.sale_price if sale_row else assessor.sale_price),
+        sale_date=_safe_date(sale_row.sale_date if sale_row else assessor.sale_date),
         property_type=assessor.property_type,
         living_area=_to_decimal(assessor.living_area),
         bedrooms=_to_decimal(assessor.bedrooms),
@@ -294,14 +302,32 @@ def load_subject(parcel_number: str) -> PropertySnapshot:
 
 
 def _base_queryset(subject: PropertySnapshot) -> Iterable[Assessor]:
+    # Annotate assessor parcels with sales facts from SALES; use SALES for comps
+    sale_sq_price = Subquery(
+        Sales.objects.filter(parcel_number=OuterRef("parcel_number")).values("sale_price")[:1]
+    )
+    sale_sq_date = Subquery(
+        Sales.objects.filter(parcel_number=OuterRef("parcel_number")).values("sale_date")[:1]
+    )
+    sale_sq_deed = Subquery(
+        Sales.objects.filter(parcel_number=OuterRef("parcel_number")).values("deed_type")[:1]
+    )
+
     qs = (
-        Assessor.objects.filter(geom__isnull=False, sale_price__gt=0)
+        Assessor.objects.filter(geom__isnull=False)
         .exclude(parcel_number=subject.parcel_number)
         .annotate(
+            comp_sale_price=sale_sq_price,
+            comp_sale_date=sale_sq_date,
+            comp_deed_type=sale_sq_deed,
+        )
+        .filter(comp_sale_price__gt=0)
+        .annotate(
             distance_sort=RawSQL("geom <-> %s", (subject.geom.ewkb,) if subject.geom else (None,)),
+            # Use ST_Distance on geography to avoid missing function errors
             distance_meters=RawSQL(
                 "CASE WHEN geom IS NULL OR %s IS NULL THEN NULL "
-                "ELSE ST_DistanceSphere(geom::geography, %s::geography) END",
+                "ELSE ST_Distance(geom::geography, %s::geography) END",
                 (subject.geom.ewkb, subject.geom.ewkb) if subject.geom else (None, None),
             ),
         )
@@ -317,16 +343,16 @@ def apply_filters(qs: Iterable[Assessor], filters: CmaFilters) -> Iterable[Asses
         start_dt = dt.datetime.combine(filters.sale_date_min, dt.time.min)
         if timezone.is_naive(start_dt):
             start_dt = timezone.make_aware(start_dt)
-        qs = qs.filter(sale_date__gte=start_dt)
+        qs = qs.filter(comp_sale_date__gte=start_dt)
     if filters.sale_date_max:
         end_dt = dt.datetime.combine(filters.sale_date_max, dt.time.max)
         if timezone.is_naive(end_dt):
             end_dt = timezone.make_aware(end_dt)
-        qs = qs.filter(sale_date__lte=end_dt)
+        qs = qs.filter(comp_sale_date__lte=end_dt)
     if filters.min_price is not None:
-        qs = qs.filter(sale_price__gte=filters.min_price)
+        qs = qs.filter(comp_sale_price__gte=filters.min_price)
     if filters.max_price is not None:
-        qs = qs.filter(sale_price__lte=filters.max_price)
+        qs = qs.filter(comp_sale_price__lte=filters.max_price)
     if filters.bedrooms is not None:
         qs = qs.filter(bedrooms__gte=filters.bedrooms)
     if filters.bathrooms is not None:
@@ -418,7 +444,7 @@ def build_comparables(
     for candidate in queryset:
         if candidate.parcel_number in excluded:
             continue
-        sale_price = _to_decimal(candidate.sale_price)
+        sale_price = _to_decimal(getattr(candidate, "comp_sale_price", None))
         if sale_price is None or sale_price <= 0:
             continue
         auto_adjustments, difference_flags = _compute_adjustments(subject, candidate)
@@ -441,7 +467,7 @@ def build_comparables(
             parcel_number=candidate.parcel_number,
             address=candidate.address or "Unknown address",
             sale_price=sale_price,
-            sale_date=_safe_date(candidate.sale_date),
+            sale_date=_safe_date(getattr(candidate, "comp_sale_date", None)),
             property_type=candidate.property_type,
             living_area=_to_decimal(candidate.living_area),
             bedrooms=_to_decimal(candidate.bedrooms),
@@ -452,7 +478,7 @@ def build_comparables(
             acres=_to_decimal(candidate.acres),
             geom=candidate.geom,
             metadata={
-                "sale_deed_type": candidate.sale_deed_type,
+                "sale_deed_type": getattr(candidate, "comp_deed_type", None),
                 "neighborhood_code": candidate.neighborhood_code,
             },
         )
@@ -461,7 +487,7 @@ def build_comparables(
             ComparableResult(
                 snapshot=comp_snapshot,
                 sale_price=sale_price.quantize(Decimal("0.01")),
-                sale_date=_safe_date(candidate.sale_date),
+                sale_date=_safe_date(getattr(candidate, "comp_sale_date", None)),
                 distance_meters=float(distance_meters) if distance_meters else None,
                 distance_miles=distance_miles,
                 auto_adjustments=auto_adjustments,
@@ -588,9 +614,9 @@ def fetch_sales_within_view(
                 "parcel_number": candidate.parcel_number,
                 "lat": candidate.geom.y,
                 "lon": candidate.geom.x,
-                "sale_price": float(candidate.sale_price) if candidate.sale_price else None,
-                "sale_date": _safe_date(candidate.sale_date).isoformat()
-                if _safe_date(candidate.sale_date)
+                "sale_price": float(getattr(candidate, "comp_sale_price", 0)) if getattr(candidate, "comp_sale_price", None) else None,
+                "sale_date": _safe_date(getattr(candidate, "comp_sale_date", None)).isoformat()
+                if _safe_date(getattr(candidate, "comp_sale_date", None))
                 else None,
                 "address": candidate.address,
             }
