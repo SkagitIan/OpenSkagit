@@ -24,6 +24,7 @@ from django.views.decorators.http import require_GET, require_POST
 logger = logging.getLogger(__name__)
 
 from . import cma, llm
+from . import appeals
 from .models import Assessor, CmaAnalysis, CmaComparableSelection
 
 
@@ -1190,3 +1191,86 @@ def cma_share(request, share_uuid):
         "markers": computation.marker_payloads(),
     }
     return render(request, "openskagit/cma/dashboard.html", context)
+
+
+# ------------------------------
+# Citizen Appeal Helper (simple)
+# ------------------------------
+
+@require_GET
+def appeal_home(request):
+    """
+    Minimal, citizen-friendly entry with a single address/parcel search box.
+    """
+    return render(request, "openskagit/appeal_home.html")
+
+
+@require_GET
+def appeal_parcel_search(request):
+    query = (request.GET.get("q") or "").strip()
+    results = []
+    if query:
+        results = list(
+            Assessor.objects.filter(
+                Q(parcel_number__istartswith=query) | Q(address__icontains=query)
+            ).order_by("parcel_number")[:15]
+        )
+    return render(
+        request,
+        "openskagit/appeal_parcel_search_results.html",
+        {"query": query, "results": results},
+    )
+
+
+@require_GET
+def appeal_result(request, parcel_number: str):
+    try:
+        subject = cma.load_subject(parcel_number)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    # Ensure assessed value is available for citizen scoring
+    try:
+        assessor_row = Assessor.objects.get(parcel_number=parcel_number)
+        if subject and isinstance(subject.metadata, dict):
+            subject.metadata["assessed_value"] = assessor_row.assessed_value
+    except Assessor.DoesNotExist:
+        pass
+
+    summary = appeals.citizen_assessment_summary(subject)
+
+    # Soft-stop gating to reduce frivolous appeals
+    over_pct = summary.get("over_assessment_pct")
+    comp_count = summary.get("comp_count") or 0
+    neigh = summary.get("neighborhood") or {}
+    neigh_diff = summary.get("neigh_diff_pct")
+    score = summary.get("score") or 0
+
+    soft_stop = False
+    soft_reasons: List[str] = []
+    if over_pct is not None and over_pct < 7:
+        soft_stop = True
+        soft_reasons.append("Assessed value is less than ~7% above market comps.")
+    if comp_count < 3:
+        soft_stop = True
+        soft_reasons.append("Fewer than 3 strong comparable sales are available.")
+    if (neigh_diff is not None) and neigh_diff <= 0:
+        soft_stop = True
+        soft_reasons.append("Your assessment did not rise more than your neighborhood average.")
+    if score < 45:
+        soft_stop = True
+        soft_reasons.append("Overall appeal likelihood is below ~45%.")
+
+    context = {
+        "subject": subject,
+        "parcel_number": parcel_number,
+        "comparables": summary.get("comparables", []),
+        "neighborhood": neigh,
+        "over_assessment_pct": over_pct,
+        "neigh_diff_pct": neigh_diff,
+        "score": score,
+        "rating": summary.get("rating"),
+        "reasons": summary.get("reasons", []),
+        "soft_stop": soft_stop,
+        "soft_reasons": soft_reasons,
+    }
+    return render(request, "openskagit/appeal_results.html", context)

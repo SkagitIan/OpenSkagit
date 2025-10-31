@@ -188,3 +188,8 @@ REST_FRAMEWORK = {
 
 # Vector search configuration
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+
+# Appeal helper configuration
+# Optional JSON with pre-parsed ratio summary; if not present, we attempt a best-effort PDF parse.
+RATIO_SUMMARY_JSON = os.environ.get("RATIO_SUMMARY_JSON")
+RATIO_SUMMARY_PDF = os.environ.get("RATIO_SUMMARY_PDF") or str(BASE_DIR / "2025-'26 all-county ratio summary.pdf")

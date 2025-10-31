@@ -1,0 +1,36 @@
+{% load humanize %}
+{% if query %}
+  {% if results %}
+    <div class="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {% for parcel in results %}
+        <button type="button"
+                class="w-full px-4 py-3 text-left hover:bg-slate-50"
+                hx-get="{% url 'appeal-result' parcel.parcel_number %}"
+                hx-target="#appeal-detail"
+                hx-swap="innerHTML"
+                hx-push-url="true"
+                hx-on::afterRequest="document.getElementById('appeal-search').value='{{ parcel.parcel_number|escapejs }}';">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-base font-semibold">{{ parcel.address|default:"Address unavailable" }}</p>
+              <p class="text-xs text-slate-500">Parcel {{ parcel.parcel_number }}</p>
+            </div>
+            <div class="text-right text-xs text-slate-500">
+              {% if parcel.sale_price %}
+                <p>${{ parcel.sale_price|floatformat:0|intcomma }}</p>
+              {% endif %}
+              {% if parcel.sale_date %}
+                <p>{{ parcel.sale_date|date:"M j, Y" }}</p>
+              {% endif %}
+            </div>
+          </div>
+        </button>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">No matches for “{{ query }}”. Try the parcel number or street.</div>
+  {% endif %}
+{% else %}
+  <div class="text-sm text-slate-500">Start typing to find your home…</div>
+{% endif %}
+
