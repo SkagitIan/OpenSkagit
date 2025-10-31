@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'rest_framework',
     "django.contrib.gis",
     "leaflet",
+    'django.contrib.humanize',
 ]
 
 LEAFLET_CONFIG = {
