@@ -1,3 +1,22 @@
 staticfiles/
 *env
 manage.py
+# Local / temporary stuff
+*.log
+*.ipynb
+*.csv
+*.json
+__pycache__/
+*.pyc
+*.db
+*.txt
+*.sh
+*.txt
+*.sqlite3
+
+# Django project data
+django_project/data/*
+logs/
+analysis.ipynb
+regression.ipynb
+
