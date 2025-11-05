@@ -1,3 +1,108 @@
+SELECT 
+  COUNT(DISTINCT a.parcel_number) AS total_res_parcels,
+  COUNT(DISTINCT i.parcel_number) AS with_main_improvement,
+  ROUND(
+    COUNT(DISTINCT i.parcel_number) * 100.0 / COUNT(DISTINCT a.parcel_number),
+    2
+  ) AS pct_with_main_impr
+FROM assessor a
+LEFT JOIN improvements i
+  ON a.parcel_number = i.parcel_number
+ AND i.improvement_detail_class_code IN ('MA','MA1.5','MA2','MA2.5','MA-SPLIT','MA-TRI','SW','MH')
+WHERE (a.land_use_code::int) IN (110,111,112,113,120,130,140,180,181,182,190,910,911,912);
+
+DROP MATERIALIZED VIEW IF EXISTS sale_regression_dataset;
+CREATE MATERIALIZED VIEW sale_regression_dataset AS
+SELECT
+    ROW_NUMBER() OVER () AS id,
+    s.id AS sale_id,
+    s.parcel_number,
+    r.year,
+    s.sale_price,
+    s.sale_date,
+    a.assessed_value,
+    a.total_market_value,
+    a.living_area,
+    -- Garage flags
+    MAX(CASE WHEN UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'AGAR%' THEN 1 ELSE 0 END) AS has_attached_garage,
+    MAX(CASE WHEN UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'DGAR%' THEN 1 ELSE 0 END) AS has_detached_garage,
+    -- Main improvement condition
+    MAX(i.condition_code) AS condition_code,
+    a.acres AS lot_acres,
+    a.bedrooms,
+    a.bathrooms,
+    a.year_built,
+    a.eff_year_built,
+    a.latitude,
+    a.longitude,
+    a.neighborhood_code,
+    a.land_use_code,
+    a.property_type
+FROM sales s
+JOIN assessor a
+  ON s.parcel_number = a.parcel_number
+ AND s.roll_id       = a.roll_id
+LEFT JOIN improvements i
+  ON a.parcel_number = i.parcel_number
+ AND a.roll_id       = i.roll_id
+ AND (
+       -- Keep only main improvements and garage improvements
+       UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'MA%' OR
+       UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'MW%' OR
+       UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'SW%' OR
+       UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'PM%' OR
+       UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'AGAR%' OR
+       UPPER(TRIM(i.improvement_detail_type_code)) LIKE 'DGAR%'
+     )
+LEFT JOIN openskagit_assessmentroll r
+  ON a.roll_id = r.id
+WHERE
+    s.sale_type = 'VALID SALE'
+AND s.sale_price IS NOT NULL
+AND s.sale_price > 10000
+AND s.sale_date >= DATE '2015-01-01'
+AND s.sale_date <  DATE '2035-01-01'
+AND a.property_type = 'R'
+AND a.land_use_code::int IN (110,111,112,113,120,130,140,180,181,182,190,910,911,912)
+GROUP BY
+    s.id, s.parcel_number, r.year, s.sale_price, s.sale_date,
+    a.assessed_value, a.total_market_value,
+    a.living_area, a.acres, a.bedrooms, a.bathrooms,
+    a.year_built, a.eff_year_built, a.latitude, a.longitude,
+    a.neighborhood_code, a.land_use_code, a.property_type;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.db import connection
+
+with connection.cursor() as cur:
+    cur.execute("""
+        SELECT parcel_number, improvement_type, total_area
+        FROM property_improvement_features
+        WHERE parcel_number = 'P90623';
+    """)
+    print(cur.fetchall())
+
+
+
+
+python3 manage.py update_assessor_2025 \
+  --sqlite-path=/home/django/django_project/django_project/data/skagit_assessor.db \
+  --year=2025
+
+
 
 Access the Django admin site
     URL: http://159.65.103.78/admin

@@ -1,5 +1,9 @@
 {% load humanize %}
-{% if query %}
+{% if query_too_short %}
+  <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+    Enter at least {{ min_search_length|default:3 }} characters to search.
+  </div>
+{% elif query %}
   {% if results %}
     <div class="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
       {% for parcel in results %}
@@ -9,7 +13,11 @@
                 hx-target="#appeal-detail"
                 hx-swap="innerHTML"
                 hx-push-url="true"
-                hx-on::afterRequest="document.getElementById('appeal-search').value='{{ parcel.parcel_number|escapejs }}';">
+                hx-indicator="#appeal-detail-indicator"
+                hx-on::afterRequest="window.appealSearchSelect(event)"
+                data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
+                data-parcel="{{ parcel.parcel_number|escape }}"
+                data-details="{% if parcel.sale_price and parcel.sale_date %}Last sold for ${{ parcel.sale_price|floatformat:0|intcomma }} on {{ parcel.sale_date|date:'M j, Y' }}{% elif parcel.sale_price %}Last sold for ${{ parcel.sale_price|floatformat:0|intcomma }}{% elif parcel.sale_date %}Last recorded sale {{ parcel.sale_date|date:'M j, Y' }}{% endif %}">
           <div class="flex items-center justify-between gap-3">
             <div>
               <p class="text-base font-semibold">{{ parcel.address|default:"Address unavailable" }}</p>
@@ -33,4 +41,3 @@
 {% else %}
   <div class="text-sm text-slate-500">Start typing to find your home…</div>
 {% endif %}
-

@@ -1,17 +1,21 @@
 import copy
+import functools
 import json
 import logging
 import math
 import os
+import operator
+import re
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.humanize.templatetags.humanize import intcomma
 from django.db import connection
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
+from django.db.models.functions import Upper
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
@@ -25,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 from . import cma, llm
 from . import appeals
-from .models import Assessor, CmaAnalysis, CmaComparableSelection
+from .models import AssessmentRoll, Assessor, CmaAnalysis, CmaComparableSelection, Parcel
 
 
 CMA_SESSION_KEY = "cma_state"
@@ -41,6 +45,46 @@ CMA_ALLOWED_SORT_DIRECTIONS = {"asc", "desc"}
 
 CHAT_SESSION_KEY = "rag_conversations"
 CHAT_ACTIVE_KEY = "rag_active_conversation"
+
+
+def _coerce_percent(value: Any) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.endswith("%"):
+            text = text[:-1]
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_percent_change(metadata: Any) -> Optional[float]:
+    if not isinstance(metadata, dict):
+        return None
+    candidate_keys = (
+        "assessed_change_pct",
+        "assessment_change_pct",
+        "percent_change",
+        "percentchange",
+        "pct_change",
+        "pct change",
+        "change_pct",
+    )
+    for key in candidate_keys:
+        if key in metadata:
+            pct = _coerce_percent(metadata.get(key))
+            if pct is not None:
+                return pct
+    assessor_meta = metadata.get("assessor")
+    if isinstance(assessor_meta, dict):
+        for key in candidate_keys:
+            pct = _coerce_percent(assessor_meta.get(key))
+            if pct is not None:
+                return pct
+    return None
 
 
 def _chat_store(request) -> Dict[str, Any]:
@@ -938,8 +982,10 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
     manual_adjustments = _manual_adjustments_from_state(parcel_state)
     excluded = parcel_state.get("excluded", [])
 
+    rollup_cache: Dict[Tuple[str, Optional[int], Optional[int]], Dict[str, object]] = {}
+
     try:
-        subject = cma.load_subject(parcel_number)
+        subject = cma.load_subject(parcel_number, rollup_cache=rollup_cache)
     except ValueError as exc:
         return {"error": str(exc)}
 
@@ -951,6 +997,8 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
         sort_field=sort_field,
         sort_direction=sort_direction,
         limit=limit,
+        load_improvements=False,
+        rollup_cache=rollup_cache,
     )
 
     return {
@@ -981,21 +1029,32 @@ def cma_dashboard_view(request, parcel_number: Optional[str] = None):
     return render(request, template_name, context)
 
 
+import time
+from django.db import connection
+
 @require_GET
 def cma_parcel_search(request):
     query = (request.GET.get("q") or "").strip()
     results = []
     if query:
+        start = time.perf_counter()
+
         results = list(
             Assessor.objects.filter(
                 Q(parcel_number__istartswith=query) | Q(address__icontains=query)
-            ).order_by("parcel_number")[:15]
+            )[:15]
         )
+
+        end = time.perf_counter()
+        elapsed = end - start
+        logger.info(f"[DEBUG] Parcel search query='{query}' took {elapsed:.3f}s")
+
     return render(
         request,
         "openskagit/cma/partials/parcel_search_results.html",
         {"query": query, "results": results},
     )
+
 
 
 @require_GET
@@ -1004,6 +1063,34 @@ def cma_comparison_grid(request, parcel_number: str):
     if "error" in context:
         return HttpResponseBadRequest(context["error"])
     return render(request, "openskagit/cma/partials/comparison_grid.html", context)
+
+
+@require_GET
+def cma_comparable_improvements(request, parcel_number: str, comp_parcel: str):
+    def _to_int(value: Optional[str]) -> Optional[int]:
+        if not value:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    roll_year = _to_int(request.GET.get("roll_year"))
+    roll_id = _to_int(request.GET.get("roll_id"))
+    assessor_style = request.GET.get("assessor_style") or None
+
+    improvements = cma.get_improvement_rollup(
+        comp_parcel,
+        roll_year=roll_year,
+        roll_id=roll_id,
+        assessor_building_style=assessor_style,
+    )
+
+    return render(
+        request,
+        "openskagit/cma/partials/comparable_improvement_info.html",
+        {"improvements": improvements},
+    )
 
 
 @require_POST
@@ -1197,6 +1284,21 @@ def cma_share(request, share_uuid):
 # Citizen Appeal Helper (simple)
 # ------------------------------
 
+APPEAL_SEARCH_LIMIT = 15
+APPEAL_MIN_QUERY_LENGTH = 3
+
+
+def _current_assessment_year() -> int:
+    year = (
+        AssessmentRoll.objects.order_by("-year")
+        .values_list("year", flat=True)
+        .first()
+    )
+    if year is None:
+        return timezone.now().year
+    return int(year)
+
+
 @require_GET
 def appeal_home(request):
     """
@@ -1205,46 +1307,229 @@ def appeal_home(request):
     return render(request, "openskagit/appeal_home.html")
 
 
+APPEAL_SEARCH_LIMIT = 15
+APPEAL_MIN_QUERY_LENGTH = 2  # whatever you use
+
 @require_GET
 def appeal_parcel_search(request):
     query = (request.GET.get("q") or "").strip()
+    query_too_short = len(query) < APPEAL_MIN_QUERY_LENGTH
     results = []
-    if query:
-        results = list(
-            Assessor.objects.filter(
-                Q(parcel_number__istartswith=query) | Q(address__icontains=query)
-            ).order_by("parcel_number")[:15]
+
+    if not query_too_short:
+        is_parcel_like = bool(re.match(r"^[Pp]\s*\d+\s*$", query))
+        qs = Parcel.objects.filter(property_type="R")
+        latest_sale = (
+            Assessor.objects.filter(parcel_number=OuterRef("parcel_number"))
+            .exclude(sale_price__isnull=True)
+            .order_by("-roll__year", "-sale_date")
         )
+        qs = qs.annotate(
+            sale_price=Subquery(latest_sale.values("sale_price")[:1]),
+            sale_date=Subquery(latest_sale.values("sale_date")[:1]),
+        )
+
+        if is_parcel_like:
+            normalized = query.upper().replace(" ", "")
+            digits_only = re.sub(r"\D", "", query)
+            filters = []
+            if normalized:
+                filters.append(Q(parcel_number__startswith=normalized))
+            if digits_only:
+                filters.append(Q(parcel_number__startswith=f"P{digits_only}"))
+            if filters:
+                qs = qs.filter(functools.reduce(operator.or_, filters))
+        else:
+            starts_with_number = bool(re.match(r"^\s*\d+", query))
+            if starts_with_number:
+                qs = qs.filter(address__istartswith=query)
+            else:
+                qs = qs.filter(address__icontains=query)
+
+        # Safety + result cap
+        results = (
+            qs.exclude(address__isnull=True)
+              .exclude(address__exact="")
+              .exclude(address__icontains="nan")
+              .order_by("parcel_number")[:APPEAL_SEARCH_LIMIT]
+        )
+
     return render(
         request,
         "openskagit/appeal_parcel_search_results.html",
-        {"query": query, "results": results},
+        {
+            "query": query,
+            "results": results,
+            "query_too_short": query_too_short,
+            "min_search_length": APPEAL_MIN_QUERY_LENGTH,
+        },
     )
-
 
 @require_GET
 def appeal_result(request, parcel_number: str):
+    current_roll_year = _current_assessment_year()
+    active_roll_year = current_roll_year
     try:
-        subject = cma.load_subject(parcel_number)
+        subject = cma.load_subject(parcel_number, roll_year=current_roll_year)
     except ValueError as exc:
-        return HttpResponseBadRequest(str(exc))
+        logger.warning(
+            "Appeal helper failed to load parcel %s for roll %s: %s",
+            parcel_number,
+            current_roll_year,
+            exc,
+        )
+        try:
+            subject = cma.load_subject(parcel_number)
+        except ValueError:
+            return HttpResponseBadRequest(str(exc))
+
+        # Derive the roll year actually used for the fallback subject.
+        fallback_year: Optional[int] = None
+        metadata_for_year = subject.metadata if isinstance(subject.metadata, dict) else {}
+        raw_year = metadata_for_year.get("assessment_roll_year")
+        if raw_year is not None:
+            try:
+                fallback_year = int(raw_year)
+            except (TypeError, ValueError):
+                fallback_year = None
+        if fallback_year is None:
+            assessor_meta = metadata_for_year.get("assessor") if isinstance(metadata_for_year, dict) else None
+            if isinstance(assessor_meta, dict):
+                raw_year = assessor_meta.get("assessment_year") or assessor_meta.get("year")
+                if raw_year is not None:
+                    try:
+                        fallback_year = int(raw_year)
+                    except (TypeError, ValueError):
+                        fallback_year = None
+        if fallback_year is not None:
+            active_roll_year = fallback_year
+            if fallback_year != current_roll_year:
+                logger.info(
+                    "Appeal helper using roll %s for parcel %s (current roll %s unavailable)",
+                    fallback_year,
+                    parcel_number,
+                    current_roll_year,
+                )
+
+    metadata = subject.metadata if isinstance(subject.metadata, dict) else {}
+    metadata["assessment_roll_year"] = active_roll_year
+
     # Ensure assessed value is available for citizen scoring
-    try:
-        assessor_row = Assessor.objects.get(parcel_number=parcel_number)
-        if subject and isinstance(subject.metadata, dict):
-            subject.metadata["assessed_value"] = assessor_row.assessed_value
-    except Assessor.DoesNotExist:
-        pass
+    assessor_row = (
+        Assessor.objects.select_related("roll")
+        .filter(parcel_number=parcel_number, roll__year=active_roll_year)
+        .first()
+    )
+    if assessor_row:
+        metadata["assessed_value"] = assessor_row.assessed_value
+
+    prior_roll_year = active_roll_year - 1
+    prior_assessor = (
+        Assessor.objects.select_related("roll")
+        .filter(parcel_number=parcel_number, roll__year=prior_roll_year)
+        .first()
+        if prior_roll_year > 0
+        else None
+    )
+
+    assessor_meta = metadata.setdefault("assessor", {})
+    if assessor_row:
+        assessor_meta["assessment_year"] = active_roll_year
+        assessor_meta["assessed_value"] = assessor_row.assessed_value
+    if prior_assessor:
+        assessor_meta["prior_assessment_year"] = prior_roll_year
+        assessor_meta["prior_assessed_value"] = prior_assessor.assessed_value
+
+    assessed_change_pct: Optional[float] = None
+    if assessor_row and prior_assessor:
+        current_value = assessor_row.assessed_value
+        prior_value = prior_assessor.assessed_value
+        if current_value is not None and prior_value not in (None, 0):
+            try:
+                current_dec = Decimal(str(current_value))
+                prior_dec = Decimal(str(prior_value))
+            except (InvalidOperation, TypeError):
+                current_dec = None
+                prior_dec = None
+            if current_dec is not None and prior_dec not in (None, Decimal("0")):
+                try:
+                    change_pct = (current_dec - prior_dec) / prior_dec * Decimal("100")
+                    assessed_change_pct = float(change_pct)
+                except (InvalidOperation, ZeroDivisionError):
+                    assessed_change_pct = None
+
+    if assessed_change_pct is not None:
+        metadata["assessed_change_pct"] = assessed_change_pct
+        assessor_meta["assessment_change_pct"] = assessed_change_pct
+
+    subject.metadata = metadata
 
     summary = appeals.citizen_assessment_summary(subject)
 
-    # Soft-stop gating to reduce frivolous appeals
     over_pct = summary.get("over_assessment_pct")
     comp_count = summary.get("comp_count") or 0
     neigh = summary.get("neighborhood") or {}
     neigh_diff = summary.get("neigh_diff_pct")
+    avg_change_pct = neigh.get("avg_increase_pct")
+    your_change_pct = _extract_percent_change(subject.metadata)
+    if your_change_pct is None and avg_change_pct is not None and neigh_diff is not None:
+        your_change_pct = avg_change_pct + neigh_diff
+    if neigh_diff is None and avg_change_pct is not None and your_change_pct is not None:
+        neigh_diff = your_change_pct - avg_change_pct
+
+    your_change_bar_pct: Optional[float] = None
+    neigh_change_bar_pct: Optional[float] = None
+    if your_change_pct is not None or avg_change_pct is not None:
+        bar_max = max(abs(your_change_pct or 0.0), abs(avg_change_pct or 0.0))
+        if bar_max == 0:
+            if your_change_pct is not None:
+                your_change_bar_pct = 0.0
+            if avg_change_pct is not None:
+                neigh_change_bar_pct = 0.0
+        else:
+            if your_change_pct is not None:
+                your_change_bar_pct = abs(your_change_pct) / bar_max * 100
+            if avg_change_pct is not None:
+                neigh_change_bar_pct = abs(avg_change_pct) / bar_max * 100
+
+    cod_descriptor: Optional[str] = None
+    cod_explainer: Optional[str] = None
+    cod_value = neigh.get("cod")
+    if isinstance(cod_value, (int, float)):
+        if cod_value <= 8:
+            cod_descriptor = "High uniformity"
+            cod_explainer = (
+                "Assessments in this area are very consistent — most homes fall within roughly "
+                f"{cod_value:.1f}% of the average ratio."
+            )
+        elif cod_value <= 15:
+            cod_descriptor = "Typical uniformity"
+            cod_explainer = (
+                "Assessments vary a bit, but the COD is still within the range most counties consider acceptable."
+            )
+        else:
+            cod_descriptor = "Low uniformity"
+            cod_explainer = (
+                "Values swing wider around the average; a higher COD means assessments differ more parcel to parcel."
+            )
+
+    prd_descriptor: Optional[str] = None
+    prd_explainer: Optional[str] = None
+    prd_value = neigh.get("prd")
+    if isinstance(prd_value, (int, float)):
+        if 0.98 <= prd_value <= 1.03:
+            prd_descriptor = "Balanced"
+            prd_explainer = "Higher- and lower-priced homes are treated evenly; PRD near 1.00 is ideal."
+        elif prd_value > 1.03:
+            prd_descriptor = "Regressive tilt"
+            prd_explainer = "Higher-value homes trend a bit low relative to average. Values above 1.03 indicate regressivity."
+        else:
+            prd_descriptor = "Progressive tilt"
+            prd_explainer = "Lower-value homes trend a bit low relative to average. Values below 0.98 indicate progressivity."
+
     score = summary.get("score") or 0
 
+    # Soft-stop gating to reduce frivolous appeals
     soft_stop = False
     soft_reasons: List[str] = []
     if over_pct is not None and over_pct < 7:
@@ -1260,6 +1545,8 @@ def appeal_result(request, parcel_number: str):
         soft_stop = True
         soft_reasons.append("Overall appeal likelihood is below ~45%.")
 
+    subject_year_built = subject.year_built or subject.effective_year_built
+
     context = {
         "subject": subject,
         "parcel_number": parcel_number,
@@ -1267,10 +1554,18 @@ def appeal_result(request, parcel_number: str):
         "neighborhood": neigh,
         "over_assessment_pct": over_pct,
         "neigh_diff_pct": neigh_diff,
+        "your_change_pct": your_change_pct,
+        "your_change_bar_pct": your_change_bar_pct,
+        "neigh_change_bar_pct": neigh_change_bar_pct,
         "score": score,
         "rating": summary.get("rating"),
         "reasons": summary.get("reasons", []),
         "soft_stop": soft_stop,
         "soft_reasons": soft_reasons,
+        "subject_year_built": subject_year_built,
+        "cod_descriptor": cod_descriptor,
+        "cod_explainer": cod_explainer,
+        "prd_descriptor": prd_descriptor,
+        "prd_explainer": prd_explainer,
     }
     return render(request, "openskagit/appeal_results.html", context)

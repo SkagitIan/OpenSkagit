@@ -1,151 +1,52 @@
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from django.conf import settings
-
 from . import cma
+from .neighborhood import get_neighborhood_snapshot
 
 
-@dataclass(frozen=True)
-class NeighborhoodStats:
-    code: str
-    name: Optional[str]
-    avg_change_pct: Optional[float]
-    cod: Optional[float]
-    valid_sales: Optional[int]
-    parcels: Optional[int]
-
-
-def _as_float(value: Any) -> Optional[float]:
-    try:
-        if value is None:
-            return None
-        text = str(value).strip().replace("%", "")
-        if text == "":
-            return None
-        return float(text)
-    except Exception:
-        return None
-
-
-def _as_int(value: Any) -> Optional[int]:
-    try:
-        if value is None:
-            return None
-        text = str(value).strip().replace(",", "")
-        if text == "":
-            return None
-        return int(float(text))
-    except Exception:
-        return None
-
-
-def load_ratio_stats() -> Dict[str, NeighborhoodStats]:
+def _empty_neighborhood_snapshot(raw_code: Optional[str]) -> Dict[str, Any]:
     """
-    Load neighborhood ratio summary stats from a JSON or PDF path.
-
-    Configuration options (first match wins):
-      • settings.RATIO_SUMMARY_JSON – path to a JSON file containing records like
-        {"code": "20MVCENTRL", "name": "Mount Vernon Central", "pct_change": 2.6, "cod": 8.9, "valid_sales": 42, "parcels": 1800}
-      • settings.RATIO_SUMMARY_PDF – path to the provided county PDF. If pdfplumber
-        is installed, we will attempt a best-effort table extraction.
-
-    Returns a dict keyed by neighborhood code.
+    Provide a consistent schema when we cannot resolve official neighborhood metrics.
     """
+    normalized = (raw_code or "").strip()
+    normalized_upper = normalized.upper() if normalized else None
+    return {
+        "code": normalized_upper or raw_code,
+        "name": None,
+        "year": None,
+        "avg_increase_pct": None,
+        "cod": None,
+        "valid_sales": None,
+        "parcels": None,
+        "reliability": None,
+        "reliability_display": "Unknown",
+        "sales_ratio": None,
+        "median_ratio": None,
+        "median_ratio_pct": None,
+        "prior_sales_ratio": None,
+        "sales_ratio_delta": None,
+        "prior_cod": None,
+        "prd": None,
+        "prior_prd": None,
+        "sample_size_pct": None,
+        "sales_ratio_pos": None,
+        "prd_pos": None,
+        "cod_pos": None,
+    }
 
-    results: Dict[str, NeighborhoodStats] = {}
 
-    # Try JSON first (simplest and most reliable)
-    json_path = getattr(settings, "RATIO_SUMMARY_JSON", None)
-    if json_path:
-        path = Path(str(json_path))
-        if path.exists():
-            import json
-
-            with path.open("r", encoding="utf-8") as fh:
-                data = json.load(fh) or []
-            for row in data:
-                code = (row.get("code") or "").strip()
-                if not code:
-                    continue
-                results[code] = NeighborhoodStats(
-                    code=code,
-                    name=(row.get("name") or None),
-                    avg_change_pct=_as_float(row.get("pct_change")),
-                    cod=_as_float(row.get("cod")),
-                    valid_sales=_as_int(row.get("valid_sales")),
-                    parcels=_as_int(row.get("parcels")),
-                )
-            return results
-
-    # Fallback: try to parse the PDF if pdfplumber is available
-    pdf_path = getattr(settings, "RATIO_SUMMARY_PDF", None)
-    if pdf_path:
-        try:
-            import pdfplumber  # type: ignore
-
-            path = Path(str(pdf_path))
-            if path.exists():
-                with pdfplumber.open(str(path)) as pdf:
-                    for page in pdf.pages:
-                        tables = page.extract_tables() or []
-                        for table in tables:
-                            # Heuristic: try to find columns matching expected headers
-                            # and coerce records. The exact structure may vary, so be lenient.
-                            headers: List[str] = [str(h or "").strip().lower() for h in (table[0] or [])]
-                            rows = table[1:]
-                            # Map header indices
-                            def col_index(*aliases: str) -> Optional[int]:
-                                for a in aliases:
-                                    if a in headers:
-                                        return headers.index(a)
-                                return None
-
-                            idx_code = col_index("neighborhood", "code")
-                            idx_name = col_index("name", "neighborhood name")
-                            idx_pct = col_index("% change", "%change", "pct change")
-                            idx_cod = col_index("cod")
-                            idx_sales = col_index("valid sales", "valid")
-                            idx_parcels = col_index("parcels", "parcel count")
-
-                            if idx_code is None:
-                                continue
-
-                            for r in rows:
-                                try:
-                                    code = (r[idx_code] or "").strip()
-                                except Exception:
-                                    continue
-                                if not code:
-                                    continue
-                                name = None
-                                if idx_name is not None:
-                                    try:
-                                        name = (r[idx_name] or None)
-                                    except Exception:
-                                        name = None
-                                stats = NeighborhoodStats(
-                                    code=code,
-                                    name=name,
-                                    avg_change_pct=_as_float(r[idx_pct]) if idx_pct is not None else None,
-                                    cod=_as_float(r[idx_cod]) if idx_cod is not None else None,
-                                    valid_sales=_as_int(r[idx_sales]) if idx_sales is not None else None,
-                                    parcels=_as_int(r[idx_parcels]) if idx_parcels is not None else None,
-                                )
-                                results[code] = stats
-        except ModuleNotFoundError:
-            # pdfplumber not installed; return empty results
-            pass
-        except Exception:
-            # Best-effort parse; ignore failures
-            pass
-
-    return results
+def _resolve_neighborhood_context(raw_code: Optional[str]) -> Dict[str, Any]:
+    """
+    Prefer official 2025 metrics, falling back to the most recent data if necessary.
+    """
+    snapshot = get_neighborhood_snapshot(raw_code, year=2025)
+    if not snapshot:
+        snapshot = get_neighborhood_snapshot(raw_code)
+    return snapshot or _empty_neighborhood_snapshot(raw_code)
 
 
 def _months_ago(months: int) -> dt.date:
@@ -213,27 +114,6 @@ def compute_over_assessment(subject_assessed: Optional[Decimal], adjusted_comp_p
         return float(diff), len(adjusted_comp_prices)
     except Exception:
         return None, len(adjusted_comp_prices)
-
-
-def neighborhood_context(neighborhood_code: Optional[str], stats: Dict[str, NeighborhoodStats]) -> Dict[str, Any]:
-    rec = stats.get(neighborhood_code or "") if stats else None
-    reliability: Optional[str] = None
-    if rec and rec.valid_sales is not None and rec.cod is not None:
-        if rec.valid_sales >= 30 and rec.cod < 10:
-            reliability = "HIGH"
-        elif rec.valid_sales >= 15 and rec.cod < 15:
-            reliability = "MEDIUM"
-        else:
-            reliability = "LOW"
-    return {
-        "code": neighborhood_code,
-        "name": getattr(rec, "name", None) if rec else None,
-        "avg_increase_pct": getattr(rec, "avg_change_pct", None) if rec else None,
-        "cod": getattr(rec, "cod", None) if rec else None,
-        "valid_sales": getattr(rec, "valid_sales", None) if rec else None,
-        "parcels": getattr(rec, "parcels", None) if rec else None,
-        "reliability": reliability,
-    }
 
 
 def score_appeal(
@@ -332,8 +212,16 @@ def citizen_assessment_summary(subject: cma.PropertySnapshot) -> Dict[str, Any]:
         if assessed_value is not None:
             over_pct, comp_count = compute_over_assessment(assessed_value, adjusted_prices)
 
-    ratio_stats = load_ratio_stats()
-    neigh = neighborhood_context(subject.metadata.get("neighborhood_code"), ratio_stats)
+    metadata = subject.metadata or {}
+    raw_neighborhood = metadata.get("neighborhood_code")
+    if not raw_neighborhood:
+        assessor_meta = metadata.get("assessor") if isinstance(metadata, dict) else None
+        if isinstance(assessor_meta, dict):
+            raw_neighborhood = assessor_meta.get("neighborhoodcode") or assessor_meta.get("neighborhood_code")
+    if not raw_neighborhood:
+        raw_neighborhood = metadata.get("neighborhood")
+
+    neigh = _resolve_neighborhood_context(raw_neighborhood)
 
     # We generally cannot compute "your increase vs neighborhood" without prior-year assessed.
     # Leave as None unless a custom field is passed via metadata in the future.
@@ -366,4 +254,3 @@ def _to_decimal_safe(value: Any) -> Optional[Decimal]:
         return Decimal(str(value))
     except Exception:
         return None
-

@@ -41,6 +41,24 @@
                         </dd>
                     </div>
                 </dl>
+                {% with ir=subject.metadata.improvements %}
+                    {% if ir %}
+                        <div class="mt-2 text-xs text-slate-400 space-y-1">
+                            <p>
+                                {% if ir.style %}Style: <span class="text-slate-200">{{ ir.style }}</span>{% else %}Style: —{% endif %}
+                                • Quality: <span class="text-slate-200">{{ ir.quality|default:"—" }}</span>
+                                • Condition: <span class="text-slate-200">{{ ir.condition|default:"—" }}</span>
+                            </p>
+                            <p>
+                                MA: <span class="text-slate-200">{% if ir.main_area.total_sqft %}{{ ir.main_area.total_sqft|intcomma }} sqft{% else %}—{% endif %}</span>
+                                {% if ir.components and ir.components.0 %}
+                                    • {{ ir.components.0.label|default:ir.components.0.code }}:
+                                    <span class="text-slate-200">{% if ir.components.0.total_sqft %}{{ ir.components.0.total_sqft|intcomma }} sqft{% else %}—{% endif %}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    {% endif %}
+                {% endwith %}
             </div>
             <div class="flex items-center gap-4">
                 {% if not share_mode %}

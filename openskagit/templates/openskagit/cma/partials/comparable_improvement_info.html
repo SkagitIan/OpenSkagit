@@ -1,0 +1,17 @@
+{% load humanize %}
+{% if improvements %}
+    <p class="mt-2 text-[11px] text-slate-400">
+        {% if improvements.style %}Style: <span class="text-slate-300">{{ improvements.style }}</span>{% else %}Style: —{% endif %}
+        • Quality: <span class="text-slate-300">{{ improvements.quality|default:"—" }}</span>
+        • Condition: <span class="text-slate-300">{{ improvements.condition|default:"—" }}</span>
+    </p>
+    <p class="text-[11px] text-slate-400">
+        MA: <span class="text-slate-300">{% if improvements.main_area.total_sqft %}{{ improvements.main_area.total_sqft|intcomma }} sqft{% else %}—{% endif %}</span>
+        {% if improvements.components and improvements.components.0 %}
+            • {{ improvements.components.0.label|default:improvements.components.0.code }}:
+            <span class="text-slate-300">{% if improvements.components.0.total_sqft %}{{ improvements.components.0.total_sqft|intcomma }} sqft{% else %}—{% endif %}</span>
+        {% endif %}
+    </p>
+{% else %}
+    <p class="mt-2 text-[11px] text-slate-500">No improvement details available.</p>
+{% endif %}

@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
+from openskagit import cma, appeals
 
 
 def _dictfetchall(cursor) -> List[Dict[str, Any]]:
@@ -65,6 +66,54 @@ def _parse_iso_datetime(value: Optional[str], field_name: str) -> Optional[datet
         return datetime.fromisoformat(value)
     except ValueError:
         raise ValidationError({field_name: "Must be an ISO 8601 date or datetime."})
+
+
+class NeighborhoodStatsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, neighborhood_code: str):
+        """
+        Mock neighborhood comparison stats endpoint.
+
+        GET /api/neighborhood_stats/{neighborhood_code}/
+
+        Returns JSON with keys:
+          - neighborhood_name, percent_change, cod, valid_sales, reliability
+
+        This is a placeholder. Replace the mock block with a real query or
+        analytics once neighborhood datasets are available.
+        """
+        code = (neighborhood_code or "").strip()
+        if not code:
+            raise ValidationError({"neighborhood_code": "Required"})
+
+        mock_map = {
+            "NBH-001": {
+                "neighborhood_name": "Downtown Core",
+                "percent_change": 3.2,
+                "cod": 12.5,
+                "valid_sales": 87,
+                "reliability": "High",
+            },
+            "NBH-002": {
+                "neighborhood_name": "Riverside",
+                "percent_change": -1.1,
+                "cod": 15.8,
+                "valid_sales": 42,
+                "reliability": "Medium",
+            },
+        }
+
+        default_payload = {
+            "neighborhood_name": f"Neighborhood {code}",
+            "percent_change": 0.0,
+            "cod": 0.0,
+            "valid_sales": 0,
+            "reliability": "Unknown",
+        }
+
+        payload = mock_map.get(code.upper(), default_payload)
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
@@ -975,3 +1024,55 @@ class NearbyParcelsView(APIView):
                 "results": rows,
             }
         )
+
+
+class AppealAnalysisView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, parcel_number: str) -> Response:
+        """
+        GET /api/appeal_analysis/{parcel_number}/
+
+        Returns JSON:
+          - appeal_likelihood: 0–100
+          - rating: weak/moderate/strong/very-strong
+          - reasons: list[str]
+          - debug: optional supporting details
+        """
+        pn = (parcel_number or "").strip()
+        if not pn:
+            raise ValidationError({"parcel_number": "Required"})
+
+        # Load subject property snapshot via existing CMA utilities
+        try:
+            subject = cma.fetch_subject_snapshot(pn)
+        except Exception:
+            raise Http404("Parcel not found or unavailable")
+
+        summary = appeals.citizen_assessment_summary(subject)
+
+        score = int(summary.get("score") or 0)
+        label = (summary.get("rating") or "").lower()
+        # normalize to requested set
+        label_map = {
+            "weak": "weak",
+            "moderate": "moderate",
+            "strong": "strong",
+            "very strong": "very-strong",
+            "verystrong": "very-strong",
+            "very_strong": "very-strong",
+        }
+        rating = label_map.get(label, "moderate")
+
+        payload = {
+            "appeal_likelihood": score,
+            "rating": rating,
+            "reasons": summary.get("reasons") or [],
+            "debug": {
+                "over_assessment_pct": summary.get("over_assessment_pct"),
+                "comp_count": summary.get("comp_count"),
+                "neighborhood": summary.get("neighborhood"),
+            },
+        }
+
+        return Response(payload, status=status.HTTP_200_OK)

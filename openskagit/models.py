@@ -11,11 +11,81 @@ from django.conf import settings
 from django.contrib.gis.db import models
 from pgvector.django import VectorField
 
+class NeighborhoodMetrics(models.Model):
+    neighborhood_code = models.CharField(max_length=20, db_index=True)
+    year = models.IntegerField()
+    sales_ratio = models.FloatField(null=True)
+    median_ratio = models.FloatField(null=True)
+    cod = models.FloatField(null=True)
+    prd = models.FloatField(null=True)
+    sample_size = models.IntegerField(default=0)
+    reliability = models.CharField(max_length=20, blank=True)
+    computed_at = models.DateTimeField(auto_now_add=True)
+
+
+class RegressionAdjustment(models.Model):
+    variable = models.CharField(max_length=100)
+    adjustment_pct = models.FloatField()
+    model_version = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.variable}: {self.adjustment_pct}%"
+
+class RegressionResult(models.Model):
+    roll = models.ForeignKey("AssessmentRoll", on_delete=models.CASCADE)
+    model_type = models.CharField(max_length=50, default="log_linear")
+    run_date = models.DateTimeField(auto_now_add=True)
+    n_obs = models.IntegerField()
+    r_squared = models.FloatField()
+    adj_r_squared = models.FloatField()
+    coefficients = models.JSONField()       # {"log_living_area": 0.73, "bathrooms": 0.09, ...}
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "regression_results"
+        ordering = ["-run_date"]
+
+
+class Parcel(models.Model):
+    parcel_number = models.CharField(max_length=20, unique=True, db_index=True)
+    address = models.CharField(max_length=255, blank=True, null=True)  # includes city & ZIP
+    neighborhood_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    land_use_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # e.g. 110, 112
+    property_type = models.CharField(
+        max_length=1,
+        choices=[('R', 'Residential'), ('C', 'Commercial'), ('I', 'Industrial')],
+        default='R',
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "parcel"
+        ordering = ["parcel_number"]
+
+    def __str__(self):
+        return f"{self.parcel_number} - {self.address or 'No Address'}"
+
+
+class AssessmentRoll(models.Model):
+    year = models.IntegerField(db_index=True)
+    imported_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return str(self.year)
+
 class Assessor(models.Model):
-    parcel_number = models.TextField(blank=True, primary_key=True)
+    id = models.BigAutoField(primary_key=True)
+    roll = models.ForeignKey("AssessmentRoll", on_delete=models.CASCADE, related_name="assessors", null=True)
+    parcel_number = models.TextField(blank=True)
     address = models.TextField(blank=True, null=True)
     neighborhood_code = models.TextField(blank=True, null=True)
+    neighborhood_code_description = models.TextField(blank=True, null=True)
     land_use_code = models.TextField(blank=True, null=True)
+    land_use_description = models.TextField(blank=True, null=True)  
     building_value = models.FloatField(blank=True, null=True)
     impr_land_value = models.FloatField(blank=True, null=True)
     unimpr_land_value = models.BigIntegerField(blank=True, null=True)
@@ -61,11 +131,15 @@ class Assessor(models.Model):
     embedding = VectorField(dimensions=384, blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'assessor'
+        unique_together = ("roll", "parcel_number")
+
 
 class Improvements(models.Model):
-    parcel_number = models.TextField(blank=True,primary_key=True)
+    id = models.BigAutoField(primary_key=True)
+    roll = models.ForeignKey("AssessmentRoll", on_delete=models.CASCADE, related_name="improvements", null=True)
+    parcel_number = models.TextField(blank=True)
     improvement_id = models.BigIntegerField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     building_style = models.TextField(blank=True, null=True)
@@ -101,12 +175,14 @@ class Improvements(models.Model):
     sketch_path = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'improvements'
 
 
 class Land(models.Model):
-    parcel_number = models.TextField(blank=True,primary_key=True)
+    id = models.BigAutoField(primary_key=True)
+    roll = models.ForeignKey("AssessmentRoll", on_delete=models.CASCADE, related_name="land", null=True)
+    parcel_number = models.TextField(blank=True)
     property_value_year = models.FloatField(blank=True, null=True)
     land_segment_id = models.FloatField(blank=True, null=True)
     land_type = models.TextField(blank=True, null=True)
@@ -126,13 +202,15 @@ class Land(models.Model):
     land_segment_comment = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'land'
 
 
 class Sales(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    roll = models.ForeignKey("AssessmentRoll", on_delete=models.CASCADE, related_name="sales", null=True)
     sale_id = models.BigIntegerField(blank=True, null=True)
-    parcel_number = models.TextField(blank=True, primary_key=True)
+    parcel_number = models.TextField(blank=True)
     account_number = models.TextField(blank=True, null=True)
     seller_name = models.TextField(blank=True, null=True)
     buyer_name = models.TextField(blank=True, null=True)
@@ -146,7 +224,7 @@ class Sales(models.Model):
     excise_number = models.FloatField(blank=True, null=True)
 
     class Meta:
-        managed = False
+        managed = True
         db_table = 'sales'
 
 

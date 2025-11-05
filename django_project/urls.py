@@ -16,6 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from openskagit import views as openskagit_views
+from openskagit.neighborhood import neighborhood_snapshot_view
 
 urlpatterns = [
     path('', openskagit_views.home, name='home'),
@@ -38,6 +39,11 @@ urlpatterns = [
         name="cma-manual-adjustment",
     ),
     path(
+        "cma/improvements/<str:parcel_number>/<str:comp_parcel>/",
+        openskagit_views.cma_comparable_improvements,
+        name="cma-comparable-improvements",
+    ),
+    path(
         "cma/toggle/<str:parcel_number>/<str:comp_parcel>/",
         openskagit_views.cma_toggle_comparable,
         name="cma-toggle-comp",
@@ -47,6 +53,7 @@ urlpatterns = [
     path("cma/share/<uuid:share_uuid>/", openskagit_views.cma_share, name="cma-share"),
     path("cma/<str:parcel_number>/", openskagit_views.cma_dashboard_view, name="cma-detail"),
     path("api/", include("openskagit.api.urls")),
+    path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
     # Citizen Appeal Helper
     path("appeal/", openskagit_views.appeal_home, name="appeal-home"),
     path("appeal/parcel-search/", openskagit_views.appeal_parcel_search, name="appeal-parcel-search"),

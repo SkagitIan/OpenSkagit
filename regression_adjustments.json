@@ -1,0 +1,1082 @@
+[
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 1,
+  "fields": {
+    "variable": "bath_sq",
+    "adjustment_pct": -2.03,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.332Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 2,
+  "fields": {
+    "variable": "bathrooms",
+    "adjustment_pct": 9.21,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.340Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 3,
+  "fields": {
+    "variable": "bedrooms",
+    "adjustment_pct": 0.39,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.343Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 4,
+  "fields": {
+    "variable": "condition_code_E",
+    "adjustment_pct": 7.97,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.347Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 5,
+  "fields": {
+    "variable": "condition_code_F",
+    "adjustment_pct": -9.27,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.349Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 6,
+  "fields": {
+    "variable": "condition_code_G",
+    "adjustment_pct": 9.19,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.352Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 7,
+  "fields": {
+    "variable": "condition_code_L",
+    "adjustment_pct": -17.46,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.354Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 8,
+  "fields": {
+    "variable": "condition_code_None",
+    "adjustment_pct": 0.0,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.356Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 9,
+  "fields": {
+    "variable": "condition_code_Other",
+    "adjustment_pct": 0.0,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.358Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 10,
+  "fields": {
+    "variable": "condition_code_VG",
+    "adjustment_pct": 17.1,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.361Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 11,
+  "fields": {
+    "variable": "effective_age",
+    "adjustment_pct": -12.23,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.364Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 12,
+  "fields": {
+    "variable": "has_attached_garage",
+    "adjustment_pct": 7.14,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.367Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 13,
+  "fields": {
+    "variable": "has_detached_garage",
+    "adjustment_pct": 4.52,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.370Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 14,
+  "fields": {
+    "variable": "land_use_code_111",
+    "adjustment_pct": -0.28,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.372Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 15,
+  "fields": {
+    "variable": "land_use_code_112",
+    "adjustment_pct": 6.35,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.374Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 16,
+  "fields": {
+    "variable": "land_use_code_113",
+    "adjustment_pct": 8.06,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.377Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 17,
+  "fields": {
+    "variable": "land_use_code_120",
+    "adjustment_pct": 6.32,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.380Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 18,
+  "fields": {
+    "variable": "land_use_code_130",
+    "adjustment_pct": 18.39,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.382Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 19,
+  "fields": {
+    "variable": "land_use_code_140",
+    "adjustment_pct": -8.47,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.385Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 20,
+  "fields": {
+    "variable": "land_use_code_180",
+    "adjustment_pct": -20.26,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.388Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 21,
+  "fields": {
+    "variable": "land_use_code_182",
+    "adjustment_pct": -9.67,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.391Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 22,
+  "fields": {
+    "variable": "land_use_code_190",
+    "adjustment_pct": -35.3,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.394Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 23,
+  "fields": {
+    "variable": "land_use_code_910",
+    "adjustment_pct": 0.0,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.397Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 24,
+  "fields": {
+    "variable": "land_use_code_911",
+    "adjustment_pct": -3.44,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.400Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 25,
+  "fields": {
+    "variable": "land_use_code_Other",
+    "adjustment_pct": 0.0,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.402Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 26,
+  "fields": {
+    "variable": "log_area",
+    "adjustment_pct": 14.27,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.405Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 27,
+  "fields": {
+    "variable": "log_lot",
+    "adjustment_pct": 6.65,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.407Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 28,
+  "fields": {
+    "variable": "neighborhood_code_10CCREC",
+    "adjustment_pct": -0.1481,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.409Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 29,
+  "fields": {
+    "variable": "neighborhood_code_10CCTYEE",
+    "adjustment_pct": 0.0,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.412Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 30,
+  "fields": {
+    "variable": "neighborhood_code_20ACENTRAL",
+    "adjustment_pct": 0.1244,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.415Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 31,
+  "fields": {
+    "variable": "neighborhood_code_20ANORTH",
+    "adjustment_pct": 0.47,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.418Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 32,
+  "fields": {
+    "variable": "neighborhood_code_20ANP",
+    "adjustment_pct": 0.2025,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.420Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 33,
+  "fields": {
+    "variable": "neighborhood_code_20ASKY",
+    "adjustment_pct": 0.2936,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.423Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 34,
+  "fields": {
+    "variable": "neighborhood_code_20ASOUTH",
+    "adjustment_pct": 0.1578,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.426Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 35,
+  "fields": {
+    "variable": "neighborhood_code_20BALGER",
+    "adjustment_pct": -0.0062,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.429Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 36,
+  "fields": {
+    "variable": "neighborhood_code_20BBAYHLCC",
+    "adjustment_pct": 0.033,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.432Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 37,
+  "fields": {
+    "variable": "neighborhood_code_20BBAYVIEW",
+    "adjustment_pct": 0.1359,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.436Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 38,
+  "fields": {
+    "variable": "neighborhood_code_20BBOW",
+    "adjustment_pct": 0.0652,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.439Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 39,
+  "fields": {
+    "variable": "neighborhood_code_20BCENTRAL",
+    "adjustment_pct": -0.1172,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.443Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 40,
+  "fields": {
+    "variable": "neighborhood_code_20BEASTBUR",
+    "adjustment_pct": -0.081,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.446Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 41,
+  "fields": {
+    "variable": "neighborhood_code_20BSAMISH",
+    "adjustment_pct": 0.1455,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.450Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 42,
+  "fields": {
+    "variable": "neighborhood_code_20BURAGRES",
+    "adjustment_pct": 0.0389,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.456Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 43,
+  "fields": {
+    "variable": "neighborhood_code_20BWESTBUR",
+    "adjustment_pct": -0.1087,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.462Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 44,
+  "fields": {
+    "variable": "neighborhood_code_20CCCHORN",
+    "adjustment_pct": -0.3691,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.465Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 45,
+  "fields": {
+    "variable": "neighborhood_code_20CCEAST",
+    "adjustment_pct": -0.2699,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.467Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 46,
+  "fields": {
+    "variable": "neighborhood_code_20CCLOT",
+    "adjustment_pct": -0.2906,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.470Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 47,
+  "fields": {
+    "variable": "neighborhood_code_20CCWEST",
+    "adjustment_pct": -0.2013,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.474Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 48,
+  "fields": {
+    "variable": "neighborhood_code_20CONAGRES",
+    "adjustment_pct": 0.042,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.476Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 49,
+  "fields": {
+    "variable": "neighborhood_code_20CONCAS",
+    "adjustment_pct": 0.2319,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.481Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 50,
+  "fields": {
+    "variable": "neighborhood_code_20CONWAY",
+    "adjustment_pct": 0.115,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.484Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 51,
+  "fields": {
+    "variable": "neighborhood_code_20FIDALGO",
+    "adjustment_pct": 0.1391,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.486Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 52,
+  "fields": {
+    "variable": "neighborhood_code_20FIDALGOW",
+    "adjustment_pct": 0.3239,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.489Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 53,
+  "fields": {
+    "variable": "neighborhood_code_20GUEMES",
+    "adjustment_pct": 0.245,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.492Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 54,
+  "fields": {
+    "variable": "neighborhood_code_20HH",
+    "adjustment_pct": 0.1553,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.496Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 55,
+  "fields": {
+    "variable": "neighborhood_code_20LCAGRES",
+    "adjustment_pct": 0.1263,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.499Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 56,
+  "fields": {
+    "variable": "neighborhood_code_20LCPLEAS",
+    "adjustment_pct": 0.1661,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.502Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 57,
+  "fields": {
+    "variable": "neighborhood_code_20LCURBAN",
+    "adjustment_pct": 0.072,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.504Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 58,
+  "fields": {
+    "variable": "neighborhood_code_20MVCENTRL",
+    "adjustment_pct": -0.043,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.507Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 59,
+  "fields": {
+    "variable": "neighborhood_code_20MVEAGLEM",
+    "adjustment_pct": 0.0891,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.511Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 60,
+  "fields": {
+    "variable": "neighborhood_code_20MVERURAL",
+    "adjustment_pct": 0.048,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.514Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 61,
+  "fields": {
+    "variable": "neighborhood_code_20MVHIGHLD",
+    "adjustment_pct": -0.0468,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.517Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 62,
+  "fields": {
+    "variable": "neighborhood_code_20MVHILCRE",
+    "adjustment_pct": -0.0392,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.520Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 63,
+  "fields": {
+    "variable": "neighborhood_code_20MVHILLTP",
+    "adjustment_pct": 0.1313,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.522Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 64,
+  "fields": {
+    "variable": "neighborhood_code_20MVNORTH",
+    "adjustment_pct": -0.0532,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.525Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 65,
+  "fields": {
+    "variable": "neighborhood_code_20MVRIVSID",
+    "adjustment_pct": -0.0277,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.527Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 66,
+  "fields": {
+    "variable": "neighborhood_code_20MVRURAL",
+    "adjustment_pct": 0.0068,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.530Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 67,
+  "fields": {
+    "variable": "neighborhood_code_20MVSOCENT",
+    "adjustment_pct": -0.0082,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.532Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 68,
+  "fields": {
+    "variable": "neighborhood_code_20MVSOWEST",
+    "adjustment_pct": -0.1206,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.535Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 69,
+  "fields": {
+    "variable": "neighborhood_code_20MVSUBRBN",
+    "adjustment_pct": 0.1076,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.538Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 70,
+  "fields": {
+    "variable": "neighborhood_code_20MVTBIRD",
+    "adjustment_pct": -0.0079,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.541Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 71,
+  "fields": {
+    "variable": "neighborhood_code_20SHELT",
+    "adjustment_pct": -0.0697,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.543Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 72,
+  "fields": {
+    "variable": "neighborhood_code_20SWBACUS",
+    "adjustment_pct": -0.1475,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.546Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 73,
+  "fields": {
+    "variable": "neighborhood_code_20SWBIGLK",
+    "adjustment_pct": 0.0701,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.548Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 74,
+  "fields": {
+    "variable": "neighborhood_code_20SWCLRLK",
+    "adjustment_pct": 0.0109,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.550Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 75,
+  "fields": {
+    "variable": "neighborhood_code_20SWHWY9",
+    "adjustment_pct": -0.0538,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.555Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 76,
+  "fields": {
+    "variable": "neighborhood_code_20SWIN",
+    "adjustment_pct": 0.1599,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.557Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 77,
+  "fields": {
+    "variable": "neighborhood_code_20SWLKCAV",
+    "adjustment_pct": -0.0546,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.560Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 78,
+  "fields": {
+    "variable": "neighborhood_code_20SWMINKLR",
+    "adjustment_pct": -0.0571,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.564Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 79,
+  "fields": {
+    "variable": "neighborhood_code_20SWNSKAGT",
+    "adjustment_pct": -0.1559,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.570Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 80,
+  "fields": {
+    "variable": "neighborhood_code_20SWNTOWN",
+    "adjustment_pct": -0.0721,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.574Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 81,
+  "fields": {
+    "variable": "neighborhood_code_20SWSSKAGT",
+    "adjustment_pct": -0.1607,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.577Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 82,
+  "fields": {
+    "variable": "neighborhood_code_20SWSTOWN",
+    "adjustment_pct": -0.0719,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.580Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 83,
+  "fields": {
+    "variable": "neighborhood_code_21BBURLHIL",
+    "adjustment_pct": 0.1868,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.584Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 84,
+  "fields": {
+    "variable": "neighborhood_code_22ASKY",
+    "adjustment_pct": 0.7851,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.588Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 85,
+  "fields": {
+    "variable": "neighborhood_code_22BWFT",
+    "adjustment_pct": 0.6243,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.594Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 86,
+  "fields": {
+    "variable": "neighborhood_code_22CCERIV",
+    "adjustment_pct": -0.1516,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.600Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 87,
+  "fields": {
+    "variable": "neighborhood_code_22CCWRIV",
+    "adjustment_pct": -0.1172,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.603Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 88,
+  "fields": {
+    "variable": "neighborhood_code_22CONWFT",
+    "adjustment_pct": 0.3021,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.606Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 89,
+  "fields": {
+    "variable": "neighborhood_code_22FIDALGO",
+    "adjustment_pct": 0.7454,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.610Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 90,
+  "fields": {
+    "variable": "neighborhood_code_22GUEMES",
+    "adjustment_pct": 0.7787,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.613Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 91,
+  "fields": {
+    "variable": "neighborhood_code_22LCWFT",
+    "adjustment_pct": 0.6306,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.617Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 92,
+  "fields": {
+    "variable": "neighborhood_code_22SWBIGLK",
+    "adjustment_pct": 0.6396,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.620Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 93,
+  "fields": {
+    "variable": "neighborhood_code_22SWINWFT",
+    "adjustment_pct": 0.7707,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.622Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 94,
+  "fields": {
+    "variable": "neighborhood_code_22SWLKCAV",
+    "adjustment_pct": 0.6625,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.626Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 95,
+  "fields": {
+    "variable": "neighborhood_code_23ACONDO",
+    "adjustment_pct": 0.2668,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.630Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 96,
+  "fields": {
+    "variable": "neighborhood_code_23BCONDO",
+    "adjustment_pct": -0.0685,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.633Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 97,
+  "fields": {
+    "variable": "neighborhood_code_23LCCONDO",
+    "adjustment_pct": -0.1537,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.637Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 98,
+  "fields": {
+    "variable": "neighborhood_code_23MVCONDO",
+    "adjustment_pct": -0.1331,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.639Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 99,
+  "fields": {
+    "variable": "neighborhood_code_23SWCONDO",
+    "adjustment_pct": -0.3491,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.645Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 100,
+  "fields": {
+    "variable": "neighborhood_code_24ANAVISTA",
+    "adjustment_pct": 0.0,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.649Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 101,
+  "fields": {
+    "variable": "neighborhood_code_24ASKY",
+    "adjustment_pct": 0.0018,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.653Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 102,
+  "fields": {
+    "variable": "neighborhood_code_25APUD",
+    "adjustment_pct": 0.1584,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.655Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 103,
+  "fields": {
+    "variable": "neighborhood_code_30AMF",
+    "adjustment_pct": 0.1481,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.659Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 104,
+  "fields": {
+    "variable": "neighborhood_code_30BMF",
+    "adjustment_pct": -0.1012,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.663Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 105,
+  "fields": {
+    "variable": "neighborhood_code_30MVMF",
+    "adjustment_pct": -0.0165,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.669Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 106,
+  "fields": {
+    "variable": "neighborhood_code_30SWMF",
+    "adjustment_pct": -0.1218,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.673Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 107,
+  "fields": {
+    "variable": "neighborhood_code_50MVMF",
+    "adjustment_pct": 0.0,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.676Z"
+  }
+},
+{
+  "model": "openskagit.regressionadjustment",
+  "pk": 108,
+  "fields": {
+    "variable": "neighborhood_code_Other",
+    "adjustment_pct": 0.2098,
+    "model_version": "2025Q4_base",
+    "created_at": "2025-11-04T13:32:00.680Z"
+  }
+}
+]

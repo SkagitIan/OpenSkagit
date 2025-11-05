@@ -26,6 +26,15 @@
         <span class="mt-2 inline-flex items-center gap-1 text-xs text-slate-400 bg-slate-800/60 border border-slate-700 px-2 py-1 rounded-lg">
             GPA {{ comparable.gross_percentage_adjustment }}%
         </span>
+        <div
+            class="mt-2 text-[11px] text-slate-400"
+            hx-get="{% url 'cma-comparable-improvements' parcel_number comparable.snapshot.parcel_number %}?roll_id={{ comparable.snapshot.metadata.roll_id|default_if_none:'' }}&roll_year={{ comparable.snapshot.metadata.roll_year|default_if_none:'' }}{% if comparable.snapshot.metadata.assessor_building_style %}&assessor_style={{ comparable.snapshot.metadata.assessor_building_style|urlencode }}{% endif %}"
+            hx-trigger="load"
+            hx-target="this"
+            hx-swap="outerHTML"
+        >
+            <span class="text-slate-500">Loading improvements…</span>
+        </div>
     </td>
     <td class="px-4 py-4 align-top">
         <p class="text-sm font-semibold text-white">${{ comparable.sale_price|floatformat:0|intcomma }}</p>

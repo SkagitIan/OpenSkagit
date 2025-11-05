@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neighborhood Snapshot</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="min-h-screen bg-slate-100 text-[#14080E]">
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    <header class="mb-6">
+      <h1 class="text-3xl font-semibold">Neighborhood Snapshot</h1>
+      {% if neighborhood.code %}
+        <p class="text-sm text-slate-500">Code: {{ neighborhood.code }}{% if neighborhood.year %} • {{ neighborhood.year }}{% endif %}</p>
+      {% endif %}
+    </header>
+
+    <div class="rounded-2xl border border-[#49475B]/20 bg-white p-6 shadow-sm">
+      <p class="text-sm text-[#49475B]/80">
+        These indicators show how this neighborhood's assessments compare to market values.
+        Lower COD means more uniform assessments, while PRD close to 1.00 means equity across value ranges.
+      </p>
+
+      <div class="mt-6 rounded-xl border border-[#B993D6]/30 bg-[#B993D6]/10 p-4">
+        <div class="flex justify-between text-xs text-[#49475B]/70">
+          <span>Assessment vs. Market</span>
+          <span>Normal: 0.90–1.10</span>
+        </div>
+        <div class="relative mt-1 h-3 w-full rounded-full bg-gradient-to-r from-yellow-300 via-[#58B09C] to-yellow-300">
+          {% if neighborhood.sales_ratio is not None %}
+            <div class="absolute -top-1 text-xs font-semibold text-[#14080E]" style="left: {{ neighborhood.sales_ratio_pos|default:50 }}%;">
+              ▲ {{ neighborhood.sales_ratio|floatformat:2 }}%
+            </div>
+          {% endif %}
+        </div>
+        <p class="mt-1 text-xs text-[#49475B]/70">
+          {% if neighborhood.median_ratio_pct is not None %}
+            Median ratio {{ neighborhood.median_ratio_pct|floatformat:2 }}% (assessments at 1.00 = market value)
+          {% elif neighborhood.median_ratio is not None %}
+            Median ratio {{ neighborhood.median_ratio|floatformat:2 }} (assessments at 1.00 = market value)
+          {% else %}
+            Median ratio — (assessments at 1.00 = market value)
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="mt-4 rounded-xl border border-[#58B09C]/30 bg-[#58B09C]/10 p-4">
+        <div class="flex justify-between text-xs text-[#49475B]/70">
+          <span>Neighborhood Uniformity (COD)</span>
+          <span>
+            {% if neighborhood.cod is not None %}
+              {{ neighborhood.cod|floatformat:1 }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+        <div class="relative mt-1 h-3 w-full rounded-full bg-gradient-to-r from-[#58B09C] via-yellow-300 to-red-400">
+          {% if neighborhood.cod_pos is not None %}
+            <span class="absolute -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#14080E] text-[10px] font-semibold text-white" style="left: {{ neighborhood.cod_pos|default:0 }}%;">
+              ●
+            </span>
+          {% endif %}
+        </div>
+        <p class="mt-1 text-xs text-[#49475B]/70">
+          Typical uniformity &lt;15 indicates stable assessment patterns.
+        </p>
+      </div>
+
+      <div class="mt-4 rounded-xl border border-[#f08000]/30 bg-[#f08000]/10 p-4">
+        <div class="flex justify-between text-xs text-[#49475B]/70">
+          <span>Fairness Across Price Ranges (PRD)</span>
+          <span>
+            {% if neighborhood.prd is not None %}
+              {{ neighborhood.prd|floatformat:3 }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+        <div class="relative mt-1 h-3 w-full rounded-full bg-gradient-to-r from-red-400 via-[#58B09C] to-red-400">
+          {% if neighborhood.prd is not None %}
+            <div class="absolute -top-1 text-xs font-semibold text-[#14080E]" style="left: {{ neighborhood.prd_pos|default:50 }}%;">
+              ▲ {{ neighborhood.prd|floatformat:2 }}
+            </div>
+          {% endif %}
+        </div>
+        <p class="mt-1 text-xs text-[#49475B]/70">
+          PRD near 1.00 is balanced. Values above 1.03 suggest higher-value homes may be under-assessed.
+        </p>
+      </div>
+
+      <div class="mt-6 flex flex-wrap items-center gap-2 text-xs text-[#49475B]/70">
+        <p>
+          Sample: {{ neighborhood.valid_sales|default:"—" }} sales
+          {% if neighborhood.sample_size_pct is not None %}
+            • {{ neighborhood.sample_size_pct|floatformat:1 }}%
+          {% endif %}
+        </p>
+        <span class="hidden text-[#49475B]/40 md:inline">•</span>
+        <p>Reliability: {{ neighborhood.reliability_display|default:"Unknown" }}</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
