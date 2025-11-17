@@ -1,11 +1,15 @@
 from django.contrib import admin
-
-# Register your models here.
 from django.contrib import admin
-from .models import Assessor, Improvements, Land, Sales, AssessmentRoll
-
+from .models import Assessor, Improvements, Land, Sales, AssessmentRoll, AdjustmentCoefficient
 from leaflet.admin import LeafletGeoAdmin
-from .models import Assessor
+
+
+@admin.register(AdjustmentCoefficient)
+class AdjustmentCoefficientAdmin(admin.ModelAdmin):
+    list_display = ("market_group", "term", "beta", "beta_se", "run_id", "created_at")
+    list_filter = ("market_group", "run_id")
+    search_fields = ("term", "market_group")
+    ordering = ("market_group", "term")
 
 @admin.register(Improvements)
 class ImprovementsAdmin(admin.ModelAdmin):

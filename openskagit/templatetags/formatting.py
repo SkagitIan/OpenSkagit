@@ -56,3 +56,18 @@ def mul(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return 0
+
+
+@register.filter(name="abs")
+def absolute(value):
+    """
+    Return the absolute value of the supplied number.
+    Falls back to float conversion when needed.
+    """
+    try:
+        return abs(value)
+    except TypeError:
+        try:
+            return abs(float(value))
+        except (TypeError, ValueError):
+            return value

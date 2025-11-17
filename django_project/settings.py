@@ -74,7 +74,30 @@ LEAFLET_CONFIG = {
 }
 
 LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _log_file_path(preferred: Path) -> str:
+    """
+    Ensure the logging path is writable; fall back to /tmp if the preferred location
+    cannot be created or opened (e.g., due to ownership/permissions).
+    """
+    try:
+        preferred.parent.mkdir(parents=True, exist_ok=True)
+        preferred.touch(exist_ok=True)
+        try:
+            preferred.chmod(0o664)
+        except OSError:
+            pass
+        return str(preferred)
+    except OSError:
+        fallback = Path("/tmp") / preferred.name
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        fallback.touch(exist_ok=True)
+        return str(fallback)
+
+
+LOG_FILE = _log_file_path(LOG_DIR / "django.log")
 
 LOGGING = {
     "version": 1,
@@ -85,7 +108,7 @@ LOGGING = {
         },
         "file": {
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": str(LOG_DIR / "django.log"),
+            "filename": LOG_FILE,
             "maxBytes": 1024 * 1024 * 5,  # 5 MB
             "backupCount": 5,
         },

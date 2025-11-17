@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
-from openskagit import cma, appeals
+from openskagit import adjustment_engine, appeals, cma
 from openskagit.models import Assessor
 from openskagit.neighborhood import get_neighborhood_snapshot
 
@@ -1432,3 +1432,36 @@ class AppealComparableImprovementsView(APIView):
             return int(value)
         except (TypeError, ValueError):
             raise ValidationError({field: "Must be an integer."})
+
+
+class CoAppraiserAdjustmentView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request) -> Response:
+        subject = request.data.get("subject")
+        comps = request.data.get("comps") or []
+        subject_pred_price = request.data.get("subject_pred_price")
+        market_group = request.data.get("market_group")
+        run_id = request.data.get("run_id")
+
+        if not isinstance(subject, dict):
+            raise ValidationError({"subject": "Subject payload is required."})
+        if not isinstance(comps, list):
+            raise ValidationError({"comps": "Comparables must be provided as a list."})
+        if subject_pred_price is None:
+            raise ValidationError({"subject_pred_price": "Required field."})
+
+        try:
+            payload = adjustment_engine.compute_adjustments(
+                subject=subject,
+                comps=comps,
+                subject_pred_price=subject_pred_price,
+                market_group=market_group,
+                run_id=run_id,
+            )
+        except adjustment_engine.MissingCoefficientError as exc:
+            return Response({"error_message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except adjustment_engine.AdjustmentEngineError as exc:
+            raise ValidationError(str(exc))
+
+        return Response(payload, status=status.HTTP_200_OK)

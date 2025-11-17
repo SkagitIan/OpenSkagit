@@ -1,4 +1,47 @@
 {% load humanize %}
+<div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between mb-4">
+    <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-slate-400">Comparable sales</p>
+        {% if advanced_mode %}
+            {% if advanced_summary %}
+                <p class="text-xs text-slate-400 mt-1">
+                    Adjusting against {{ advanced_summary.market_group|default:"market" }} regression baseline
+                    (<span class="text-slate-200">${{ advanced_summary.subject_pred_price|floatformat:0|intcomma }}</span>)
+                </p>
+            {% elif advanced_error %}
+                <p class="text-xs text-rose-300 mt-1">{{ advanced_error }}</p>
+            {% endif %}
+        {% else %}
+            <p class="text-xs text-slate-500 mt-1">Toggle advanced mode to inspect model-based adjustments.</p>
+        {% endif %}
+    </div>
+    <div class="flex items-center gap-3">
+        <span class="text-xs uppercase tracking-wide text-slate-500">View</span>
+        <div class="inline-flex rounded-xl border border-slate-800 overflow-hidden">
+            <button
+                type="button"
+                class="px-4 py-2 text-xs font-semibold transition {% if not advanced_mode %}bg-slate-700 text-white{% else %}text-slate-400 hover:text-white{% endif %}"
+                hx-get="{% url 'cma-comparison-grid' parcel_number %}"
+                hx-target="#cma-comparison-grid"
+                hx-include="#cma-filter-form"
+                hx-vals='{"view_mode": "standard"}'
+            >
+                Standard
+            </button>
+            <button
+                type="button"
+                class="px-4 py-2 text-xs font-semibold transition {% if advanced_mode %}bg-slate-700 text-white{% else %}text-slate-400 hover:text-white{% endif %}"
+                hx-get="{% url 'cma-comparison-grid' parcel_number %}"
+                hx-target="#cma-comparison-grid"
+                hx-include="#cma-filter-form"
+                hx-vals='{"view_mode": "advanced"}'
+            >
+                Advanced
+            </button>
+        </div>
+    </div>
+</div>
+
 {% if comparables %}
 <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-slate-800 text-sm text-slate-200">
@@ -13,7 +56,7 @@
                         hx-target="#cma-comparison-grid"
                         hx-include="#cma-filter-form"
                     >
-                        Sale &amp; Assessed
+                        Sale / Assessed / Adjusted
                         {% if sort_field == "sale_price" %}
                             {% if sort_direction == "asc" %}
                                 <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M5 12l5-5 5 5H5z"></path></svg>
@@ -29,7 +72,7 @@
         </thead>
         <tbody class="divide-y divide-slate-800">
             {% for comp in comparables %}
-                {% include "openskagit/cma/partials/comparable_row.html" with comparable=comp subject=subject parcel_number=parcel_number %}
+                {% include "openskagit/cma/partials/comparable_row.html" with comparable=comp subject=subject parcel_number=parcel_number advanced_mode=advanced_mode %}
             {% endfor %}
         </tbody>
     </table>
@@ -61,3 +104,4 @@
 {{ markers|json_script:"cma-map-data" }}
 <input type="hidden" id="cma-sort-field" name="sort_field" value="{{ sort_field }}" hx-swap-oob="true">
 <input type="hidden" id="cma-sort-direction" name="sort_direction" value="{{ sort_direction }}" hx-swap-oob="true">
+<input type="hidden" id="cma-view-mode" name="view_mode" value="{{ view_mode }}" hx-swap-oob="true">

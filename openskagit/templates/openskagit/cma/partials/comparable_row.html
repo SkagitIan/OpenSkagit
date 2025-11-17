@@ -1,4 +1,5 @@
-{% load humanize %}
+{% load humanize formatting %}
+{% with adj=comparable.adjustment_payload %}
 <tr class="hover:bg-slate-900/60 transition">
     <td class="px-4 py-4 align-top">
         <button
@@ -43,6 +44,19 @@
                 —
             {% endif %}
         </p>
+        {% if advanced_mode and adj %}
+            <p class="text-xs text-slate-500 mt-2">
+                Adjusted:
+                <span class="text-white font-semibold">${{ adj.adjusted_value|floatformat:0|intcomma }}</span>
+                {% if adj.total_adjustment > 0 %}
+                    <span class="ml-1 text-emerald-300">+${{ adj.total_adjustment|floatformat:0|intcomma }}</span>
+                {% elif adj.total_adjustment < 0 %}
+                    <span class="ml-1 text-rose-300">-${{ adj.total_adjustment|abs|floatformat:0|intcomma }}</span>
+                {% else %}
+                    <span class="ml-1 text-slate-400">$0</span>
+                {% endif %}
+            </p>
+        {% endif %}
     </td>
     <td class="px-4 py-4 align-top">
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
@@ -53,6 +67,15 @@
                     /
                     {% if comparable.snapshot.living_area %}{{ comparable.snapshot.living_area|floatformat:0|intcomma }}{% else %}—{% endif %}
                 </p>
+                {% if advanced_mode and adj %}
+                    {% with delta=adj.adjustments.area %}
+                        {% if delta > 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-200">+${{ delta|floatformat:0|intcomma }}</span>
+                        {% elif delta < 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-200">-${{ delta|abs|floatformat:0|intcomma }}</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
             </div>
             <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.bedrooms %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
                 <p class="uppercase text-[10px] tracking-wide">Beds</p>
@@ -77,6 +100,15 @@
                     /
                     {% if comparable.snapshot.garage_sqft %}{{ comparable.snapshot.garage_sqft|floatformat:0|intcomma }}{% else %}—{% endif %}
                 </p>
+                {% if advanced_mode and adj %}
+                    {% with delta=adj.adjustments.garage %}
+                        {% if delta > 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-200">+${{ delta|floatformat:0|intcomma }}</span>
+                        {% elif delta < 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-200">-${{ delta|abs|floatformat:0|intcomma }}</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
             </div>
             <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.acres %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
                 <p class="uppercase text-[10px] tracking-wide">Lot size</p>
@@ -85,6 +117,15 @@
                     /
                     {% if comparable.snapshot.acres %}{{ comparable.snapshot.acres|floatformat:2 }}{% else %}—{% endif %}
                 </p>
+                {% if advanced_mode and adj %}
+                    {% with delta=adj.adjustments.lot %}
+                        {% if delta > 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-200">+${{ delta|floatformat:0|intcomma }}</span>
+                        {% elif delta < 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-200">-${{ delta|abs|floatformat:0|intcomma }}</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
             </div>
             <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.year_built %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
                 <p class="uppercase text-[10px] tracking-wide">Year built</p>
@@ -93,6 +134,15 @@
                     /
                     {% if comparable.snapshot.year_built %}{{ comparable.snapshot.year_built }}{% else %}—{% endif %}
                 </p>
+                {% if advanced_mode and adj %}
+                    {% with delta=adj.adjustments.age %}
+                        {% if delta > 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-200">+${{ delta|floatformat:0|intcomma }}</span>
+                        {% elif delta < 0 %}
+                            <span class="mt-1 inline-flex text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-200">-${{ delta|abs|floatformat:0|intcomma }}</span>
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
             </div>
         </div>
     </td>
@@ -108,5 +158,29 @@
                 Located {{ comparable.distance_miles }} miles from the subject.
             {% endif %}
         </p>
+        {% if advanced_mode and adj and adj.adjustment_list %}
+            <div class="mt-3 pt-3 border-t border-slate-800">
+                <p class="text-[10px] uppercase tracking-wide text-slate-500">Adjustment breakdown</p>
+                <dl class="mt-2 space-y-1 text-[11px]">
+                    {% for item in adj.adjustment_list %}
+                        {% if item.amount %}
+                            <div class="flex items-center justify-between gap-2">
+                                <dt class="text-slate-400">{{ item.label }}</dt>
+                                <dd>
+                                    {% if item.amount > 0 %}
+                                        <span class="text-emerald-300">+${{ item.amount|floatformat:0|intcomma }}</span>
+                                    {% elif item.amount < 0 %}
+                                        <span class="text-rose-300">-${{ item.amount|abs|floatformat:0|intcomma }}</span>
+                                    {% else %}
+                                        <span class="text-slate-500">$0</span>
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </dl>
+            </div>
+        {% endif %}
     </td>
 </tr>
+{% endwith %}

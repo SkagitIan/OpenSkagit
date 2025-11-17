@@ -12,6 +12,35 @@ from django.contrib.gis.db import models
 from pgvector.django import VectorField
 from django.contrib.gis.db import models as gis_models
 
+from django.db import models
+
+class AdjustmentCoefficient(models.Model):
+    """
+    Stores regression coefficients for a given market group (valuation_area).
+    These coefficients are used to compute subject-specific dollar adjustments
+    for comparable sales.
+    """
+    # Example: "ANACORTES", "BURLINGTON", "MOUNT_VERNON"
+    market_group = models.CharField(max_length=100, db_index=True)
+    # Example: "log_area", "log_lot", "has_garage"
+    term = models.CharField(max_length=200, db_index=True)
+    # Regression coefficient (beta) and standard error
+    beta = models.FloatField()
+    beta_se = models.FloatField(null=True, blank=True)
+    # Regression run that generated this coefficient
+    run_id = models.CharField(max_length=20, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("market_group", "term", "run_id")
+        indexes = [
+            models.Index(fields=["market_group", "term"]),
+        ]
+
+    def __str__(self):
+        return f"{self.market_group} | {self.term} = {self.beta}"
+
+
 class NeighborhoodMetrics(models.Model):
     neighborhood_code = models.CharField(max_length=20, db_index=True)
     year = models.IntegerField()
@@ -128,7 +157,7 @@ class Assessor(models.Model):
     has_septic = models.TextField(blank=True, null=True)
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
-    geom = models.PointField(srid=4326, blank=True, null=True)
+    geom = gis_models.PointField(srid=4326, blank=True, null=True)
     embedding = VectorField(dimensions=384, blank=True, null=True)
     centroid_geog = gis_models.PointField(geography=True, srid=4326, null=True, blank=True)
     class Meta:

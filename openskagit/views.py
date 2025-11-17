@@ -1,4 +1,5 @@
 import copy
+import datetime as dt
 import functools
 import json
 import logging
@@ -28,9 +29,10 @@ from django.views.decorators.http import require_GET, require_POST
 
 logger = logging.getLogger(__name__)
 
-from . import cma, llm
-from . import appeals
+from . import adjustment_engine, appeals, cma, llm
 from .models import Assessor, CmaAnalysis, CmaComparableSelection, Parcel
+from .improvement_utils import QUALITY_WEIGHTS
+from .valuation_areas import resolve_market_group
 
 
 CMA_SESSION_KEY = "cma_state"
@@ -45,6 +47,41 @@ CMA_ALLOWED_SORT_DIRECTIONS = {"asc", "desc"}
 CHAT_SESSION_KEY = "rag_conversations"
 CHAT_ACTIVE_KEY = "rag_active_conversation"
 
+CONDITION_SCORE_MAP = {
+    "P": 1,
+    "POOR": 1,
+    "F": 2,
+    "FAIR": 2,
+    "A": 3,
+    "AVERAGE": 3,
+    "G": 4,
+    "GOOD": 4,
+    "VG": 5,
+    "VERY GOOD": 5,
+    "E": 6,
+    "EXCELLENT": 6,
+}
+
+QUALITY_LABEL_SCORE_MAP = {
+    "low": 1,
+    "fair": 2,
+    "average": 3,
+    "good": 4,
+    "very good": 5,
+    "excellent": 6,
+}
+
+ADJUSTMENT_LABELS = [
+    ("area", "Living area"),
+    ("lot", "Lot size"),
+    ("age", "Age"),
+    ("quality", "Quality"),
+    ("condition", "Condition"),
+    ("garage", "Garage"),
+    ("basement", "Basement"),
+    ("view", "View"),
+    ("time", "Time trend"),
+]
 
 
 def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metadata: object) -> None:
@@ -184,6 +221,240 @@ def _merge_request_params(request) -> Dict[str, Any]:
         for key, value in request.POST.items():
             merged[key] = value
     return merged
+
+
+def _metadata_dict(snapshot: cma.PropertySnapshot) -> Dict[str, Any]:
+    metadata = snapshot.metadata
+    if not isinstance(metadata, dict):
+        return {}
+    return metadata
+
+
+def _quality_score(metadata: Dict[str, Any]) -> Optional[float]:
+    improvements = metadata.get("improvements")
+    if isinstance(improvements, dict):
+        code = (improvements.get("quality_code") or "").strip().upper()
+        if code:
+            score = QUALITY_WEIGHTS.get(code)
+            if score:
+                return float(score)
+        label = improvements.get("quality")
+        if isinstance(label, str):
+            score = QUALITY_LABEL_SCORE_MAP.get(label.strip().lower())
+            if score:
+                return float(score)
+    raw = metadata.get("quality_score")
+    if raw is not None:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _condition_score(metadata: Dict[str, Any]) -> Optional[float]:
+    improvements = metadata.get("improvements")
+    code = None
+    if isinstance(improvements, dict):
+        code = improvements.get("condition_code")
+    if not code:
+        code = metadata.get("condition_code")
+    if isinstance(code, str):
+        normalized = code.strip().upper()
+        score = CONDITION_SCORE_MAP.get(normalized)
+        if score:
+            return float(score)
+    label = None
+    if isinstance(improvements, dict):
+        label = improvements.get("condition")
+    if isinstance(label, str):
+        score = CONDITION_SCORE_MAP.get(label.strip().upper())
+        if score:
+            return float(score)
+    raw = metadata.get("condition_score")
+    if raw is not None:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _boolean_flag(value: Any) -> Optional[int]:
+    if value in (None, "", "null"):
+        return None
+    if isinstance(value, bool):
+        return 1 if value else 0
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if numeric > 0:
+        return 1
+    if numeric == 0:
+        return 0
+    return None
+
+
+def _calculate_age(snapshot: cma.PropertySnapshot, reference_date: Optional[dt.date]) -> Optional[float]:
+    year = snapshot.year_built or snapshot.effective_year_built
+    if not year:
+        return None
+    try:
+        year_int = int(year)
+    except (TypeError, ValueError):
+        return None
+    if reference_date is None:
+        reference_date = timezone.now().date()
+    return max(reference_date.year - year_int, 0)
+
+
+def _subject_predicted_price(subject: cma.PropertySnapshot, market_group: Optional[str]) -> Optional[float]:
+    metadata = _metadata_dict(subject)
+    candidate_keys = (
+        "predicted_value",
+        "subject_pred_price",
+        "regression_predicted_value",
+        "regression_market_value",
+        "model_price",
+    )
+    for key in candidate_keys:
+        value = metadata.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    if subject.assessed_value is not None:
+        try:
+            return float(subject.assessed_value)
+        except (TypeError, ValueError):
+            pass
+    if subject.sale_price is not None:
+        try:
+            return float(subject.sale_price)
+        except (TypeError, ValueError):
+            pass
+    if market_group:
+        payload = _snapshot_adjustment_payload(subject, market_group=market_group)
+        predicted = adjustment_engine.predict_price(payload, market_group=market_group)
+        if predicted is not None:
+            return predicted
+    return None
+
+
+def _subject_market_group(subject: cma.PropertySnapshot) -> Optional[str]:
+    metadata = _metadata_dict(subject)
+    candidates = (
+        metadata.get("valuation_area"),
+        metadata.get("market_group"),
+        metadata.get("city_district"),
+    )
+    for candidate in candidates:
+        if not candidate:
+            continue
+        text = str(candidate).strip()
+        if text:
+            return text.upper()
+    mapped = resolve_market_group(metadata.get("neighborhood_code"))
+    if mapped:
+        return mapped
+    return None
+
+
+def _has_basement(metadata: Dict[str, Any]) -> Optional[int]:
+    if "has_basement" in metadata:
+        return _boolean_flag(metadata.get("has_basement"))
+    finished = metadata.get("finished_basement_sqft")
+    unfinished = metadata.get("unfinished_basement_sqft")
+    if finished not in (None, "", 0) or unfinished not in (None, "", 0):
+        return 1
+    return None
+
+
+def _snapshot_adjustment_payload(
+    snapshot: cma.PropertySnapshot,
+    *,
+    market_group: Optional[str] = None,
+    include_sale_price: bool = False,
+) -> Dict[str, Any]:
+    metadata = _metadata_dict(snapshot)
+    sale_date = snapshot.sale_date.isoformat() if snapshot.sale_date else None
+    payload = {
+        "GLA": float(snapshot.living_area) if snapshot.living_area is not None else None,
+        "lot_acres": float(snapshot.acres) if snapshot.acres is not None else None,
+        "age": _calculate_age(snapshot, snapshot.sale_date),
+        "quality_score": _quality_score(metadata),
+        "condition_score": _condition_score(metadata),
+        "has_garage": _boolean_flag(snapshot.garage_sqft),
+        "has_basement": _has_basement(metadata),
+        "is_view": _boolean_flag(metadata.get("has_view")),
+        "sale_date": sale_date,
+        "property_type": snapshot.property_type,
+    }
+    if market_group:
+        payload["valuation_area"] = market_group
+    if include_sale_price and snapshot.sale_price is not None:
+        try:
+            payload["sale_price"] = float(snapshot.sale_price)
+        except (TypeError, ValueError):
+            payload["sale_price"] = None
+    return payload
+
+
+def _comparable_adjustment_payload(comp: cma.ComparableResult) -> Optional[Dict[str, Any]]:
+    snapshot = comp.snapshot
+    base_payload = _snapshot_adjustment_payload(snapshot, include_sale_price=True)
+    sale_price = base_payload.get("sale_price")
+    if sale_price in (None, ""):
+        return None
+    base_payload["comp_id"] = snapshot.parcel_number
+    return base_payload
+
+
+def _compute_adjustment_summary(
+    subject: cma.PropertySnapshot,
+    comparables: List[cma.ComparableResult],
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    market_group = _subject_market_group(subject)
+    if not market_group:
+        return None, "Market/valuation group unavailable."
+    subject_pred_price = _subject_predicted_price(subject, market_group)
+    if subject_pred_price is None:
+        return None, "Predicted subject price unavailable."
+    comps_payload: List[Dict[str, Any]] = []
+    for comp in comparables:
+        payload = _comparable_adjustment_payload(comp)
+        if payload:
+            comps_payload.append(payload)
+    if not comps_payload:
+        return None, "Comparable sale pricing unavailable."
+    subject_payload = _snapshot_adjustment_payload(subject, market_group=market_group)
+    try:
+        raw_payload = adjustment_engine.compute_adjustments(
+            subject=subject_payload,
+            comps=comps_payload,
+            subject_pred_price=subject_pred_price,
+            market_group=market_group,
+        )
+    except adjustment_engine.MissingCoefficientError as exc:
+        return None, str(exc)
+    except adjustment_engine.AdjustmentEngineError as exc:
+        return None, str(exc)
+    for comp in raw_payload.get("comparables", []):
+        adjustments = comp.get("adjustments") or {}
+        detail_list = []
+        for key, label in ADJUSTMENT_LABELS:
+            detail_list.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "amount": adjustments.get(key, 0.0),
+                }
+            )
+        comp["adjustment_list"] = detail_list
+    return raw_payload, None
 
 
 API_ENDPOINTS = [
@@ -1228,6 +1499,9 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
         params.get("sort_direction"),
     )
     limit = _parse_limit(params.get("limit"))
+    raw_view_mode = (params.get("view_mode") or "").strip().lower()
+    advanced_mode = raw_view_mode in {"advanced", "adv", "true", "1", "yes", "on"}
+    view_mode = "advanced" if advanced_mode else "standard"
 
     excluded = parcel_state.get("excluded", [])
 
@@ -1245,9 +1519,25 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
         sort_field=sort_field,
         sort_direction=sort_direction,
         limit=limit,
-        load_improvements=False,
+        load_improvements=advanced_mode,
         rollup_cache=rollup_cache,
     )
+    for comparable in computation.comparables:
+        setattr(comparable, "adjustment_payload", None)
+
+    advanced_payload: Optional[Dict[str, Any]] = None
+    advanced_error: Optional[str] = None
+    advanced_summary: Optional[Dict[str, Any]] = None
+    if advanced_mode:
+        advanced_payload, advanced_error = _compute_adjustment_summary(subject, computation.comparables)
+        if advanced_payload:
+            comp_map = {item["comp_id"]: item for item in advanced_payload.get("comparables", [])}
+            for comparable in computation.comparables:
+                comparable.adjustment_payload = comp_map.get(comparable.snapshot.parcel_number)
+            advanced_summary = {
+                "subject_pred_price": advanced_payload.get("subject_pred_price"),
+                "market_group": advanced_payload.get("market_group"),
+            }
 
     return {
         "subject": computation.subject,
@@ -1260,6 +1550,11 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
         "excluded": excluded,
         "markers": computation.marker_payloads(),
         "limit": limit,
+        "view_mode": view_mode,
+        "advanced_mode": advanced_mode,
+        "advanced_summary": advanced_summary,
+        "advanced_error": advanced_error,
+        "adjustment_labels": ADJUSTMENT_LABELS,
         "error": None,
     }
 
@@ -1476,18 +1771,18 @@ def appeal_home(request):
     """
     Minimal, citizen-friendly entry with a single address/parcel search box.
     """
-    return render(request, "openskagit/appeal_home_modern.html", {"step": 1})
+    return render(request, "openskagit/appeal_home_v3.html", {"step": 1})
 
 
 @require_GET
 def appeal_new(request):
     """API-only, mobile-first appeal homepage (no ORM)."""
     # Intentionally avoid ORM usage; all data is fetched via XHR from /api endpoints.
-    return render(request, "openskagit/appeal_home_v2.html")
+    return render(request, "openskagit/appeal_home_v3.html", {"step": 1})
 
 
 APPEAL_SEARCH_LIMIT = 15
-APPEAL_MIN_QUERY_LENGTH = 2  # whatever you use
+APPEAL_MIN_QUERY_LENGTH = 3
 
 @require_GET
 def appeal_parcel_search(request):
@@ -1535,7 +1830,7 @@ def appeal_parcel_search(request):
 
     return render(
         request,
-        "openskagit/appeal_parcel_search_results_modern.html",
+        "openskagit/appeal_parcel_search_results_v3.html",
         {
             "query": query,
             "results": results,
@@ -1558,7 +1853,7 @@ def appeal_result(request, parcel_number: str):
     comparables_url = request.path + "comparables/"
     return render(
         request,
-        "openskagit/appeal_results_modern.html",
+        "openskagit/appeal_results_v3.html",
         {
             "subject": subject,
             "parcel_number": parcel_number,
@@ -1574,6 +1869,9 @@ def appeal_result(request, parcel_number: str):
 def appeal_result_comparables(request, parcel_number: str):
     request_start = time.perf_counter()
     subject_start = time.perf_counter()
+    raw_view_mode = (request.GET.get("view_mode") or "").strip().lower()
+    advanced_mode = raw_view_mode in {"advanced", "adv", "true", "1", "yes", "on"}
+    view_mode = "advanced" if advanced_mode else "standard"
     try:
         subject, _ = appeals.load_subject_with_roll_context(parcel_number)
     except ValueError as exc:
@@ -1667,11 +1965,84 @@ def appeal_result_comparables(request, parcel_number: str):
         limit=display_limit,
     )
 
+    # Flatten comparable results for v3 templates (which expect simple dicts)
+    view_comps = []
+    adjustment_map: Dict[str, Dict[str, Any]] = {}
+    advanced_payload: Optional[Dict[str, Any]] = None
+    advanced_error: Optional[str] = None
+    advanced_summary: Optional[Dict[str, Any]] = None
+    if advanced_mode:
+        advanced_payload, advanced_error = _compute_adjustment_summary(subject, comps)
+        if advanced_payload:
+            adjustment_map = {
+                str(item.get("comp_id")): item for item in advanced_payload.get("comparables", [])
+            }
+            advanced_summary = {
+                "subject_pred_price": advanced_payload.get("subject_pred_price"),
+                "market_group": advanced_payload.get("market_group"),
+            }
+
+    for c in comps:
+        snapshot = getattr(c, "snapshot", None)
+        address = getattr(snapshot, "address", None) if snapshot else None
+        bedrooms = getattr(snapshot, "bedrooms", None) if snapshot else None
+        bathrooms = getattr(snapshot, "bathrooms", None) if snapshot else None
+        living_area = getattr(snapshot, "living_area", None) if snapshot else None
+        year_built = getattr(snapshot, "year_built", None) if snapshot else None
+        geom = getattr(snapshot, "geom", None) if snapshot else None
+        lat = getattr(geom, "y", None) if geom is not None else None
+        lon = getattr(geom, "x", None) if geom is not None else None
+        try:
+            sqft = float(living_area) if living_area not in (None, 0) else None
+        except Exception:
+            sqft = None
+        try:
+            price = float(c.sale_price) if c.sale_price is not None else None
+        except Exception:
+            price = None
+        price_per_sqft = None
+        if price is not None and sqft not in (None, 0):
+            try:
+                price_per_sqft = price / sqft
+            except Exception:
+                price_per_sqft = None
+        comp_id = getattr(snapshot, "parcel_number", None) if snapshot else None
+        adjustments = adjustment_map.get(str(comp_id)) if comp_id else None
+        view_comps.append(
+            {
+                "parcel_number": getattr(snapshot, "parcel_number", None) if snapshot else None,
+                "address": address,
+                "sale_price": c.sale_price,
+                "sale_date": c.sale_date,
+                "distance_miles": c.distance_miles,
+                "assessed_value": c.assessed_value,
+                "bedrooms": bedrooms,
+                "bathrooms": bathrooms,
+                "living_area": living_area,
+                "year_built": year_built,
+                "price_per_sqft": price_per_sqft,
+                "latitude": lat,
+                "longitude": lon,
+                "adjusted_value": adjustments.get("adjusted_value") if adjustments else None,
+                "total_adjustment": adjustments.get("total_adjustment") if adjustments else None,
+                "adjustments": adjustments.get("adjustment_list") if adjustments else [],
+            }
+        )
+
+    # Expose subject coordinates for map rendering if available
+    try:
+        if getattr(subject, "geom", None) is not None and not hasattr(subject, "latitude"):
+            setattr(subject, "latitude", subject.geom.y)
+            setattr(subject, "longitude", subject.geom.x)
+    except Exception:
+        pass
+
     return render(
         request,
-        "openskagit/appeal_results_comparables_modern.html",
+        "openskagit/appeal_results_comparables_v3.html",
         {
-            "comparables": comps,
+            "subject": subject,
+            "comparables": view_comps,
             "soft_stop": soft_stop,
             "soft_reasons": soft_reasons,
             "score": score,
@@ -1680,5 +2051,12 @@ def appeal_result_comparables(request, parcel_number: str):
             "has_more": has_more,
             "load_more_url": load_more_url,
             "parcel_number": parcel_number,
+            "view_mode": view_mode,
+            "advanced_mode": advanced_mode,
+            "advanced_summary": advanced_summary,
+            "advanced_error": advanced_error,
+            "adjustment_labels": ADJUSTMENT_LABELS,
+            "radius_meters_used": radius_used,
+            "fetch_url": request.path,
         },
     )

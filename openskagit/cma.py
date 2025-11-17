@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from .models import Assessor, Sales
 from .improvement_utils import rollup_for_parcel
+from .valuation_areas import resolve_market_group
 
 
 DEFAULT_COMPARABLE_LIMIT = 16
@@ -282,6 +283,8 @@ def load_subject(
     subject_roll_year = assessor.roll.year if getattr(assessor, "roll", None) else None
     subject_roll_id = assessor.roll_id if getattr(assessor, "roll_id", None) else None
 
+    subject_market_group = resolve_market_group(assessor.neighborhood_code) or assessor.city_district
+
     snapshot = PropertySnapshot(
         parcel_number=assessor.parcel_number,
         address=assessor.address or "Unknown address",
@@ -300,13 +303,23 @@ def load_subject(
         metadata={
             "neighborhood_code": assessor.neighborhood_code,
             "land_use_code": assessor.land_use_code,
+            "city_district": assessor.city_district,
+            "valuation_area": subject_market_group,
             "assessment_roll_year": subject_roll_year,
             "roll_year": subject_roll_year,
             "roll_id": subject_roll_id,
             "assessor_building_style": assessor.building_style,
             "assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
+            "finished_basement_sqft": float(assessor.finished_basement) if assessor.finished_basement else None,
+            "unfinished_basement_sqft": float(assessor.unfinished_basement) if assessor.unfinished_basement else None,
         },
     )
+    has_basement = False
+    if assessor.finished_basement and assessor.finished_basement > 0:
+        has_basement = True
+    if assessor.unfinished_basement and assessor.unfinished_basement > 0:
+        has_basement = True
+    snapshot.metadata["has_basement"] = has_basement
 
     # Attach improvement rollup for subject display and downstream pages
     snapshot.metadata["improvements"] = get_improvement_rollup(
@@ -365,10 +378,13 @@ def _base_queryset(subject: PropertySnapshot, radius_meters: Optional[float]) ->
         "acres",
         "year_built",
         "eff_year_built",
+        "finished_basement",
+        "unfinished_basement",
         "geom",
         "property_type",
         "neighborhood_code",
         "building_style",
+        "city_district",
         "assessed_value",
     )
 
@@ -476,6 +492,8 @@ def build_comparables(
         candidate_roll_id = candidate.roll_id if getattr(candidate, "roll_id", None) else None
         candidate_style = getattr(candidate, "building_style", None)
 
+        comp_market_group = resolve_market_group(candidate.neighborhood_code) or getattr(candidate, "city_district", None)
+
         comp_snapshot = PropertySnapshot(
             parcel_number=candidate.parcel_number,
             address=candidate.address or "Unknown address",
@@ -494,12 +512,24 @@ def build_comparables(
             metadata={
                 "sale_deed_type": getattr(candidate, "comp_deed_type", None),
                 "neighborhood_code": candidate.neighborhood_code,
+                "city_district": getattr(candidate, "city_district", None),
+                "valuation_area": comp_market_group,
                 "roll_year": candidate_roll_year,
                 "roll_id": candidate_roll_id,
                 "assessor_building_style": candidate_style,
                 "assessed_value": float(assessed_value) if assessed_value is not None else None,
+                "finished_basement_sqft": float(candidate.finished_basement) if candidate.finished_basement else None,
+                "unfinished_basement_sqft": (
+                    float(candidate.unfinished_basement) if candidate.unfinished_basement else None
+                ),
             },
         )
+        has_basement = False
+        if candidate.finished_basement and candidate.finished_basement > 0:
+            has_basement = True
+        if candidate.unfinished_basement and candidate.unfinished_basement > 0:
+            has_basement = True
+        comp_snapshot.metadata["has_basement"] = has_basement
 
         # Attach improvement rollup for comparable display
         if load_improvements:

@@ -15,12 +15,12 @@
            href="{% url 'appeal-result' parcel.parcel_number %}"
            data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
            data-parcel="{{ parcel.parcel_number|escape }}"
-           data-details="{% if sale_price and sale_date %}Last sold for ${{ sale_price|floatformat:0|intcomma }} on {{ sale_date|date:'M j, Y' %}{% elif sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% elif sale_date %}Last recorded sale {{ sale_date|date:'M j, Y' }}{% endif %}">
+           data-details="{% if sale_price and sale_date %}Last sold for ${{ sale_price|floatformat:0|intcomma }} on {{ sale_date|date:'M j, Y' }}{% elif sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% elif sale_date %}Last recorded sale {{ sale_date|date:'M j, Y' }}{% endif %}">
           <div class="result-address">{{ parcel.address|default:"Address unavailable" }}</div>
           <div class="result-parcel">Parcel {{ parcel.parcel_number }}</div>
           {% if sale_price or sale_date %}
             <div class="result-sale-info">
-              {% if sale_price %}Last sale May 29, 2025{% if sale_date %} on {{ sale_date|date:"M j, Y" }}{% endif %}{% elif sale_date %}Last sale {{ sale_date|date:"M j, Y" }}{% endif %}
+              {% if sale_price %}Last sale ${{ sale_price|floatformat:0|intcomma }}{% if sale_date %} on {{ sale_date|date:"M j, Y" }}{% endif %}{% elif sale_date %}Last sale {{ sale_date|date:"M j, Y" }}{% endif %}
             </div>
           {% endif %}
           <div class="result-cta">
