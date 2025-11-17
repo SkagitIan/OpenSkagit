@@ -1,0 +1,472 @@
+{% extends "openskagit/appeal_base_v3.html" %}
+
+{% block page_title %}Step 1 — Find Your Property{% endblock %}
+
+{% block content %}
+<style>
+  /* Enhanced autocomplete styling */
+  .search-card {
+    animation-delay: 0.1s;
+  }
+
+  .search-results-container {
+    margin-top: var(--space-6);
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: all var(--transition-base);
+    background: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .search-results-container--visible {
+    max-height: 600px;
+    opacity: 1;
+    overflow-y: auto;
+  }
+
+  .autocomplete-result {
+    display: block;
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--gray-100);
+    text-decoration: none;
+    color: inherit;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    position: relative;
+  }
+
+  .autocomplete-result:last-child {
+    border-bottom: none;
+  }
+
+  .autocomplete-result::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--primary-500);
+    transform: scaleY(0);
+    transition: transform var(--transition-fast);
+  }
+
+  .autocomplete-result:hover {
+    background: linear-gradient(90deg, var(--primary-50), transparent);
+    padding-left: calc(var(--space-5) + 12px);
+  }
+
+  .autocomplete-result:hover::before {
+    transform: scaleY(1);
+  }
+
+  .result-address {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: var(--space-1);
+  }
+
+  .result-parcel {
+    font-size: 0.875rem;
+    color: var(--primary-600);
+    margin-bottom: var(--space-1);
+  }
+
+  .result-sale-info {
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+  }
+
+  .result-cta {
+    font-size: 0.8125rem;
+    color: var(--primary-600);
+    font-weight: 600;
+    margin-top: var(--space-2);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .result-cta svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .selected-property {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-6);
+    background: linear-gradient(135deg, var(--success-50), white);
+    border: 2px solid var(--success-200);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-6);
+    animation: scaleIn 0.3s var(--transition-bounce);
+  }
+
+  .selected-property__icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    box-shadow: var(--shadow-md);
+    flex-shrink: 0;
+  }
+
+  .selected-property__content {
+    flex: 1;
+  }
+
+  .selected-property__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--success-700);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-1);
+  }
+
+  .selected-property__address {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: var(--space-1);
+  }
+
+  .selected-property__details {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+  }
+
+  .selected-property__change {
+    padding: var(--space-2) var(--space-4);
+    background: white;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    color: var(--gray-700);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .selected-property__change:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-300);
+  }
+
+  .info-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+    background: linear-gradient(135deg, var(--accent-50), var(--primary-50));
+    border: 1px solid var(--primary-200);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-6);
+  }
+
+  .info-banner__icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--primary-600);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .info-banner__content {
+    flex: 1;
+  }
+
+  .info-banner__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary-700);
+    margin-bottom: var(--space-1);
+  }
+
+  .info-banner__text {
+    font-size: 0.8125rem;
+    color: var(--gray-700);
+    line-height: 1.5;
+  }
+
+  .input-wrapper {
+    position: relative;
+  }
+
+  .input {
+    width: 100%;
+    padding: var(--space-4) var(--space-5);
+    padding-left: calc(var(--space-5) + 2rem);
+    font-size: 1rem;
+    font-family: inherit;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    background: white;
+    color: var(--gray-900);
+    transition: all var(--transition-base);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 4px var(--primary-100), var(--shadow-md);
+  }
+
+  .input::placeholder {
+    color: var(--gray-400);
+  }
+
+  .input-icon {
+    position: absolute;
+    left: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400);
+    pointer-events: none;
+    transition: color var(--transition-fast);
+  }
+
+  .input-wrapper:focus-within .input-icon {
+    color: var(--primary-500);
+  }
+
+  .input-clear {
+    position: absolute;
+    right: var(--space-4);
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: var(--radius-full);
+    background: var(--gray-200);
+    border: none;
+    color: var(--gray-600);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all var(--transition-fast);
+  }
+
+  .input-wrapper:focus-within .input-clear,
+  .input-wrapper:hover .input-clear {
+    opacity: 1;
+  }
+
+  .input-clear:hover {
+    background: var(--gray-300);
+  }
+
+  .form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: var(--space-2);
+  }
+
+  .input-hint {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin-top: var(--space-2);
+  }
+
+  .loading-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    margin-top: var(--space-4);
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--gray-300);
+    border-right-color: var(--primary-500);
+    border-radius: var(--radius-full);
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+</style>
+
+<div class="card search-card">
+  <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-6);">
+    <div style="width: 3rem; height: 3rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe)); color: white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+    </div>
+    <div>
+      <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900); margin: 0;">Find Your Property</h2>
+      <p style="font-size: 0.9375rem; color: var(--gray-600); margin: var(--space-1) 0 0;">Search by address or parcel number to get started</p>
+    </div>
+  </div>
+
+  <div class="info-banner">
+    <svg class="info-banner__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="16" x2="12" y2="12"></line>
+      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+    </svg>
+    <div class="info-banner__content">
+      <div class="info-banner__title">Quick tip</div>
+      <div class="info-banner__text">Try searching "123 Main St" or a parcel number like "P12345". We'll find residential properties in the current assessment roll.</div>
+    </div>
+  </div>
+
+  <div id="appeal-selection-display" class="hidden"></div>
+
+  <form class="form-group" onsubmit="return false;">
+    <label for="appeal-search" class="form-label">Property Search</label>
+    <div class="input-wrapper">
+      <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+      <input
+        id="appeal-search"
+        name="q"
+        type="text"
+        class="input"
+        placeholder="e.g., 101 Main St or P12345"
+        autocomplete="off"
+        hx-get="{% url 'appeal-parcel-search' %}"
+        hx-target="#appeal-results"
+        hx-trigger="keyup changed delay:400ms"
+        hx-indicator="#search-loading"
+        hx-on::before-request="
+          const minLen = 3;
+          if(this.value.trim().length < minLen) {
+            event.detail.shouldCancel = true;
+            document.getElementById('appeal-results').innerHTML = '';
+            document.getElementById('search-results-wrapper').classList.remove('search-results-container--visible');
+          }
+        "
+        hx-on::after-request="
+          const wrapper = document.getElementById('search-results-wrapper');
+          const results = document.getElementById('appeal-results');
+          if(results.innerHTML.trim()) {
+            wrapper.classList.add('search-results-container--visible');
+          }
+        "
+      />
+      <button type="button" class="input-clear" onclick="
+        const input = document.getElementById('appeal-search');
+        const results = document.getElementById('appeal-results');
+        const wrapper = document.getElementById('search-results-wrapper');
+        input.value = '';
+        results.innerHTML = '';
+        wrapper.classList.remove('search-results-container--visible');
+        input.focus();
+      " aria-label="Clear search">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="input-hint">Type at least 3 characters to search</div>
+  </form>
+
+  <div id="search-loading" class="hidden loading-indicator">
+    <div class="spinner"></div>
+    Searching properties...
+  </div>
+
+  <div id="search-results-wrapper" class="search-results-container">
+    <div id="appeal-results"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.appealSearchSelect = function (event) {
+    const input = document.getElementById('appeal-search');
+    const display = document.getElementById('appeal-selection-display');
+    const results = document.getElementById('appeal-results');
+    const wrapper = document.getElementById('search-results-wrapper');
+    const button = event?.detail?.elt;
+
+    if (!input || !display || !results || !button) {
+      return;
+    }
+
+    const address = button.dataset.address || '';
+    const parcel = button.dataset.parcel || '';
+    const details = button.dataset.details || '';
+
+    input.classList.add('hidden');
+    display.innerHTML = `
+      <div class="selected-property">
+        <div class="selected-property__icon">✓</div>
+        <div class="selected-property__content">
+          <div class="selected-property__title">Selected Property</div>
+          <div class="selected-property__address">${address}</div>
+          <div class="selected-property__details">Parcel ${parcel}${details ? ' • ' + details : ''}</div>
+        </div>
+        <button class="selected-property__change" type="button" onclick="window.appealSearchReset()">
+          Change
+        </button>
+      </div>
+    `;
+    display.classList.remove('hidden');
+    results.innerHTML = '';
+    wrapper.classList.remove('search-results-container--visible');
+    input.blur();
+  };
+
+  window.appealSearchReset = function () {
+    const input = document.getElementById('appeal-search');
+    const display = document.getElementById('appeal-selection-display');
+    const results = document.getElementById('appeal-results');
+    const wrapper = document.getElementById('search-results-wrapper');
+
+    if (!input || !display || !results) {
+      return;
+    }
+
+    display.classList.add('hidden');
+    display.textContent = '';
+    input.classList.remove('hidden');
+    input.value = '';
+    results.innerHTML = '';
+    wrapper.classList.remove('search-results-container--visible');
+    window.setTimeout(() => input.focus(), 0);
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('appeal-search')?.focus();
+  });
+</script>
+{% endblock %}

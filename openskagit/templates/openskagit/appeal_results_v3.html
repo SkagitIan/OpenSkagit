@@ -1,0 +1,714 @@
+{% extends "openskagit/appeal_base_v3.html" %}
+{% load humanize formatting %}
+
+{% block page_title %}Step 2 — Property Review{% endblock %}
+
+{% block content %}
+<style>
+  /* Property Hero */
+  .property-hero {
+    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+    color: white;
+    padding: var(--space-8);
+    border-radius: var(--radius-2xl);
+    margin-bottom: var(--space-6);
+    box-shadow: 0 20px 40px -10px rgba(108, 105, 141, 0.3);
+    animation: fadeInUp 0.5s var(--transition-base);
+  }
+
+  .property-hero__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-6);
+    gap: var(--space-4);
+  }
+
+  .property-hero__title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+    line-height: 1.2;
+  }
+
+  .property-hero__subtitle {
+    font-size: 1rem;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .property-hero__value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: var(--space-2);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .property-hero__label {
+    font-size: 0.9375rem;
+    opacity: 0.9;
+    font-weight: 500;
+  }
+
+  .property-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .property-stat {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .property-stat__value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: var(--space-1);
+  }
+
+  .property-stat__label {
+    font-size: 0.8125rem;
+    opacity: 0.85;
+    font-weight: 500;
+  }
+
+  /* Flippable Gauge Cards */
+  .gauge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-6);
+    margin-top: var(--space-8);
+  }
+
+  .gauge-card {
+    perspective: 1000px;
+    height: 420px;
+    position: relative;
+  }
+
+  .gauge-card__inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+  }
+
+  .gauge-card.flipped .gauge-card__inner {
+    transform: rotateY(180deg);
+  }
+
+  .gauge-card__front,
+  .gauge-card__back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    background: white;
+    border: 2px solid var(--gray-100);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .gauge-card__back {
+    transform: rotateY(180deg);
+    overflow-y: auto;
+  }
+
+  .gauge-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-4);
+  }
+
+  .gauge-card__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+
+  .flip-indicator {
+    background: var(--primary-50);
+    border: none;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    animation: pulseRotate 3s infinite;
+  }
+
+  .flip-indicator:hover {
+    background: var(--primary-100);
+    transform: scale(1.1);
+  }
+
+  @keyframes pulseRotate {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.05); }
+  }
+
+  .gauge-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    margin: var(--space-6) 0;
+    height: 140px;
+  }
+
+  .gauge-value {
+    position: absolute;
+    bottom: 10px;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--primary-600);
+  }
+
+  .gauge-status {
+    text-align: center;
+    margin-top: var(--space-4);
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .status-badge--excellent {
+    background: var(--success-50);
+    color: var(--success-700);
+  }
+
+  .status-badge--good {
+    background: var(--primary-50);
+    color: var(--primary-700);
+  }
+
+  .status-badge--fair {
+    background: var(--warning-50);
+    color: var(--warning-700);
+  }
+
+  .gauge-explanation {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .explanation-text {
+    margin-bottom: var(--space-4);
+    color: var(--gray-700);
+  }
+
+  .explanation-section {
+    margin-bottom: var(--space-4);
+  }
+
+  .explanation-section h5 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary-700);
+    margin-bottom: var(--space-2);
+  }
+
+  .explanation-section p {
+    color: var(--gray-600);
+  }
+
+  .explanation-metrics {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+
+  .metric-item {
+    padding: var(--space-3);
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+  }
+
+  .metric-label {
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: var(--space-1);
+  }
+
+  .metric-desc {
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+  }
+
+  .continue-section {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--space-10);
+    animation: fadeInUp 0.5s var(--transition-base) 0.5s both;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-6);
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    border-radius: var(--radius-xl);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    text-decoration: none;
+  }
+
+  .btn--primary {
+    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+    color: white;
+    box-shadow: 0 4px 14px 0 rgba(108, 105, 141, 0.39);
+  }
+
+  .btn--primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px 0 rgba(108, 105, 141, 0.5);
+  }
+
+  .btn--large {
+    padding: var(--space-5) var(--space-8);
+    font-size: 1.125rem;
+  }
+
+  @media (max-width: 768px) {
+    .property-hero__header {
+      flex-direction: column;
+    }
+    .gauge-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="property-hero">
+  <div class="property-hero__header">
+    <div>
+      <h2 class="property-hero__title">{{ subject.address|default:"Address unavailable" }}</h2>
+      <div class="property-hero__subtitle">
+        <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        </svg>
+        Parcel {{ subject.parcel_number }}
+      </div>
+    </div>
+  </div>
+
+  <div class="property-hero__value">
+    {% if subject.metadata.assessed_value %}
+      ${{ subject.metadata.assessed_value|floatformat:0|intcomma }}
+    {% else %}
+      —
+    {% endif %}
+  </div>
+  <div class="property-hero__label">Assessed Value</div>
+
+  <div class="property-stats" style="margin-top: var(--space-6);">
+    <div class="property-stat">
+      <div class="property-stat__value">{% if subject.bedrooms %}{{ subject.bedrooms|floatformat:"-1" }}{% else %}—{% endif %}</div>
+      <div class="property-stat__label">Bedrooms</div>
+    </div>
+    <div class="property-stat">
+      <div class="property-stat__value">{% if subject.bathrooms %}{{ subject.bathrooms|floatformat:"-1" }}{% else %}—{% endif %}</div>
+      <div class="property-stat__label">Bathrooms</div>
+    </div>
+    <div class="property-stat">
+      <div class="property-stat__value">
+        {% if subject.living_area %}
+          {{ subject.living_area|floatformat:0|intcomma }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div class="property-stat__label">Living Area (sq ft)</div>
+    </div>
+    <div class="property-stat">
+      <div class="property-stat__value">
+        {% if subject.acres %}
+          {{ subject.acres|floatformat:2 }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div class="property-stat__label">Lot Size (acres)</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-8);">
+    <div style="width: 2.5rem; height: 2.5rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe)); color: white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <line x1="17" y1="5" x2="9.5" y2="5"></line>
+        <line x1="17" y1="13" x2="9.5" y2="13"></line>
+        <path d="M9.5 5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+    </div>
+    <div>
+      <h3 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900); margin: 0;">Neighborhood Comparison</h3>
+      <p style="font-size: 0.9375rem; color: var(--gray-600); margin: var(--space-1) 0 0;">Click any card to learn more about these assessment metrics</p>
+    </div>
+  </div>
+
+  <div class="gauge-grid">
+    <!-- COD Card -->
+    <div class="gauge-card" id="cod-card">
+      <div class="gauge-card__inner">
+        <div class="gauge-card__front">
+          <div class="gauge-card__header">
+            <h4 class="gauge-card__title">Coefficient of Dispersion (COD)</h4>
+            <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip to see details">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="gauge-container">
+            <canvas id="cod-gauge" width="200" height="120"></canvas>
+            <div class="gauge-value">{{ neighborhood.cod|default:0|floatformat:1 }}</div>
+          </div>
+          <div class="gauge-status">
+            {% if neighborhood.cod < 10 %}
+              <span class="status-badge status-badge--excellent">Excellent Uniformity</span>
+            {% elif neighborhood.cod < 15 %}
+              <span class="status-badge status-badge--good">Good Uniformity</span>
+            {% else %}
+              <span class="status-badge status-badge--fair">Fair Uniformity</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="gauge-card__back">
+          <div class="gauge-card__header">
+            <h4 class="gauge-card__title">What is COD?</h4>
+            <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="gauge-explanation">
+            <p class="explanation-text">
+              The <strong>Coefficient of Dispersion (COD)</strong> measures how consistent property assessments are across similar properties.
+            </p>
+            <div class="explanation-section">
+              <h5>What it measures:</h5>
+              <p>"Horizontal equity" – the consistency of appraisals for similar properties, regardless of their value.</p>
+            </div>
+            <div class="explanation-section">
+              <h5>Ideal range (IAAO):</h5>
+              <p>Between <strong>5% and 15%</strong> is considered acceptable.</p>
+            </div>
+            <div class="explanation-metrics">
+              <div class="metric-item">
+                <div class="metric-label">Lower COD (Better)</div>
+                <div class="metric-desc">More consistent valuations across similar properties</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-label">Higher COD (Worse)</div>
+                <div class="metric-desc">Greater variation, less uniform assessments</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRD Card -->
+    <div class="gauge-card" id="prd-card">
+      <div class="gauge-card__inner">
+        <div class="gauge-card__front">
+          <div class="gauge-card__header">
+            <h4 class="gauge-card__title">Price-Related Differential (PRD)</h4>
+            <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip to see details">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="gauge-container">
+            <canvas id="prd-gauge" width="200" height="120"></canvas>
+            <div class="gauge-value">{{ neighborhood.prd|default:1|floatformat:2 }}</div>
+          </div>
+          <div class="gauge-status">
+            {% if neighborhood.prd and neighborhood.prd >= 0.98 and neighborhood.prd <= 1.03 %}
+              <span class="status-badge status-badge--excellent">Excellent Equity</span>
+            {% elif neighborhood.prd and neighborhood.prd > 1.03 %}
+              <span class="status-badge status-badge--fair">Regressive</span>
+            {% else %}
+              <span class="status-badge status-badge--fair">Progressive</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="gauge-card__back">
+          <div class="gauge-card__header">
+            <h4 class="gauge-card__title">What is PRD?</h4>
+            <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="gauge-explanation">
+            <p class="explanation-text">
+              The <strong>Price-Related Differential (PRD)</strong> tests for vertical assessment inequity in mass appraisals.
+            </p>
+            <div class="explanation-section">
+              <h5>What it measures:</h5>
+              <p>Whether high-value and low-value properties are assessed at the same ratio to market value.</p>
+            </div>
+            <div class="explanation-section">
+              <h5>How it works:</h5>
+              <p>PRD = Mean sales ratio ÷ Weighted mean sales ratio</p>
+            </div>
+            <div class="explanation-metrics">
+              <div class="metric-item">
+                <div class="metric-label">PRD = 1.00 (Perfect)</div>
+                <div class="metric-desc">No assessment bias between high and low valued properties</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-label">PRD &gt; 1.03 (Regressive)</div>
+                <div class="metric-desc">High-value parcels are relatively under-appraised</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-label">PRD &lt; 0.98 (Progressive)</div>
+                <div class="metric-desc">High-value parcels are relatively over-appraised</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sales Ratio Card -->
+    <div class="gauge-card" id="sales-ratio-card">
+      <div class="gauge-card__inner">
+        <div class="gauge-card__front">
+          <div class="gauge-card__header">
+            <h4 class="gauge-card__title">Assessment to Sales Ratio</h4>
+            <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip to see details">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="gauge-container">
+            <canvas id="sales-ratio-gauge" width="200" height="120"></canvas>
+            <div class="gauge-value">{{ neighborhood.sales_ratio|default:100|floatformat:0 }}%</div>
+          </div>
+          <div class="gauge-status">
+            {% if neighborhood.sales_ratio and neighborhood.sales_ratio >= 90 and neighborhood.sales_ratio <= 110 %}
+              <span class="status-badge status-badge--excellent">Within IAAO Standard</span>
+            {% else %}
+              <span class="status-badge status-badge--fair">Outside Standard</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="gauge-card__back">
+          <div class="gauge-card__header">
+            <h4 class="gauge-card__title">What is Sales Ratio?</h4>
+            <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="gauge-explanation">
+            <p class="explanation-text">
+              This ratio compares <strong>assessed values to actual market values</strong> (sale prices).
+            </p>
+            <div class="explanation-section">
+              <h5>Ideal Target:</h5>
+              <p>A ratio of <strong>1.0 or 100%</strong> where assessed value equals market value.</p>
+            </div>
+            <div class="explanation-section">
+              <h5>IAAO Acceptable Range:</h5>
+              <p>Between <strong>0.90 and 1.10</strong> (90% to 110% of market value).</p>
+            </div>
+            <div class="explanation-section">
+              <h5>Purpose:</h5>
+              <p>Ensures properties are assessed consistently and fairly relative to their market value.</p>
+            </div>
+            <div class="explanation-metrics">
+              <div class="metric-item">
+                <div class="metric-label">Above 110%</div>
+                <div class="metric-desc">Properties may be over-assessed relative to market</div>
+              </div>
+              <div class="metric-item">
+                <div class="metric-label">Below 90%</div>
+                <div class="metric-desc">Properties may be under-assessed relative to market</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="continue-section">
+  <button id="comparables-button" class="btn btn--primary btn--large" type="button" data-url="{{ comparables_url }}" onclick="window.appealFetchComparables()">
+    <span>View Comparable Sales</span>
+    <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+      <polyline points="12 5 19 12 12 19"></polyline>
+    </svg>
+  </button>
+</div>
+
+<div id="comparables-placeholder"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function flipCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    
+    card.classList.toggle('flipped');
+  }
+
+  function createGauge(canvasId, value, min, max, idealMin, idealMax) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const centerX = 100;
+    const centerY = 100;
+    const radius = 80;
+    const startAngle = Math.PI;
+    const endAngle = 2 * Math.PI;
+
+    function drawGauge(currentValue) {
+      ctx.clearRect(0, 0, 200, 120);
+
+      // Background arc
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.lineWidth = 20;
+      ctx.strokeStyle = '#e5e5e5';
+      ctx.stroke();
+
+      // Ideal range (green zone)
+      if (idealMin !== undefined && idealMax !== undefined) {
+        const idealStartAngle = startAngle + ((idealMin - min) / (max - min)) * Math.PI;
+        const idealEndAngle = startAngle + ((idealMax - min) / (max - min)) * Math.PI;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, idealStartAngle, idealEndAngle);
+        ctx.lineWidth = 20;
+        ctx.strokeStyle = '#10b981';
+        ctx.globalAlpha = 0.3;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      // Value arc
+      const valueAngle = startAngle + ((currentValue - min) / (max - min)) * Math.PI;
+      const gradient = ctx.createLinearGradient(0, 0, 200, 0);
+      gradient.addColorStop(0, '#6c698d');
+      gradient.addColorStop(1, '#aa968a');
+
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, startAngle, valueAngle);
+      ctx.lineWidth = 20;
+      ctx.strokeStyle = gradient;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    // Animate with anime.js
+    if (typeof anime !== 'undefined') {
+      anime({
+        targets: { val: min },
+        val: value,
+        duration: 1500,
+        easing: 'easeOutQuad',
+        update: function(anim) {
+          drawGauge(anim.animations[0].currentValue);
+        }
+      });
+    } else {
+      drawGauge(value);
+    }
+  }
+
+  window.appealFetchComparables = function () {
+    const button = document.getElementById('comparables-button');
+    const placeholder = document.getElementById('comparables-placeholder');
+    if (!button || button.dataset.loading === 'running') return;
+
+    button.dataset.loading = 'running';
+    button.disabled = true;
+    button.innerHTML = '<div class="spinner"></div><span>Loading comparables...</span>';
+
+    fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to fetch');
+        return response.text();
+      })
+      .then((text) => {
+        placeholder.innerHTML = text;
+        button.classList.add('hidden');
+      })
+      .catch(() => {
+        button.disabled = false;
+        button.dataset.loading = '';
+        button.innerHTML = '<span>Retry</span>';
+      });
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Initialize gauges
+    const codValue = {{ neighborhood.cod|default:0 }};
+    const prdValue = {{ neighborhood.prd|default:1 }};
+    const salesRatioValue = {{ neighborhood.sales_ratio|default:100 }};
+
+    createGauge('cod-gauge', codValue, 0, 30, 5, 15);
+    createGauge('prd-gauge', prdValue, 0.80, 1.20, 0.98, 1.03);
+    createGauge('sales-ratio-gauge', salesRatioValue, 70, 130, 90, 110);
+
+    // Auto-load comparables
+    window.appealFetchComparables();
+  });
+</script>
+<style>
+  .spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-right-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}
