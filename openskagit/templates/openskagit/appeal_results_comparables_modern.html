@@ -1,0 +1,789 @@
+{% load humanize formatting %}
+<style>
+  .comparables-section {
+    animation: fadeInUp 0.6s var(--transition-base);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-6);
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .section-title__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--primary-500), var(--accent-500));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+
+  .section-title__text h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+  }
+
+  .section-title__text p {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin: var(--space-1) 0 0;
+  }
+
+  .comp-grid {
+    display: grid;
+    gap: var(--space-4);
+    margin-bottom: var(--space-8);
+  }
+
+  .comp-card {
+    background: white;
+    border: 2px solid var(--gray-100);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    transition: all var(--transition-base);
+    animation: slideInRight 0.4s var(--transition-base);
+    animation-fill-mode: both;
+  }
+
+  .comp-card:nth-child(1) { animation-delay: 0.05s; }
+  .comp-card:nth-child(2) { animation-delay: 0.1s; }
+  .comp-card:nth-child(3) { animation-delay: 0.15s; }
+  .comp-card:nth-child(4) { animation-delay: 0.2s; }
+  .comp-card:nth-child(5) { animation-delay: 0.25s; }
+  .comp-card:nth-child(6) { animation-delay: 0.3s; }
+  .comp-card:nth-child(7) { animation-delay: 0.35s; }
+
+  .comp-card:hover {
+    border-color: var(--primary-300);
+    box-shadow: var(--shadow-xl);
+    transform: translateX(4px);
+  }
+
+  .comp-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .comp-card__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: var(--space-2);
+  }
+
+  .comp-card__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    flex-wrap: wrap;
+  }
+
+  .comp-card__meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .comp-card__price {
+    font-size: 1.75rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary-600), var(--accent-600));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    white-space: nowrap;
+  }
+
+  .comp-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .comp-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .comp-tag--primary {
+    background: var(--primary-100);
+    color: var(--primary-700);
+  }
+
+  .comp-card__details {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    line-height: 1.6;
+    margin-bottom: var(--space-4);
+  }
+
+  .comp-card__expand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--gray-50);
+    border: none;
+    border-radius: var(--radius-lg);
+    color: var(--primary-600);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .comp-card__expand:hover {
+    background: var(--primary-50);
+  }
+
+  .comp-improvements {
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--gray-200);
+    font-size: 0.875rem;
+    color: var(--gray-600);
+  }
+
+  .score-card {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.05), rgba(14, 165, 233, 0.05));
+    border: 2px solid var(--primary-200);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-8);
+    margin-bottom: var(--space-6);
+    animation: scaleIn 0.5s var(--transition-bounce) 0.4s both;
+  }
+
+  .score-card__header {
+    text-align: center;
+    margin-bottom: var(--space-8);
+  }
+
+  .score-card__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-6);
+  }
+
+  .score-circle {
+    width: 180px;
+    height: 180px;
+    margin: 0 auto var(--space-6);
+    position: relative;
+  }
+
+  .score-circle__svg {
+    transform: rotate(-90deg);
+  }
+
+  .score-circle__bg {
+    fill: none;
+    stroke: var(--gray-200);
+    stroke-width: 12;
+  }
+
+  .score-circle__progress {
+    fill: none;
+    stroke: url(#scoreGradient);
+    stroke-width: 12;
+    stroke-linecap: round;
+    transition: stroke-dasharray 1.5s var(--transition-base);
+  }
+
+  .score-circle__content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .score-circle__value {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--primary-600), var(--accent-600));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .score-circle__percent {
+    font-size: 1.5rem;
+  }
+
+  .score-circle__label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: var(--space-1);
+  }
+
+  .score-rating {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    background: white;
+    border: 2px solid var(--primary-200);
+    border-radius: var(--radius-full);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--primary-700);
+    box-shadow: var(--shadow-md);
+    margin: 0 auto;
+  }
+
+  .score-rating--weak { border-color: var(--error-200); color: var(--error-700); }
+  .score-rating--moderate { border-color: var(--warning-200); color: var(--warning-700); }
+  .score-rating--strong { border-color: var(--success-200); color: var(--success-700); }
+  .score-rating--very-strong { border-color: var(--success-300); color: var(--success-800); }
+
+  .score-reasons {
+    margin-top: var(--space-8);
+  }
+
+  .score-reasons__title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: var(--space-4);
+    text-align: center;
+  }
+
+  .score-reasons__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .score-reason {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+  }
+
+  .score-reason__icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--primary-500), var(--accent-500));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .score-reason__text {
+    flex: 1;
+    font-size: 0.9375rem;
+    color: var(--gray-700);
+    line-height: 1.6;
+  }
+
+  .alert-card {
+    background: linear-gradient(135deg, var(--error-50), rgba(255, 255, 255, 0.9));
+    border: 2px solid var(--error-200);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-6);
+    animation: fadeInUp 0.5s var(--transition-base) 0.5s both;
+  }
+
+  .alert-card__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .alert-card__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-full);
+    background: var(--error-500);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+
+  .alert-card__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--error-800);
+  }
+
+  .alert-card__text {
+    font-size: 0.9375rem;
+    color: var(--error-700);
+    line-height: 1.6;
+    margin-bottom: var(--space-4);
+  }
+
+  .alert-card__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .alert-card__list li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    font-size: 0.875rem;
+    color: var(--error-700);
+  }
+
+  .alert-card__list li::before {
+    content: "•";
+    color: var(--error-500);
+    font-weight: 700;
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .success-card {
+    background: linear-gradient(135deg, var(--success-50), rgba(255, 255, 255, 0.9));
+    border: 2px solid var(--success-200);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-6);
+    animation: fadeInUp 0.5s var(--transition-base) 0.5s both;
+  }
+
+  .success-card__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .success-card__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+
+  .success-card__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--success-800);
+  }
+
+  .success-card__text {
+    font-size: 0.9375rem;
+    color: var(--success-700);
+    line-height: 1.6;
+    margin-bottom: var(--space-4);
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .disclaimer-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin-top: var(--space-8);
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+    line-height: 1.6;
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .comp-card__header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .score-circle {
+      width: 150px;
+      height: 150px;
+    }
+
+    .score-circle__value {
+      font-size: 2.5rem;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+
+    .action-buttons .btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<div class="comparables-section">
+  <div class="card">
+    <div class="section-header">
+      <div class="section-title">
+        <div class="section-title__icon">
+          <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+        </div>
+        <div class="section-title__text">
+          <h3>Comparable Sales</h3>
+          <p>{{ comparables|length }} recent sales within ~{{ radius_meters_used|default:3218 }} meters</p>
+        </div>
+      </div>
+      {% if has_more %}
+        <button class="btn btn--secondary" type="button" data-url="{{ load_more_url }}" onclick="window.appealLoadMoreComps(this)">
+          <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+          Load More
+        </button>
+      {% endif %}
+    </div>
+
+    <div class="comp-grid">
+      {% for comp in comparables %}
+        <article class="comp-card">
+          <div class="comp-card__header">
+            <div style="flex: 1;">
+              <div class="comp-card__title">{{ comp.snapshot.address|default:"Address unavailable" }}</div>
+              <div class="comp-card__meta">
+                <span class="comp-card__meta-item">
+                  <svg style="width: 0.875rem; height: 0.875rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="10" r="3"></circle>
+                    <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 6.9 8 11.7z"></path>
+                  </svg>
+                  {{ comp.distance_miles|floatformat:2 }} mi
+                </span>
+                <span class="comp-card__meta-item">
+                  <svg style="width: 0.875rem; height: 0.875rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  {{ comp.sale_date|date:"M j, Y" }}
+                </span>
+              </div>
+            </div>
+            <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+          </div>
+
+          <div class="comp-card__tags">
+            {% if comp.assessed_value %}
+              <span class="comp-tag comp-tag--primary">
+                <svg style="width: 0.75rem; height: 0.75rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="1" x2="12" y2="23"></line>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Assessed ${{ comp.assessed_value|floatformat:0|intcomma }}
+              </span>
+            {% endif %}
+            <span class="comp-tag">{{ comp.snapshot.bedrooms|default_if_none:"?" }} bd</span>
+            <span class="comp-tag">{{ comp.snapshot.bathrooms|default_if_none:"?" }} ba</span>
+            {% if comp.snapshot.living_area %}
+              <span class="comp-tag">{{ comp.snapshot.living_area|floatformat:0|intcomma }} sq ft</span>
+            {% endif %}
+            {% if comp.snapshot.year_built %}
+              <span class="comp-tag">Built {{ comp.snapshot.year_built }}</span>
+            {% endif %}
+          </div>
+
+          <button
+            type="button"
+            class="comp-card__expand"
+            hx-get="{% url 'cma-comparable-improvements' parcel_number comp.snapshot.parcel_number %}?roll_id={{ comp.snapshot.metadata.roll_id|default_if_none:'' }}&roll_year={{ comp.snapshot.metadata.roll_year|default_if_none:'' }}{% if comp.snapshot.metadata.assessor_building_style %}&assessor_style={{ comp.snapshot.metadata.assessor_building_style|urlencode }}{% endif %}"
+            hx-target="#comp-improvements-{{ comp.snapshot.parcel_number }}"
+            hx-swap="innerHTML"
+          >
+            <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+            View Details
+          </button>
+          <div id="comp-improvements-{{ comp.snapshot.parcel_number }}" class="comp-improvements"></div>
+        </article>
+      {% empty %}
+        <div class="empty-state" style="padding: var(--space-10) var(--space-4);">
+          <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          </svg>
+          <div class="empty-state__text">No comparable sales found. Appeals are more challenging without recent comps nearby.</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="score-card">
+    <div class="score-card__header">
+      <div class="score-card__title">Appeal Likelihood</div>
+      <div class="score-circle">
+        <svg class="score-circle__svg" width="180" height="180" viewBox="0 0 180 180">
+          <defs>
+            <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#0ea5e9;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+          <circle class="score-circle__bg" cx="90" cy="90" r="80"></circle>
+          <circle class="score-circle__progress" cx="90" cy="90" r="80"
+            style="stroke-dasharray: {{ score|default:0|floatformat:0|mul:5.026 }} 502.6;"></circle>
+        </svg>
+        <div class="score-circle__content">
+          <div class="score-circle__value">
+            {{ score|default:0 }}<span class="score-circle__percent">%</span>
+          </div>
+          <div class="score-circle__label">Score</div>
+        </div>
+      </div>
+      <div class="score-rating score-rating--{{ rating|lower|default:'moderate' }}">
+        {% if rating == 'Weak' %}
+          <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        {% elif rating == 'Very Strong' %}
+          <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        {% elif rating == 'Strong' %}
+          <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        {% else %}
+          <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+        {% endif %}
+        {{ rating|default:"Unknown" }}
+      </div>
+    </div>
+
+    {% if reasons %}
+      <div class="score-reasons">
+        <div class="score-reasons__title">Key Factors</div>
+        <ul class="score-reasons__list">
+          {% for reason in reasons %}
+            <li class="score-reason">
+              <div class="score-reason__icon">
+                <svg style="width: 0.875rem; height: 0.875rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 11 12 14 22 4"></polyline>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+              </div>
+              <div class="score-reason__text">{{ reason }}</div>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if soft_stop %}
+    <div class="alert-card">
+      <div class="alert-card__header">
+        <div class="alert-card__icon">
+          <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <div class="alert-card__title">Appeal May Be Challenging</div>
+      </div>
+      <div class="alert-card__text">Based on current data, your appeal likelihood is moderate to low. Consider these factors before proceeding:</div>
+      <ul class="alert-card__list">
+        {% for reason in soft_reasons %}
+          <li>{{ reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="success-card">
+      <div class="success-card__header">
+        <div class="success-card__icon">
+          <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <div class="success-card__title">Worth Pursuing</div>
+      </div>
+      <div class="success-card__text">Your property shows indicators that support an appeal. Review county filing requirements and deadlines before proceeding.</div>
+      <div class="action-buttons">
+        <button class="btn btn--primary" type="button" onclick="window.print()">
+          <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Download PDF Report
+        </button>
+        <button class="btn btn--secondary" type="button">
+          <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          Email Report
+        </button>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card__header">
+      <div class="card__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="12" y1="18" x2="12" y2="12"></line>
+          <line x1="9" y1="15" x2="15" y2="15"></line>
+        </svg>
+      </div>
+      <div>
+        <h3 class="card__title">Filing Requirements (RCW 84.48)</h3>
+        <p class="card__subtitle">Important deadlines and legal requirements</p>
+      </div>
+    </div>
+    <ul class="info-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-3);">
+      <li style="display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200);">
+        <svg style="width: 1.25rem; height: 1.25rem; color: var(--primary-600); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span style="color: var(--gray-700); font-size: 0.9375rem;">Appeals must be filed by July 1 of the assessment year</span>
+      </li>
+      <li style="display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200);">
+        <svg style="width: 1.25rem; height: 1.25rem; color: var(--primary-600); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <span style="color: var(--gray-700); font-size: 0.9375rem;">Submit comparable sales at least 21 days before the hearing</span>
+      </li>
+      <li style="display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200);">
+        <svg style="width: 1.25rem; height: 1.25rem; color: var(--primary-600); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 11H3v9h18v-9h-6"></path>
+          <path d="M9 11V6l3-3 3 3v5"></path>
+        </svg>
+        <span style="color: var(--gray-700); font-size: 0.9375rem;">Burden of proof requires clear, cogent, and convincing evidence</span>
+      </li>
+      <li style="display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200);">
+        <svg style="width: 1.25rem; height: 1.25rem; color: var(--primary-600); flex-shrink: 0; margin-top: 2px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+        <span style="color: var(--gray-700); font-size: 0.9375rem;">The assessor's valuation is presumed correct unless proven otherwise</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="disclaimer-card">
+    <strong style="display: block; margin-bottom: var(--space-2); color: var(--gray-700);">Disclaimer:</strong>
+    This tool provides informational guidance only and does not constitute legal advice. Property assessment data is subject to updates and corrections. Always verify information with official county records and consult qualified professionals before filing an appeal.
+  </div>
+</div>
+
+<script>
+  window.appealLoadMoreComps = function (button) {
+    if (!button) return;
+
+    button.disabled = true;
+    button.innerHTML = '<div class="spinner"></div><span>Loading...</span>';
+
+    const placeholder = document.getElementById('comparables-placeholder');
+    fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to load');
+        return response.text();
+      })
+      .then((html) => {
+        if (placeholder) placeholder.innerHTML = html;
+      })
+      .catch(() => {
+        button.innerHTML = '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg><span>Retry</span>';
+        button.disabled = false;
+      });
+  };
+</script>
