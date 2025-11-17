@@ -17,13 +17,28 @@
         code.path { font-size: 0.95rem; display: inline-block; padding: 0.35rem 0.6rem; border-radius: 0.5rem; background: #0ea5e9; color: #fff; margin-left: 0.5rem; }
         span.method { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.12em; color: #0ea5e9; font-weight: 700; }
         article.endpoint { border: 1px solid #e5e7eb; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.5rem; background: #f9fbff; }
+        nav.endpoint-nav { margin-bottom: 1.5rem; }
+        ol.endpoint-index { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.35rem 1.25rem; padding-left: 1.5rem; margin: 0; }
+        ol.endpoint-index li { margin: 0; font-weight: 600; }
+        ol.endpoint-index a { color: #0ea5e9; text-decoration: none; }
+        ol.endpoint-index a:hover { text-decoration: underline; }
         details { margin-top: 1rem; }
         summary { cursor: pointer; font-weight: 600; color: #2563eb; }
         ul.notes { list-style: disc; margin-left: 1.5rem; }
+        p.instructions { margin: 0.75rem 0 0; font-weight: 500; color: #1f2933; }
+        p.use-case { margin: 0.35rem 0 0; color: #0f172a; font-size: 0.95rem; }
+        p.use-case strong { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: #0ea5e9; margin-right: 0.35rem; }
+        table.param-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.92rem; }
+        table.param-table th { text-align: left; font-size: 0.8rem; letter-spacing: 0.08em; color: #64748b; text-transform: uppercase; }
+        table.param-table th, table.param-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+        table.param-table tr:last-child td { border-bottom: none; }
+        table.param-table td strong { font-weight: 600; color: #0f172a; }
         @media (max-width: 768px) {
             section { padding: 1.5rem; }
             header { padding: 2.5rem 1rem; }
             header h1 { font-size: 2rem; }
+            ol.endpoint-index { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); padding-left: 1rem; }
+            table.param-table { font-size: 0.85rem; }
         }
     </style>
 </head>
@@ -42,16 +57,53 @@
 
         <section>
             <h2>Endpoints</h2>
+            <nav class="endpoint-nav">
+                <ol class="endpoint-index">
+                    {% for endpoint in endpoints %}
+                        <li><a href="#{{ endpoint.key }}">{{ endpoint.name }}</a></li>
+                    {% endfor %}
+                </ol>
+            </nav>
             {% for endpoint in endpoints %}
-                <article class="endpoint">
+                <article class="endpoint" id="{{ endpoint.key }}">
                     <header>
                         <span class="method">{{ endpoint.method }}</span>
                         <code class="path">{{ endpoint.display_path|default:endpoint.path }}</code>
                     </header>
                     <p>{{ endpoint.description }}</p>
+                    {% if endpoint.instructions %}
+                        <p class="instructions">{{ endpoint.instructions }}</p>
+                    {% endif %}
+                    {% if endpoint.use_case %}
+                        <p class="use-case"><strong>Use Case</strong> {{ endpoint.use_case }}</p>
+                    {% endif %}
+                    {% if endpoint.parameters %}
+                        <table class="param-table">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Where</th>
+                                    <th>Type</th>
+                                    <th>Required?</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for param in endpoint.parameters %}
+                                    <tr>
+                                        <td><strong>{{ param.name }}</strong></td>
+                                        <td>{{ param.location|title }}</td>
+                                        <td>{{ param.type }}</td>
+                                        <td>{% if param.required %}Required{% else %}Optional{% endif %}</td>
+                                        <td>{{ param.description }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
                     {% if endpoint.payload_json %}
                         <details>
-                            <summary>Sample Payload</summary>
+                            <summary>{{ endpoint.payload_label|default:"Sample Payload" }}</summary>
                             <pre><code>{{ endpoint.payload_json }}</code></pre>
                         </details>
                     {% endif %}

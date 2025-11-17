@@ -4,10 +4,10 @@ import datetime as dt
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-import math
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from django.contrib.gis.measure import D
 
+from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 from django.db.models.expressions import RawSQL
 from django.db.models import F, OuterRef, Subquery, Window
@@ -21,24 +21,21 @@ from .improvement_utils import rollup_for_parcel
 DEFAULT_COMPARABLE_LIMIT = 16
 MAX_COMPARABLE_LIMIT = 24
 
-from openskagit.models import RegressionAdjustment
-
-
 logger = logging.getLogger(__name__)
 
-FIELD_MAP: Dict[str, str] = {
-    "bath_sq": "bathrooms",
-    "bathrooms": "bathrooms",
-    "bedrooms": "bedrooms",
-    "effective_age": "effective_age",
-    "has_attached_garage": "has_attached_garage",
-    "has_detached_garage": "has_detached_garage",
-    # log variables use dedicated handling but map to canonical field names for labels
-    "log_area": "living_area",
-    "log_lot": "acres",
-}
-
 RollupCache = Dict[Tuple[str, Optional[int], Optional[int]], Dict[str, object]]
+
+WGS84_SRID = 4326
+
+
+def _ensure_wgs84(geom: Optional[GEOSGeometry]) -> Optional[GEOSGeometry]:
+    if geom is None:
+        return None
+    if getattr(geom, "srid", None) == WGS84_SRID:
+        return geom
+    cloned = GEOSGeometry(geom.wkb, srid=geom.srid)
+    cloned.transform(WGS84_SRID)
+    return cloned
 
 
 def get_improvement_rollup(
@@ -69,25 +66,6 @@ def get_improvement_rollup(
     if cache is not None:
         cache[key] = rollup
     return rollup
-
-def load_regression_adjustments():
-    """Load regression-derived percentage adjustments from the database."""
-    qs = RegressionAdjustment.objects.order_by("-created_at")
-    adjustments = {r.variable: Decimal(str(r.adjustment_pct)) for r in qs}
-    return adjustments
-
-
-@dataclass(frozen=True)
-class AdjustmentRule:
-    key: str
-    label: str
-    attribute: str
-    rate: Decimal
-    rationale: str
-    threshold: Decimal = Decimal("0")
-    is_percentage: bool = False
-
-
 
 DIFFERENCE_ALERTS: Dict[str, Decimal] = {
     "living_area": Decimal("150"),
@@ -124,14 +102,6 @@ class CmaFilters:
 
 
 @dataclass
-class AdjustmentLine:
-    code: str
-    label: str
-    amount: Decimal
-    rationale: str
-
-
-@dataclass
 class PropertySnapshot:
     parcel_number: str
     address: str
@@ -145,6 +115,7 @@ class PropertySnapshot:
     effective_year_built: Optional[int]
     garage_sqft: Optional[Decimal]
     acres: Optional[Decimal]
+    assessed_value: Optional[Decimal]
     geom: Optional[GEOSGeometry]
     metadata: Dict[str, Optional[str]] = field(default_factory=dict)
 
@@ -162,6 +133,7 @@ class PropertySnapshot:
             "effective_year_built": self.effective_year_built,
             "garage_sqft": float(self.garage_sqft) if self.garage_sqft is not None else None,
             "acres": float(self.acres) if self.acres is not None else None,
+            "assessed_value": float(self.assessed_value) if self.assessed_value is not None else None,
             "metadata": self.metadata,
         }
 
@@ -170,14 +142,10 @@ class PropertySnapshot:
 class ComparableResult:
     snapshot: PropertySnapshot
     sale_price: Decimal
+    assessed_value: Optional[Decimal]
     sale_date: Optional[dt.date]
     distance_meters: Optional[float]
     distance_miles: Optional[Decimal]
-    auto_adjustments: List[AdjustmentLine]
-    manual_adjustments: Dict[str, Decimal]
-    adjusted_price: Decimal
-    gross_adjustment_total: Decimal
-    gross_percentage_adjustment: Decimal
     difference_flags: Dict[str, bool]
     inclusion_rank: int
 
@@ -190,8 +158,7 @@ class ComparableResult:
             "lat": geom.y,
             "lon": geom.x,
             "sale_price": float(self.sale_price),
-            "adjusted_price": float(self.adjusted_price),
-            "gpa": float(self.gross_percentage_adjustment),
+            "assessed_value": float(self.assessed_value) if self.assessed_value is not None else None,
             "address": self.snapshot.address,
             "rank": self.inclusion_rank,
         }
@@ -206,8 +173,8 @@ class CmaComputation:
     sort_direction: str
 
     def summary(self) -> Dict[str, object]:
-        adjusted_values = [comp.adjusted_price for comp in self.comparables]
-        if not adjusted_values:
+        sale_values = [comp.sale_price for comp in self.comparables]
+        if not sale_values:
             return {
                 "count": 0,
                 "average": None,
@@ -216,7 +183,7 @@ class CmaComputation:
                 "high": None,
             }
 
-        quantized = [value.quantize(Decimal("0.01")) for value in adjusted_values]
+        quantized = [value.quantize(Decimal("0.01")) for value in sale_values]
         average = sum(quantized) / Decimal(len(quantized))
         sorted_values = sorted(quantized)
         if len(sorted_values) % 2 == 1:
@@ -298,6 +265,10 @@ def load_subject(
     if assessor.geom is None:
         raise ValueError("Subject property does not have geospatial coordinates.")
 
+    subject_geom = _ensure_wgs84(assessor.geom)
+    if subject_geom is None:
+        raise ValueError("Unable to project subject geometry to WGS84.")
+
     # Prefer SALES table for last sale details; handle multiple rows safely
     sale_row = (
         Sales.objects.filter(
@@ -324,7 +295,8 @@ def load_subject(
         effective_year_built=int(assessor.eff_year_built) if assessor.eff_year_built else None,
         garage_sqft=_to_decimal(assessor.garage_sqft),
         acres=_to_decimal(assessor.acres),
-        geom=assessor.geom,
+        assessed_value=_to_decimal(assessor.assessed_value),
+        geom=subject_geom,
         metadata={
             "neighborhood_code": assessor.neighborhood_code,
             "land_use_code": assessor.land_use_code,
@@ -332,6 +304,7 @@ def load_subject(
             "roll_year": subject_roll_year,
             "roll_id": subject_roll_id,
             "assessor_building_style": assessor.building_style,
+            "assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
         },
     )
 
@@ -347,8 +320,8 @@ def load_subject(
     return snapshot
 
 
-def _base_queryset(subject: PropertySnapshot) -> Iterable[Assessor]:
-    # Annotate assessor parcels with sales facts from SALES; use SALES for comps
+def _base_queryset(subject: PropertySnapshot, radius_meters: Optional[float]) -> Iterable[Assessor]:
+    # Subqueries for SALES table
     sale_sq_base = Sales.objects.filter(
         parcel_number=OuterRef("parcel_number"),
         sale_type__iregex=r"^\s*valid sale\s*$",
@@ -358,55 +331,86 @@ def _base_queryset(subject: PropertySnapshot) -> Iterable[Assessor]:
     sale_sq_date = Subquery(sale_sq_base.values("sale_date")[:1])
     sale_sq_deed = Subquery(sale_sq_base.values("deed_type")[:1])
 
-    qs = (
-        Assessor.objects.filter(geom__isnull=False)
-        .only(
-            "parcel_number",
-            "address",
-            "living_area",
-            "bedrooms",
-            "bathrooms",
-            "garage_sqft",
-            "acres",
-            "year_built",
-            "eff_year_built",
-            "geom",
-            "property_type",
-            "neighborhood_code",
-            "building_style",
-        )
-        .exclude(parcel_number=subject.parcel_number)
-        .filter(geom__distance_lte=(subject.geom, D(m=8000)))  # <— add this line
-        .annotate(
-            comp_sale_price=sale_sq_price,
-            comp_sale_date=sale_sq_date,
-            comp_deed_type=sale_sq_deed,
-        )
-        .filter(comp_sale_price__gt=0)
-        .annotate(
-            parcel_rank=Window(
-                expression=RowNumber(),
-                partition_by=[F("parcel_number")],
-                order_by=[
-                    F("roll__year").desc(nulls_last=True),
-                    F("id").desc(),
-                ],
+    # Subject geography (point)
+    subject_geom = subject.geom
+    subject_geom_param = subject_geom.ewkb if subject_geom else None
+
+    subject_point_geog = RawSQL(
+        "%s::geography",
+        (subject_geom_param,),
+        output_field=gis_models.PointField(geography=True, srid=WGS84_SRID),
+    )
+
+    # -----------------------------------------------------
+    # BASE QUERYSET – SPATIAL PRUNING FIRST (very fast)
+    # -----------------------------------------------------
+    qs = Assessor.objects.filter(geom__isnull=False, roll__year=2025, property_type='R')
+
+    if radius_meters is not None and subject_geom_param:
+        qs = qs.filter(
+            centroid_geog__distance_lte=(
+                subject_point_geog,
+                radius_meters,
             )
         )
-        .filter(parcel_rank=1)
-        .annotate(
-            distance_sort=RawSQL("geom <-> %s", (subject.geom.ewkb,) if subject.geom else (None,)),
-            # Use ST_Distance on geography to avoid missing function errors
-            distance_meters=RawSQL(
-                "CASE WHEN geom IS NULL OR %s IS NULL THEN NULL "
-                "ELSE ST_Distance(geom::geography, %s::geography) END",
-                (subject.geom.ewkb, subject.geom.ewkb) if subject.geom else (None, None),
-            ),
-        )
-        .select_related()
-    )
-    return qs
 
+    # Only select fields needed later
+    qs = qs.only(
+        "parcel_number",
+        "address",
+        "living_area",
+        "bedrooms",
+        "bathrooms",
+        "garage_sqft",
+        "acres",
+        "year_built",
+        "eff_year_built",
+        "geom",
+        "property_type",
+        "neighborhood_code",
+        "building_style",
+        "assessed_value",
+    )
+
+    # Exclude subject parcel
+    qs = qs.exclude(parcel_number=subject.parcel_number)
+
+    # Attach sales subqueries
+    qs = qs.annotate(
+        comp_sale_price=sale_sq_price,
+        comp_sale_date=sale_sq_date,
+        comp_deed_type=sale_sq_deed,
+    ).filter(comp_sale_price__gt=0)
+
+    # Pick latest roll per parcel
+    qs = qs.annotate(
+        parcel_rank=Window(
+            expression=RowNumber(),
+            partition_by=[F("parcel_number")],
+            order_by=[
+                F("roll__year").desc(nulls_last=True),
+                F("id").desc(),
+            ],
+        )
+    ).filter(parcel_rank=1)
+
+    # Distance annotations — uses centroid_geog (indexed)
+    qs = qs.annotate(
+        distance_sort=RawSQL(
+            "centroid_geog <-> %s::geography",
+            (subject_geom_param,)
+        ),
+        distance_meters=RawSQL(
+            "ST_Distance(centroid_geog, %s::geography)",
+            (subject_geom_param,)
+        ),
+    )
+
+    # Enforce radius again (cheap now)
+    if radius_meters is not None:
+        qs = qs.filter(distance_meters__lte=radius_meters)
+
+    return qs.select_related()
 
 def apply_filters(qs: Iterable[Assessor], filters: CmaFilters) -> Iterable[Assessor]:
     if filters.property_type:
@@ -433,208 +437,22 @@ def apply_filters(qs: Iterable[Assessor], filters: CmaFilters) -> Iterable[Asses
         qs = qs.filter(geom__within=filters.bbox)
     return qs
 
-from decimal import Decimal, ROUND_HALF_UP
-
-def _safe_decimal(val):
-    """Convert to Decimal safely, returning None on bad input."""
-    try:
-        return Decimal(str(val))
-    except Exception:
-        return None
-
-def _log_ratio_delta(subj_val, comp_val):
-    """Return the log ratio delta between subject and comp (safe)."""
-    try:
-        s, c = float(subj_val), float(comp_val)
-        if s > 0 and c > 0:
-            return Decimal(np.log(s / c))
-    except Exception:
-        pass
-    return Decimal(0)
-
-def _get_code(obj, field_prefix):
-    """Try to pull code from .metadata or direct field."""
-    if hasattr(obj, "metadata") and isinstance(obj.metadata, dict):
-        return obj.metadata.get(field_prefix)
-    return getattr(obj, field_prefix, None)
-
-
-def _numeric_feature(obj: object, field: str):
-    """
-    Resolve numeric attributes used for adjustments.
-
-    Handles derived fields such as `effective_age` that may not exist on the
-    underlying object, falling back to raw attributes when present.
-    """
-    if field == "effective_age":
-        year_built = getattr(obj, "year_built", None)
-        eff_year_built = getattr(obj, "effective_year_built", None)
-        if eff_year_built is None:
-            eff_year_built = getattr(obj, "eff_year_built", None)
-        if year_built is not None and eff_year_built is not None:
-            try:
-                delta = Decimal(str(year_built)) - Decimal(str(eff_year_built))
-            except Exception:
-                delta = None
-            if isinstance(delta, Decimal) and delta < 0:
-                delta = Decimal("0")
-            if delta is not None:
-                return delta
-        return getattr(obj, field, None)
-    return getattr(obj, field, None)
-from decimal import Decimal, ROUND_HALF_UP
-import numpy as np
-
-def _compute_adjustments(subject, comp_record):
-    """
-    Compute regression-based auto adjustments between a subject and comp.
-
-    Each RegressionAdjustment record provides a % effect per variable.
-    This function compares the subject and comp for that variable and
-    multiplies the delta by the % rate and comp sale price.
-    """
-    adj_factors = load_regression_adjustments()  # latest model version
-    adjustments, difference_flags = [], {}
-    base_value = Decimal(getattr(comp_record, "comp_sale_price", 0) or 1)
-
-    if base_value <= 1:
-        logger.warning("CMA adjustments skipped: missing sale price for parcel=%s", getattr(comp_record, "parcel_number", "?"))
-        return [], {}
-
-    for key, pct in adj_factors.items():
-        try:
-            pct = Decimal(str(pct))
-        except Exception:
-            continue
-        # skip nulls, but keep small rates (can matter!)
-        if pct is None:
-            continue
-
-        canonical_field = FIELD_MAP.get(key, key)
-        field = None
-        adj_amount = Decimal(0)
-        delta = Decimal(0)
-
-        # --- Continuous log-type ---
-        if key in ["log_area", "log_lot"]:
-            field = "living_area" if key == "log_area" else "acres"
-            s = getattr(subject, field, 0) or 0
-            c = getattr(comp_record, field, 0) or 0
-            try:
-                if s > 0 and c > 0:
-                    delta = Decimal(np.log(s / c))
-                    adj_amount = base_value * (pct / Decimal("100")) * delta
-            except Exception:
-                pass
-
-        # --- Linear count features ---
-        elif canonical_field in ["bedrooms", "bathrooms", "effective_age"]:
-            field = canonical_field
-            subj = _safe_decimal(_numeric_feature(subject, field))
-            comp = _safe_decimal(_numeric_feature(comp_record, field))
-            if subj is None or comp is None:
-                continue
-            delta = subj - comp
-            adj_amount = base_value * (pct / Decimal("100")) * delta
-
-        # --- Garage flags ---
-        elif canonical_field in ["has_attached_garage", "has_detached_garage"]:
-            field = canonical_field
-            subj = int(bool(getattr(subject, field, 0)))
-            comp = int(bool(getattr(comp_record, field, 0)))
-            delta = Decimal(subj - comp)
-            adj_amount = base_value * (pct / Decimal("100")) * delta
-
-        # --- Condition / Land Use / Neighborhood codes ---
-        elif any(prefix in key for prefix in ["condition_code_", "land_use_code_", "neighborhood_code_"]):
-            parts = canonical_field.split("_")
-            field_prefix = "_".join(parts[:2])  # e.g., "condition_code"
-            field = field_prefix
-
-            subj_code = _get_code(subject, field_prefix)
-            comp_code = _get_code(comp_record, field_prefix)
-            dummy_suffix = key.split(field_prefix + "_")[-1]
-
-            if (
-                str(comp_code).strip().upper() == str(dummy_suffix).strip().upper()
-                and subj_code != comp_code
-            ):
-                delta = Decimal(1)
-                adj_amount = base_value * (pct / Decimal("100")) * delta
-
-        # --- Skip unrecognized keys ---
-        else:
-            continue
-
-        # --- finalize ---
-        if field is None or adj_amount == 0:
-            continue
-
-        adj_amount = adj_amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        rationale = f"{pct:+.2f}% effect on {field} (Δ={delta})"
-        adjustments.append(
-            AdjustmentLine(
-                code=key,
-                label=field.replace("_", " ").title(),
-                amount=adj_amount,
-                rationale=rationale,
-            )
-        )
-        difference_flags[field] = delta != 0
-
-        # --- Debug log ---
-        logger.debug(
-            "CMA auto adjustment | parcel=%s field=%s delta=%s pct=%s amount=%s",
-            getattr(comp_record, "parcel_number", "?"),
-            field,
-            delta,
-            pct,
-            adj_amount,
-        )
-
-    if not adjustments:
-        logger.debug(
-            "CMA auto adjustment | parcel=%s generated no adjustments | factors=%s",
-            getattr(comp_record, "parcel_number", "?"),
-            list(adj_factors.keys()),
-        )
-
-    return adjustments, difference_flags
-
-def _manual_adjustment_total(manual_adjustments: Dict[str, Decimal]) -> Decimal:
-    total = Decimal("0")
-    for value in manual_adjustments.values():
-        if value is None:
-            continue
-        total += Decimal(str(value))
-    return total
-
-
-def _gross_adjustment_total(auto_adjustments: Sequence[AdjustmentLine], manual_adjustments: Dict[str, Decimal]) -> Decimal:
-    gross = Decimal("0")
-    for adj in auto_adjustments:
-        gross += abs(adj.amount)
-    for value in manual_adjustments.values():
-        gross += abs(Decimal(str(value)))
-    return gross
-
-
 def build_comparables(
     subject: PropertySnapshot,
     filters: CmaFilters,
-    manual_adjustments: Dict[str, Dict[str, Decimal]],
     excluded: Sequence[str],
     sort_field: str,
     sort_direction: str,
     limit: int = DEFAULT_COMPARABLE_LIMIT,
     *,
+    radius_meters: Optional[float] = 8000,
     load_improvements: bool = True,
     rollup_cache: Optional[RollupCache] = None,
 ) -> CmaComputation:
     if limit > MAX_COMPARABLE_LIMIT:
         limit = MAX_COMPARABLE_LIMIT
 
-    queryset = _base_queryset(subject)
+    queryset = _base_queryset(subject, radius_meters)
     queryset = apply_filters(queryset, filters)
     queryset = queryset.order_by("distance_sort")[: max(limit, DEFAULT_COMPARABLE_LIMIT)]
 
@@ -646,54 +464,8 @@ def build_comparables(
         sale_price = _to_decimal(getattr(candidate, "comp_sale_price", None))
         if sale_price is None or sale_price <= 0:
             continue
-        auto_adjustments, difference_flags = _compute_adjustments(subject, candidate)
-        auto_total = sum((adj.amount for adj in auto_adjustments), start=Decimal("0"))
-        manual = manual_adjustments.get(candidate.parcel_number, {})
-        manual_total = _manual_adjustment_total(manual)
-        adjusted_price = (sale_price or Decimal("0")) + auto_total + manual_total
-        gross_total = _gross_adjustment_total(auto_adjustments, manual)
-        logger.debug(
-            "CMA adjustments | parcel=%s sale=%s auto=%s manual=%s adjusted=%s manual_fields=%s",
-            candidate.parcel_number,
-            sale_price,
-            auto_total,
-            manual_total,
-            adjusted_price,
-            list(manual.keys()),
-        )
-        if auto_total == 0 and manual_total == 0:
-            logger.debug(
-                "CMA adjustments absent | parcel=%s | difference_flags=%s | subject_vals=%s | comp_vals=%s",
-                candidate.parcel_number,
-                difference_flags,
-                {
-                    "living_area": subject.living_area,
-                    "bedrooms": subject.bedrooms,
-                    "bathrooms": subject.bathrooms,
-                    "acres": subject.acres,
-                    "effective_year_built": subject.effective_year_built,
-                    "year_built": subject.year_built,
-                    "garage_sqft": subject.garage_sqft,
-                    "metadata": subject.metadata,
-                },
-                {
-                    "living_area": _to_decimal(candidate.living_area),
-                    "bedrooms": _to_decimal(candidate.bedrooms),
-                    "bathrooms": _to_decimal(candidate.bathrooms),
-                    "acres": _to_decimal(candidate.acres),
-                    "effective_year_built": _to_decimal(candidate.eff_year_built),
-                    "year_built": _to_decimal(candidate.year_built),
-                    "garage_sqft": _to_decimal(candidate.garage_sqft),
-                    "metadata": {
-                        "neighborhood_code": candidate.neighborhood_code,
-                        "land_use_code": getattr(candidate, "land_use_code", None),
-                    },
-                },
-            )
-        if sale_price > 0:
-            gpa = (gross_total / sale_price * Decimal("100")).quantize(Decimal("0.01"))
-        else:
-            gpa = Decimal("0")
+        difference_flags = _compute_difference_flags(subject, candidate)
+        assessed_value = _to_decimal(getattr(candidate, "assessed_value", None))
 
         distance_meters = getattr(candidate, "distance_meters", None)
         distance_miles: Optional[Decimal] = None
@@ -717,13 +489,15 @@ def build_comparables(
             effective_year_built=int(candidate.eff_year_built) if candidate.eff_year_built else None,
             garage_sqft=_to_decimal(candidate.garage_sqft),
             acres=_to_decimal(candidate.acres),
-            geom=candidate.geom,
+            assessed_value=assessed_value,
+            geom=_ensure_wgs84(candidate.geom),
             metadata={
                 "sale_deed_type": getattr(candidate, "comp_deed_type", None),
                 "neighborhood_code": candidate.neighborhood_code,
                 "roll_year": candidate_roll_year,
                 "roll_id": candidate_roll_id,
                 "assessor_building_style": candidate_style,
+                "assessed_value": float(assessed_value) if assessed_value is not None else None,
             },
         )
 
@@ -743,14 +517,10 @@ def build_comparables(
             ComparableResult(
                 snapshot=comp_snapshot,
                 sale_price=sale_price.quantize(Decimal("0.01")),
+                assessed_value=assessed_value.quantize(Decimal("0.01")) if assessed_value is not None else None,
                 sale_date=_safe_date(getattr(candidate, "comp_sale_date", None)),
                 distance_meters=float(distance_meters) if distance_meters else None,
                 distance_miles=distance_miles,
-                auto_adjustments=auto_adjustments,
-                manual_adjustments=manual,
-                adjusted_price=adjusted_price,
-                gross_adjustment_total=gross_total.quantize(Decimal("0.01")),
-                gross_percentage_adjustment=gpa,
                 difference_flags=difference_flags,
                 inclusion_rank=0,
             )
@@ -777,14 +547,38 @@ def _sort_comparables(
 
     key_map = {
         "sale_price": lambda c: c.sale_price,
-        "adjusted_price": lambda c: c.adjusted_price,
+        "adjusted_price": lambda c: c.sale_price,
         "distance": lambda c: c.distance_miles if c.distance_miles is not None else Decimal("0"),
         "sale_date": lambda c: c.sale_date or dt.date.min,
-        "gpa": lambda c: c.gross_percentage_adjustment,
-        "total_adjustment": lambda c: c.gross_adjustment_total,
+        "gpa": lambda c: Decimal("0"),
+        "total_adjustment": lambda c: Decimal("0"),
     }
-    key_func = key_map.get(sort_field, key_map["gpa"])
+    key_func = key_map.get(sort_field, key_map["distance"])
     return sorted(comparables, key=key_func, reverse=reverse)
+
+
+def _compute_difference_flags(subject: PropertySnapshot, candidate: Assessor) -> Dict[str, bool]:
+    """
+    Compare basic property characteristics to flag notable deltas without applying adjustments.
+    """
+    flags: Dict[str, bool] = {}
+    field_pairs = {
+        "living_area": ("living_area", "living_area"),
+        "bedrooms": ("bedrooms", "bedrooms"),
+        "bathrooms": ("bathrooms", "bathrooms"),
+        "garage_sqft": ("garage_sqft", "garage_sqft"),
+        "acres": ("acres", "acres"),
+        "year_built": ("year_built", "year_built"),
+    }
+    for key, (subject_attr, candidate_attr) in field_pairs.items():
+        subj_val = _to_decimal(getattr(subject, subject_attr, None))
+        comp_val = _to_decimal(getattr(candidate, candidate_attr, None))
+        threshold = DIFFERENCE_ALERTS.get(key, Decimal("0"))
+        if subj_val is None or comp_val is None:
+            flags[key] = False
+            continue
+        flags[key] = abs(subj_val - comp_val) >= threshold
+    return flags
 
 
 def parse_filters_from_request(params: Dict[str, str]) -> CmaFilters:

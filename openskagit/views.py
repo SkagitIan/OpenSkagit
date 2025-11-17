@@ -6,6 +6,7 @@ import math
 import os
 import operator
 import re
+import time
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
@@ -29,17 +30,15 @@ logger = logging.getLogger(__name__)
 
 from . import cma, llm
 from . import appeals
-from .models import AssessmentRoll, Assessor, CmaAnalysis, CmaComparableSelection, Parcel
+from .models import Assessor, CmaAnalysis, CmaComparableSelection, Parcel
 
 
 CMA_SESSION_KEY = "cma_state"
 CMA_ALLOWED_SORT_FIELDS = {
-    "gpa",
-    "sale_price",
-    "adjusted_price",
     "distance",
+    "sale_price",
     "sale_date",
-    "total_adjustment",
+    "adjusted_price",  # legacy alias; treated as sale_price
 }
 CMA_ALLOWED_SORT_DIRECTIONS = {"asc", "desc"}
 
@@ -47,44 +46,15 @@ CHAT_SESSION_KEY = "rag_conversations"
 CHAT_ACTIVE_KEY = "rag_active_conversation"
 
 
-def _coerce_percent(value: Any) -> Optional[float]:
-    try:
-        if value is None:
-            return None
-        text = str(value).strip()
-        if not text:
-            return None
-        if text.endswith("%"):
-            text = text[:-1]
-        return float(text)
-    except (TypeError, ValueError):
-        return None
 
-
-def _extract_percent_change(metadata: Any) -> Optional[float]:
-    if not isinstance(metadata, dict):
-        return None
-    candidate_keys = (
-        "assessed_change_pct",
-        "assessment_change_pct",
-        "percent_change",
-        "percentchange",
-        "pct_change",
-        "pct change",
-        "change_pct",
+def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metadata: object) -> None:
+    details = " ".join(
+        f"{key}={value}" for key, value in metadata.items() if value is not None
     )
-    for key in candidate_keys:
-        if key in metadata:
-            pct = _coerce_percent(metadata.get(key))
-            if pct is not None:
-                return pct
-    assessor_meta = metadata.get("assessor")
-    if isinstance(assessor_meta, dict):
-        for key in candidate_keys:
-            pct = _coerce_percent(assessor_meta.get(key))
-            if pct is not None:
-                return pct
-    return None
+    message = f"[comparables] parcel={parcel_number} step={step} took {elapsed:.3f}s"
+    if details:
+        message = f"{message} {details}"
+    logger.info(message)
 
 
 def _chat_store(request) -> Dict[str, Any]:
@@ -160,48 +130,13 @@ def _get_parcel_state(request, parcel_number: str) -> Dict[str, Any]:
     parcel_state = state.get(parcel_number)
     if not isinstance(parcel_state, dict):
         parcel_state = {
-            "manual_adjustments": {},
             "excluded": [],
-            "sort_field": "gpa",
+            "sort_field": "distance",
             "sort_direction": "asc",
         }
         state[parcel_number] = parcel_state
         request.session.modified = True
     return parcel_state
-
-
-def _manual_adjustments_from_state(parcel_state: Dict[str, Any]) -> Dict[str, Dict[str, Decimal]]:
-    results: Dict[str, Dict[str, Decimal]] = {}
-    for parcel, adjustments in parcel_state.get("manual_adjustments", {}).items():
-        if not isinstance(adjustments, dict):
-            continue
-        parcel_adjustments: Dict[str, Decimal] = {}
-        for key, raw_value in adjustments.items():
-            try:
-                parcel_adjustments[key] = Decimal(str(raw_value))
-            except (InvalidOperation, TypeError):
-                continue
-        if parcel_adjustments:
-            results[parcel] = parcel_adjustments
-    return results
-
-
-def _store_manual_adjustment(
-    request, parcel_number: str, comp_parcel: str, field: str, amount: Optional[Decimal]
-) -> None:
-    parcel_state = _get_parcel_state(request, parcel_number)
-    manual_adjustments = parcel_state.setdefault("manual_adjustments", {})
-    comp_entry = manual_adjustments.setdefault(comp_parcel, {})
-    if amount is None:
-        if field in comp_entry:
-            comp_entry.pop(field, None)
-            if not comp_entry:
-                manual_adjustments.pop(comp_parcel, None)
-        request.session.modified = True
-        return
-
-    comp_entry[field] = str(amount)
-    request.session.modified = True
 
 
 def _toggle_comparable_inclusion(request, parcel_number: str, comp_parcel: str) -> bool:
@@ -219,10 +154,10 @@ def _toggle_comparable_inclusion(request, parcel_number: str, comp_parcel: str) 
 def _current_sort(
     request, parcel_state: Dict[str, Any], requested_field: Optional[str], requested_direction: Optional[str]
 ):
-    field = requested_field or parcel_state.get("sort_field") or "gpa"
+    field = requested_field or parcel_state.get("sort_field") or "distance"
     direction = requested_direction or parcel_state.get("sort_direction") or "asc"
     if field not in CMA_ALLOWED_SORT_FIELDS:
-        field = "gpa"
+        field = "distance"
     if direction not in CMA_ALLOWED_SORT_DIRECTIONS:
         direction = "asc"
     if parcel_state.get("sort_field") != field or parcel_state.get("sort_direction") != direction:
@@ -258,6 +193,25 @@ API_ENDPOINTS = [
         "method": "GET",
         "path": "/api/parcel/{parcel_number}/",
         "description": "Retrieve parcel details joined across assessor, land, improvements, and sales data.",
+        "instructions": "Type in a parcel number when you need the full story for one property. The reply bundles values, building facts, land, and the five most recent verified sales so a teammate can speak to the parcel with confidence.",
+        "use_case": "Show a rich fact sheet when someone clicks a parcel pin or a row in search results.",
+        "parameters": [
+            {
+                "name": "parcel_number",
+                "location": "path",
+                "type": "string",
+                "required": True,
+                "description": "11-character parcel number such as P12345.",
+            }
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/parcel/P12345/",
+                "query": {},
+            },
+            indent=2,
+        ),
         "sample": {
             "parcel_number": "P12345",
             "address": "101 Main St",
@@ -287,6 +241,37 @@ API_ENDPOINTS = [
         "method": "GET",
         "path": "/api/sales/",
         "description": "Return top valid sales with assessor, land, and improvement context. Override sort direction via `direction=asc|desc`.",
+        "instructions": "Use this feed when you want to call out headline sales. Pick a sort option, tighten the filters (price, neighborhood, acreage), and the service will hand back the most noteworthy transfers first.",
+        "use_case": "Populate a “Recent Movers” card on a dashboard or a report that highlights high-dollar closings.",
+        "parameters": [
+            {"name": "limit", "location": "query", "type": "int", "required": False, "description": "Default 25, max 100."},
+            {"name": "sort", "location": "query", "type": "string", "required": False, "description": "One of recent, sale_price, neighborhood, assessed_value, market_value, acres, year_built."},
+            {"name": "direction", "location": "query", "type": "string", "required": False, "description": "asc or desc. Defaults to the sort's natural direction."},
+            {"name": "neighborhood", "location": "query", "type": "string", "required": False, "description": "Exact neighborhood code filter."},
+            {"name": "city", "location": "query", "type": "string", "required": False, "description": "City district filter."},
+            {"name": "parcel_number", "location": "query", "type": "string", "required": False, "description": "Restrict to a single parcel number."},
+            {"name": "min_sale_price", "location": "query", "type": "number", "required": False, "description": "Lower sale price bound."},
+            {"name": "max_sale_price", "location": "query", "type": "number", "required": False, "description": "Upper sale price bound."},
+            {"name": "start_date", "location": "query", "type": "ISO datetime", "required": False, "description": "Earliest sale_date to include."},
+            {"name": "end_date", "location": "query", "type": "ISO datetime", "required": False, "description": "Latest sale_date to include."},
+            {"name": "land_use_code", "location": "query", "type": "string", "required": False, "description": "Match a land use code."},
+            {"name": "property_type", "location": "query", "type": "string", "required": False, "description": "Restrict to one assessor property type."},
+            {"name": "min_acres", "location": "query", "type": "number", "required": False, "description": "Lower acreage bound."},
+            {"name": "max_acres", "location": "query", "type": "number", "required": False, "description": "Upper acreage bound."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/sales/",
+                "query": {
+                    "sort": "sale_price",
+                    "direction": "desc",
+                    "limit": 5,
+                    "min_sale_price": 450000,
+                },
+            },
+            indent=2,
+        ),
         "sample": {
             "count": 125,
             "limit": 10,
@@ -366,6 +351,37 @@ API_ENDPOINTS = [
         "method": "GET",
         "path": "/api/search/",
         "description": "Filter parcels with pagination and value, year, sale price, and acreage constraints.",
+        "instructions": "Lean on this search whenever someone is trying to browse for property. Mix-and-match address text, parcel IDs, pricing, acreage, and year built filters, then turn the page controls to keep scrolling.",
+        "use_case": "Power the main search results grid or a “find similar homes” drawer with pagination.",
+        "parameters": [
+            {"name": "page", "location": "query", "type": "int", "required": False, "description": "1-based page index; defaults to 1."},
+            {"name": "page_size", "location": "query", "type": "int", "required": False, "description": "Defaults to REST_FRAMEWORK PAGE_SIZE (25) and max 250."},
+            {"name": "address", "location": "query", "type": "string", "required": False, "description": "Case-insensitive contains search."},
+            {"name": "parcel_number", "location": "query", "type": "string", "required": False, "description": "Exact parcel number."},
+            {"name": "min_value", "location": "query", "type": "number", "required": False, "description": "Minimum assessed value."},
+            {"name": "max_value", "location": "query", "type": "number", "required": False, "description": "Maximum assessed value."},
+            {"name": "district", "location": "query", "type": "string", "required": False, "description": "City district filter."},
+            {"name": "min_year", "location": "query", "type": "int", "required": False, "description": "Oldest acceptable year_built."},
+            {"name": "max_year", "location": "query", "type": "int", "required": False, "description": "Newest acceptable year_built."},
+            {"name": "min_acres", "location": "query", "type": "number", "required": False, "description": "Minimum acreage filter."},
+            {"name": "max_acres", "location": "query", "type": "number", "required": False, "description": "Maximum acreage filter."},
+            {"name": "min_sale_price", "location": "query", "type": "number", "required": False, "description": "Minimum last sale price (if a sale exists)."},
+            {"name": "max_sale_price", "location": "query", "type": "number", "required": False, "description": "Maximum last sale price (if a sale exists)."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/search/",
+                "query": {
+                    "address": "Main St",
+                    "min_value": 350000,
+                    "max_value": 750000,
+                    "page": 1,
+                    "page_size": 25,
+                },
+            },
+            indent=2,
+        ),
         "sample": None,
         "default_path_params": {},
         "default_querystring": "address=Main St&min_value=300000&max_value=700000",
@@ -377,6 +393,36 @@ API_ENDPOINTS = [
         "method": "GET",
         "path": "/api/summary/",
         "description": "Aggregate parcel metrics suitable for dashboards and reporting.",
+        "instructions": "Reach for this rollup when you want quick talking points: pick a grouping (city, school, fire, neighborhood, levy) and let the service total or average the values.",
+        "use_case": "Build KPI cards like “Average assessed value by city” or “Top 10 neighborhoods by acreage value.”",
+        "parameters": [
+            {"name": "group_by", "location": "query", "type": "string", "required": True, "description": "Required. One of city_district, school_district, fire_district, neighborhood_code, levy_code."},
+            {"name": "metric", "location": "query", "type": "string", "required": True, "description": "Required. One of avg_assessed_value, avg_market_value, total_assessed_value, parcel_count."},
+            {"name": "limit", "location": "query", "type": "int", "required": False, "description": "Number of rows to return (default 50, max 200)."},
+            {"name": "address", "location": "query", "type": "string", "required": False, "description": "Optional filter identical to /api/search."},
+            {"name": "parcel_number", "location": "query", "type": "string", "required": False, "description": "Optional filter identical to /api/search."},
+            {"name": "min_value", "location": "query", "type": "number", "required": False, "description": "See /api/search filters."},
+            {"name": "max_value", "location": "query", "type": "number", "required": False, "description": "See /api/search filters."},
+            {"name": "district", "location": "query", "type": "string", "required": False, "description": "See /api/search filters."},
+            {"name": "min_year", "location": "query", "type": "int", "required": False, "description": "See /api/search filters."},
+            {"name": "max_year", "location": "query", "type": "int", "required": False, "description": "See /api/search filters."},
+            {"name": "min_acres", "location": "query", "type": "number", "required": False, "description": "See /api/search filters."},
+            {"name": "max_acres", "location": "query", "type": "number", "required": False, "description": "See /api/search filters."},
+            {"name": "min_sale_price", "location": "query", "type": "number", "required": False, "description": "See /api/search filters."},
+            {"name": "max_sale_price", "location": "query", "type": "number", "required": False, "description": "See /api/search filters."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/summary/",
+                "query": {
+                    "group_by": "city_district",
+                    "metric": "avg_assessed_value",
+                    "limit": 10,
+                },
+            },
+            indent=2,
+        ),
         "sample": None,
         "default_path_params": {},
         "default_querystring": "group_by=city_district&metric=avg_assessed_value",
@@ -388,6 +434,23 @@ API_ENDPOINTS = [
         "method": "POST",
         "path": "/api/semantic_search/",
         "description": "Vector similarity search against parcel embeddings using MiniLM and pgvector.",
+        "instructions": "Let teammates describe the dream property in plain language (for example “farmhouse with mountain view and 5 acres”). The service scores every embedding and returns the closest matches, or a reasonable fallback list if vectors are offline.",
+        "use_case": "Offer a natural-language search box that surfaces “homes like this” suggestions.",
+        "parameters": [
+            {"name": "query", "location": "body", "type": "string", "required": True, "description": "Natural language description to embed."},
+            {"name": "limit", "location": "body", "type": "int", "required": False, "description": "Max matches to return (default 10, max 50)."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "POST",
+                "url": "/api/semantic_search/",
+                "body": {
+                    "query": "modern farmhouse with a big lot and room for a shop",
+                    "limit": 8,
+                },
+            },
+            indent=2,
+        ),
         "sample": None,
         "default_path_params": {},
         "default_querystring": "",
@@ -399,9 +462,192 @@ API_ENDPOINTS = [
         "method": "GET",
         "path": "/api/nearby/",
         "description": "Find nearby parcels using PostGIS ST_DWithin with optional acreage and value filters.",
+        "instructions": "Drop a pin (lat/lon) and a comfortable walking radius to see which parcels surround that point. Layer on assessed value or acreage limits to keep the list manageable.",
+        "use_case": "Drive a “near me” sidebar when exploring a parcel on the map.",
+        "parameters": [
+            {"name": "lat", "location": "query", "type": "number", "required": True, "description": "Latitude of the search center."},
+            {"name": "lon", "location": "query", "type": "number", "required": True, "description": "Longitude of the search center."},
+            {"name": "radius", "location": "query", "type": "number", "required": False, "description": "Radius in meters (defaults to 1000). Alias: radius_meters."},
+            {"name": "limit", "location": "query", "type": "int", "required": False, "description": "Max results (default 50, max 200)."},
+            {"name": "min_value", "location": "query", "type": "number", "required": False, "description": "Minimum assessed value."},
+            {"name": "max_value", "location": "query", "type": "number", "required": False, "description": "Maximum assessed value."},
+            {"name": "min_acres", "location": "query", "type": "number", "required": False, "description": "Minimum acreage."},
+            {"name": "max_acres", "location": "query", "type": "number", "required": False, "description": "Maximum acreage."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/nearby/",
+                "query": {
+                    "lat": 48.45,
+                    "lon": -122.33,
+                    "radius": 1500,
+                    "min_value": 300000,
+                },
+            },
+            indent=2,
+        ),
         "sample": None,
         "default_path_params": {},
         "default_querystring": "lat=48.45&lon=-122.33&radius=2000",
+        "default_body": "",
+    },
+    {
+        "key": "neighborhood-stats",
+        "name": "Neighborhood Stats",
+        "method": "GET",
+        "path": "/api/neighborhood_stats/{neighborhood_code}/",
+        "description": "Return the latest snapshot for a neighborhood code (alias: /api/neighborhoods/{code}/).",
+        "instructions": "Whenever a teammate wants quick neighborhood talking points, give them this snapshot. Provide the code (like NE045) and optionally the assessment year to pull the figures they care about.",
+        "use_case": "Show a context card above parcel details describing the neighborhood’s average value and change rates.",
+        "parameters": [
+            {"name": "neighborhood_code", "location": "path", "type": "string", "required": True, "description": "Assessor neighborhood code, e.g. NE045."},
+            {"name": "year", "location": "query", "type": "int", "required": False, "description": "Optional assessment year override."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/neighborhood_stats/NE045/",
+                "query": {
+                    "year": 2024,
+                },
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {"neighborhood_code": "NE045"},
+        "default_querystring": "year=2024",
+        "default_body": "",
+    },
+    {
+        "key": "appeal-analysis",
+        "name": "Appeal Analysis",
+        "method": "GET",
+        "path": "/api/appeal_analysis/{parcel_number}/",
+        "description": "Return a heuristic appeal likelihood rating for a parcel.",
+        "instructions": "Before inviting someone to file an appeal, run this health check. It returns a 0–100 score, a friendly rating, and why we think that rating fits so staff can offer helpful guidance.",
+        "use_case": "Gate the “Start appeal” CTA with a quick recommendation and talking points.",
+        "parameters": [
+            {"name": "parcel_number", "location": "path", "type": "string", "required": True, "description": "Parcel to analyze."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/appeal_analysis/P12345/",
+                "query": {},
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {"parcel_number": "P12345"},
+        "default_querystring": "",
+        "default_body": "",
+    },
+    {
+        "key": "appeal-search",
+        "name": "Appeal Parcel Search",
+        "method": "GET",
+        "path": "/api/appeals/search/",
+        "description": "Citizen-facing parcel/address search limited to residential property in the latest roll year.",
+        "instructions": "Use this friendly search box as residents type their parcel or street. Once three characters have been entered, we return matching residential parcels from the active roll year.",
+        "use_case": "Power the auto-complete field at the top of the appeal intake wizard.",
+        "parameters": [
+            {"name": "q", "location": "query", "type": "string", "required": True, "description": "Parcel number or address fragment (min length 3)."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/appeals/search/",
+                "query": {
+                    "q": "101 Main",
+                },
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {},
+        "default_querystring": "q=101 Main St",
+        "default_body": "",
+    },
+    {
+        "key": "appeal-subject",
+        "name": "Appeal Subject Snapshot",
+        "method": "GET",
+        "path": "/api/appeals/{parcel_number}/subject/",
+        "description": "Roll-aware property snapshot plus neighborhood context for the appeal wizard.",
+        "instructions": "After the resident picks their parcel, call this endpoint to fill the sidebar with their valuation, home facts, and neighborhood averages. It keeps everyone aligned on the same baseline data.",
+        "use_case": "Pre-fill the appeal form with the subject parcel’s assessor facts.",
+        "parameters": [
+            {"name": "parcel_number", "location": "path", "type": "string", "required": True, "description": "Appeal subject parcel."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/appeals/P12345/subject/",
+                "query": {},
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {"parcel_number": "P12345"},
+        "default_querystring": "",
+        "default_body": "",
+    },
+    {
+        "key": "appeal-comparables",
+        "name": "Appeal Comparables",
+        "method": "GET",
+        "path": "/api/appeals/{parcel_number}/comparables/",
+        "description": "Fetch cached comparable sales, appeal score, and soft-stop messages for a parcel.",
+        "instructions": "Surface this data when a resident or staff member wants to review comps. You can ask for more comps by increasing the `count` value, and the response also shares why we think an appeal will or won’t succeed.",
+        "use_case": "Fill the “Comparable Sales” tab in the appeal flow with ready-to-read cards.",
+        "parameters": [
+            {"name": "parcel_number", "location": "path", "type": "string", "required": True, "description": "Parcel requesting comparable set."},
+            {"name": "count", "location": "query", "type": "int", "required": False, "description": "Target number of comparables. Defaults to the INITIAL_COMPARABLE_LIMIT and maxes at EXTENDED_COMPARABLE_LIMIT."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/appeals/P12345/comparables/",
+                "query": {
+                    "count": 7,
+                },
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {"parcel_number": "P12345"},
+        "default_querystring": "count=7",
+        "default_body": "",
+    },
+    {
+        "key": "appeal-improvements",
+        "name": "Comparable Improvements",
+        "method": "GET",
+        "path": "/api/appeals/{parcel_number}/comparables/{comp_parcel}/improvements/",
+        "description": "Return improvement rollup details for a selected comparable parcel.",
+        "instructions": "When someone expands a comparable card they usually want to see the nuts and bolts (square footage, style, year built). This endpoint hands those details back for the comparable you pass in.",
+        "use_case": "Reveal the structure breakdown for a selected comp without loading the entire dataset again.",
+        "parameters": [
+            {"name": "parcel_number", "location": "path", "type": "string", "required": True, "description": "Appeal subject parcel."},
+            {"name": "comp_parcel", "location": "path", "type": "string", "required": True, "description": "Comparable parcel id whose improvements are requested."},
+            {"name": "roll_year", "location": "query", "type": "int", "required": False, "description": "Optional roll year override."},
+            {"name": "roll_id", "location": "query", "type": "int", "required": False, "description": "Optional roll identifier override."},
+            {"name": "assessor_style", "location": "query", "type": "string", "required": False, "description": "Optional assessor building_style filter."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/appeals/P12345/comparables/P54321/improvements/",
+                "query": {
+                    "roll_year": 2024,
+                },
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {"parcel_number": "P12345", "comp_parcel": "P54321"},
+        "default_querystring": "roll_year=2024",
         "default_body": "",
     },
 ]
@@ -923,8 +1169,12 @@ def api_docs(request):
         entry = copy.deepcopy(endpoint)
         querystring = entry.get("default_querystring") or ""
         entry["display_path"] = f"{entry['path']}?{querystring}" if querystring else entry["path"]
-        if entry.get("default_body"):
+        if entry.get("request_example"):
+            entry["payload_json"] = entry["request_example"]
+            entry["payload_label"] = "Sample Request"
+        elif entry.get("default_body"):
             entry["payload_json"] = entry["default_body"]
+            entry["payload_label"] = "Sample Payload"
         if entry.get("sample"):
             entry["sample_json"] = json.dumps(entry["sample"], indent=2)
         endpoints.append(entry)
@@ -979,7 +1229,6 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
     )
     limit = _parse_limit(params.get("limit"))
 
-    manual_adjustments = _manual_adjustments_from_state(parcel_state)
     excluded = parcel_state.get("excluded", [])
 
     rollup_cache: Dict[Tuple[str, Optional[int], Optional[int]], Dict[str, object]] = {}
@@ -992,7 +1241,6 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
     computation = cma.build_comparables(
         subject=subject,
         filters=filters,
-        manual_adjustments=manual_adjustments,
         excluded=excluded,
         sort_field=sort_field,
         sort_direction=sort_direction,
@@ -1009,7 +1257,6 @@ def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, A
         "filters": filters,
         "sort_field": sort_field,
         "sort_direction": sort_direction,
-        "manual_adjustments": parcel_state.get("manual_adjustments", {}),
         "excluded": excluded,
         "markers": computation.marker_payloads(),
         "limit": limit,
@@ -1028,9 +1275,6 @@ def cma_dashboard_view(request, parcel_number: Optional[str] = None):
         template_name = "openskagit/cma/partials/dashboard_content.html"
     return render(request, template_name, context)
 
-
-import time
-from django.db import connection
 
 @require_GET
 def cma_parcel_search(request):
@@ -1094,49 +1338,6 @@ def cma_comparable_improvements(request, parcel_number: str, comp_parcel: str):
 
 
 @require_POST
-def cma_manual_adjustment(request, parcel_number: str, comp_parcel: str):
-    field = (request.POST.get("field") or "").strip()
-    if not field:
-        return HttpResponseBadRequest("Adjustment field is required.")
-
-    raw_value = (request.POST.get("value") or "").strip()
-    amount: Optional[Decimal]
-    if raw_value == "":
-        amount = None
-    else:
-        try:
-            amount = Decimal(raw_value)
-        except (InvalidOperation, TypeError):
-            return HttpResponseBadRequest("Invalid adjustment value.")
-
-    _store_manual_adjustment(request, parcel_number, comp_parcel, field, amount)
-
-    merged_params = _merge_request_params(request)
-    context = _build_cma_context(request, parcel_number, merged_params)
-    if "error" in context:
-        return HttpResponseBadRequest(context["error"])
-
-    comparable = next(
-        (comp for comp in context.get("comparables", []) if comp.snapshot.parcel_number == comp_parcel),
-        None,
-    )
-    if not comparable:
-        return HttpResponseBadRequest("Comparable could not be recalculated.")
-
-    return render(
-        request,
-        "openskagit/cma/partials/comparable_row.html",
-        {
-            "subject": context["subject"],
-            "comparable": comparable,
-            "manual_adjustments": context.get("manual_adjustments", {}),
-            "filters": context["filters"],
-            "parcel_number": parcel_number,
-        },
-    )
-
-
-@require_POST
 def cma_toggle_comparable(request, parcel_number: str, comp_parcel: str):
     _toggle_comparable_inclusion(request, parcel_number, comp_parcel)
     merged_params = _merge_request_params(request)
@@ -1187,15 +1388,12 @@ def cma_save_analysis(request, parcel_number: str):
     if not comparables:
         return HttpResponseBadRequest("At least one comparable is required.")
 
-    parcel_state = _get_parcel_state(request, parcel_number)
-    manual_adjustments_state = parcel_state.get("manual_adjustments", {})
-
     analysis_record = CmaAnalysis.objects.create(
         user=request.user,
         subject_parcel=context["subject"].parcel_number,
         subject_snapshot=context["subject"].as_dict(),
         filters=context["filters"].as_dict(),
-        manual_adjustments=manual_adjustments_state,
+        manual_adjustments={},
     )
 
     for comp in comparables:
@@ -1205,18 +1403,10 @@ def cma_save_analysis(request, parcel_number: str):
             included=True,
             rank=comp.inclusion_rank,
             raw_sale_price=comp.sale_price,
-            adjusted_sale_price=comp.adjusted_price,
-            gross_percentage_adjustment=comp.gross_percentage_adjustment,
-            auto_adjustments=[
-                {
-                    "code": adj.code,
-                    "label": adj.label,
-                    "amount": str(adj.amount),
-                    "rationale": adj.rationale,
-                }
-                for adj in comp.auto_adjustments
-            ],
-            manual_adjustments={key: str(value) for key, value in comp.manual_adjustments.items()},
+            adjusted_sale_price=comp.sale_price,
+            gross_percentage_adjustment=Decimal("0"),
+            auto_adjustments=[],
+            manual_adjustments={},
             metadata=comp.snapshot.as_dict(),
         )
 
@@ -1233,11 +1423,6 @@ def cma_share(request, share_uuid):
     analysis_record = get_object_or_404(CmaAnalysis, share_uuid=share_uuid)
     filters = cma.filters_from_dict(analysis_record.filters)
 
-    manual_adjustments = {
-        parcel: {field: Decimal(str(amount)) for field, amount in (adjustments or {}).items()}
-        for parcel, adjustments in analysis_record.manual_adjustments.items()
-    }
-
     try:
         subject = cma.load_subject(analysis_record.subject_parcel)
     except ValueError as exc:
@@ -1246,9 +1431,8 @@ def cma_share(request, share_uuid):
     computation = cma.build_comparables(
         subject=subject,
         filters=filters,
-        manual_adjustments=manual_adjustments,
         excluded=[],
-        sort_field="gpa",
+        sort_field="distance",
         sort_direction="asc",
         limit=cma.MAX_COMPARABLE_LIMIT,
     )
@@ -1273,7 +1457,6 @@ def cma_share(request, share_uuid):
         "summary": computation.summary(),
         "filters": filters,
         "shared_analysis": analysis_record,
-        "manual_adjustments": analysis_record.manual_adjustments,
         "share_mode": True,
         "markers": computation.marker_payloads(),
     }
@@ -1288,23 +1471,19 @@ APPEAL_SEARCH_LIMIT = 15
 APPEAL_MIN_QUERY_LENGTH = 3
 
 
-def _current_assessment_year() -> int:
-    year = (
-        AssessmentRoll.objects.order_by("-year")
-        .values_list("year", flat=True)
-        .first()
-    )
-    if year is None:
-        return timezone.now().year
-    return int(year)
-
-
 @require_GET
 def appeal_home(request):
     """
     Minimal, citizen-friendly entry with a single address/parcel search box.
     """
-    return render(request, "openskagit/appeal_home.html")
+    return render(request, "openskagit/appeal_home.html", {"step": 1})
+
+
+@require_GET
+def appeal_new(request):
+    """API-only, mobile-first appeal homepage (no ORM)."""
+    # Intentionally avoid ORM usage; all data is fetched via XHR from /api endpoints.
+    return render(request, "openskagit/appeal_home_v2.html")
 
 
 APPEAL_SEARCH_LIMIT = 15
@@ -1365,171 +1544,101 @@ def appeal_parcel_search(request):
         },
     )
 
+
 @require_GET
 def appeal_result(request, parcel_number: str):
-    current_roll_year = _current_assessment_year()
-    active_roll_year = current_roll_year
     try:
-        subject = cma.load_subject(parcel_number, roll_year=current_roll_year)
+        subject, _ = appeals.load_subject_with_roll_context(parcel_number)
     except ValueError as exc:
-        logger.warning(
-            "Appeal helper failed to load parcel %s for roll %s: %s",
+        return HttpResponseBadRequest(str(exc))
+
+    neighborhood = appeals.get_subject_neighborhood_snapshot(subject)
+    subject_year_built = subject.year_built or subject.effective_year_built
+
+    comparables_url = request.path + "comparables/"
+    return render(
+        request,
+        "openskagit/appeal_results.html",
+        {
+            "subject": subject,
+            "parcel_number": parcel_number,
+            "neighborhood": neighborhood,
+            "subject_year_built": subject_year_built,
+            "comparables_url": comparables_url,
+            "step": 2,
+        },
+    )
+
+
+@require_GET
+def appeal_result_comparables(request, parcel_number: str):
+    request_start = time.perf_counter()
+    subject_start = time.perf_counter()
+    try:
+        subject, _ = appeals.load_subject_with_roll_context(parcel_number)
+    except ValueError as exc:
+        subject_elapsed = time.perf_counter() - subject_start
+        _log_comparables_step(
             parcel_number,
-            current_roll_year,
-            exc,
+            "load_subject",
+            subject_elapsed,
+            error=str(exc),
         )
-        try:
-            subject = cma.load_subject(parcel_number)
-        except ValueError:
-            return HttpResponseBadRequest(str(exc))
+        return HttpResponseBadRequest(str(exc))
+    subject_elapsed = time.perf_counter() - subject_start
+    _log_comparables_step(parcel_number, "load_subject", subject_elapsed)
 
-        # Derive the roll year actually used for the fallback subject.
-        fallback_year: Optional[int] = None
-        metadata_for_year = subject.metadata if isinstance(subject.metadata, dict) else {}
-        raw_year = metadata_for_year.get("assessment_roll_year")
-        if raw_year is not None:
-            try:
-                fallback_year = int(raw_year)
-            except (TypeError, ValueError):
-                fallback_year = None
-        if fallback_year is None:
-            assessor_meta = metadata_for_year.get("assessor") if isinstance(metadata_for_year, dict) else None
-            if isinstance(assessor_meta, dict):
-                raw_year = assessor_meta.get("assessment_year") or assessor_meta.get("year")
-                if raw_year is not None:
-                    try:
-                        fallback_year = int(raw_year)
-                    except (TypeError, ValueError):
-                        fallback_year = None
-        if fallback_year is not None:
-            active_roll_year = fallback_year
-            if fallback_year != current_roll_year:
-                logger.info(
-                    "Appeal helper using roll %s for parcel %s (current roll %s unavailable)",
-                    fallback_year,
-                    parcel_number,
-                    current_roll_year,
-                )
-
-    metadata = subject.metadata if isinstance(subject.metadata, dict) else {}
-    metadata["assessment_roll_year"] = active_roll_year
-
-    # Ensure assessed value is available for citizen scoring
-    assessor_row = (
-        Assessor.objects.select_related("roll")
-        .filter(parcel_number=parcel_number, roll__year=active_roll_year)
-        .first()
+    requested_count = int(request.GET.get("count", appeals.INITIAL_COMPARABLE_LIMIT))
+    display_limit = (
+        appeals.EXTENDED_COMPARABLE_LIMIT
+        if requested_count >= appeals.EXTENDED_COMPARABLE_LIMIT
+        else appeals.INITIAL_COMPARABLE_LIMIT
     )
-    if assessor_row:
-        metadata["assessed_value"] = assessor_row.assessed_value
-
-    prior_roll_year = active_roll_year - 1
-    prior_assessor = (
-        Assessor.objects.select_related("roll")
-        .filter(parcel_number=parcel_number, roll__year=prior_roll_year)
-        .first()
-        if prior_roll_year > 0
-        else None
+    comps_start = time.perf_counter()
+    comps, radius_used = appeals._comparable_candidates(subject, display_limit)
+    comps_elapsed = time.perf_counter() - comps_start
+    _log_comparables_step(
+        parcel_number,
+        "fetch_candidates",
+        comps_elapsed,
+        comp_count=len(comps),
+        radius=radius_used,
+        requested=requested_count,
+        limit=display_limit,
     )
 
-    assessor_meta = metadata.setdefault("assessor", {})
-    if assessor_row:
-        assessor_meta["assessment_year"] = active_roll_year
-        assessor_meta["assessed_value"] = assessor_row.assessed_value
-    if prior_assessor:
-        assessor_meta["prior_assessment_year"] = prior_roll_year
-        assessor_meta["prior_assessed_value"] = prior_assessor.assessed_value
-
-    assessed_change_pct: Optional[float] = None
-    if assessor_row and prior_assessor:
-        current_value = assessor_row.assessed_value
-        prior_value = prior_assessor.assessed_value
-        if current_value is not None and prior_value not in (None, 0):
-            try:
-                current_dec = Decimal(str(current_value))
-                prior_dec = Decimal(str(prior_value))
-            except (InvalidOperation, TypeError):
-                current_dec = None
-                prior_dec = None
-            if current_dec is not None and prior_dec not in (None, Decimal("0")):
-                try:
-                    change_pct = (current_dec - prior_dec) / prior_dec * Decimal("100")
-                    assessed_change_pct = float(change_pct)
-                except (InvalidOperation, ZeroDivisionError):
-                    assessed_change_pct = None
-
-    if assessed_change_pct is not None:
-        metadata["assessed_change_pct"] = assessed_change_pct
-        assessor_meta["assessment_change_pct"] = assessed_change_pct
-
-    subject.metadata = metadata
-
-    summary = appeals.citizen_assessment_summary(subject)
+    summary_start = time.perf_counter()
+    summary = appeals.citizen_assessment_summary(
+        subject,
+        comparables=comps,
+        radius_meters=radius_used,
+        limit=display_limit,
+    )
+    summary_elapsed = time.perf_counter() - summary_start
+    summary_comps = summary.get("comparables") or []
+    _log_comparables_step(
+        parcel_number,
+        "summarize",
+        summary_elapsed,
+        summary_count=len(summary_comps),
+        score=summary.get("score"),
+        radius=radius_used,
+        limit=display_limit,
+    )
 
     over_pct = summary.get("over_assessment_pct")
     comp_count = summary.get("comp_count") or 0
     neigh = summary.get("neighborhood") or {}
     neigh_diff = summary.get("neigh_diff_pct")
     avg_change_pct = neigh.get("avg_increase_pct")
-    your_change_pct = _extract_percent_change(subject.metadata)
+    your_change_pct = appeals.extract_assessment_change_pct(subject.metadata)
     if your_change_pct is None and avg_change_pct is not None and neigh_diff is not None:
         your_change_pct = avg_change_pct + neigh_diff
     if neigh_diff is None and avg_change_pct is not None and your_change_pct is not None:
         neigh_diff = your_change_pct - avg_change_pct
 
-    your_change_bar_pct: Optional[float] = None
-    neigh_change_bar_pct: Optional[float] = None
-    if your_change_pct is not None or avg_change_pct is not None:
-        bar_max = max(abs(your_change_pct or 0.0), abs(avg_change_pct or 0.0))
-        if bar_max == 0:
-            if your_change_pct is not None:
-                your_change_bar_pct = 0.0
-            if avg_change_pct is not None:
-                neigh_change_bar_pct = 0.0
-        else:
-            if your_change_pct is not None:
-                your_change_bar_pct = abs(your_change_pct) / bar_max * 100
-            if avg_change_pct is not None:
-                neigh_change_bar_pct = abs(avg_change_pct) / bar_max * 100
-
-    cod_descriptor: Optional[str] = None
-    cod_explainer: Optional[str] = None
-    cod_value = neigh.get("cod")
-    if isinstance(cod_value, (int, float)):
-        if cod_value <= 8:
-            cod_descriptor = "High uniformity"
-            cod_explainer = (
-                "Assessments in this area are very consistent — most homes fall within roughly "
-                f"{cod_value:.1f}% of the average ratio."
-            )
-        elif cod_value <= 15:
-            cod_descriptor = "Typical uniformity"
-            cod_explainer = (
-                "Assessments vary a bit, but the COD is still within the range most counties consider acceptable."
-            )
-        else:
-            cod_descriptor = "Low uniformity"
-            cod_explainer = (
-                "Values swing wider around the average; a higher COD means assessments differ more parcel to parcel."
-            )
-
-    prd_descriptor: Optional[str] = None
-    prd_explainer: Optional[str] = None
-    prd_value = neigh.get("prd")
-    if isinstance(prd_value, (int, float)):
-        if 0.98 <= prd_value <= 1.03:
-            prd_descriptor = "Balanced"
-            prd_explainer = "Higher- and lower-priced homes are treated evenly; PRD near 1.00 is ideal."
-        elif prd_value > 1.03:
-            prd_descriptor = "Regressive tilt"
-            prd_explainer = "Higher-value homes trend a bit low relative to average. Values above 1.03 indicate regressivity."
-        else:
-            prd_descriptor = "Progressive tilt"
-            prd_explainer = "Lower-value homes trend a bit low relative to average. Values below 0.98 indicate progressivity."
-
     score = summary.get("score") or 0
 
-    # Soft-stop gating to reduce frivolous appeals
     soft_stop = False
     soft_reasons: List[str] = []
     if over_pct is not None and over_pct < 7:
@@ -1545,27 +1654,31 @@ def appeal_result(request, parcel_number: str):
         soft_stop = True
         soft_reasons.append("Overall appeal likelihood is below ~45%.")
 
-    subject_year_built = subject.year_built or subject.effective_year_built
+    has_more = len(comps) == display_limit and display_limit < appeals.EXTENDED_COMPARABLE_LIMIT
+    load_more_url = f"{request.path}?count={appeals.EXTENDED_COMPARABLE_LIMIT}"
 
-    context = {
-        "subject": subject,
-        "parcel_number": parcel_number,
-        "comparables": summary.get("comparables", []),
-        "neighborhood": neigh,
-        "over_assessment_pct": over_pct,
-        "neigh_diff_pct": neigh_diff,
-        "your_change_pct": your_change_pct,
-        "your_change_bar_pct": your_change_bar_pct,
-        "neigh_change_bar_pct": neigh_change_bar_pct,
-        "score": score,
-        "rating": summary.get("rating"),
-        "reasons": summary.get("reasons", []),
-        "soft_stop": soft_stop,
-        "soft_reasons": soft_reasons,
-        "subject_year_built": subject_year_built,
-        "cod_descriptor": cod_descriptor,
-        "cod_explainer": cod_explainer,
-        "prd_descriptor": prd_descriptor,
-        "prd_explainer": prd_explainer,
-    }
-    return render(request, "openskagit/appeal_results.html", context)
+    total_elapsed = time.perf_counter() - request_start
+    _log_comparables_step(
+        parcel_number,
+        "request",
+        total_elapsed,
+        comp_count=len(summary_comps),
+        score=score,
+        limit=display_limit,
+    )
+
+    return render(
+        request,
+        "openskagit/appeal_results_comparables.html",
+        {
+            "comparables": comps,
+            "soft_stop": soft_stop,
+            "soft_reasons": soft_reasons,
+            "score": score,
+            "rating": summary.get("rating"),
+            "reasons": summary.get("reasons", []),
+            "has_more": has_more,
+            "load_more_url": load_more_url,
+            "parcel_number": parcel_number,
+        },
+    )

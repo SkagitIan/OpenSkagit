@@ -5,34 +5,33 @@
   </div>
 {% elif query %}
   {% if results %}
-    <div class="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div class="space-y-3">
       {% for parcel in results %}
-        <button type="button"
-                class="w-full px-4 py-3 text-left hover:bg-slate-50"
-                hx-get="{% url 'appeal-result' parcel.parcel_number %}"
-                hx-target="#appeal-detail"
-                hx-swap="innerHTML"
-                hx-push-url="true"
-                hx-indicator="#appeal-detail-indicator"
-                hx-on::afterRequest="window.appealSearchSelect(event)"
-                data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
-                data-parcel="{{ parcel.parcel_number|escape }}"
-                data-details="{% if parcel.sale_price and parcel.sale_date %}Last sold for ${{ parcel.sale_price|floatformat:0|intcomma }} on {{ parcel.sale_date|date:'M j, Y' }}{% elif parcel.sale_price %}Last sold for ${{ parcel.sale_price|floatformat:0|intcomma }}{% elif parcel.sale_date %}Last recorded sale {{ parcel.sale_date|date:'M j, Y' }}{% endif %}">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-base font-semibold">{{ parcel.address|default:"Address unavailable" }}</p>
-              <p class="text-xs text-slate-500">Parcel {{ parcel.parcel_number }}</p>
-            </div>
-            <div class="text-right text-xs text-slate-500">
-              {% if parcel.sale_price %}
-                <p>${{ parcel.sale_price|floatformat:0|intcomma }}</p>
-              {% endif %}
-              {% if parcel.sale_date %}
-                <p>{{ parcel.sale_date|date:"M j, Y" }}</p>
+        {% with sale_price=parcel.sale_price sale_date=parcel.sale_date %}
+          <a class="home-card"
+             href="{% url 'appeal-result' parcel.parcel_number %}"
+             data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
+             data-parcel="{{ parcel.parcel_number|escape }}"
+             data-details="{% if sale_price and sale_date %}Last sold for ${{ sale_price|floatformat:0|intcomma }} on {{ sale_date|date:'M j, Y' }}{% elif sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% elif sale_date %}Last recorded sale {{ sale_date|date:'M j, Y' }}{% endif %}">
+            <div class="home-card-info">
+              <p class="home-card-title">{{ parcel.address|default:"Address unavailable" }}</p>
+              <p class="home-card-parcel">Parcel {{ parcel.parcel_number }}</p>
+              {% if sale_price %}
+                <p class="home-card-details">
+                  Sold: ${{ sale_price|floatformat:0|intcomma }}{% if sale_date %} · {{ sale_date|date:"M j, Y" }}{% endif %}
+                </p>
+              {% elif sale_date %}
+                <p class="home-card-details">Last sale {{ sale_date|date:"M j, Y" }}</p>
+              {% else %}
+                <p class="home-card-details text-slate-500">Sale info unavailable</p>
               {% endif %}
             </div>
-          </div>
-        </button>
+            <div class="home-card-cta">
+              <span class="home-card-focus">Select to continue →</span>
+              <span class="home-card-cta-note">Jump directly to Step 2</span>
+            </div>
+          </a>
+        {% endwith %}
       {% endfor %}
     </div>
   {% else %}

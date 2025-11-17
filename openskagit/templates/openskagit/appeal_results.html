@@ -1,437 +1,167 @@
+{% extends "openskagit/appeal_base.html" %}
 {% load humanize formatting %}
-<section class="space-y-6">
-  <header class="space-y-1">
-    <h2 class="text-2xl font-bold">Step 2 — Results</h2>
-    <p class="text-slate-600">We found your property and nearby recent sales.</p>
-  </header>
 
-  <div class="rounded-3xl border-2 border-sky-200 bg-sky-50/70 p-6 shadow-sm">
-    <h3 class="text-xl font-semibold text-slate-900">{{ subject.parcel_number|default:"Your Property" }}</h3>
-    <p class="text-slate-600">{{ subject.address|default:"Address unavailable"|title }}</p>
-    {% if subject.metadata.assessed_value %}
-      <p class="mt-2 text-xl text-slate-900">2025 assessed value: <span class="font-semibold">${{ subject.metadata.assessed_value|floatformat:0|intcomma }}</span></p>
-    {% endif %}
-    <div class="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 px-3 py-2">
-        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700">
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 17V12h16v5" />
-            <path d="M4 17h16" />
-            <path d="M7 12V8a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v4" />
-            <path d="M4 17v3" />
-            <path d="M20 17v3" />
-          </svg>
-        </span>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Beds</p>
-          <p class="font-medium text-slate-700">
-            {% if subject.bedrooms is not None %}
-              {{ subject.bedrooms|floatformat:"-1" }}
-            {% else %}
-              &mdash;
-            {% endif %}
-          </p>
-        </div>
-      </div>
-      <div class="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 px-3 py-2">
-        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700">
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 10V7a2 2 0 0 1 2-2h2" />
-            <path d="M4 12h16v1a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-1z" />
-            <path d="M6 17v2" />
-            <path d="M18 17v2" />
-          </svg>
-        </span>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Baths</p>
-          {% with baths=subject.bathrooms|quarter_baths %}
-            <p class="font-medium text-slate-700">
-              {% if baths %}
-                {{ baths }}
-              {% else %}
-                &mdash;
-              {% endif %}
-            </p>
-          {% endwith %}
-        </div>
-      </div>
-      <div class="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 px-3 py-2">
-        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700">
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 11 L12 5l8 6" />
-            <path d="M6 10v9h12v-9" />
-            <path d="M10 19v-4h4v4" />
-          </svg>
-        </span>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Living area</p>
-          <p class="font-medium text-slate-700">
-            {% if subject.living_area is not None %}
-              {{ subject.living_area|floatformat:0|intcomma }} sq ft
-            {% else %}
-              &mdash;
-            {% endif %}
-          </p>
-        </div>
-      </div>
-      <div class="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 px-3 py-2">
-        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700">
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="5" y="5" width="14" height="14" rx="3" />
-            <path d="M9 9 L15 15" />
-            <path d="M15 9 L9 15" />
-          </svg>
-        </span>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Acreage</p>
-          <p class="font-medium text-slate-700">
-            {% if subject.acres is not None %}
-              {{ subject.acres|floatformat:"-2" }} ac
-            {% else %}
-              &mdash;
-            {% endif %}
-          </p>
-        </div>
-      </div>
-      <div class="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 px-3 py-2">
-        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700">
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4" y="6" width="16" height="12" rx="2" />
-            <path d="M8 4v4" />
-            <path d="M16 4v4" />
-            <path d="M4 10h16" />
-          </svg>
-        </span>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Year built</p>
-          <p class="font-medium text-slate-700">
-            {% if subject_year_built %}
-              {{ subject_year_built }}
-            {% else %}
-              &mdash;
-            {% endif %}
-          </p>
-        </div>
-      </div>
-      <div class="flex items-center gap-3 rounded-xl border border-sky-100 bg-white/80 px-3 py-2">
-        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-sky-50 text-sky-700">
-          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 11.5 L12 9l6 2.5" />
-            <path d="M6 17v-3.5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2V17" />
-            <path d="M6 17h12" />
-            <path d="M9 17v-2h6v2" />
-          </svg>
-        </span>
-        <div>
-          <p class="text-xs uppercase tracking-wide text-slate-500">Garage</p>
-          <p class="font-medium text-slate-700">
-            {% if subject.garage_sqft is not None %}
-              {{ subject.garage_sqft|floatformat:0|intcomma }} sq ft
-            {% else %}
-              &mdash;
-            {% endif %}
-          </p>
-        </div>
-      </div>
+{% block page_title %}Step 2 — Neighborhood Snapshot{% endblock %}
+{% block header_title %}Assessment Review{% endblock %}
+{% block header_teaser %}
+We located your property and gathered neighborhood insights. Scroll through the key metrics before you review comparables.
+{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <div class="step-header">
+      <span class="icon">📊</span>
+      Step 2 — Neighborhood Snapshot
     </div>
-
-    {% with improvements=subject.metadata.improvements %}
-      {% if improvements %}
-        {% with primary=improvements.primary components=improvements.components %}
-          {% if primary.code or primary.label or primary.building_style or components %}
-            <div class="mt-6 space-y-3">
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Structures &amp; improvements</p>
-              <div class="flex flex-wrap gap-3">
-                {% if primary.code or primary.label or primary.building_style %}
-                  <div class="flex min-w-[14rem] flex-1 items-start gap-3 rounded-xl border border-sky-200 bg-white/90 px-3 py-2">
-                    <span class="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 text-sky-700">
-                      {% with category=primary.category %}
-                        {% if category == "garage" %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 11.5 12 6l9 5.5" />
-                            <path d="M5 11.5v9h14v-9" />
-                            <path d="M8 16h8" />
-                            <path d="M10 16v4" />
-                            <path d="M14 16v4" />
-                          </svg>
-                        {% elif category == "outbuilding" %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 18V9l8-5 8 5v9" />
-                            <path d="M9 18v-4a3 3 0 0 1 6 0v4" />
-                          </svg>
-                        {% elif category == "amenity" %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m12 3 2.1 4.26 4.7.68-3.4 3.3.8 4.68L12 14.77 7.8 16l.8-4.68-3.4-3.3 4.7-.68L12 3z" />
-                          </svg>
-                        {% else %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 11 L12 5l8 6" />
-                            <path d="M6 10v9h12v-9" />
-                            <path d="M10 19v-4h4v4" />
-                          </svg>
-                        {% endif %}
-                      {% endwith %}
-                    </span>
-                    <div>
-                      <p class="text-xs uppercase tracking-wide text-slate-500">Primary home</p>
-                      <p class="font-medium text-slate-900">
-                        {{ primary.label|default:primary.building_style|default:"Home" }}
-                      </p>
-                      {% if primary.building_style and not primary.label %}
-                        <p class="text-xs text-slate-500">{{ primary.building_style }}</p>
-                      {% endif %}
-                      {% if primary.total_sqft %}
-                        <p class="text-xs text-slate-500">{{ primary.total_sqft|intcomma }} sq ft</p>
-                      {% endif %}
-                    </div>
-                  </div>
-                {% endif %}
-
-                {% for item in components %}
-                  <div class="flex min-w-[12rem] flex-1 items-start gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                      {% with category=item.category %}
-                        {% if category == "garage" %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 11.5 12 6l9 5.5" />
-                            <path d="M5 11.5v9h14v-9" />
-                            <path d="M8 16h8" />
-                            <path d="M10 16v4" />
-                            <path d="M14 16v4" />
-                          </svg>
-                        {% elif category == "outbuilding" %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 18V9l8-5 8 5v9" />
-                            <path d="M9 18v-4a3 3 0 0 1 6 0v4" />
-                          </svg>
-                        {% elif category == "amenity" %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m12 3 2.1 4.26 4.7.68-3.4 3.3.8 4.68L12 14.77 7.8 16l.8-4.68-3.4-3.3 4.7-.68L12 3z" />
-                          </svg>
-                        {% else %}
-                          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 11 L12 5l8 6" />
-                            <path d="M6 10v9h12v-9" />
-                            <path d="M10 19v-4h4v4" />
-                          </svg>
-                        {% endif %}
-                      {% endwith %}
-                    </span>
-                    <div>
-                      <p class="text-sm font-medium text-slate-800">
-                        {{ item.label|default:item.code }}
-                      </p>
-                      {% if item.total_sqft %}
-                        <p class="text-xs text-slate-500">{{ item.total_sqft|intcomma }} sq ft</p>
-                      {% endif %}
-                      {% if item.count and item.count > 1 %}
-                        <p class="text-xs text-slate-500">{{ item.count }} structures</p>
-                      {% endif %}
-                    </div>
-                  </div>
-                {% empty %}
-                  <p class="text-sm text-slate-600">No additional improvements on record.</p>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
-        {% endwith %}
-      {% endif %}
-    {% endwith %}
-
-  </div>
-
-<div class="rounded-2xl border border-[#49475B]/20 bg-white p-5 m-3">
-  <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-    <h3 class="text-lg font-semibold text-[#14080E]">Neighborhood Snapshot</h3>
-    {% if neighborhood.code %}
-      <span class="text-xs font-medium uppercase tracking-wide text-[#49475B]/70">Code: {{ neighborhood.code }}</span>
-    {% endif %}
-  </div>
-  <p class="mt-1 text-sm text-[#49475B]/80">
-    These indicators show how your neighborhood's assessments compare to market values.
-    Lower COD means more uniform assessments, while PRD close to 1.00 means equity across value ranges.
-  </p>
-
-  <!-- Assessment Ratio Gauge -->
-  <div class="mt-6 rounded-xl border border-[#B993D6]/30 bg-[#B993D6]/10 p-4">
-    <div class="flex justify-between text-xs text-[#49475B]/70">
-      <span>Assessment vs. Market</span>
-      <span>Normal: 0.90–1.10</span>
+    <div class="summary-banner">
+      <span>Looking good! ✓</span>
+      Your assessed value is higher than most nearby sales. Keep that gap in mind when appealing.
     </div>
-    <div class="relative mt-1 h-3 w-full rounded-full bg-gradient-to-r from-[#B993D6] to-[#58B09C]">
-      {% if neighborhood.sales_ratio is not None %}
-        <div class="absolute -top-6 flex -translate-x-1/2 flex-col items-center text-[11px] font-semibold text-white" style="left: {{ neighborhood.sales_ratio_pos|default:50 }}%;">
-          <span class="rounded-full bg-[#14080E] px-2 py-1 shadow-md shadow-[#14080E]/30">
-            {{ neighborhood.sales_ratio|floatformat:2 }}%
-          </span>
-          <span class="mt-1 h-2 w-2 rotate-45 rounded-sm bg-[#14080E]"></span>
-        </div>
-      {% endif %}
-    </div>
-    <p class="mt-1 text-xs text-[#49475B]/70">
-      {% if neighborhood.median_ratio_pct is not None %}
-        Median ratio {{ neighborhood.median_ratio_pct|floatformat:2 }}% (assessments at 1.00 = market value)
-      {% elif neighborhood.median_ratio is not None %}
-        Median ratio {{ neighborhood.median_ratio|floatformat:2 }} (assessments at 1.00 = market value)
+    <h2>Your Property Details</h2>
+    <div class="detail-card">
+      {% if subject.metadata.assessed_value %}
+        <strong>${{ subject.metadata.assessed_value|floatformat:0|intcomma }}</strong>
       {% else %}
-        Median ratio — (assessments at 1.00 = market value)
+        <strong>—</strong>
       {% endif %}
-    </p>
-  </div>
-
-  <!-- COD Gauge -->
-  <div class="mt-4 rounded-xl border border-[#58B09C]/30 bg-[#58B09C]/10 p-4">
-    <div class="flex justify-between text-xs text-[#49475B]/70">
-      <span>Neighborhood Uniformity (COD)</span>
       <span>
-        {% if neighborhood.cod is not None %}
+        {{ subject.address|default:"Address unavailable" }}
+        · Parcel {{ subject.parcel_number }}
+      </span>
+      <div class="property-grid">
+        <div>
+          <strong>{% if subject.bedrooms %}{{ subject.bedrooms|floatformat:"-1" }}{% else %}&mdash;{% endif %}</strong>
+          <span>Bedrooms</span>
+        </div>
+        <div>
+          <strong>
+            {% if subject.living_area %}
+              {{ subject.living_area|floatformat:0|intcomma }}
+            {% else %}
+              &mdash;
+            {% endif %}
+          </strong>
+          <span>Living area (sq ft)</span>
+        </div>
+        <div>
+          <strong>{{ subject_year_built|default:"—" }}</strong>
+          <span>Year built</span>
+        </div>
+        <div>
+          <strong>
+            {% if subject.acres %}
+              {{ subject.acres|floatformat:2 }}
+            {% else %}
+              &mdash;
+            {% endif %}
+          </strong>
+          <span>Lot (acres)</span>
+        </div>
+      </div>
+    </div>
+
+    <h2 style="margin-top: 24px;">How you compare</h2>
+    <div class="metric-row metric-positive">
+      <div>
+        <strong>Assessment vs. Market</strong>
+        <p class="metric-caption">
+          {% if neighborhood.sales_ratio %}
+            About {{ neighborhood.sales_ratio|floatformat:2 }}% of nearby sales, higher than 5 of 6 comparables.
+          {% else %}
+            Insights are loading. Comparables will show where you land.
+          {% endif %}
+        </p>
+      </div>
+      <span class="metric-value">
+        {% if neighborhood.sales_ratio %}
+          {{ neighborhood.sales_ratio|floatformat:2 }}%
+        {% else %}
+          —
+        {% endif %}
+      </span>
+    </div>
+    <div class="metric-row">
+      <div>
+        <strong>Neighborhood Uniformity (COD)</strong>
+        <p class="metric-caption">Lower scores mean steadier patterns across similar homes.</p>
+      </div>
+      <span class="metric-value">
+        {% if neighborhood.cod %}
           {{ neighborhood.cod|floatformat:1 }}
         {% else %}
           —
         {% endif %}
       </span>
     </div>
-    <div class="relative mt-1 h-3 w-full rounded-full bg-gradient-to-r from-[#58B09C] to-[#f08000]">
-      {% if neighborhood.cod_pos is not None %}
-        <div class="absolute -top-6 flex -translate-x-1/2 flex-col items-center text-[11px] font-semibold text-white" style="left: {{ neighborhood.cod_pos|default:0 }}%;">
-          <span class="rounded-full bg-[#14080E] px-2 py-1 shadow-md shadow-[#14080E]/30">
-            {{ neighborhood.cod|floatformat:1 }}
-          </span>
-          <span class="mt-1 h-2 w-2 rotate-45 rounded-sm bg-[#14080E]"></span>
-        </div>
-      {% endif %}
-    </div>
-    <p class="mt-1 text-xs text-[#49475B]/70">
-      Typical uniformity &lt;15 indicates stable assessment patterns.
-    </p>
-  </div>
-
-  <!-- PRD Gauge -->
-  <div class="mt-4 rounded-xl border border-[#f08000]/30 bg-[#f08000]/10 p-4">
-    <div class="flex justify-between text-xs text-[#49475B]/70">
-      <span>Fairness Across Price Ranges (PRD)</span>
-      <span>
-        {% if neighborhood.prd is not None %}
-          {{ neighborhood.prd|floatformat:3 }}
+    <div class="metric-row metric-warning">
+      <div>
+        <strong>Price Dispersion (PRD)</strong>
+        <p class="metric-caption">Values near 1.00 signal consistency; higher may mean variance.</p>
+      </div>
+      <span class="metric-value">
+        {% if neighborhood.prd %}
+          {{ neighborhood.prd|floatformat:2 }}
         {% else %}
           —
         {% endif %}
       </span>
     </div>
-    <div class="relative mt-1 h-3 w-full rounded-full bg-gradient-to-r from-[#B993D6] to-[#f08000]">
-      {% if neighborhood.prd is not None %}
-        <div class="absolute -top-6 flex -translate-x-1/2 flex-col items-center text-[11px] font-semibold text-white" style="left: {{ neighborhood.prd_pos|default:50 }}%;">
-          <span class="rounded-full bg-[#14080E] px-2 py-1 shadow-md shadow-[#14080E]/30">
-            {{ neighborhood.prd|floatformat:2 }}
-          </span>
-          <span class="mt-1 h-2 w-2 rotate-45 rounded-sm bg-[#14080E]"></span>
-        </div>
-      {% endif %}
+
+    <div class="section-cta">
+      <button id="comparables-button" class="cta-button" type="button" data-url="{{ comparables_url }}">
+        View Comparable Sales →
+      </button>
     </div>
-    <p class="mt-1 text-xs text-[#49475B]/70">
-      PRD near 1.00 is balanced. &gt;1.03 suggests higher-value homes may be under-assessed.
-    </p>
-  </div>
-
-  <!-- Footer -->
-  <div class="mt-6 flex flex-wrap items-center gap-2 text-xs text-[#49475B]/70">
-    <p>
-      Sample: {{ neighborhood.valid_sales|default:"—" }} sales
-      {% if neighborhood.sample_size_pct is not None %}
-        • {{ neighborhood.sample_size_pct|floatformat:1 }}%
-      {% endif %}
-    </p>
-    <span class="hidden text-[#49475B]/40 md:inline">•</span>
-    <p>Reliability: {{ neighborhood.reliability_display|default:"Unknown" }}</p>
-  </div>
-</div>
-
-
-  <div class="rounded-2xl border border-slate-200 bg-white p-4">
-    <h3 class="text-lg font-semibold">Comparable Sales (3–5)</h3>
-    <div class="mt-3 space-y-3">
-      {% for comp in comparables %}
-        <div class="rounded-xl border border-slate-200 p-3">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="font-medium">{{ comp.snapshot.address|default:"Address unavailable" }}</p>
-              <p class="text-xs text-slate-500">{{ comp.distance_miles }} mi • {{ comp.sale_date|date:"M j, Y" }}</p>
-            </div>
-            <div class="text-right text-sm">
-              <p>Sold: <span class="font-semibold">${{ comp.sale_price|floatformat:0|intcomma }}</span></p>
-              <p class="text-slate-500">Adjusted: ${{ comp.adjusted_price|floatformat:0|intcomma }}</p>
-            </div>
-          </div>
-          <p class="mt-2 text-sm text-slate-600">Why this matters: Similar home nearby sold on {{ comp.sale_date|date:"M j, Y" }} for {{ comp.sale_price|floatformat:0|intcomma }}. Adjustments account for size, beds, baths, year, and lot.</p>
-          <div class="mt-2 text-xs text-slate-500">Beds {{ comp.snapshot.bedrooms|default:"?" }}, Baths {{ comp.snapshot.bathrooms|quarter_baths|default:"?" }}, {{ comp.snapshot.living_area|default:"?"|intcomma }} sq ft</div>
-          {% with ir=comp.snapshot.metadata.improvements %}
-            {% if ir %}
-              <div class="mt-2 text-xs text-slate-600">
-                <span>Style: {{ ir.style|default:"—" }}</span>
-                • <span>Quality: {{ ir.quality|default:"—" }}</span>
-                • <span>Condition: {{ ir.condition|default:"—" }}</span>
-                • <span>MA: {% if ir.main_area.total_sqft %}{{ ir.main_area.total_sqft|intcomma }} sq ft{% else %}—{% endif %}</span>
-              </div>
-            {% endif %}
-          {% endwith %}
-        </div>
-      {% empty %}
-        <p class="text-slate-600">We didn’t find enough nearby recent sales. Appeals are harder without 3+ comps.</p>
-      {% endfor %}
+    <div id="comparables-status" class="indicator">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.25" />
+        <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+      </svg>
+      Gathering comparable sales...
     </div>
-  </div>
+  </section>
+  <div id="comparables-placeholder"></div>
+{% endblock %}
 
-  <div class="grid gap-4 md:grid-cols-2">
-    {% if soft_stop %}
-      <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-        <h3 class="text-lg font-semibold text-amber-900">Soft Stop</h3>
-        <p class="mt-1 text-amber-900">Your case looks marginal right now. Consider waiting for more data next year.</p>
-        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
-          {% for r in soft_reasons %}
-            <li>{{ r }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% else %}
-      <div class="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-        <div>
-          <h3 class="text-lg font-semibold text-emerald-900">Looks worth pursuing</h3>
-          <p class="text-sm text-emerald-900">Download a simple report and follow county instructions.</p>
-        </div>
-        <a href="#" onclick="window.print(); return false;" class="rounded-lg bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">Download PDF</a>
-      </div>
-    {% endif %}
-    <div class="rounded-2xl border border-slate-200 bg-white p-4">
-      <h3 class="text-lg font-semibold">Appeal Likelihood</h3>
-      <div class="mt-2 flex items-end justify-between">
-        <div class="text-4xl font-bold">{{ score }}<span class="text-xl">%</span></div>
-        <div class="rounded-full border px-2 py-1 text-sm">{{ rating }}</div>
-      </div>
-      <div class="mt-3 h-3 w-full overflow-hidden rounded-full bg-slate-100">
-        <div class="h-full" style="width: {{ score }}%; background-color: {% if score >= 65 %}#16a34a{% elif score >= 50 %}#f59e0b{% else %}#dc2626{% endif %}"></div>
-      </div>
-      <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
-        {% for reason in reasons %}
-          <li>{{ reason }}</li>
-        {% empty %}
-          <li>We use comparable sales, neighborhood stats, and consistency (COD) to score.</li>
-        {% endfor %}
-      </ul>
-    </div>
-  </div>
+{% block extra_js %}
+  <script>
+    window.appealFetchComparables = function () {
+      const button = document.getElementById("comparables-button");
+      const placeholder = document.getElementById("comparables-placeholder");
+      const status = document.getElementById("comparables-status");
+      if (!button || button.dataset.loading === "running") {
+        return;
+      }
+      button.dataset.loading = "running";
+      button.disabled = true;
+      status.innerHTML = `
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.25" />
+          <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+        </svg>
+        Gathering comparable sales...
+      `;
+      fetch(button.dataset.url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Unable to fetch");
+          }
+          return response.text();
+        })
+        .then((text) => {
+          placeholder.innerHTML = text;
+          status.textContent = "Comparables ready";
+          button.textContent = "Comparables loaded";
+        })
+        .catch(() => {
+          status.textContent = "Comparables unavailable. Try again.";
+          button.disabled = false;
+          button.dataset.loading = "";
+        });
+    };
 
-  <div class="rounded-2xl border border-slate-200 bg-white p-4">
-    <h3 class="text-lg font-semibold">What to Know (RCW 84.48)</h3>
-    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-      <li>Appeals must be filed by <strong>July 1</strong>.</li>
-      <li>You need <strong>clear, cogent, and convincing evidence</strong>.</li>
-      <li>Provide comparable sales at least <strong>21 days</strong> before the hearing.</li>
-      <li>The assessor’s value is presumed correct — bring documentation.</li>
-    </ul>
-  </div>
-
-  <div class="text-sm text-slate-500">
-    <p>Disclaimer: This tool is for guidance only. Verify all data and consult county resources when filing.</p>
-  </div>
-</section>
+    document.addEventListener("DOMContentLoaded", () => {
+      window.appealFetchComparables();
+    });
+  </script>
+{% endblock %}

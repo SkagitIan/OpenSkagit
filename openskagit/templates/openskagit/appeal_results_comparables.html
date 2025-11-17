@@ -1,0 +1,140 @@
+{% load humanize formatting %}
+<div class="card">
+  <div class="step-header">
+    <span class="icon">🏡</span>
+    Step 3 — Comparable Sales
+  </div>
+  <h3>Comparable Sales ({{ comparables|length }})</h3>
+  <p style="color:#475569;margin-top:4px;">
+    We brought back recent, similar homes to highlight where your assessment lands.
+  </p>
+  <div class="comparables-list">
+    {% for comp in comparables %}
+      <article class="comparable">
+        <div>
+          <h3>{{ comp.snapshot.address|default:"Address unavailable" }}</h3>
+          <small>
+            {{ comp.distance_miles|floatformat:2 }} mi · Sold {{ comp.sale_date|date:"M j, Y" }}
+          </small>
+          <div class="tags">
+            {% if comp.assessed_value %}
+              <span class="tag">Assessed ${{ comp.assessed_value|floatformat:0|intcomma }}</span>
+            {% endif %}
+            <span class="tag">Sale price ${{ comp.sale_price|floatformat:0|intcomma }}</span>
+          </div>
+          <div style="margin-top:8px;color:#475569;font-size:0.85rem;">
+            Beds {{ comp.snapshot.bedrooms|default_if_none:"?" }},
+            Baths {{ comp.snapshot.bathrooms|default_if_none:"?" }},
+            {% if comp.snapshot.living_area %}
+              {{ comp.snapshot.living_area|floatformat:0|intcomma }} sq ft
+            {% else %}
+              &mdash; sq ft
+            {% endif %}
+          </div>
+          <div class="mt-2">
+            <button
+              type="button"
+              class="link-button"
+              hx-get="{% url 'cma-comparable-improvements' parcel_number comp.snapshot.parcel_number %}?roll_id={{ comp.snapshot.metadata.roll_id|default_if_none:'' }}&roll_year={{ comp.snapshot.metadata.roll_year|default_if_none:'' }}{% if comp.snapshot.metadata.assessor_building_style %}&assessor_style={{ comp.snapshot.metadata.assessor_building_style|urlencode }}{% endif %}"
+              hx-target="#appeal-improvements-{{ comp.snapshot.parcel_number }}"
+              hx-swap="innerHTML"
+            >
+              View improvement details
+            </button>
+          </div>
+          <div id="appeal-improvements-{{ comp.snapshot.parcel_number }}" style="font-size:0.85rem;color:#475569;margin-top:8px;"></div>
+        </div>
+        <div class="comparable-price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+      </article>
+    {% empty %}
+      <p style="color:#475569;">We couldn’t find enough recent comparable sales. Appeals are harder without 3+ comps.</p>
+    {% endfor %}
+  </div>
+  {% if has_more %}
+    <div class="section-cta" style="margin-top:16px;">
+      <button class="outline-button" type="button" data-url="{{ load_more_url }}" onclick="window.appealLoadMoreComps(this)">
+        Load more comparable sales
+      </button>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  {% if soft_stop %}
+    <div class="alert-card">
+      <h3 style="margin-top:0;">Soft stop</h3>
+      <p style="margin-bottom:8px;">Your appeal looks marginal right now. Consider gathering more data.</p>
+      <ul class="info-list">
+        {% for reason in soft_reasons %}
+          <li>{{ reason }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="info-card" style="margin:0;">
+      <h3 style="margin-top:0;">Looks worth pursuing</h3>
+      <p style="margin:4px 0;">Download a summary report and follow county instructions.</p>
+      <button class="secondary-button" type="button" onclick="window.print()">Download PDF</button>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>Appeal Likelihood</h3>
+  <div style="display:flex;align-items:flex-end;gap:16px;margin-top:12px;">
+    <div style="font-size:2.5rem;font-weight:700;">{{ score|default:0 }}<span style="font-size:1rem;">%</span></div>
+    <div style="font-weight:600;color:#475569;">{{ rating|default:"Unknown" }}</div>
+  </div>
+  <div class="score-meter">
+    <div class="score-fill" style="width:{{ score|default:0 }}%;"></div>
+  </div>
+  <p class="score-label">Score uses neighborhood stats, comparable results, and consistency.</p>
+  <ul class="info-list">
+    {% for reason in reasons %}
+      <li>{{ reason }}</li>
+    {% empty %}
+      <li>We look at comps, COD, PRD, and assessment trends.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="card">
+  <h3>What to know (RCW 84.48)</h3>
+  <ul class="info-list">
+    <li>Appeals must be filed by July 1.</li>
+    <li>You need clear, cogent, and convincing evidence.</li>
+    <li>Submit comparables at least 21 days before a hearing.</li>
+    <li>The assessor’s value is presumed correct; bring documentation.</li>
+  </ul>
+</div>
+
+<div class="card" style="padding-bottom:18px;">
+  <p style="margin:0;color:#475569;font-size:0.85rem;">Disclaimer: This tool is for guidance only. Verify data and consult county resources before filing.</p>
+</div>
+
+<script>
+  window.appealLoadMoreComps = function (button) {
+    if (!button) {
+      return;
+    }
+    button.disabled = true;
+    button.textContent = "Loading more…";
+    const placeholder = document.getElementById("comparables-placeholder");
+    fetch(button.dataset.url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Unable to load");
+        }
+        return response.text();
+      })
+      .then((html) => {
+        if (placeholder) {
+          placeholder.innerHTML = html;
+        }
+      })
+      .catch(() => {
+        button.textContent = "Could not load";
+        button.disabled = false;
+      });
+  };
+</script>

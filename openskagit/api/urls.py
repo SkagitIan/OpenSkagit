@@ -12,4 +12,13 @@ urlpatterns = [
     path("nearby/", views.NearbyParcelsView.as_view(), name="parcel-nearby"),
     path("neighborhood_stats/<str:neighborhood_code>/", views.NeighborhoodStatsView.as_view(), name="neighborhood-stats"),
     path("appeal_analysis/<str:parcel_number>/", views.AppealAnalysisView.as_view(), name="appeal-analysis"),
+    path("appeals/search/", views.AppealParcelSearchView.as_view(), name="appeal-search"),
+    path("appeals/<str:parcel_number>/subject/", views.AppealSubjectView.as_view(), name="appeal-subject"),
+    path("appeals/<str:parcel_number>/comparables/", views.AppealComparablesView.as_view(), name="appeal-comparables"),
+    path(
+        "appeals/<str:parcel_number>/comparables/<str:comp_parcel>/improvements/",
+        views.AppealComparableImprovementsView.as_view(),
+        name="appeal-comparable-improvements",
+    ),
+    path("neighborhoods/<str:neighborhood_code>/", views.NeighborhoodStatsView.as_view(), name="neighborhood-detail"),
 ]
