@@ -31,7 +31,7 @@ def ip_addresses():
     try:
         interfaces = netifaces.interfaces()
     except PermissionError:
-        return ["127.0.0.1", "::1"]
+        return ["127.0.0.1", "::1","159.65.103.78"]
 
     ip_list = []
     for interface in interfaces:
@@ -45,7 +45,7 @@ def ip_addresses():
 
     return ip_list or ["127.0.0.1", "::1"]
 
-ALLOWED_HOSTS = list(dict.fromkeys(ip_addresses() + ["localhost", "127.0.0.1", "testserver"]))
+ALLOWED_HOSTS = list(dict.fromkeys(ip_addresses() + ["localhost", "127.0.0.1", "testserver","159.65.103.78"]))
 
 
 # Application definition
