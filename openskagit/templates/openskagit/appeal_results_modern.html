@@ -1,0 +1,535 @@
+{% extends "openskagit/appeal_base_modern.html" %}
+{% load humanize formatting %}
+
+{% block page_title %}Step 2 — Property Review{% endblock %}
+
+{% block content %}
+<style>
+  .property-hero {
+    background: linear-gradient(135deg, var(--primary-600), var(--accent-600));
+    color: white;
+    padding: var(--space-8);
+    border-radius: var(--radius-2xl);
+    margin-bottom: var(--space-6);
+    box-shadow: 0 20px 40px -10px rgba(79, 70, 229, 0.3);
+    animation: fadeInUp 0.5s var(--transition-base);
+  }
+
+  .property-hero__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-6);
+    gap: var(--space-4);
+  }
+
+  .property-hero__title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+    line-height: 1.2;
+  }
+
+  .property-hero__subtitle {
+    font-size: 1rem;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .property-hero__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .property-hero__value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: var(--space-2);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .property-hero__label {
+    font-size: 0.9375rem;
+    opacity: 0.9;
+    font-weight: 500;
+  }
+
+  .property-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .property-stat {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .property-stat__value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: var(--space-1);
+  }
+
+  .property-stat__label {
+    font-size: 0.8125rem;
+    opacity: 0.85;
+    font-weight: 500;
+  }
+
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-6);
+    margin-top: var(--space-8);
+  }
+
+  .comparison-card {
+    background: white;
+    border: 2px solid var(--gray-100);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    transition: all var(--transition-base);
+    animation: fadeInUp 0.5s var(--transition-base);
+  }
+
+  .comparison-card:nth-child(1) { animation-delay: 0.1s; }
+  .comparison-card:nth-child(2) { animation-delay: 0.2s; }
+  .comparison-card:nth-child(3) { animation-delay: 0.3s; }
+
+  .comparison-card:hover {
+    border-color: var(--primary-200);
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-4px);
+  }
+
+  .comparison-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+  }
+
+  .comparison-card__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .comparison-card__icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--primary-500), var(--accent-500));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+
+  .comparison-card__value {
+    font-size: 2.25rem;
+    font-weight: 800;
+    color: var(--gray-900);
+    margin-bottom: var(--space-2);
+    line-height: 1;
+  }
+
+  .comparison-card__value--positive {
+    color: var(--success-600);
+  }
+
+  .comparison-card__value--warning {
+    color: var(--warning-600);
+  }
+
+  .comparison-card__value--neutral {
+    color: var(--accent-600);
+  }
+
+  .comparison-card__description {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    line-height: 1.5;
+  }
+
+  .metric-bar {
+    background: var(--gray-100);
+    height: 0.75rem;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin: var(--space-3) 0;
+    position: relative;
+  }
+
+  .metric-bar__fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-500), var(--accent-500));
+    border-radius: var(--radius-full);
+    transition: width 1s var(--transition-base);
+  }
+
+  .metric-bar__fill--success {
+    background: linear-gradient(90deg, var(--success-500), var(--success-600));
+  }
+
+  .metric-bar__fill--warning {
+    background: linear-gradient(90deg, var(--warning-500), var(--warning-600));
+  }
+
+  .insight-banner {
+    background: linear-gradient(135deg, var(--success-50), var(--accent-50));
+    border: 2px solid var(--success-200);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    margin-top: var(--space-6);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    animation: fadeInUp 0.5s var(--transition-base) 0.4s both;
+  }
+
+  .insight-banner__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: var(--shadow-md);
+  }
+
+  .insight-banner__content {
+    flex: 1;
+  }
+
+  .insight-banner__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--success-800);
+    margin-bottom: var(--space-2);
+  }
+
+  .insight-banner__text {
+    font-size: 0.9375rem;
+    color: var(--success-700);
+    line-height: 1.6;
+  }
+
+  .continue-section {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--space-10);
+    animation: fadeInUp 0.5s var(--transition-base) 0.5s both;
+  }
+
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-10) var(--space-4);
+    color: var(--gray-600);
+  }
+
+  .loading-state__spinner {
+    width: 3rem;
+    height: 3rem;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--primary-500);
+    border-radius: var(--radius-full);
+    animation: spin 0.8s linear infinite;
+    margin-bottom: var(--space-4);
+  }
+
+  .loading-state__text {
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  @media (max-width: 768px) {
+    .property-hero__header {
+      flex-direction: column;
+    }
+
+    .property-hero__value {
+      font-size: 2rem;
+    }
+
+    .comparison-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="property-hero">
+  <div class="property-hero__header">
+    <div>
+      <h2 class="property-hero__title">{{ subject.address|default:"Address unavailable" }}</h2>
+      <div class="property-hero__subtitle">
+        <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        </svg>
+        Parcel {{ subject.parcel_number }}
+      </div>
+    </div>
+    <div class="property-hero__badge">
+      <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      Assessment Year {{ subject_year_built|default:"—" }}
+    </div>
+  </div>
+
+  <div class="property-hero__value">
+    {% if subject.metadata.assessed_value %}
+      ${{ subject.metadata.assessed_value|floatformat:0|intcomma }}
+    {% else %}
+      —
+    {% endif %}
+  </div>
+  <div class="property-hero__label">Assessed Value</div>
+
+  <div class="property-stats" style="margin-top: var(--space-6);">
+    <div class="property-stat">
+      <div class="property-stat__value">{% if subject.bedrooms %}{{ subject.bedrooms|floatformat:"-1" }}{% else %}—{% endif %}</div>
+      <div class="property-stat__label">Bedrooms</div>
+    </div>
+    <div class="property-stat">
+      <div class="property-stat__value">{% if subject.bathrooms %}{{ subject.bathrooms|floatformat:"-1" }}{% else %}—{% endif %}</div>
+      <div class="property-stat__label">Bathrooms</div>
+    </div>
+    <div class="property-stat">
+      <div class="property-stat__value">
+        {% if subject.living_area %}
+          {{ subject.living_area|floatformat:0|intcomma }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div class="property-stat__label">Living Area (sq ft)</div>
+    </div>
+    <div class="property-stat">
+      <div class="property-stat__value">
+        {% if subject.acres %}
+          {{ subject.acres|floatformat:2 }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div class="property-stat__label">Lot Size (acres)</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card__header">
+    <div class="card__icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <line x1="17" y1="5" x2="9.5" y2="5"></line>
+        <line x1="17" y1="13" x2="9.5" y2="13"></line>
+        <path d="M9.5 5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+    </div>
+    <div>
+      <h3 class="card__title">Neighborhood Comparison</h3>
+      <p class="card__subtitle">See how your assessment compares to nearby properties</p>
+    </div>
+  </div>
+
+  <div class="comparison-grid">
+    <div class="comparison-card">
+      <div class="comparison-card__header">
+        <div class="comparison-card__title">Assessment Ratio</div>
+        <div class="comparison-card__icon">
+          <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="comparison-card__value comparison-card__value--neutral">
+        {% if neighborhood.sales_ratio %}
+          {{ neighborhood.sales_ratio|floatformat:1 }}%
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div class="comparison-card__description">
+        {% if neighborhood.sales_ratio %}
+          Your assessment is about {{ neighborhood.sales_ratio|floatformat:1 }}% of recent nearby sale prices
+        {% else %}
+          Assessment ratio data is being calculated
+        {% endif %}
+      </div>
+      {% if neighborhood.sales_ratio %}
+        <div class="metric-bar">
+          <div class="metric-bar__fill" style="width: {{ neighborhood.sales_ratio|floatformat:0 }}%;"></div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="comparison-card">
+      <div class="comparison-card__header">
+        <div class="comparison-card__title">Uniformity (COD)</div>
+        <div class="comparison-card__icon">
+          <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+          </svg>
+        </div>
+      </div>
+      <div class="comparison-card__value {% if neighborhood.cod < 10 %}comparison-card__value--positive{% elif neighborhood.cod > 20 %}comparison-card__value--warning{% endif %}">
+        {% if neighborhood.cod %}
+          {{ neighborhood.cod|floatformat:1 }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div class="comparison-card__description">
+        {% if neighborhood.cod %}
+          {% if neighborhood.cod < 10 %}
+            Excellent uniformity - assessments are very consistent
+          {% elif neighborhood.cod < 15 %}
+            Good uniformity across similar properties
+          {% else %}
+            Higher variance - assessments vary more widely
+          {% endif %}
+        {% else %}
+          Uniformity metrics being calculated
+        {% endif %}
+      </div>
+      {% if neighborhood.cod %}
+        <div class="metric-bar">
+          <div class="metric-bar__fill {% if neighborhood.cod < 10 %}metric-bar__fill--success{% elif neighborhood.cod > 20 %}metric-bar__fill--warning{% endif %}" style="width: {{ neighborhood.cod|floatformat:0 }}%; max-width: 100%;"></div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="comparison-card">
+      <div class="comparison-card__header">
+        <div class="comparison-card__title">Price Dispersion (PRD)</div>
+        <div class="comparison-card__icon">
+          <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          </svg>
+        </div>
+      </div>
+      <div class="comparison-card__value {% if neighborhood.prd and neighborhood.prd >= 0.98 and neighborhood.prd <= 1.03 %}comparison-card__value--positive{% endif %}">
+        {% if neighborhood.prd %}
+          {{ neighborhood.prd|floatformat:2 }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+      <div class="comparison-card__description">
+        {% if neighborhood.prd %}
+          {% if neighborhood.prd >= 0.98 and neighborhood.prd <= 1.03 %}
+            Excellent consistency near the ideal 1.00
+          {% elif neighborhood.prd > 1.03 %}
+            Higher-priced homes may be over-assessed
+          {% else %}
+            Lower-priced homes may be over-assessed
+          {% endif %}
+        {% else %}
+          Price dispersion data being processed
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="insight-banner">
+    <div class="insight-banner__icon">
+      <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+    </div>
+    <div class="insight-banner__content">
+      <div class="insight-banner__title">Ready to Review Comparables</div>
+      <div class="insight-banner__text">
+        We've gathered your property details and neighborhood metrics. Next, we'll show you recent comparable sales to help determine if your assessment is higher than market values.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="continue-section">
+  <button id="comparables-button" class="btn btn--primary btn--large" type="button" data-url="{{ comparables_url }}">
+    <span>View Comparable Sales</span>
+    <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+      <polyline points="12 5 19 12 12 19"></polyline>
+    </svg>
+  </button>
+</div>
+
+<div id="comparables-placeholder"></div>
+<div id="comparables-status" class="hidden loading-state">
+  <div class="loading-state__spinner"></div>
+  <div class="loading-state__text">Gathering comparable sales...</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.appealFetchComparables = function () {
+    const button = document.getElementById('comparables-button');
+    const placeholder = document.getElementById('comparables-placeholder');
+    const status = document.getElementById('comparables-status');
+
+    if (!button || button.dataset.loading === 'running') {
+      return;
+    }
+
+    button.dataset.loading = 'running';
+    button.disabled = true;
+    button.innerHTML = '<div class="spinner"></div><span>Loading comparables...</span>';
+    status.classList.remove('hidden');
+
+    fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Unable to fetch');
+        }
+        return response.text();
+      })
+      .then((text) => {
+        placeholder.innerHTML = text;
+        status.classList.add('hidden');
+        button.classList.add('hidden');
+      })
+      .catch(() => {
+        status.innerHTML = '<div class="empty-state"><svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><div class="empty-state__text">Unable to load comparables. Please try again.</div></div>';
+        button.disabled = false;
+        button.dataset.loading = '';
+        button.innerHTML = '<span>Retry</span><svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>';
+      });
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    window.appealFetchComparables();
+  });
+</script>
+{% endblock %}

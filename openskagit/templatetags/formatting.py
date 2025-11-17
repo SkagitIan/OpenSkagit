@@ -45,3 +45,14 @@ def quarter_baths(value):
     if fraction_text:
         return f"{whole} {fraction_text}"
     return str(whole)
+
+
+@register.filter
+def mul(value, arg):
+    """
+    Multiply the value by the argument.
+    """
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return 0
