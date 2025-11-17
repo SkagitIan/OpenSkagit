@@ -1476,7 +1476,7 @@ def appeal_home(request):
     """
     Minimal, citizen-friendly entry with a single address/parcel search box.
     """
-    return render(request, "openskagit/appeal_home.html", {"step": 1})
+    return render(request, "openskagit/appeal_home_modern.html", {"step": 1})
 
 
 @require_GET
@@ -1535,7 +1535,7 @@ def appeal_parcel_search(request):
 
     return render(
         request,
-        "openskagit/appeal_parcel_search_results.html",
+        "openskagit/appeal_parcel_search_results_modern.html",
         {
             "query": query,
             "results": results,
@@ -1558,7 +1558,7 @@ def appeal_result(request, parcel_number: str):
     comparables_url = request.path + "comparables/"
     return render(
         request,
-        "openskagit/appeal_results.html",
+        "openskagit/appeal_results_modern.html",
         {
             "subject": subject,
             "parcel_number": parcel_number,
@@ -1669,7 +1669,7 @@ def appeal_result_comparables(request, parcel_number: str):
 
     return render(
         request,
-        "openskagit/appeal_results_comparables.html",
+        "openskagit/appeal_results_comparables_modern.html",
         {
             "comparables": comps,
             "soft_stop": soft_stop,

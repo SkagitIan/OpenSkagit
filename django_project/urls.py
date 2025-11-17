@@ -50,8 +50,10 @@ urlpatterns = [
     path("api/", include("openskagit.api.urls")),
     path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
     # Citizen Appeal Helper
+
     path("appeal/new/", openskagit_views.appeal_new, name="appeal-new"),
     path("appeal/", openskagit_views.appeal_home, name="appeal-home"),
+    #path('appeal/modern/', openskagit_views.appeal_home, name='appeal-home-modern'),
     path("appeal/parcel-search/", openskagit_views.appeal_parcel_search, name="appeal-parcel-search"),
     path("appeal/result/<str:parcel_number>/", openskagit_views.appeal_result, name="appeal-result"),
     path(
