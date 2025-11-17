@@ -658,30 +658,78 @@
     }
   }
 
-  window.appealFetchComparables = function () {
+  (function () {
     const button = document.getElementById('comparables-button');
     const placeholder = document.getElementById('comparables-placeholder');
-    if (!button || button.dataset.loading === 'running') return;
+    const baseUrl = button ? button.dataset.url : null;
 
-    button.dataset.loading = 'running';
-    button.disabled = true;
-    button.innerHTML = '<div class="spinner"></div><span>Loading comparables...</span>';
-
-    fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then((response) => {
-        if (!response.ok) throw new Error('Unable to fetch');
-        return response.text();
-      })
-      .then((text) => {
-        placeholder.innerHTML = text;
-        button.classList.add('hidden');
-      })
-      .catch(() => {
-        button.disabled = false;
-        button.dataset.loading = '';
-        button.innerHTML = '<span>Retry</span>';
+    function executeInlineScripts(container) {
+      const scripts = container.querySelectorAll('script');
+      scripts.forEach((oldScript) => {
+        const s = document.createElement('script');
+        if (oldScript.type) s.type = oldScript.type;
+        if (oldScript.src) {
+          s.src = oldScript.src;
+        } else {
+          s.text = oldScript.textContent || '';
+        }
+        document.body.appendChild(s);
+        setTimeout(() => s.remove(), 0);
       });
-  };
+    }
+
+    function buildUrl(viewMode) {
+      if (!baseUrl) return null;
+      const mode = viewMode && viewMode !== 'standard' ? viewMode : null;
+      return mode ? `${baseUrl}?view_mode=${encodeURIComponent(mode)}` : baseUrl;
+    }
+
+    function fetchComparables(url, { fromButton }) {
+      if (!url || !placeholder) return;
+      if (fromButton) {
+        if (!button || button.dataset.loading === 'running') return;
+        button.dataset.loading = 'running';
+        button.disabled = true;
+        button.innerHTML = '<div class="spinner"></div><span>Loading comparables...</span>';
+      } else {
+        placeholder.innerHTML = '<div class="comparables-loading"><div class="spinner"></div><span>Updating view…</span></div>';
+      }
+
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then((response) => {
+          if (!response.ok) throw new Error('Unable to fetch');
+          return response.text();
+        })
+        .then((text) => {
+          placeholder.innerHTML = text;
+          executeInlineScripts(placeholder);
+          if (button) {
+            button.classList.add('hidden');
+            button.disabled = false;
+            button.dataset.loading = '';
+          }
+        })
+        .catch(() => {
+          if (fromButton && button) {
+            button.disabled = false;
+            button.dataset.loading = '';
+            button.innerHTML = '<span>Retry</span>';
+          } else if (placeholder) {
+            placeholder.innerHTML = '<div class="empty-state">Unable to update comparables. Please try again.</div>';
+          }
+        });
+    }
+
+    window.appealFetchComparables = function (viewMode = 'standard') {
+      const url = buildUrl(viewMode);
+      fetchComparables(url, { fromButton: true });
+    };
+
+    window.appealUpdateComparables = function (viewMode = 'standard') {
+      const url = buildUrl(viewMode);
+      fetchComparables(url, { fromButton: false });
+    };
+  })();
 
   document.addEventListener('DOMContentLoaded', () => {
     // Initialize gauges
@@ -709,6 +757,16 @@
   }
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  .comparables-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    font-size: 0.9375rem;
+    color: var(--gray-600);
   }
 </style>
 {% endblock %}

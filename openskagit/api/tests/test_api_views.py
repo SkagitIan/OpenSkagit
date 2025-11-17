@@ -13,6 +13,7 @@ from rest_framework.test import APIClient
 
 from openskagit import cma
 from openskagit.api import views
+from openskagit.models import AdjustmentCoefficient
 
 
 class FakeCursor:
@@ -649,6 +650,96 @@ class AppealComparableImprovementsViewTests(BaseAPITestCase):
         self.assertEqual(payload["parcel_number"], "P300")
         self.assertEqual(payload["improvements"][0]["description"], "Residence")
         mock_rollup.assert_called_once()
+
+
+class CoAppraiserAdjustmentViewTests(BaseAPITestCase):
+    def setUp(self):
+        super().setUp()
+        self.run_id = "A100"
+        coeffs = {
+            "log_area": 0.12,
+            "log_lot": 0.05,
+            "log_age": -0.03,
+            "t": 0.01,
+            "area_time": -0.002,
+            "quality_score": 0.02,
+            "condition_score": 0.015,
+            "has_garage": 0.01,
+            "has_basement": 0.035,
+            "is_view": 0.025,
+        }
+        for term, beta in coeffs.items():
+            AdjustmentCoefficient.objects.create(
+                market_group="ANACORTES",
+                term=term,
+                beta=beta,
+                beta_se=0.001,
+                run_id=self.run_id,
+            )
+        self.subject = {
+            "valuation_area": "ANACORTES",
+            "GLA": 2100,
+            "lot_acres": 0.3,
+            "age": 18,
+            "quality_score": 3.5,
+            "condition_score": 3.0,
+            "has_garage": 1,
+            "has_basement": 0,
+            "is_view": 1,
+            "sale_date": "2024-01-15",
+        }
+        self.comp = {
+            "comp_id": "C1",
+            "sale_price": 540000,
+            "GLA": 1900,
+            "lot_acres": 0.2,
+            "age": 25,
+            "quality_score": 3.0,
+            "condition_score": 3.2,
+            "has_garage": 0,
+            "has_basement": 1,
+            "is_view": 0,
+            "sale_date": "2023-07-15",
+        }
+
+    def test_returns_adjustment_payload(self):
+        url = reverse("co-appraiser-adjustments")
+        response = self.client.post(
+            url,
+            data={
+                "subject": self.subject,
+                "comps": [self.comp],
+                "subject_pred_price": 600000,
+                "market_group": "ANACORTES",
+                "run_id": self.run_id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["market_group"], "ANACORTES")
+        self.assertEqual(payload["subject_pred_price"], 600000.0)
+        self.assertEqual(len(payload["comparables"]), 1)
+        self.assertIn("area", payload["comparables"][0]["adjustments"])
+        self.assertIn("time", payload["comparables"][0]["adjustments"])
+
+    def test_missing_coefficient_returns_error(self):
+        AdjustmentCoefficient.objects.filter(term="log_area").delete()
+        url = reverse("co-appraiser-adjustments")
+        response = self.client.post(
+            url,
+            data={
+                "subject": self.subject,
+                "comps": [self.comp],
+                "subject_pred_price": 600000,
+                "market_group": "ANACORTES",
+                "run_id": self.run_id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn("error_message", payload)
 
 
 class NeighborhoodStatsViewTests(BaseAPITestCase):

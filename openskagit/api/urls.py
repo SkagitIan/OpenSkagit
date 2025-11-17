@@ -21,4 +21,9 @@ urlpatterns = [
         name="appeal-comparable-improvements",
     ),
     path("neighborhoods/<str:neighborhood_code>/", views.NeighborhoodStatsView.as_view(), name="neighborhood-detail"),
+    path(
+        "co_appraiser/adjustments/",
+        views.CoAppraiserAdjustmentView.as_view(),
+        name="co-appraiser-adjustments",
+    ),
 ]

@@ -45,6 +45,14 @@
     margin: var(--space-1) 0 0;
   }
 
+  .section-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+
   /* View Switcher */
   .view-switcher {
     display: inline-flex;
@@ -85,6 +93,56 @@
   .view-btn:hover:not(.view-btn--active) {
     color: var(--primary-500);
     background: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Mode Switcher */
+  .mode-switcher {
+    min-width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .mode-toggle {
+    display: inline-flex;
+    gap: var(--space-1);
+    background: var(--gray-100);
+    padding: var(--space-1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mode-btn {
+    border: none;
+    background: transparent;
+    padding: var(--space-2) var(--space-4);
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+  }
+
+  .mode-btn--active {
+    background: white;
+    color: var(--primary-600);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mode-btn:hover:not(.mode-btn--active) {
+    color: var(--primary-500);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .mode-note {
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+  }
+
+  .mode-note--warning {
+    color: var(--rose-600);
   }
 
   /* View Containers */
@@ -163,6 +221,41 @@
     margin-top: var(--space-1);
   }
 
+  .comp-price-block {
+    text-align: right;
+  }
+
+  .comp-adjusted {
+    margin-top: var(--space-2);
+    text-align: right;
+  }
+
+  .comp-adjusted__label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    letter-spacing: 0.05em;
+  }
+
+  .comp-adjusted__value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .comp-adjusted__delta {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .comp-adjusted__delta--up {
+    color: var(--emerald-600);
+  }
+
+  .comp-adjusted__delta--down {
+    color: var(--rose-600);
+  }
+
   .comp-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
@@ -185,6 +278,42 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-top: var(--space-1);
+  }
+
+  .adjustments-breakdown {
+    margin-top: var(--space-4);
+  }
+
+  .adjustments-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: var(--space-2);
+  }
+
+  .adjustment-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .adjustment-chip {
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--gray-100);
+    color: var(--gray-700);
+  }
+
+  .adjustment-chip--up {
+    background: var(--success-50);
+    color: var(--success-700);
+  }
+
+  .adjustment-chip--down {
+    background: var(--rose-50);
+    color: var(--rose-700);
   }
 
   /* Grid View */
@@ -255,7 +384,7 @@
   }
 </style>
 
-<div class="card comparables-section">
+<div class="card comparables-section" id="appeal-comparables-root" data-fetch-url="{{ fetch_url }}" data-active-mode="{{ view_mode }}">
   <div class="section-header">
     <div class="section-title">
       <div class="section-title__icon">
@@ -270,35 +399,57 @@
       </div>
     </div>
 
-    <div class="view-switcher">
-      <button class="view-btn view-btn--active" data-view="list" onclick="switchView('list')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="8" y1="6" x2="21" y2="6"></line>
-          <line x1="8" y1="12" x2="21" y2="12"></line>
-          <line x1="8" y1="18" x2="21" y2="18"></line>
-          <line x1="3" y1="6" x2="3.01" y2="6"></line>
-          <line x1="3" y1="12" x2="3.01" y2="12"></line>
-          <line x1="3" y1="18" x2="3.01" y2="18"></line>
-        </svg>
-        List
-      </button>
-      <button class="view-btn" data-view="grid" onclick="switchView('grid')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-        Grid
-      </button>
-      <button class="view-btn" data-view="map" onclick="switchView('map')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
-          <line x1="8" y1="2" x2="8" y2="18"></line>
-          <line x1="16" y1="6" x2="16" y2="22"></line>
-        </svg>
-        Map
-      </button>
+    <div class="section-controls">
+      <div class="view-switcher">
+        <button class="view-btn view-btn--active" data-view="list" onclick="switchView('list')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          List
+        </button>
+        <button class="view-btn" data-view="grid" onclick="switchView('grid')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          Grid
+        </button>
+        <button class="view-btn" data-view="map" onclick="switchView('map')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+            <line x1="8" y1="2" x2="8" y2="18"></line>
+            <line x1="16" y1="6" x2="16" y2="22"></line>
+          </svg>
+          Map
+        </button>
+      </div>
+      <div class="mode-switcher">
+        <div class="mode-toggle">
+          <button class="mode-btn {% if not advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('standard')">Standard</button>
+          <button class="mode-btn {% if advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('advanced')">Advanced</button>
+        </div>
+        {% if advanced_mode %}
+          {% if advanced_summary %}
+            <p class="mode-note">
+              Adjusting against {{ advanced_summary.market_group|default:"market" }} baseline
+              {% if advanced_summary.subject_pred_price %}
+                ({{ advanced_summary.subject_pred_price|floatformat:0|intcomma }})
+              {% endif %}
+            </p>
+          {% elif advanced_error %}
+            <p class="mode-note mode-note--warning">{{ advanced_error }}</p>
+          {% endif %}
+        {% else %}
+          <p class="mode-note">Use advanced mode to view regression-based adjustments.</p>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -315,9 +466,27 @@
                 <span>📅 Sold {{ comp.sale_date|date:"M Y" }}</span>
               </div>
             </div>
-            <div style="text-align: right;">
+            <div class="comp-price-block">
               <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
               <div class="comp-card__price-label">Sale Price</div>
+              {% if advanced_mode and comp.adjusted_value %}
+                <div class="comp-adjusted">
+                  <div class="comp-adjusted__label">Adjusted Value</div>
+                  <div class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</div>
+                  {% if comp.total_adjustment %}
+                    {% if comp.total_adjustment > 0 %}
+                      <div class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</div>
+                    {% elif comp.total_adjustment < 0 %}
+                      <div class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</div>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              {% elif advanced_mode and advanced_error %}
+                <div class="comp-adjusted">
+                  <div class="comp-adjusted__label">Adjusted Value</div>
+                  <div class="comp-adjusted__delta comp-adjusted__delta--down">Unavailable</div>
+                </div>
+              {% endif %}
             </div>
           </div>
 
@@ -343,6 +512,20 @@
               <div class="comp-stat__label">$/Sq Ft</div>
             </div>
           </div>
+          {% if advanced_mode and comp.adjustments %}
+            <div class="adjustments-breakdown">
+              <div class="adjustments-title">Adjustments</div>
+              <div class="adjustment-chips">
+                {% for item in comp.adjustments %}
+                  {% if item.amount %}
+                    <span class="adjustment-chip {% if item.amount > 0 %}adjustment-chip--up{% elif item.amount < 0 %}adjustment-chip--down{% endif %}">
+                      {{ item.label }} {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                    </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
@@ -362,6 +545,19 @@
           <div style="text-align: center; margin: var(--space-4) 0;">
             <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
             <div class="comp-card__price-label">Sale Price</div>
+            {% if advanced_mode and comp.adjusted_value %}
+              <div class="comp-adjusted" style="text-align:center;">
+                <div class="comp-adjusted__label">Adjusted Value</div>
+                <div class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</div>
+                {% if comp.total_adjustment %}
+                  {% if comp.total_adjustment > 0 %}
+                    <div class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</div>
+                  {% elif comp.total_adjustment < 0 %}
+                    <div class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</div>
+                  {% endif %}
+                {% endif %}
+              </div>
+            {% endif %}
           </div>
 
           <div class="comp-stats">
@@ -378,6 +574,20 @@
               <div class="comp-stat__label">Sq Ft</div>
             </div>
           </div>
+          {% if advanced_mode and comp.adjustments %}
+            <div class="adjustments-breakdown">
+              <div class="adjustments-title">Adjustments</div>
+              <div class="adjustment-chips">
+                {% for item in comp.adjustments %}
+                  {% if item.amount %}
+                    <span class="adjustment-chip {% if item.amount > 0 %}adjustment-chip--up{% elif item.amount < 0 %}adjustment-chip--down{% endif %}">
+                      {{ item.label }} {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                    </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
@@ -394,6 +604,22 @@
 <script>
   let comparablesMap = null;
   let markersGroup = null;
+
+  function handleComparablesMode(mode) {
+    const root = document.getElementById('appeal-comparables-root');
+    if (root && root.dataset.activeMode === mode) {
+      return;
+    }
+    if (root) {
+      root.dataset.activeMode = mode;
+    }
+    if (window.appealUpdateComparables) {
+      window.appealUpdateComparables(mode);
+    } else if (root && root.dataset.fetchUrl) {
+      const params = mode ? `?view_mode=${encodeURIComponent(mode)}` : "";
+      window.location.href = `${root.dataset.fetchUrl}${params}`;
+    }
+  }
 
   function switchView(view) {
     // Update buttons
@@ -460,7 +686,9 @@
             distance: "{{ comp.distance_miles|floatformat:2 }}",
             beds: "{{ comp.bedrooms|default:"—"|floatformat:"-1" }}",
             baths: "{{ comp.bathrooms|default:"—"|floatformat:"-1" }}",
-            sqft: "{{ comp.living_area|default:"—"|floatformat:0|intcomma }}"
+            sqft: "{{ comp.living_area|default:"—"|floatformat:0|intcomma }}",
+            adjusted_value: {{ comp.adjusted_value|default:"null" }},
+            total_adjustment: {{ comp.total_adjustment|default:"null" }}
           },
         {% endif %}
       {% endfor %}
@@ -484,6 +712,9 @@
           <div>Distance: ${comp.distance} mi</div>
           <div>${comp.beds} beds, ${comp.baths} baths</div>
           <div>${comp.sqft} sq ft</div>
+          {% if advanced_mode %}
+            ${comp.adjusted_value !== null ? `<div>Adjusted: $${comp.adjusted_value.toLocaleString()}${comp.total_adjustment !== null && comp.total_adjustment !== 0 ? ` (${comp.total_adjustment > 0 ? '+' : ''}$${Math.abs(comp.total_adjustment).toLocaleString()})` : ''}</div>` : ''}
+          {% endif %}
         </div>
       `);
     });
