@@ -1,0 +1,512 @@
+{% load humanize formatting %}
+<style>
+  .comparables-section {
+    animation: fadeInUp 0.6s var(--transition-base);
+    margin-top: var(--space-8);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-6);
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .section-title__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+  }
+
+  .section-title__text h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+  }
+
+  .section-title__text p {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin: var(--space-1) 0 0;
+  }
+
+  /* View Switcher */
+  .view-switcher {
+    display: inline-flex;
+    gap: var(--space-1);
+    background: var(--gray-100);
+    padding: var(--space-1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border: none;
+    background: transparent;
+    color: var(--gray-600);
+    font-weight: 600;
+    font-size: 0.875rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: inherit;
+  }
+
+  .view-btn svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .view-btn--active {
+    background: white;
+    color: var(--primary-600);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .view-btn:hover:not(.view-btn--active) {
+    color: var(--primary-500);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  /* View Containers */
+  .view-container {
+    display: none;
+  }
+
+  .view-container--active {
+    display: block;
+  }
+
+  /* List View */
+  .comp-list {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .comp-card {
+    background: white;
+    border: 2px solid var(--gray-100);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    transition: all var(--transition-base);
+    animation: slideInRight 0.4s var(--transition-base);
+    animation-fill-mode: both;
+  }
+
+  .comp-card:nth-child(1) { animation-delay: 0.05s; }
+  .comp-card:nth-child(2) { animation-delay: 0.1s; }
+  .comp-card:nth-child(3) { animation-delay: 0.15s; }
+  .comp-card:nth-child(4) { animation-delay: 0.2s; }
+  .comp-card:nth-child(5) { animation-delay: 0.25s; }
+  .comp-card:nth-child(6) { animation-delay: 0.3s; }
+  .comp-card:nth-child(7) { animation-delay: 0.35s; }
+
+  .comp-card:hover {
+    border-color: var(--primary-300);
+    box-shadow: var(--shadow-xl);
+    transform: translateX(4px);
+  }
+
+  .comp-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .comp-card__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: var(--space-2);
+  }
+
+  .comp-card__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    flex-wrap: wrap;
+  }
+
+  .comp-card__price {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-600);
+    line-height: 1;
+  }
+
+  .comp-card__price-label {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin-top: var(--space-1);
+  }
+
+  .comp-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    margin-top: var(--space-4);
+  }
+
+  .comp-stat__value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .comp-stat__label {
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: var(--space-1);
+  }
+
+  /* Grid View */
+  .comp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .comp-grid .comp-card {
+    height: 100%;
+  }
+
+  /* Map View */
+  #comparables-map {
+    height: 600px;
+    width: 100%;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    z-index: 1;
+  }
+
+  .map-container {
+    position: relative;
+  }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: var(--radius-lg);
+  }
+
+  .popup-content {
+    padding: var(--space-2);
+    min-width: 200px;
+  }
+
+  .popup-content strong {
+    display: block;
+    font-size: 0.9375rem;
+    margin-bottom: var(--space-2);
+    color: var(--gray-900);
+  }
+
+  .popup-content div {
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+    margin-bottom: var(--space-1);
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .view-switcher {
+      width: 100%;
+      justify-content: center;
+    }
+    .comp-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="card comparables-section">
+  <div class="section-header">
+    <div class="section-title">
+      <div class="section-title__icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </div>
+      <div class="section-title__text">
+        <h3>Comparable Sales</h3>
+        <p>{{ comparables|length }} similar properties found nearby</p>
+      </div>
+    </div>
+
+    <div class="view-switcher">
+      <button class="view-btn view-btn--active" data-view="list" onclick="switchView('list')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+        List
+      </button>
+      <button class="view-btn" data-view="grid" onclick="switchView('grid')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        Grid
+      </button>
+      <button class="view-btn" data-view="map" onclick="switchView('map')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+          <line x1="8" y1="2" x2="8" y2="18"></line>
+          <line x1="16" y1="6" x2="16" y2="22"></line>
+        </svg>
+        Map
+      </button>
+    </div>
+  </div>
+
+  <!-- List View -->
+  <div id="list-view" class="view-container view-container--active">
+    <div class="comp-list">
+      {% for comp in comparables %}
+        <div class="comp-card">
+          <div class="comp-card__header">
+            <div style="flex: 1;">
+              <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+              <div class="comp-card__meta">
+                <span>📍 {{ comp.distance_miles|floatformat:2 }} mi away</span>
+                <span>📅 Sold {{ comp.sale_date|date:"M Y" }}</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+              <div class="comp-card__price-label">Sale Price</div>
+            </div>
+          </div>
+
+          <div class="comp-stats">
+            <div>
+              <div class="comp-stat__value">{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</div>
+              <div class="comp-stat__label">Beds</div>
+            </div>
+            <div>
+              <div class="comp-stat__value">{{ comp.bathrooms|default:"—"|floatformat:"-1" }}</div>
+              <div class="comp-stat__label">Baths</div>
+            </div>
+            <div>
+              <div class="comp-stat__value">{{ comp.living_area|default:"—"|floatformat:0|intcomma }}</div>
+              <div class="comp-stat__label">Sq Ft</div>
+            </div>
+            <div>
+              <div class="comp-stat__value">{{ comp.year_built|default:"—" }}</div>
+              <div class="comp-stat__label">Built</div>
+            </div>
+            <div>
+              <div class="comp-stat__value">${{ comp.price_per_sqft|default:"—"|floatformat:0|intcomma }}</div>
+              <div class="comp-stat__label">$/Sq Ft</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Grid View -->
+  <div id="grid-view" class="view-container">
+    <div class="comp-grid">
+      {% for comp in comparables %}
+        <div class="comp-card">
+          <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+          <div class="comp-card__meta">
+            <span>{{ comp.distance_miles|floatformat:2 }} mi</span>
+            <span>{{ comp.sale_date|date:"M Y" }}</span>
+          </div>
+
+          <div style="text-align: center; margin: var(--space-4) 0;">
+            <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+            <div class="comp-card__price-label">Sale Price</div>
+          </div>
+
+          <div class="comp-stats">
+            <div>
+              <div class="comp-stat__value">{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</div>
+              <div class="comp-stat__label">Beds</div>
+            </div>
+            <div>
+              <div class="comp-stat__value">{{ comp.bathrooms|default:"—"|floatformat:"-1" }}</div>
+              <div class="comp-stat__label">Baths</div>
+            </div>
+            <div>
+              <div class="comp-stat__value">{{ comp.living_area|default:"—"|floatformat:0|intcomma }}</div>
+              <div class="comp-stat__label">Sq Ft</div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Map View -->
+  <div id="map-view" class="view-container">
+    <div class="map-container">
+      <div id="comparables-map"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let comparablesMap = null;
+  let markersGroup = null;
+
+  function switchView(view) {
+    // Update buttons
+    document.querySelectorAll('.view-btn').forEach(btn => {
+      btn.classList.toggle('view-btn--active', btn.dataset.view === view);
+    });
+
+    // Show/hide views
+    document.querySelectorAll('.view-container').forEach(container => {
+      container.classList.remove('view-container--active');
+    });
+
+    const targetView = document.getElementById(view + '-view');
+    if (targetView) {
+      targetView.classList.add('view-container--active');
+    }
+
+    // Initialize map if needed
+    if (view === 'map' && !comparablesMap) {
+      setTimeout(initComparablesMap, 100);
+    } else if (view === 'map' && comparablesMap) {
+      setTimeout(() => comparablesMap.invalidateSize(), 100);
+    }
+  }
+
+  function initComparablesMap() {
+    const mapEl = document.getElementById('comparables-map');
+    if (!mapEl || comparablesMap) return;
+
+    // Initialize map
+    comparablesMap = L.map('comparables-map').setView([48.5, -122.5], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(comparablesMap);
+
+    markersGroup = L.featureGroup().addTo(comparablesMap);
+
+    // Add subject property marker (red)
+    {% if subject.latitude and subject.longitude %}
+      const subjectMarker = L.marker([{{ subject.latitude }}, {{ subject.longitude }}], {
+        icon: L.divIcon({
+          className: 'subject-marker',
+          html: '<div style="background: #ef4444; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        })
+      }).addTo(markersGroup);
+
+      subjectMarker.bindPopup('<div class="popup-content"><strong>Your Property</strong><div>{{ subject.address|default:"" }}</div></div>');
+    {% endif %}
+
+    // Add comparable markers (dusty grape color)
+    const comparables = [
+      {% for comp in comparables %}
+        {% if comp.latitude and comp.longitude %}
+          {
+            lat: {{ comp.latitude }},
+            lon: {{ comp.longitude }},
+            address: "{{ comp.address|default:""|escapejs }}",
+            price: "{{ comp.sale_price|floatformat:0|intcomma }}",
+            date: "{{ comp.sale_date|date:"M j, Y" }}",
+            distance: "{{ comp.distance_miles|floatformat:2 }}",
+            beds: "{{ comp.bedrooms|default:"—"|floatformat:"-1" }}",
+            baths: "{{ comp.bathrooms|default:"—"|floatformat:"-1" }}",
+            sqft: "{{ comp.living_area|default:"—"|floatformat:0|intcomma }}"
+          },
+        {% endif %}
+      {% endfor %}
+    ];
+
+    comparables.forEach((comp, index) => {
+      const marker = L.marker([comp.lat, comp.lon], {
+        icon: L.divIcon({
+          className: 'comp-marker',
+          html: '<div style="background: #6c698d; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        })
+      }).addTo(markersGroup);
+
+      marker.bindPopup(`
+        <div class="popup-content">
+          <strong>${comp.address}</strong>
+          <div>Sale: $${comp.price}</div>
+          <div>Date: ${comp.date}</div>
+          <div>Distance: ${comp.distance} mi</div>
+          <div>${comp.beds} beds, ${comp.baths} baths</div>
+          <div>${comp.sqft} sq ft</div>
+        </div>
+      `);
+    });
+
+    // Fit bounds to show all markers
+    if (markersGroup.getBounds().isValid()) {
+      comparablesMap.fitBounds(markersGroup.getBounds(), { padding: [50, 50] });
+    }
+
+    setTimeout(() => comparablesMap.invalidateSize(), 100);
+  }
+
+  // Auto-initialize animations
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof anime !== 'undefined') {
+      anime({
+        targets: '.comp-card',
+        translateX: [20, 0],
+        opacity: [0, 1],
+        delay: anime.stagger(100),
+        duration: 400,
+        easing: 'easeOutQuad'
+      });
+    }
+  });
+</script>
