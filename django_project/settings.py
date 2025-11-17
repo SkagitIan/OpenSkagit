@@ -45,7 +45,7 @@ def ip_addresses():
 
     return ip_list or ["127.0.0.1", "::1"]
 
-ALLOWED_HOSTS = ip_addresses()
+ALLOWED_HOSTS = list(dict.fromkeys(ip_addresses() + ["localhost", "127.0.0.1", "testserver"]))
 
 
 # Application definition
@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "django.contrib.gis",
     "leaflet",
     'django.contrib.humanize',
+    'agent',
 ]
 
 LEAFLET_CONFIG = {
@@ -122,7 +123,7 @@ ROOT_URLCONF = 'django_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

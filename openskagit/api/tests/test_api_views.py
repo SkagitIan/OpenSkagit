@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Iterable, List, Optional, Sequence, Tuple
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from openskagit import cma
 from openskagit.api import views
 
 
@@ -460,3 +462,204 @@ class NearbyParcelsViewTests(BaseAPITestCase):
     def test_nearby_requires_coordinates(self):
         response = self.client.get(reverse("parcel-nearby"), {"lon": "-122.0"})
         self.assertEqual(response.status_code, 400)
+
+
+class AppealParcelSearchViewTests(BaseAPITestCase):
+    @patch("openskagit.api.views.appeals.current_assessment_year", return_value=2024)
+    @patch("openskagit.api.views.AppealParcelSearchView._base_queryset")
+    def test_address_search_returns_results(self, mock_queryset, _mock_year):
+        class DummyQuery(list):
+            def filter(self, *args, **kwargs):  # pragma: no cover - trivial passthrough
+                return self
+
+            def exclude(self, *args, **kwargs):  # pragma: no cover - trivial passthrough
+                return self
+
+            def order_by(self, *args, **kwargs):  # pragma: no cover - trivial passthrough
+                return self
+
+        record = SimpleNamespace(
+            parcel_number="P12345",
+            address="123 Main St",
+            city_district="Central",
+            assessed_value=350000,
+            sale_price=325000,
+            sale_date=date(2023, 5, 1),
+            bedrooms=3,
+            bathrooms=2,
+            living_area=1800,
+            acres=0.25,
+            roll=SimpleNamespace(year=2024),
+        )
+        mock_queryset.return_value = DummyQuery([record])
+
+        response = self.client.get(reverse("appeal-search"), {"q": "123 Main"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["query_too_short"])
+        self.assertEqual(payload["result_count"], 1)
+        record_payload = payload["results"][0]
+        self.assertEqual(record_payload["parcel_number"], "P12345")
+        self.assertEqual(record_payload["assessment_year"], 2024)
+        self.assertEqual(record_payload["city_district"], "Central")
+
+    @patch("openskagit.api.views.AppealParcelSearchView._base_queryset")
+    def test_short_query_is_rejected(self, mock_queryset):
+        response = self.client.get(reverse("appeal-search"), {"q": "ab"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["query_too_short"])
+        self.assertEqual(payload["result_count"], 0)
+        mock_queryset.assert_not_called()
+
+
+class AppealSubjectViewTests(BaseAPITestCase):
+    @patch("openskagit.api.views.appeals.get_subject_neighborhood_snapshot")
+    @patch("openskagit.api.views.appeals.load_subject_with_roll_context")
+    def test_returns_subject_snapshot(self, mock_load_subject, mock_neighborhood):
+        snapshot = cma.PropertySnapshot(
+            parcel_number="P100",
+            address="100 River Rd",
+            sale_price=None,
+            sale_date=None,
+            property_type="R",
+            living_area=Decimal("1800"),
+            bedrooms=Decimal("3"),
+            bathrooms=Decimal("2"),
+            year_built=1990,
+            effective_year_built=1995,
+            garage_sqft=None,
+            acres=Decimal("0.30"),
+            assessed_value=Decimal("425000"),
+            geom=None,
+            metadata={
+                "assessment_roll_year": 2024,
+                "assessed_value": 425000,
+                "assessor": {
+                    "prior_assessment_year": 2023,
+                    "prior_assessed_value": 390000,
+                },
+                "assessed_change_pct": 9.0,
+            },
+        )
+        mock_load_subject.return_value = (snapshot, 2024)
+        mock_neighborhood.return_value = {"code": "20ASKY", "cod": 12.5}
+
+        response = self.client.get(reverse("appeal-subject", kwargs={"parcel_number": "P100"}))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["subject"]["parcel_number"], "P100")
+        self.assertEqual(payload["assessment"]["roll_year"], 2024)
+        self.assertEqual(payload["assessment"]["prior_roll_year"], 2023)
+        self.assertIn("neighborhood", payload)
+        mock_load_subject.assert_called_once_with("P100")
+
+
+class AppealComparablesViewTests(BaseAPITestCase):
+    @patch("openskagit.api.views.appeals.citizen_assessment_summary")
+    @patch("openskagit.api.views.appeals._comparable_candidates")
+    @patch("openskagit.api.views.appeals.load_subject_with_roll_context")
+    def test_returns_comparables_payload(self, mock_load_subject, mock_candidates, mock_summary):
+        subject = cma.PropertySnapshot(
+            parcel_number="P200",
+            address="200 Mountain Dr",
+            sale_price=None,
+            sale_date=None,
+            property_type="R",
+            living_area=Decimal("2200"),
+            bedrooms=Decimal("4"),
+            bathrooms=Decimal("3"),
+            year_built=2005,
+            effective_year_built=2006,
+            garage_sqft=None,
+            acres=Decimal("0.45"),
+            assessed_value=Decimal("550000"),
+            geom=None,
+            metadata={"assessed_change_pct": 8.0},
+        )
+        mock_load_subject.return_value = (subject, 2024)
+
+        comp_snapshot = cma.PropertySnapshot(
+            parcel_number="P300",
+            address="300 Mountain Dr",
+            sale_price=None,
+            sale_date=None,
+            property_type="R",
+            living_area=Decimal("2100"),
+            bedrooms=Decimal("3"),
+            bathrooms=Decimal("2.5"),
+            year_built=2004,
+            effective_year_built=2004,
+            garage_sqft=None,
+            acres=Decimal("0.40"),
+            assessed_value=Decimal("520000"),
+            geom=None,
+            metadata={"roll_year": 2024, "roll_id": 1},
+        )
+        comparable = cma.ComparableResult(
+            snapshot=comp_snapshot,
+            sale_price=Decimal("600000"),
+            assessed_value=Decimal("520000"),
+            sale_date=date(2023, 7, 1),
+            distance_meters=500,
+            distance_miles=Decimal("0.3"),
+            difference_flags={},
+            inclusion_rank=1,
+        )
+        mock_candidates.return_value = ([comparable], 3218)
+        mock_summary.return_value = {
+            "comparables": [comparable],
+            "over_assessment_pct": 12.0,
+            "comp_count": 1,
+            "neighborhood": {"avg_increase_pct": 5.0},
+            "score": 70,
+            "rating": "Strong",
+            "reasons": ["Assessed value ~7–12% above comps."],
+            "neigh_diff_pct": None,
+        }
+
+        response = self.client.get(reverse("appeal-comparables", kwargs={"parcel_number": "P200"}))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["score"], 70)
+        self.assertEqual(len(payload["comparables"]), 1)
+        self.assertTrue(payload["soft_stop"])
+        self.assertIn("comparables", payload)
+        mock_candidates.assert_called_once()
+
+
+class AppealComparableImprovementsViewTests(BaseAPITestCase):
+    @patch("openskagit.api.views.cma.get_improvement_rollup")
+    def test_returns_improvement_rollup(self, mock_rollup):
+        mock_rollup.return_value = [
+            {"description": "Residence", "improvement_value": 400000},
+        ]
+
+        url = reverse(
+            "appeal-comparable-improvements",
+            kwargs={"parcel_number": "P200", "comp_parcel": "P300"},
+        )
+        response = self.client.get(url, {"roll_year": "2024", "roll_id": "5"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["parcel_number"], "P300")
+        self.assertEqual(payload["improvements"][0]["description"], "Residence")
+        mock_rollup.assert_called_once()
+
+
+class NeighborhoodStatsViewTests(BaseAPITestCase):
+    @patch("openskagit.api.views.get_neighborhood_snapshot")
+    def test_returns_snapshot_payload(self, mock_snapshot):
+        mock_snapshot.return_value = {"code": "20ASKY", "cod": 12.3}
+
+        response = self.client.get(reverse("neighborhood-stats", kwargs={"neighborhood_code": "20ASKY"}))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["code"], "20ASKY")
+        self.assertAlmostEqual(payload["cod"], 12.3)
+        mock_snapshot.assert_called_once()

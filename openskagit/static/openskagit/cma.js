@@ -71,8 +71,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (marker.parcel_number) {
         popupLines.push(`Parcel ${marker.parcel_number}`);
       }
-      if (marker.type !== "subject" && marker.adjusted_price) {
-        popupLines.push(`Adj. Price $${Number(marker.adjusted_price).toLocaleString()}`);
+      if (marker.type !== "subject" && marker.sale_price) {
+        popupLines.push(`Sale $${Number(marker.sale_price).toLocaleString()}`);
+      }
+      if (marker.type !== "subject" && marker.assessed_value) {
+        popupLines.push(`Assessed $${Number(marker.assessed_value).toLocaleString()}`);
       }
       leafletMarker.bindPopup(popupLines.join("<br>"));
       markerLayer.addLayer(leafletMarker);

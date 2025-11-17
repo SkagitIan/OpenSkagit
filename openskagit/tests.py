@@ -6,46 +6,18 @@ os.environ.setdefault("USE_SQLITE_FOR_TESTS", "1")
 from django.test import RequestFactory, TestCase
 
 from . import cma
-from .views import (
-    CMA_SESSION_KEY,
-    _manual_adjustments_from_state,
-    _merge_request_params,
-    _store_manual_adjustment,
-)
+from .views import _merge_request_params
 
 
 class CmaHelperTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
 
-    def _request_with_session(self, method="get"):
-        request = getattr(self.factory, method)("/")
-        # lazily create session store
-        request.session = self.client.session
-        return request
-
-    def test_store_and_parse_manual_adjustment(self):
-        request = self._request_with_session("post")
-        _store_manual_adjustment(request, "P123", "P999", "condition", Decimal("5000"))
-        parcel_state = request.session.get(CMA_SESSION_KEY, {}).get("P123")
-        self.assertIsNotNone(parcel_state)
-        manual = _manual_adjustments_from_state(parcel_state)
-        self.assertIn("P999", manual)
-        self.assertEqual(manual["P999"]["condition"], Decimal("5000"))
-
-    def test_manual_adjustment_removal(self):
-        request = self._request_with_session("post")
-        _store_manual_adjustment(request, "P123", "P999", "view", Decimal("2500"))
-        _store_manual_adjustment(request, "P123", "P999", "view", None)
-        parcel_state = request.session.get(CMA_SESSION_KEY, {}).get("P123")
-        manual = _manual_adjustments_from_state(parcel_state)
-        self.assertNotIn("P999", manual)
-
     def test_merge_params_prioritizes_post(self):
-        request = self.factory.post("/?limit=10", {"limit": "12", "sort_field": "gpa"})
+        request = self.factory.post("/?limit=10", {"limit": "12", "sort_field": "distance"})
         merged = _merge_request_params(request)
         self.assertEqual(merged["limit"], "12")
-        self.assertEqual(merged["sort_field"], "gpa")
+        self.assertEqual(merged["sort_field"], "distance")
 
 
 class CmaFilterTests(TestCase):

@@ -23,9 +23,6 @@
         {% if comparable.sale_date %}
             <p class="text-xs text-slate-500 mt-1">Sold {{ comparable.sale_date|date:"M j, Y" }}</p>
         {% endif %}
-        <span class="mt-2 inline-flex items-center gap-1 text-xs text-slate-400 bg-slate-800/60 border border-slate-700 px-2 py-1 rounded-lg">
-            GPA {{ comparable.gross_percentage_adjustment }}%
-        </span>
         <div
             class="mt-2 text-[11px] text-slate-400"
             hx-get="{% url 'cma-comparable-improvements' parcel_number comparable.snapshot.parcel_number %}?roll_id={{ comparable.snapshot.metadata.roll_id|default_if_none:'' }}&roll_year={{ comparable.snapshot.metadata.roll_year|default_if_none:'' }}{% if comparable.snapshot.metadata.assessor_building_style %}&assessor_style={{ comparable.snapshot.metadata.assessor_building_style|urlencode }}{% endif %}"
@@ -38,7 +35,14 @@
     </td>
     <td class="px-4 py-4 align-top">
         <p class="text-sm font-semibold text-white">${{ comparable.sale_price|floatformat:0|intcomma }}</p>
-        <p class="text-xs text-slate-500">Gross adj: ${{ comparable.gross_adjustment_total|floatformat:0|intcomma }}</p>
+        <p class="text-xs text-slate-500">
+            Assessed:
+            {% if comparable.assessed_value %}
+                ${{ comparable.assessed_value|floatformat:0|intcomma }}
+            {% else %}
+                —
+            {% endif %}
+        </p>
     </td>
     <td class="px-4 py-4 align-top">
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
@@ -93,81 +97,16 @@
         </div>
     </td>
     <td class="px-4 py-4 align-top">
-        <ul class="space-y-1 text-xs">
-            {% for adj in comparable.auto_adjustments %}
-                <li class="flex items-center justify-between gap-4">
-                    <span class="text-slate-400">{{ adj.label }}</span>
-                    <span class="{% if adj.amount > 0 %}text-emerald-300{% elif adj.amount < 0 %}text-rose-300{% else %}text-slate-300{% endif %}">
-                        {% if adj.amount > 0 %}+{% endif %}${{ adj.amount|floatformat:0|intcomma }}
-                    </span>
-                </li>
-            {% empty %}
-                <li class="text-slate-500">No automated adjustments</li>
-            {% endfor %}
-            {% for key, value in comparable.manual_adjustments.items %}
-                <li class="flex items-center justify-between gap-4">
-                    <span class="text-slate-300 capitalize">{{ key }} input</span>
-                    <span class="{% if value > 0 %}text-emerald-300{% elif value < 0 %}text-rose-300{% else %}text-slate-300{% endif %}">
-                        {% if value > 0 %}+{% endif %}${{ value|floatformat:0|intcomma }}
-                    </span>
-                </li>
-            {% endfor %}
-        </ul>
-    </td>
-    <td class="px-4 py-4 align-top">
-        <div class="space-y-3">
-            <div>
-                <label class="text-xs uppercase tracking-wide text-slate-500">Condition Adj ($)</label>
-                <input
-                    type="number"
-                    name="value"
-                    step="100"
-                    value="{{ comparable.manual_adjustments.condition|default_if_none:'' }}"
-                    class="w-full mt-1 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
-                    hx-post="{% url 'cma-manual-adjustment' parcel_number comparable.snapshot.parcel_number %}"
-                    hx-trigger="change delay:300ms"
-                    hx-include="#cma-filter-form"
-                    hx-vals='{"field": "condition"}'
-                    hx-target="closest tr"
-                    hx-swap="outerHTML"
-                >
-            </div>
-            <div>
-                <label class="text-xs uppercase tracking-wide text-slate-500">View Adj ($)</label>
-                <input
-                    type="number"
-                    name="value"
-                    step="100"
-                    value="{{ comparable.manual_adjustments.view|default_if_none:'' }}"
-                    class="w-full mt-1 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
-                    hx-post="{% url 'cma-manual-adjustment' parcel_number comparable.snapshot.parcel_number %}"
-                    hx-trigger="change delay:300ms"
-                    hx-include="#cma-filter-form"
-                    hx-vals='{"field": "view"}'
-                    hx-target="closest tr"
-                    hx-swap="outerHTML"
-                >
-            </div>
-            <div>
-                <label class="text-xs uppercase tracking-wide text-slate-500">Other Adj ($)</label>
-                <input
-                    type="number"
-                    name="value"
-                    step="100"
-                    value="{{ comparable.manual_adjustments.other|default_if_none:'' }}"
-                    class="w-full mt-1 bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-sm"
-                    hx-post="{% url 'cma-manual-adjustment' parcel_number comparable.snapshot.parcel_number %}"
-                    hx-trigger="change delay:300ms"
-                    hx-include="#cma-filter-form"
-                    hx-vals='{"field": "other"}'
-                    hx-target="closest tr"
-                    hx-swap="outerHTML"
-                >
-            </div>
-        </div>
-    </td>
-    <td class="px-4 py-4 align-top">
-        <p class="text-lg font-semibold text-white">${{ comparable.adjusted_price|floatformat:0|intcomma }}</p>
-        <p class="text-xs text-slate-500">Difference vs. sale: ${{ (comparable.adjusted_price - comparable.sale_price)|floatformat:0|intcomma }}</p>
+        <p class="text-sm font-semibold text-white">Comparable insight</p>
+        <p class="mt-2 text-xs text-slate-400">
+            Sold {{ comparable.sale_date|date:"M j, Y" }} for {{ comparable.sale_price|floatformat:0|intcomma }}.
+            {% if comparable.assessed_value %}
+                County assessed at {{ comparable.assessed_value|floatformat:0|intcomma }}
+                (Δ ${{ (comparable.sale_price - comparable.assessed_value)|floatformat:0|intcomma }}).
+            {% endif %}
+            {% if comparable.distance_miles %}
+                Located {{ comparable.distance_miles }} miles from the subject.
+            {% endif %}
+        </p>
     </td>
 </tr>

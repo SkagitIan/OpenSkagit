@@ -34,11 +34,6 @@ urlpatterns = [
     path("cma/parcel-search/", openskagit_views.cma_parcel_search, name="cma-parcel-search"),
     path("cma/comparison/<str:parcel_number>/", openskagit_views.cma_comparison_grid, name="cma-comparison-grid"),
     path(
-        "cma/adjustment/<str:parcel_number>/<str:comp_parcel>/",
-        openskagit_views.cma_manual_adjustment,
-        name="cma-manual-adjustment",
-    ),
-    path(
         "cma/improvements/<str:parcel_number>/<str:comp_parcel>/",
         openskagit_views.cma_comparable_improvements,
         name="cma-comparable-improvements",
@@ -55,7 +50,13 @@ urlpatterns = [
     path("api/", include("openskagit.api.urls")),
     path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
     # Citizen Appeal Helper
+    path("appeal/new/", openskagit_views.appeal_new, name="appeal-new"),
     path("appeal/", openskagit_views.appeal_home, name="appeal-home"),
     path("appeal/parcel-search/", openskagit_views.appeal_parcel_search, name="appeal-parcel-search"),
     path("appeal/result/<str:parcel_number>/", openskagit_views.appeal_result, name="appeal-result"),
+    path(
+        "appeal/result/<str:parcel_number>/comparables/",
+        openskagit_views.appeal_result_comparables,
+        name="appeal-result-comparables",
+    ),
 ]

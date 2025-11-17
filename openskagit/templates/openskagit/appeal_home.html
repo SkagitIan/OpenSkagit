@@ -1,69 +1,50 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Skagit Appeal Helper</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-</head>
-<body class="bg-white text-slate-900">
-  <main class="max-w-3xl mx-auto px-4 py-10 space-y-8">
-    <header class="space-y-2">
-      <h1 class="text-3xl font-bold tracking-tight">Property Tax Appeal Helper</h1>
-      <p class="text-lg text-slate-600">Simple check to see if an appeal is worth your time. No jargon.</p>
-    </header>
+{% extends "openskagit/appeal_base.html" %}
 
-    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-      <label for="appeal-search" class="block text-sm font-semibold text-slate-700">Step 1 — Enter your address or parcel</label>
-      <div class="mt-2 space-y-3">
-        <input id="appeal-search"
-               name="q"
-               type="text"
-               placeholder="e.g., 101 Main St or P12345"
-               class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg placeholder:text-slate-400 focus:border-slate-500 focus:outline-none"
-               hx-get="{% url 'appeal-parcel-search' %}"
-               hx-target="#appeal-results"
-               hx-trigger="keyup changed delay:500ms"
-               hx-indicator="#appeal-search-indicator"
-               hx-on::beforeRequest="const minLen=parseInt(this.dataset.minLength,10);if(this.value.trim().length<minLen){event.detail.shouldCancel=true;}"
-               hx-on::keyup="
-                  const minLen=parseInt(this.dataset.minLength,10);
-                  const target=document.getElementById('appeal-results');
-                  if(this.value.trim().length<minLen){
-                      target.innerHTML=`<div class=&quot;text-sm text-slate-500&quot;>Enter at least ${minLen} characters to search…</div>`;
-                  }
-               "
-               data-min-length="3"
-               autocomplete="off">
-        <div id="appeal-search-indicator" class="flex items-center gap-2 text-sm text-slate-500 htmx-indicator" style="display: none;">
-          <svg class="h-4 w-4 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-          </svg>
-          <span>Searching properties…</span>
-        </div>
-        <div id="appeal-selection-display" class="hidden rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600"></div>
-      </div>
-      <div id="appeal-results" class="mt-3"></div>
-    </section>
+{% block page_title %}Step 1 — Address Entry{% endblock %}
+{% block header_teaser %}
+Simple, guided entry with a warm tone. Enter your address or parcel and we’ll guide the rest.
+{% endblock %}
 
-    <section class="space-y-3">
-      <div id="appeal-detail-indicator" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm htmx-indicator" style="display: none;">
-        <svg class="h-4 w-4 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+{% block content %}
+  <section class="card">
+    <div class="step-header">
+      <span class="icon">📍</span>
+      Step 1 — Address Entry
+    </div>
+    <div class="search-column" style="margin-top: 16px;">
+      <input id="appeal-search"
+             name="q"
+             type="text"
+             placeholder="e.g., 101 Main St or P12345"
+             hx-get="{% url 'appeal-parcel-search' %}"
+             hx-target="#appeal-results"
+             hx-trigger="keyup changed delay:500ms"
+             hx-indicator="#appeal-search-indicator"
+             hx-on::beforeRequest="const minLen=parseInt(this.dataset.minLength,10);if(this.value.trim().length<minLen){event.detail.shouldCancel=true;}"
+             hx-on::keyup="
+                const minLen=parseInt(this.dataset.minLength,10);
+                const target=document.getElementById('appeal-results');
+                if(this.value.trim().length<minLen){
+                    target.innerHTML=`<p style=&quot;color:#475569;font-size:0.95rem;&quot;>Enter at least ${minLen} characters to search…</p>`;
+                }
+             "
+             data-min-length="3"
+             autocomplete="off">
+    <button class="address-button" type="button">Continue to Assessment Review →</button>
+      <div class="indicator" id="appeal-search-indicator" style="display:none;">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" opacity="0.25" />
+          <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
         </svg>
-        <span>Loading your appeal snapshot…</span>
+        Searching properties…
       </div>
-      <section id="appeal-detail" class="space-y-6"></section>
-    </section>
+    </div>
+    <div id="appeal-selection-display" class="selection-display hidden"></div>
+    <div id="appeal-results" class="search-results"></div>
+  </section>
+{% endblock %}
 
-    <footer class="text-sm text-slate-500">
-      <p>Tip: An increasing assessment alone does not mean higher taxes. What matters is whether you rose more than similar homes nearby.</p>
-    </footer>
-  </main>
+{% block extra_js %}
   <script>
     window.appealSearchSelect = function (event) {
       const input = document.getElementById("appeal-search");
@@ -78,15 +59,14 @@
       const details = button.dataset.details || "";
       input.classList.add("hidden");
       display.innerHTML = `
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-base font-semibold text-slate-900">${address}</p>
-            <p class="text-xs text-slate-500">Parcel ${parcel}</p>
-            ${details ? `<p class="text-xs text-slate-500 mt-1">${details}</p>` : ""}
+        <div class="home-card">
+          <div class="home-card-info">
+            <p class="home-card-title">This is your home!</p>
+            <p class="home-card-address">${address}</p>
+            <p class="home-card-parcel">Parcel ${parcel}</p>
+            ${details ? `<p class="home-card-details">${details}</p>` : ""}
           </div>
-          <button type="button"
-                  class="text-xs font-semibold text-slate-600 hover:text-slate-800"
-                  onclick="window.appealSearchReset()">Change</button>
+          <button class="home-card-change" type="button" onclick="window.appealSearchReset()">Change</button>
         </div>`;
       display.classList.remove("hidden");
       results.innerHTML = "";
@@ -97,20 +77,16 @@
       const input = document.getElementById("appeal-search");
       const display = document.getElementById("appeal-selection-display");
       const results = document.getElementById("appeal-results");
-      const detail = document.getElementById("appeal-detail");
       if (!input || !display || !results) {
         return;
       }
       display.classList.add("hidden");
       display.textContent = "";
-      input.classList.remove("hidden");
-      input.value = "";
-      results.innerHTML = `<div class="text-sm text-slate-500">Start typing to find your home…</div>`;
-      if (detail) {
-        detail.innerHTML = "";
-      }
-      window.setTimeout(() => input.focus(), 0);
+    input.classList.remove("hidden");
+    input.value = "";
+    results.innerHTML = "";
+    window.setTimeout(() => input.focus(), 0);
     };
+    document.getElementById("appeal-search")?.focus();
   </script>
-</body>
-</html>
+{% endblock %}

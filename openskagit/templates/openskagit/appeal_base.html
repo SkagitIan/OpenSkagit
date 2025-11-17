@@ -1,0 +1,512 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block page_title %}Property Tax Appeal Helper{% endblock %}</title>
+  <style>
+    :root {
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      color: #0f172a;
+      background-color: #f5f7fb;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg,#eef1fb 0%,#f7f8ff 70%,#ffffff 100%);
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    header h1 {
+      font-size: 2rem;
+      margin-bottom: 6px;
+      letter-spacing: 0.03em;
+    }
+    header p {
+      margin: 0 auto;
+      max-width: 600px;
+      color: #42516b;
+      font-size: 1rem;
+    }
+    .progress {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 34px;
+    }
+    .progress button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      background: #dfe4ff;
+      color: #4b56c2;
+      cursor: default;
+    }
+    .progress button.active {
+      background: linear-gradient(135deg,#5c61e5,#6e8dff);
+      color: #fff;
+      box-shadow: 0 10px 28px rgba(92,97,229,.25);
+    }
+    .card {
+      background: #fff;
+      border-radius: 24px;
+      padding: 28px;
+      margin-bottom: 32px;
+      border: 1px solid rgba(99,102,241,.15);
+      box-shadow: 0 25px 80px rgba(15,23,42,.08);
+    }
+    .step-header {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+      color: #4b5563;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: rgba(59,130,246,.18);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+    .search-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    input[type="text"] {
+      border-radius: 16px;
+      border: 1px solid #d1d5db;
+      padding: 14px 16px;
+      font-size: 1rem;
+      transition: border 0.2s ease, box-shadow 0.2s ease;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,.2);
+    }
+    .helper-note {
+      border-radius: 12px;
+      background: #f1f5ff;
+      padding: 12px 14px;
+      color: #475569;
+      font-size: 0.9rem;
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .address-button,
+    .cta-button {
+      border: none;
+      border-radius: 16px;
+      padding: 14px 20px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: transform 0.15s ease;
+    }
+    .address-button {
+      background: linear-gradient(135deg,#5c61e5,#6e8dff);
+      color: #fff;
+      box-shadow: 0 15px 32px rgba(92,97,229,.3);
+    }
+    .address-button:active,
+    .cta-button:active {
+      transform: translateY(1px);
+    }
+    .selection-display {
+      border-radius: 16px;
+      border: 1px solid #d1d5db;
+      padding: 14px 16px;
+      background: #fdfdfd;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #475569;
+      font-size: 0.95rem;
+    }
+    .selection-display.hidden {
+      display: none !important;
+    }
+    .search-results {
+      margin-top: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(99,102,241,0.2);
+      background: #fff;
+      box-shadow: 0 15px 35px rgba(15,23,42,0.08);
+      padding: 18px;
+      min-height: 96px;
+    }
+    .home-card {
+      background: linear-gradient(120deg,#ffffff,#f6f6ff);
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: 22px;
+      box-shadow: 0 18px 40px rgba(15,23,42,.12);
+      padding: 18px 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      gap: 16px;
+      min-height: 96px;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .home-card:hover,
+    .home-card:focus-visible {
+      border-color: rgba(79,70,229,0.5);
+      box-shadow: 0 22px 50px rgba(79,70,229,0.18);
+      transform: translateY(-3px);
+    }
+    .home-card:focus-visible {
+      outline: 3px solid rgba(79,70,229,0.35);
+      outline-offset: 3px;
+    }
+    .home-card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .home-card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 0;
+      color: #111827;
+    }
+    .home-card-address {
+      font-weight: 500;
+      color: #1e293b;
+      letter-spacing: 0.01em;
+    }
+    .home-card-parcel {
+      color: #475569;
+      font-size: 0.9rem;
+    }
+    .home-card-details {
+      color: #475569;
+      font-size: 0.85rem;
+    }
+    .home-card-cta {
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .home-card-cta-note {
+      font-size: 0.75rem;
+      color: #64748b;
+      letter-spacing: 0.02em;
+    }
+    .home-card-focus {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: #4338ca;
+      letter-spacing: 0.04em;
+      font-size: 0.85rem;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(99,102,241,0.12);
+    }
+    .home-card-change {
+      border: none;
+      background: #fff;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-weight: 600;
+      color: #2563eb;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(37,99,235,.25);
+    }
+    .summary-banner {
+      border-radius: 18px;
+      padding: 16px 20px;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+    .detail-card {
+      border-radius: 18px;
+      border: 1px solid rgba(99,102,241,.25);
+      background: linear-gradient(180deg,#eef2ff,#fff);
+      padding: 20px;
+    }
+    .detail-card strong {
+      font-size: 1.6rem;
+      color: #111827;
+      display: block;
+    }
+    .detail-card span {
+      color: #475569;
+      margin-top: 4px;
+      display: block;
+    }
+    .property-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit,minmax(140px,1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .property-grid div {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+    }
+    .property-grid div strong {
+      display: block;
+      font-size: 1.2rem;
+      color: #111827;
+    }
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      margin-bottom: 10px;
+    }
+    .metric-row strong {
+      font-size: 1rem;
+      color: #374151;
+    }
+    .metric-caption {
+      color: #6b7280;
+      font-size: 0.85rem;
+      margin: 0;
+    }
+    .metric-value {
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+    .metric-positive .metric-value {
+      color: #047857;
+    }
+    .metric-warning .metric-value {
+      color: #c2410c;
+    }
+    .section-cta {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+    .secondary-button {
+      border-radius: 16px;
+      border: 1px solid #cbd5f5;
+      background: #fff;
+      padding: 12px 20px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #1d4ed8;
+    }
+    .outline-button {
+      border-radius: 16px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      padding: 10px 18px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .comparables-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .comparable {
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      padding: 14px 16px;
+      background: #fff;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .comparable h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: #111827;
+    }
+    .comparable small {
+      color: #6b7280;
+      font-size: 0.9rem;
+    }
+    .comparable-price {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #1d4ed8;
+      text-align: right;
+    }
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .tag {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: #e0e7ff;
+      color: #3730a3;
+    }
+    .bottom-cta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .score-meter {
+      position: relative;
+      width: 100%;
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .score-fill {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg,#4f46e5,#1d4ed8);
+      border-radius: 999px;
+    }
+    .score-label {
+      font-size: 0.9rem;
+      color: #475569;
+      margin-top: 8px;
+    }
+    .info-list {
+      list-style: disc;
+      margin: 12px 0 0;
+      padding-left: 20px;
+      color: #475569;
+    }
+    .info-list li {
+      margin-bottom: 6px;
+    }
+    .link-button {
+      border: none;
+      background: none;
+      padding: 0;
+      color: #2563eb;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .bottom-cta button {
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      padding: 14px 28px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 20px 35px rgba(79,70,229,.35);
+    }
+    .indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      color: #475569;
+    }
+    .indicator svg {
+      width: 16px;
+      height: 16px;
+      animation: spin 0.7s linear infinite;
+    }
+    .hidden {
+      display: none !important;
+    }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    @media (max-width: 768px) {
+      .progress {
+        grid-template-columns: 1fr;
+      }
+      .comparable {
+        grid-template-columns: 1fr;
+        text-align: left;
+      }
+      .section-cta,
+      .bottom-cta {
+        justify-content: center;
+      flex-direction: column;
+    }
+    .alert-card {
+      border-radius: 18px;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      background: #fef2f2;
+      padding: 20px;
+      color: #991b1b;
+    }
+    .info-card {
+      border-radius: 18px;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      background: #ecfccb;
+      padding: 20px;
+      color: #166534;
+    }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>{% block header_title %}Property Tax Appeal Helper{% endblock %}</h1>
+      <p>{% block header_teaser %}Simple steps to decide whether an appeal is worth your time—guided, friendly, and data-backed.{% endblock %}</p>
+    </header>
+    <div class="progress">
+      <button class="{% if step == 1 %}active{% endif %}">1. Your Address</button>
+      <button class="{% if step == 2 %}active{% endif %}">2. Neighborhood Snapshot</button>
+      <button class="{% if step == 3 %}active{% endif %}">3. Comparable Sales</button>
+    </div>
+    {% block content %}{% endblock %}
+  </main>
+  {% block extra_js %}{% endblock %}
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</body>
+</html>

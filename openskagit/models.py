@@ -10,6 +10,7 @@ import uuid
 from django.conf import settings
 from django.contrib.gis.db import models
 from pgvector.django import VectorField
+from django.contrib.gis.db import models as gis_models
 
 class NeighborhoodMetrics(models.Model):
     neighborhood_code = models.CharField(max_length=20, db_index=True)
@@ -129,7 +130,7 @@ class Assessor(models.Model):
     longitude = models.FloatField(blank=True, null=True)
     geom = models.PointField(srid=4326, blank=True, null=True)
     embedding = VectorField(dimensions=384, blank=True, null=True)
-
+    centroid_geog = gis_models.PointField(geography=True, srid=4326, null=True, blank=True)
     class Meta:
         managed = True
         db_table = 'assessor'

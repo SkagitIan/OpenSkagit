@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import functools
+import operator
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from functools import lru_cache
@@ -8,6 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from django.conf import settings
 from django.db import connection
+from django.db.models import Q
 from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import APIException, ValidationError
@@ -17,6 +21,8 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 from openskagit import cma, appeals
+from openskagit.models import Assessor
+from openskagit.neighborhood import get_neighborhood_snapshot
 
 
 def _dictfetchall(cursor) -> List[Dict[str, Any]]:
@@ -72,48 +78,25 @@ class NeighborhoodStatsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, neighborhood_code: str):
-        """
-        Mock neighborhood comparison stats endpoint.
+        """Return the latest snapshot for a neighborhood code."""
 
-        GET /api/neighborhood_stats/{neighborhood_code}/
-
-        Returns JSON with keys:
-          - neighborhood_name, percent_change, cod, valid_sales, reliability
-
-        This is a placeholder. Replace the mock block with a real query or
-        analytics once neighborhood datasets are available.
-        """
         code = (neighborhood_code or "").strip()
         if not code:
             raise ValidationError({"neighborhood_code": "Required"})
 
-        mock_map = {
-            "NBH-001": {
-                "neighborhood_name": "Downtown Core",
-                "percent_change": 3.2,
-                "cod": 12.5,
-                "valid_sales": 87,
-                "reliability": "High",
-            },
-            "NBH-002": {
-                "neighborhood_name": "Riverside",
-                "percent_change": -1.1,
-                "cod": 15.8,
-                "valid_sales": 42,
-                "reliability": "Medium",
-            },
-        }
+        year_param = request.query_params.get("year")
+        year: Optional[int] = None
+        if year_param:
+            try:
+                year = int(year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"year": "Must be an integer year."})
 
-        default_payload = {
-            "neighborhood_name": f"Neighborhood {code}",
-            "percent_change": 0.0,
-            "cod": 0.0,
-            "valid_sales": 0,
-            "reliability": "Unknown",
-        }
+        snapshot = get_neighborhood_snapshot(code, year=year)
+        if not snapshot:
+            raise Http404("Neighborhood metrics not found.")
 
-        payload = mock_map.get(code.upper(), default_payload)
-        return Response(payload, status=status.HTTP_200_OK)
+        return Response(_normalize(snapshot), status=status.HTTP_200_OK)
 
 
 def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
@@ -885,7 +868,20 @@ class SemanticSearchView(APIView):
 
         limit = _parse_positive_int(request.data.get("limit"), 10, max_value=50)
 
-        model = _load_embedding_model()
+        try:
+            model = _load_embedding_model()
+        except APIException as exc:
+            logger.warning("Semantic search fallback: %s", exc)
+            fallback_results = self._fallback_semantic_results(limit)
+            return Response(
+                {
+                    "query": query,
+                    "results": fallback_results,
+                    "fallback": True,
+                    "detail": str(exc),
+                },
+                status=status.HTTP_200_OK,
+            )
         embedding = model.encode([query], normalize_embeddings=True)[0].tolist()
 
         # ✅ Convert to proper pgvector format: [0.123,0.456,...]
@@ -935,6 +931,39 @@ class SemanticSearchView(APIView):
             status=status.HTTP_200_OK,
         )
 
+    def _fallback_semantic_results(self, limit: int) -> List[Dict[str, Any]]:
+        sql = """
+            SELECT
+                a.parcel_number,
+                a.address,
+                a.assessed_value,
+                a.total_market_value,
+                a.acres,
+                a.city_district,
+                latest_sale.sale_price AS last_sale_price,
+                latest_sale.sale_date AS last_sale_date
+            FROM assessor a
+            LEFT JOIN LATERAL (
+                SELECT s.sale_price,
+                       s.sale_date
+                FROM sales s
+                WHERE s.parcel_number = a.parcel_number
+                ORDER BY s.sale_date DESC NULLS LAST
+                LIMIT 1
+            ) latest_sale ON TRUE
+            WHERE a.address IS NOT NULL
+              AND UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'
+            ORDER BY a.total_market_value DESC NULLS LAST
+            LIMIT %s
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [limit])
+            rows = [_normalize(row) for row in _dictfetchall(cursor)]
+        for row in rows:
+            row["similarity"] = None
+        return rows
+
 
 class NearbyParcelsView(APIView):
     permission_classes = [AllowAny]
@@ -954,6 +983,8 @@ class NearbyParcelsView(APIView):
 
         clauses: List[str] = []
         args: List[Any] = [lon, lat, lon, lat, radius]
+        point_geog = "ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography"
+        geom_geog = "ST_Transform(a.geom, 4326)::geography"
 
         min_value = request.query_params.get("min_value")
         if min_value:
@@ -1003,10 +1034,10 @@ class NearbyParcelsView(APIView):
                 a.total_market_value,
                 a.acres,
                 a.city_district,
-                ST_Distance(a.geom::geography, ST_MakePoint(%s, %s)::geography) AS distance_meters
+                ST_Distance({geom_geog}, {point_geog}) AS distance_meters
             FROM assessor a
             WHERE a.geom IS NOT NULL
-              AND ST_DWithin(a.geom::geography, ST_MakePoint(%s, %s)::geography, %s)
+              AND ST_DWithin({geom_geog}, {point_geog}, %s)
               AND UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'
               {where_additional}
             ORDER BY distance_meters ASC
@@ -1043,10 +1074,9 @@ class AppealAnalysisView(APIView):
         if not pn:
             raise ValidationError({"parcel_number": "Required"})
 
-        # Load subject property snapshot via existing CMA utilities
         try:
-            subject = cma.fetch_subject_snapshot(pn)
-        except Exception:
+            subject, _ = appeals.load_subject_with_roll_context(pn)
+        except ValueError:
             raise Http404("Parcel not found or unavailable")
 
         summary = appeals.citizen_assessment_summary(subject)
@@ -1076,3 +1106,329 @@ class AppealAnalysisView(APIView):
         }
 
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class AppealParcelSearchView(APIView):
+    permission_classes = [AllowAny]
+
+    MIN_QUERY_LENGTH = 3
+    RESULT_LIMIT = 15
+
+    def _base_queryset(self):
+        return (
+            Assessor.objects.select_related("roll")
+            .filter(property_type__isnull=False)
+            .filter(parcel_number__isnull=False)
+            .filter(property_type__iexact="R")
+            .exclude(address__isnull=True)
+            .exclude(address__exact="")
+            .exclude(address__icontains="nan")
+        )
+
+    def get(self, request) -> Response:
+        query = (request.query_params.get("q") or "").strip()
+        query_too_short = len(query) < self.MIN_QUERY_LENGTH
+        results: List[Dict[str, Any]] = []
+        minimal_param = (request.query_params.get("fields") or "").lower() in {"min", "minimal", "lite"} or (
+            request.query_params.get("minimal") or ""
+        ).lower() in {"1", "true", "yes", "y"}
+
+        if not query_too_short:
+            # If minimal mode is requested, use a very light SQL against parcel.
+            if minimal_param:
+                is_parcel_like = bool(re.match(r"^[Pp]\s*\d+\s*$", query))
+                starts_with_number = bool(re.match(r"^\s*\d+", query))
+
+                clauses: List[str] = ["p.property_type = 'R'"]
+                params: List[Any] = []
+
+                if is_parcel_like:
+                    normalized = query.upper().replace(" ", "")
+                    digits_only = re.sub(r"\D", "", query)
+                    parcel_filters: List[str] = []
+                    if normalized:
+                        parcel_filters.append("UPPER(p.parcel_number) LIKE %s")
+                        params.append(normalized + "%")
+                    if digits_only:
+                        parcel_filters.append("UPPER(p.parcel_number) LIKE %s")
+                        params.append(("P" + digits_only + "%").upper())
+                    if parcel_filters:
+                        clauses.append("(" + " OR ".join(parcel_filters) + ")")
+                else:
+                    if starts_with_number:
+                        clauses.append("p.address ILIKE %s")
+                        params.append(query + "%")
+                    else:
+                        clauses.append("p.address ILIKE %s")
+                        params.append("%" + query + "%")
+
+                where_sql = " WHERE " + " AND ".join(clauses)
+                sql = f"""
+                    SELECT p.parcel_number, p.address
+                    FROM parcel p
+                    {where_sql}
+                    ORDER BY p.parcel_number
+                    LIMIT %s
+                """
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, params + [self.RESULT_LIMIT])
+                    rows = _dictfetchall(cursor)
+                results = [_normalize(r) for r in rows]
+                return Response(
+                    {
+                        "query": query,
+                        "query_too_short": False,
+                        "min_search_length": self.MIN_QUERY_LENGTH,
+                        "results": results,
+                        "result_count": len(results),
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                qs = self._base_queryset()
+
+            is_parcel_like = bool(re.match(r"^[Pp]\s*\d+\s*$", query))
+            if is_parcel_like:
+                normalized = query.upper().replace(" ", "")
+                digits_only = re.sub(r"\D", "", query)
+                filters: List[Q] = []
+                if normalized:
+                    filters.append(Q(parcel_number__startswith=normalized))
+                if digits_only:
+                    filters.append(Q(parcel_number__startswith=f"P{digits_only}"))
+                if filters:
+                    qs = qs.filter(functools.reduce(operator.or_, filters))
+            else:
+                starts_with_number = bool(re.match(r"^\s*\d+", query))
+                if starts_with_number:
+                    qs = qs.filter(address__istartswith=query)
+                else:
+                    qs = qs.filter(address__icontains=query)
+
+            current_year = appeals.current_assessment_year()
+            if current_year:
+                qs = qs.filter(roll__year=current_year)
+
+            for row in qs.order_by("parcel_number")[: self.RESULT_LIMIT]:
+                record = {
+                    "parcel_number": (row.parcel_number or "").strip(),
+                    "address": row.address,
+                    "city_district": row.city_district,
+                    "assessed_value": row.assessed_value,
+                    "sale_price": row.sale_price,
+                    "sale_date": row.sale_date,
+                    "assessment_year": row.roll.year if row.roll else current_year,
+                    "bedrooms": row.bedrooms,
+                    "bathrooms": row.bathrooms,
+                    "living_area_sqft": row.living_area,
+                    "acres": row.acres,
+                }
+                results.append(_normalize(record))
+
+        return Response(
+            {
+                "query": query,
+                "query_too_short": query_too_short,
+                "min_search_length": self.MIN_QUERY_LENGTH,
+                "results": results,
+                "result_count": len(results),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AppealSubjectView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, parcel_number: str) -> Response:
+        pn = (parcel_number or "").strip()
+        if not pn:
+            raise ValidationError({"parcel_number": "Required"})
+
+        try:
+            subject, roll_year = appeals.load_subject_with_roll_context(pn)
+        except ValueError:
+            raise Http404("Parcel not found.")
+
+        metadata = subject.metadata if isinstance(subject.metadata, dict) else {}
+        assessor_meta = metadata.get("assessor") if isinstance(metadata.get("assessor"), dict) else {}
+        assessed_value = metadata.get("assessed_value") or subject.assessed_value
+
+        subject_payload = {
+            "parcel_number": subject.parcel_number,
+            "address": subject.address,
+            "valuation": {
+                "assessed": assessed_value,
+            },
+            "structure": {
+                "bedrooms": subject.bedrooms,
+                "bathrooms": subject.bathrooms,
+                "living_area_sqft": subject.living_area,
+                "year_built": subject.year_built,
+                "effective_year_built": subject.effective_year_built,
+            },
+            "location": {
+                "acres": subject.acres,
+            },
+        }
+
+        assessment = {
+            "roll_year": metadata.get("assessment_roll_year") or roll_year,
+            "assessed_value": assessed_value,
+            "prior_roll_year": assessor_meta.get("prior_assessment_year"),
+            "prior_assessed_value": assessor_meta.get("prior_assessed_value"),
+            "change_pct": metadata.get("assessed_change_pct"),
+        }
+
+        neighborhood = appeals.get_subject_neighborhood_snapshot(subject)
+
+        return Response(
+            {
+                "subject": _normalize(subject_payload),
+                "assessment": _normalize(assessment),
+                "neighborhood": _normalize(neighborhood),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class AppealComparablesView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, parcel_number: str) -> Response:
+        pn = (parcel_number or "").strip()
+        if not pn:
+            raise ValidationError({"parcel_number": "Required"})
+
+        try:
+            subject, _ = appeals.load_subject_with_roll_context(pn)
+        except ValueError:
+            raise Http404("Parcel not found.")
+
+        count_param = request.query_params.get("count")
+        try:
+            requested_count = int(count_param) if count_param is not None else appeals.INITIAL_COMPARABLE_LIMIT
+        except (TypeError, ValueError):
+            raise ValidationError({"count": "Must be an integer."})
+
+        display_limit = (
+            appeals.EXTENDED_COMPARABLE_LIMIT
+            if requested_count >= appeals.EXTENDED_COMPARABLE_LIMIT
+            else appeals.INITIAL_COMPARABLE_LIMIT
+        )
+
+        comparables, radius_used = appeals._comparable_candidates(subject, display_limit)
+        summary = appeals.citizen_assessment_summary(
+            subject,
+            comparables=comparables,
+            radius_meters=radius_used,
+            limit=display_limit,
+        )
+
+        payload_comps = [self._serialize_comparable(comp) for comp in comparables]
+
+        over_pct = summary.get("over_assessment_pct")
+        comp_count = summary.get("comp_count") or 0
+        neighborhood = summary.get("neighborhood") or {}
+        neigh_diff = summary.get("neigh_diff_pct")
+        avg_change_pct = neighborhood.get("avg_increase_pct")
+        your_change_pct = appeals.extract_assessment_change_pct(subject.metadata)
+        if your_change_pct is None and avg_change_pct is not None and neigh_diff is not None:
+            your_change_pct = avg_change_pct + neigh_diff
+        if neigh_diff is None and avg_change_pct is not None and your_change_pct is not None:
+            neigh_diff = your_change_pct - avg_change_pct
+
+        score = summary.get("score") or 0
+
+        soft_stop = False
+        soft_reasons: List[str] = []
+        if over_pct is not None and over_pct < 7:
+            soft_stop = True
+            soft_reasons.append("Assessed value is less than ~7% above market comps.")
+        if comp_count < 3:
+            soft_stop = True
+            soft_reasons.append("Fewer than 3 strong comparable sales are available.")
+        if (neigh_diff is not None) and neigh_diff <= 0:
+            soft_stop = True
+            soft_reasons.append("Your assessment did not rise more than your neighborhood average.")
+        if score < 45:
+            soft_stop = True
+            soft_reasons.append("Overall appeal likelihood is below ~45%.")
+
+        has_more = len(comparables) == display_limit and display_limit < appeals.EXTENDED_COMPARABLE_LIMIT
+
+        return Response(
+            {
+                "parcel_number": pn,
+                "comparables": payload_comps,
+                "score": score,
+                "rating": summary.get("rating"),
+                "reasons": summary.get("reasons", []),
+                "over_assessment_pct": over_pct,
+                "comp_count": comp_count,
+                "neighborhood": _normalize(neighborhood),
+                "neigh_diff_pct": neigh_diff,
+                "soft_stop": soft_stop,
+                "soft_reasons": soft_reasons,
+                "has_more": has_more,
+                "current_limit": display_limit,
+                "max_limit": appeals.EXTENDED_COMPARABLE_LIMIT,
+                "radius_meters_used": radius_used,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @staticmethod
+    def _serialize_comparable(comp: cma.ComparableResult) -> Dict[str, Any]:
+        metadata = comp.snapshot.metadata if isinstance(comp.snapshot.metadata, dict) else {}
+        return _normalize(
+            {
+                "parcel_number": comp.snapshot.parcel_number,
+                "address": comp.snapshot.address,
+                "sale_price": comp.sale_price,
+                "sale_date": comp.sale_date,
+                "assessed_value": comp.assessed_value,
+                "distance_miles": comp.distance_miles,
+                "distance_meters": comp.distance_meters,
+                "bedrooms": comp.snapshot.bedrooms,
+                "bathrooms": comp.snapshot.bathrooms,
+                "living_area_sqft": comp.snapshot.living_area,
+                "year_built": comp.snapshot.year_built,
+                "effective_year_built": comp.snapshot.effective_year_built,
+                "metadata": metadata,
+                "rank": comp.inclusion_rank,
+            }
+        )
+
+
+class AppealComparableImprovementsView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, parcel_number: str, comp_parcel: str) -> Response:  # pylint: disable=unused-argument
+        roll_year = self._parse_optional_int(request.query_params.get("roll_year"), "roll_year")
+        roll_id = self._parse_optional_int(request.query_params.get("roll_id"), "roll_id")
+        assessor_style = request.query_params.get("assessor_style") or None
+
+        improvements = cma.get_improvement_rollup(
+            comp_parcel,
+            roll_year=roll_year,
+            roll_id=roll_id,
+            assessor_building_style=assessor_style,
+        )
+
+        return Response(
+            {
+                "parcel_number": comp_parcel,
+                "improvements": _normalize(improvements),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @staticmethod
+    def _parse_optional_int(value: Optional[str], field: str) -> Optional[int]:
+        if value in (None, ""):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise ValidationError({field: "Must be an integer."})
