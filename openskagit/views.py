@@ -1219,7 +1219,7 @@ def parcel_modal(request, parcel_number: str):
 
 def home(request):
     """
-    Render the ChatGPT-style RAG interface backed by pgvector.
+    Render the OpenSkagit portal homepage with chatbot-first interface.
     """
     requested_id = request.GET.get("cid")
     conversation_id = _ensure_conversation(request, requested_id)
@@ -1230,7 +1230,7 @@ def home(request):
         "conversation_id": conversation_id,
         "messages": messages,
     }
-    return render(request, "openskagit/home.html", context)
+    return render(request, "openskagit/home_portal.html", context)
 
 
 @require_GET
@@ -1335,12 +1335,12 @@ def chat(request):
     request.session.modified = True
 
     html_user = render_to_string(
-        "partials/message.html",
+        "partials/message_portal.html",
         {"role": "user", "content": prompt},
         request=request,
     )
     html_assistant = render_to_string(
-        "partials/message.html",
+        "partials/message_portal.html",
         {"role": "assistant", "content": answer, "sources": sources},
         request=request,
     )
