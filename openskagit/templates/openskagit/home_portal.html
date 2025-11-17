@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenSkagit.com - AI-Enhanced Data Portal</title>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://unpkg.com/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
+  <style>
+    :root {
+      --os-sage: #7A9D7A;
+      --os-sage-light: #A4C4A4;
+      --os-sage-dark: #5A7D5A;
+      --os-terracotta: #C97C63;
+      --os-teal: #5B9A99;
+      --os-teal-light: #7DBDBC;
+      --os-warm-gray: #8B8680;
+      --os-light-gray: #E8E6E3;
+      --os-off-white: #F7F6F4;
+      --os-charcoal: #3C3C3C;
+      --os-text: #2D2D2D;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--os-off-white);
+      color: var(--os-text);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: white;
+      border-bottom: 1px solid var(--os-light-gray);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--os-charcoal);
+    }
+
+    .logo-mark {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--os-sage), var(--os-teal));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: white;
+      font-size: 1.125rem;
+    }
+
+    .logo-text {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .header-subtitle {
+      font-size: 0.875rem;
+      color: var(--os-warm-gray);
+      margin-left: auto;
+      display: none;
+    }
+
+    @media (min-width: 768px) {
+      .header-subtitle {
+        display: block;
+      }
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 3rem 1.5rem;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .hero-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--os-charcoal);
+      margin-bottom: 1rem;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-subtitle {
+      font-size: 1.125rem;
+      color: var(--os-warm-gray);
+      max-width: 600px;
+      margin: 0 auto 2rem;
+      line-height: 1.7;
+    }
+
+    .chatbot-section {
+      background: white;
+      border-radius: 16px;
+      padding: 2.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+      margin-bottom: 3rem;
+      border: 1px solid var(--os-light-gray);
+    }
+
+    .chatbot-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--os-warm-gray);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .ai-badge {
+      background: linear-gradient(135deg, var(--os-sage-light), var(--os-teal-light));
+      color: white;
+      padding: 0.25rem 0.625rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .chat-input-wrapper {
+      position: relative;
+      margin-bottom: 1.5rem;
+    }
+
+    .chat-input {
+      width: 100%;
+      padding: 1.25rem 4.5rem 1.25rem 1.25rem;
+      font-size: 1.125rem;
+      border: 2px solid var(--os-light-gray);
+      border-radius: 12px;
+      background: var(--os-off-white);
+      color: var(--os-text);
+      transition: all 0.2s ease;
+      resize: none;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--os-sage);
+      background: white;
+      box-shadow: 0 0 0 3px rgba(122, 157, 122, 0.1);
+    }
+
+    .chat-input::placeholder {
+      color: var(--os-warm-gray);
+    }
+
+    .chat-submit {
+      position: absolute;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--os-sage), var(--os-teal));
+      color: white;
+      border: none;
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(122, 157, 122, 0.3);
+    }
+
+    .chat-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(122, 157, 122, 0.4);
+    }
+
+    .chat-submit:active {
+      transform: translateY(0);
+    }
+
+    .chat-submit svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .example-prompts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+
+    .example-prompt {
+      background: var(--os-off-white);
+      border: 1px solid var(--os-light-gray);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      color: var(--os-warm-gray);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .example-prompt:hover {
+      background: white;
+      border-color: var(--os-sage);
+      color: var(--os-sage-dark);
+      transform: translateY(-1px);
+    }
+
+    .tools-section {
+      margin-bottom: 3rem;
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--os-charcoal);
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 640px) {
+      .tools-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .tools-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .tool-card {
+      background: white;
+      border: 2px solid var(--os-light-gray);
+      border-radius: 12px;
+      padding: 2rem;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tool-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--os-sage), var(--os-teal));
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    .tool-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .tool-card.active:hover {
+      border-color: var(--os-sage);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(122, 157, 122, 0.15);
+    }
+
+    .tool-card.coming-soon {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .tool-card.coming-soon:hover {
+      transform: none;
+      border-color: var(--os-light-gray);
+    }
+
+    .tool-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+      font-size: 1.75rem;
+    }
+
+    .tool-card.active .tool-icon {
+      background: linear-gradient(135deg, var(--os-sage-light), var(--os-teal-light));
+    }
+
+    .tool-card.coming-soon .tool-icon {
+      background: var(--os-light-gray);
+    }
+
+    .tool-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--os-charcoal);
+      margin-bottom: 0.75rem;
+    }
+
+    .tool-description {
+      font-size: 0.9375rem;
+      color: var(--os-warm-gray);
+      line-height: 1.6;
+      margin-bottom: 1rem;
+      flex: 1;
+    }
+
+    .tool-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 0.375rem 0.75rem;
+      border-radius: 6px;
+      align-self: flex-start;
+    }
+
+    .tool-badge.available {
+      background: rgba(122, 157, 122, 0.15);
+      color: var(--os-sage-dark);
+    }
+
+    .tool-badge.coming-soon {
+      background: var(--os-light-gray);
+      color: var(--os-warm-gray);
+    }
+
+    .footer {
+      background: white;
+      border-top: 1px solid var(--os-light-gray);
+      padding: 2rem;
+      margin-top: auto;
+    }
+
+    .footer-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 0.875rem;
+      color: var(--os-warm-gray);
+      line-height: 1.6;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .footer-link {
+      color: var(--os-sage-dark);
+      text-decoration: none;
+      font-size: 0.875rem;
+      transition: color 0.2s ease;
+    }
+
+    .footer-link:hover {
+      color: var(--os-sage);
+    }
+
+    @media (max-width: 640px) {
+      .hero-title {
+        font-size: 2rem;
+      }
+
+      .chatbot-section {
+        padding: 1.5rem;
+      }
+
+      .main {
+        padding: 2rem 1rem;
+      }
+    }
+
+    .chat-messages {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-bottom: 1rem;
+      padding: 1rem;
+      background: var(--os-off-white);
+      border-radius: 8px;
+      display: none;
+    }
+
+    .chat-messages.active {
+      display: block;
+    }
+
+    .message {
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+    }
+
+    .message.user {
+      background: white;
+      border-left: 3px solid var(--os-sage);
+    }
+
+    .message.assistant {
+      background: white;
+      border-left: 3px solid var(--os-teal);
+    }
+
+    .message-role {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      color: var(--os-warm-gray);
+    }
+
+    .message-content {
+      font-size: 0.9375rem;
+      line-height: 1.6;
+      color: var(--os-text);
+    }
+
+    .loading-indicator {
+      display: none;
+      text-align: center;
+      padding: 1rem;
+      color: var(--os-warm-gray);
+      font-size: 0.875rem;
+    }
+
+    .loading-indicator.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <a href="/" class="logo">
+        <div class="logo-mark">OS</div>
+        <span class="logo-text">OpenSkagit.com</span>
+      </a>
+      <span class="header-subtitle">AI-Enhanced Data Portal for Skagit County</span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="hero">
+      <h1 class="hero-title">Discover Skagit County Data</h1>
+      <p class="hero-subtitle">
+        Ask questions, explore property records, analyze trends, and access civic information with AI-powered assistance.
+      </p>
+    </div>
+
+    <div class="chatbot-section" x-data="{ hasMessages: false }">
+      <div class="chatbot-label">
+        <span>Ask me anything</span>
+        <span class="ai-badge">AI POWERED</span>
+      </div>
+
+      <div id="chat-messages" class="chat-messages" :class="{ 'active': hasMessages }">
+        {% if messages %}
+          {% for m in messages %}
+            <div class="message {{ m.role }}">
+              <div class="message-role">{{ m.role }}</div>
+              <div class="message-content">{{ m.content }}</div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+
+      <div id="loading" class="loading-indicator">Thinking...</div>
+
+      <form id="chat-form"
+            hx-post="/chat/"
+            hx-target="#chat-messages"
+            hx-swap="beforeend"
+            hx-indicator="#loading"
+            hx-include="[name='conversation_id']">
+        {% csrf_token %}
+        {% if conversation_id %}
+          <input type="hidden" name="conversation_id" value="{{ conversation_id }}">
+        {% endif %}
+        <div class="chat-input-wrapper">
+          <textarea
+            id="prompt"
+            name="prompt"
+            class="chat-input"
+            placeholder="Search property records, ask about tax assessments, or explore county data..."
+            rows="1"
+            required
+            oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"
+          ></textarea>
+          <button type="submit" class="chat-submit" aria-label="Send message">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+        </div>
+      </form>
+
+      <div class="example-prompts">
+        <button class="example-prompt" onclick="setPrompt('Find my property tax assessment')">
+          Find my property tax assessment
+        </button>
+        <button class="example-prompt" onclick="setPrompt('Show me recent home sales in my area')">
+          Show recent home sales
+        </button>
+        <button class="example-prompt" onclick="setPrompt('Help me understand my property value')">
+          Understand property values
+        </button>
+      </div>
+    </div>
+
+    <div class="tools-section">
+      <h2 class="section-title">Tools & Reports</h2>
+      <div class="tools-grid">
+        <a href="/appeal/" class="tool-card active">
+          <div class="tool-icon">⚖️</div>
+          <h3 class="tool-title">Property Tax Appeal Helper</h3>
+          <p class="tool-description">
+            Review your property assessment, compare to similar properties, and generate appeal documentation.
+          </p>
+          <span class="tool-badge available">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Available Now
+          </span>
+        </a>
+
+        <div class="tool-card coming-soon">
+          <div class="tool-icon">💰</div>
+          <h3 class="tool-title">Budget Insights</h3>
+          <p class="tool-description">
+            Explore Skagit County budget allocations, spending trends, and departmental financial data.
+          </p>
+          <span class="tool-badge coming-soon">Coming Soon</span>
+        </div>
+
+        <div class="tool-card coming-soon">
+          <div class="tool-icon">📊</div>
+          <h3 class="tool-title">Job Outlook</h3>
+          <p class="tool-description">
+            Analyze local employment trends, industry growth, and economic indicators for Skagit County.
+          </p>
+          <span class="tool-badge coming-soon">Coming Soon</span>
+        </div>
+
+        <div class="tool-card coming-soon">
+          <div class="tool-icon">📈</div>
+          <h3 class="tool-title">Market Analysis</h3>
+          <p class="tool-description">
+            Track real estate market trends, price movements, and neighborhood statistics over time.
+          </p>
+          <span class="tool-badge coming-soon">Coming Soon</span>
+        </div>
+
+        <div class="tool-card coming-soon">
+          <div class="tool-icon">🏘️</div>
+          <h3 class="tool-title">Neighborhood Reports</h3>
+          <p class="tool-description">
+            Detailed insights about neighborhoods including demographics, schools, and amenities.
+          </p>
+          <span class="tool-badge coming-soon">Coming Soon</span>
+        </div>
+
+        <div class="tool-card coming-soon">
+          <div class="tool-icon">📋</div>
+          <h3 class="tool-title">Custom Reports</h3>
+          <p class="tool-description">
+            Generate custom data reports and visualizations based on county records and analytics.
+          </p>
+          <span class="tool-badge coming-soon">Coming Soon</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-content">
+      <p class="footer-text">
+        Data sourced from Skagit County public records, assessor databases, and official sources.
+        Information is updated regularly but may not reflect real-time changes.
+      </p>
+      <div class="footer-links">
+        <a href="https://www.skagitcounty.net/" target="_blank" class="footer-link">Skagit County Official Site</a>
+        <a href="/api/docs/" class="footer-link">API Documentation</a>
+        <a href="#" class="footer-link">About OpenSkagit</a>
+        <a href="#" class="footer-link">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function setPrompt(text) {
+      const input = document.getElementById('prompt');
+      input.value = text;
+      input.focus();
+      input.style.height = 'auto';
+      input.style.height = (input.scrollHeight) + 'px';
+    }
+
+    document.addEventListener('htmx:afterSwap', (event) => {
+      if (event.target && event.target.id === 'chat-messages') {
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        const alpine = Alpine;
+        if (alpine && alpine.store) {
+          messagesDiv.classList.add('active');
+        }
+      }
+    });
+
+    document.addEventListener('htmx:afterRequest', (event) => {
+      if (event.detail?.target?.id === 'chat-messages') {
+        const promptField = document.getElementById('prompt');
+        if (promptField) {
+          promptField.value = '';
+          promptField.style.height = 'auto';
+          promptField.focus({ preventScroll: true });
+        }
+      }
+    });
+
+    document.addEventListener('htmx:beforeRequest', (event) => {
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.classList.add('active');
+      }
+    });
+
+    document.addEventListener('htmx:afterRequest', (event) => {
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.classList.remove('active');
+      }
+    });
+  </script>
+</body>
+</html>
