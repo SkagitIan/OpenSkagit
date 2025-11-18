@@ -24,7 +24,7 @@
           </div>
           <div style="margin-top:8px;color:#475569;font-size:0.85rem;">
             Beds {{ comp.snapshot.bedrooms|default_if_none:"?" }},
-            Baths {{ comp.snapshot.bathrooms|default_if_none:"?" }},
+            Baths {{ comp.snapshot.bathrooms|quarter_baths|default:"?" }},
             {% if comp.snapshot.living_area %}
               {{ comp.snapshot.living_area|floatformat:0|intcomma }} sq ft
             {% else %}

@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import math
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
-from django.contrib.gis.measure import D
-
 from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import GEOSGeometry, Polygon
-from django.db.models.expressions import RawSQL
+from django.contrib.gis.measure import D
 from django.db.models import F, OuterRef, Subquery, Window
 from django.db.models.functions import RowNumber
 from django.utils import timezone
+from django.contrib.gis.db.models.functions import Distance, Transform
 
 from .models import Assessor, Sales
 from .improvement_utils import rollup_for_parcel
@@ -21,9 +21,9 @@ from .valuation_areas import resolve_market_group
 
 DEFAULT_COMPARABLE_LIMIT = 16
 MAX_COMPARABLE_LIMIT = 24
-
+DEFAULT_RADIUS_METERS = 3000
+DEFAULT_MAX_SALE_AGE_DAYS = 540
 logger = logging.getLogger(__name__)
-
 RollupCache = Dict[Tuple[str, Optional[int], Optional[int]], Dict[str, object]]
 
 WGS84_SRID = 4326
@@ -37,6 +37,29 @@ def _ensure_wgs84(geom: Optional[GEOSGeometry]) -> Optional[GEOSGeometry]:
     cloned = GEOSGeometry(geom.wkb, srid=geom.srid)
     cloned.transform(WGS84_SRID)
     return cloned
+
+
+def _normalize_subject_geom(subject: PropertySnapshot) -> GEOSGeometry:
+    """
+    Ensure the subject snapshot stores a WGS84 geometry for reuse.
+    """
+    normalized = _ensure_wgs84(getattr(subject, "geom", None))
+    if normalized is None:
+        raise ValueError("Subject parcel missing geometry.")
+    subject.geom = normalized
+    return normalized
+
+
+def _sale_date_cutoff(max_sale_age_days: Optional[int]) -> Optional[dt.datetime]:
+    if not max_sale_age_days:
+        return None
+    try:
+        days = int(max_sale_age_days)
+    except (TypeError, ValueError):
+        return None
+    if days <= 0:
+        return None
+    return timezone.now() - dt.timedelta(days=days)
 
 
 def get_improvement_rollup(
@@ -110,6 +133,7 @@ class PropertySnapshot:
     sale_date: Optional[dt.date]
     property_type: Optional[str]
     living_area: Optional[Decimal]
+    lot_acres: Optional[Decimal]
     bedrooms: Optional[Decimal]
     bathrooms: Optional[Decimal]
     year_built: Optional[int]
@@ -118,7 +142,91 @@ class PropertySnapshot:
     acres: Optional[Decimal]
     assessed_value: Optional[Decimal]
     geom: Optional[GEOSGeometry]
-    metadata: Dict[str, Optional[str]] = field(default_factory=dict)
+    metadata: Dict[str, object] = field(default_factory=dict)
+
+    @classmethod
+    def from_assessor_row(cls, row, rollup_cache=None):
+        """
+        Build a PropertySnapshot from an Assessor row used in comparable selection.
+        Mirrors load_subject(), ensuring consistent metadata for CMA and adjustments.
+        """
+        snapshot_geom = getattr(row, "geom", None)
+        if snapshot_geom is not None:
+            snapshot_geom = _ensure_wgs84(snapshot_geom)
+
+        roll = getattr(row, "roll", None)
+        roll_year = roll.year if roll else None
+        roll_id = getattr(row, "roll_id", None)
+
+        valuation_area = resolve_market_group(getattr(row, "neighborhood_code", None)) or getattr(
+            row, "city_district", None
+        )
+
+        metadata: Dict[str, Optional[object]] = {
+            "neighborhood_code": getattr(row, "neighborhood_code", None),
+            "neighborhood": getattr(row, "neighborhood_code_description", None),
+            "land_use_code": getattr(row, "land_use_code", None),
+            "city_district": getattr(row, "city_district", None),
+            "valuation_area": valuation_area,
+            "valuation_subarea": getattr(row, "neighborhood_code", None),
+            "assessment_roll_year": roll_year,
+            "roll_year": roll_year,
+            "roll_id": roll_id,
+            "assessor_building_style": getattr(row, "building_style", None),
+            "assessed_value": float(row.assessed_value) if getattr(row, "assessed_value", None) is not None else None,
+            "finished_basement_sqft": float(row.finished_basement) if getattr(row, "finished_basement", None) else None,
+            "unfinished_basement_sqft": float(row.unfinished_basement) if getattr(row, "unfinished_basement", None) else None,
+        }
+
+        age_value: Optional[int] = None
+        effective_year = int(row.eff_year_built) if row.eff_year_built else None
+        if effective_year:
+            age_value = max(0, timezone.now().year - effective_year)
+
+        garage_sqft_val = getattr(row, "garage_sqft", None)
+        has_garage = bool(_to_decimal(garage_sqft_val) not in (None, Decimal("0")))
+        has_basement = bool(getattr(row, "finished_basement", 0) or getattr(row, "unfinished_basement", 0))
+
+        snapshot = cls(
+            parcel_number=row.parcel_number,
+            address=row.address or "",
+            sale_price=_to_decimal(getattr(row, "comp_sale_price", None)),
+            sale_date=_safe_date(getattr(row, "comp_sale_date", None)),
+            property_type=row.property_type,
+            living_area=_to_decimal(row.living_area),
+            lot_acres=_to_decimal(row.acres),
+            bedrooms=_to_decimal(row.bedrooms),
+            bathrooms=_to_decimal(row.bathrooms),
+            year_built=int(row.year_built) if row.year_built else None,
+            effective_year_built=effective_year,
+            garage_sqft=_to_decimal(row.garage_sqft),
+            acres=_to_decimal(row.acres),
+            assessed_value=_to_decimal(row.assessed_value),
+            geom=snapshot_geom,
+            metadata=metadata,
+        )
+
+        snapshot.metadata.update(
+            {
+                "age": age_value,
+                "quality_score": getattr(row, "quality_score", None),
+                "condition_score": getattr(row, "condition_score", None),
+                "has_garage": has_garage,
+                "has_basement": has_basement,
+            }
+        )
+
+        # Improvement rollup
+        if rollup_cache is not None:
+            snapshot.metadata["improvements"] = get_improvement_rollup(
+                row.parcel_number,
+                roll_year=roll_year,
+                roll_id=roll_id,
+                assessor_building_style=getattr(row, "building_style", None),
+                cache=rollup_cache,
+            )
+
+        return snapshot
 
     def as_dict(self) -> Dict[str, Optional[str]]:
         return {
@@ -128,6 +236,7 @@ class PropertySnapshot:
             "sale_date": self.sale_date.isoformat() if self.sale_date else None,
             "property_type": self.property_type,
             "living_area": float(self.living_area) if self.living_area is not None else None,
+            "lot_acres": float(self.lot_acres) if self.lot_acres is not None else None,
             "bedrooms": float(self.bedrooms) if self.bedrooms is not None else None,
             "bathrooms": float(self.bathrooms) if self.bathrooms is not None else None,
             "year_built": self.year_built,
@@ -140,15 +249,41 @@ class PropertySnapshot:
 
 
 @dataclass
+class ComparableScore:
+    location_score: Decimal
+    time_score: Decimal
+    physical_score: Decimal
+    total_score: Decimal
+
+    @classmethod
+    def from_components(cls, location: float, time: float, physical: float) -> "ComparableScore":
+        loc_val = Decimal(str(max(0.0, min(1.0, location or 0.0))))
+        time_val = Decimal(str(max(0.0, min(1.0, time or 0.0))))
+        phys_val = Decimal(str(max(0.0, min(1.0, physical or 0.0))))
+        total = (Decimal("0.40") * loc_val) + (Decimal("0.30") * time_val) + (Decimal("0.30") * phys_val)
+        return cls(
+            location_score=loc_val,
+            time_score=time_val,
+            physical_score=phys_val,
+            total_score=total,
+        )
+
+
+@dataclass
 class ComparableResult:
     snapshot: PropertySnapshot
-    sale_price: Decimal
-    assessed_value: Optional[Decimal]
+    sale_price: Optional[Decimal]
     sale_date: Optional[dt.date]
+    assessed_value: Optional[Decimal]
     distance_meters: Optional[float]
     distance_miles: Optional[Decimal]
     difference_flags: Dict[str, bool]
     inclusion_rank: int
+    score: Optional[ComparableScore] = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.snapshot, PropertySnapshot):
+            raise TypeError("ComparableResult.snapshot must be a PropertySnapshot instance.")
 
     def marker_payload(self) -> Dict[str, object]:
         geom = self.snapshot.geom
@@ -158,7 +293,7 @@ class ComparableResult:
             "parcel_number": self.snapshot.parcel_number,
             "lat": geom.y,
             "lon": geom.x,
-            "sale_price": float(self.sale_price),
+            "sale_price": float(self.sale_price) if self.sale_price is not None else None,
             "assessed_value": float(self.assessed_value) if self.assessed_value is not None else None,
             "address": self.snapshot.address,
             "rank": self.inclusion_rank,
@@ -166,7 +301,7 @@ class ComparableResult:
 
 
 @dataclass
-class CmaComputation:
+class ComputationResult:
     subject: PropertySnapshot
     comparables: List[ComparableResult]
     filters: CmaFilters
@@ -241,6 +376,161 @@ def _safe_date(value: Optional[dt.datetime]) -> Optional[dt.date]:
     return None
 
 
+def _metadata_dict(snapshot: PropertySnapshot) -> Dict[str, object]:
+    metadata = getattr(snapshot, "metadata", {})
+    if isinstance(metadata, dict):
+        return metadata
+    return {}
+
+
+def _subject_valuation_date(subject: PropertySnapshot) -> dt.date:
+    metadata = _metadata_dict(subject)
+    roll_year = metadata.get("assessment_roll_year")
+    if roll_year is not None:
+        try:
+            year = int(roll_year)
+            return dt.date(year, 1, 1)
+        except (TypeError, ValueError):
+            pass
+    if subject.sale_date:
+        return subject.sale_date
+    return timezone.now().date()
+
+
+def _compute_location_score(
+    subject: PropertySnapshot,
+    comparable: PropertySnapshot,
+    distance_meters: Optional[float],
+    search_radius: Optional[float],
+) -> float:
+    subject_meta = _metadata_dict(subject)
+    comp_meta = _metadata_dict(comparable)
+    subject_area = subject_meta.get("valuation_area")
+    comp_area = comp_meta.get("valuation_area")
+    if subject_area and comp_area and subject_area != comp_area:
+        return 0.0
+
+    subject_nbhd = subject_meta.get("neighborhood_code")
+    comp_nbhd = comp_meta.get("neighborhood_code")
+    subject_city = subject_meta.get("city_district")
+    comp_city = comp_meta.get("city_district")
+
+    try:
+        distance_val = float(distance_meters) if distance_meters is not None else None
+    except (TypeError, ValueError):
+        distance_val = None
+
+    radius = float(search_radius or DEFAULT_RADIUS_METERS or 1.0)
+    if radius <= 0:
+        radius = float(DEFAULT_RADIUS_METERS)
+
+    base = 0.8 if distance_val is None else max(0.0, 1.0 - min(distance_val, radius) / radius)
+    if subject_nbhd and comp_nbhd and subject_nbhd == comp_nbhd:
+        base += 0.2
+    elif subject_city and comp_city and subject_city == comp_city:
+        base += 0.05
+
+    return max(0.0, min(1.0, base))
+
+
+def _compute_time_score(sale_date: Optional[dt.date], valuation_date: dt.date) -> float:
+    if not sale_date or not valuation_date:
+        return 0.0
+    days = abs((valuation_date - sale_date).days)
+    months = days / 30.4375
+    if months <= 3:
+        return 1.0
+    if months <= 6:
+        return 0.9
+    if months <= 12:
+        return 0.7
+    if months <= 18:
+        return 0.5
+    if months <= 24:
+        return 0.3
+    return 0.0
+
+
+def _float_value(value: Optional[object]) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _compute_physical_score(subject: PropertySnapshot, comparable: PropertySnapshot) -> float:
+    subject_meta = _metadata_dict(subject)
+    comp_meta = _metadata_dict(comparable)
+
+    def accumulate(weight: float, similarity: Optional[float], *, accumulator: Dict[str, float]) -> None:
+        if similarity is None:
+            return
+        accumulator["score"] += weight * similarity
+        accumulator["weight"] += weight
+
+    totals = {"score": 0.0, "weight": 0.0}
+
+    subj_area = _float_value(subject.living_area)
+    comp_area = _float_value(comparable.living_area)
+    if subj_area is not None and comp_area is not None and subj_area > 0:
+        scale = max(subj_area * 0.2, 300.0)
+        similarity = math.exp(-abs(subj_area - comp_area) / scale)
+        accumulate(0.25, similarity, accumulator=totals)
+
+    subj_baths = _float_value(subject.bathrooms)
+    comp_baths = _float_value(comparable.bathrooms)
+    if subj_baths is not None and comp_baths is not None:
+        similarity = math.exp(-abs(subj_baths - comp_baths) / 0.75)
+        accumulate(0.15, similarity, accumulator=totals)
+
+    subj_beds = _float_value(subject.bedrooms)
+    comp_beds = _float_value(comparable.bedrooms)
+    if subj_beds is not None and comp_beds is not None:
+        similarity = math.exp(-abs(subj_beds - comp_beds) / 1.0)
+        accumulate(0.1, similarity, accumulator=totals)
+
+    subj_lot = _float_value(subject.acres or subject.lot_acres)
+    comp_lot = _float_value(comparable.acres or comparable.lot_acres)
+    if subj_lot is not None and comp_lot is not None and subj_lot > 0:
+        scale = max(subj_lot * 0.25, 0.1)
+        similarity = math.exp(-abs(subj_lot - comp_lot) / scale)
+        accumulate(0.15, similarity, accumulator=totals)
+
+    subj_age = _float_value(subject_meta.get("age"))
+    comp_age = _float_value(comp_meta.get("age"))
+    if subj_age is not None and comp_age is not None:
+        similarity = math.exp(-abs(subj_age - comp_age) / 10.0)
+        accumulate(0.1, similarity, accumulator=totals)
+
+    subj_garage = subject_meta.get("has_garage")
+    comp_garage = comp_meta.get("has_garage")
+    if subj_garage is not None and comp_garage is not None:
+        accumulate(0.05, 1.0 if bool(subj_garage) == bool(comp_garage) else 0.5, accumulator=totals)
+
+    subj_basement = subject_meta.get("has_basement")
+    comp_basement = comp_meta.get("has_basement")
+    if subj_basement is not None and comp_basement is not None:
+        accumulate(0.05, 1.0 if bool(subj_basement) == bool(comp_basement) else 0.6, accumulator=totals)
+
+    subj_quality = subject_meta.get("quality_score")
+    comp_quality = comp_meta.get("quality_score")
+    if subj_quality is not None and comp_quality is not None:
+        similarity = 1.0 if str(subj_quality).strip().lower() == str(comp_quality).strip().lower() else 0.6
+        accumulate(0.075, similarity, accumulator=totals)
+
+    subj_condition = subject_meta.get("condition_score")
+    comp_condition = comp_meta.get("condition_score")
+    if subj_condition is not None and comp_condition is not None:
+        similarity = 1.0 if str(subj_condition).strip().lower() == str(comp_condition).strip().lower() else 0.6
+        accumulate(0.075, similarity, accumulator=totals)
+
+    if totals["weight"] == 0:
+        return 0.0
+    return max(0.0, min(1.0, totals["score"] / totals["weight"]))
+
+
 def load_subject(
     parcel_number: str,
     *,
@@ -292,6 +582,7 @@ def load_subject(
         sale_date=_safe_date(sale_row.sale_date if sale_row else assessor.sale_date),
         property_type=assessor.property_type,
         living_area=_to_decimal(assessor.living_area),
+        lot_acres=_to_decimal(assessor.acres),
         bedrooms=_to_decimal(assessor.bedrooms),
         bathrooms=_to_decimal(assessor.bathrooms),
         year_built=int(assessor.year_built) if assessor.year_built else None,
@@ -312,6 +603,14 @@ def load_subject(
             "assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
             "finished_basement_sqft": float(assessor.finished_basement) if assessor.finished_basement else None,
             "unfinished_basement_sqft": float(assessor.unfinished_basement) if assessor.unfinished_basement else None,
+            "quality_score": getattr(assessor, "quality_score", None),
+            "condition_score": getattr(assessor, "condition_code", None),
+            "has_garage": bool(assessor.garage_sqft),
+            "has_basement": bool(
+                (assessor.finished_basement or 0) > 0 or (assessor.unfinished_basement or 0) > 0
+            ),
+            "lot_acres": float(assessor.acres) if assessor.acres is not None else None,
+            "age": (timezone.now().year - int(assessor.eff_year_built)) if assessor.eff_year_built else None,
         },
     )
     has_basement = False
@@ -333,7 +632,12 @@ def load_subject(
     return snapshot
 
 
-def _base_queryset(subject: PropertySnapshot, radius_meters: Optional[float]) -> Iterable[Assessor]:
+def _base_queryset(
+    subject: PropertySnapshot,
+    radius_meters: Optional[float] = None,
+    *,
+    max_sale_age_days: Optional[int] = DEFAULT_MAX_SALE_AGE_DAYS,
+) -> Iterable[Assessor]:
     # Subqueries for SALES table
     sale_sq_base = Sales.objects.filter(
         parcel_number=OuterRef("parcel_number"),
@@ -344,28 +648,31 @@ def _base_queryset(subject: PropertySnapshot, radius_meters: Optional[float]) ->
     sale_sq_date = Subquery(sale_sq_base.values("sale_date")[:1])
     sale_sq_deed = Subquery(sale_sq_base.values("deed_type")[:1])
 
-    # Subject geography (point)
-    subject_geom = subject.geom
-    subject_geom_param = subject_geom.ewkb if subject_geom else None
-
-    subject_point_geog = RawSQL(
-        "%s::geography",
-        (subject_geom_param,),
-        output_field=gis_models.PointField(geography=True, srid=WGS84_SRID),
-    )
+    # Subject geography (point) normalized to WGS84
+    subject_geom = _normalize_subject_geom(subject)
 
     # -----------------------------------------------------
     # BASE QUERYSET – SPATIAL PRUNING FIRST (very fast)
     # -----------------------------------------------------
-    qs = Assessor.objects.filter(geom__isnull=False, roll__year=2025, property_type='R')
+    qs = (
+        Assessor.objects
+        .filter(geom__isnull=False, roll__year=2025, property_type="R")
+        .annotate(geom_4326=Transform("geom", WGS84_SRID))
+    )
 
-    if radius_meters is not None and subject_geom_param:
+    if radius_meters is not None:
         qs = qs.filter(
-            centroid_geog__distance_lte=(
-                subject_point_geog,
-                radius_meters,
+            geom_4326__distance_lte=(
+                subject_geom,
+                D(m=radius_meters),
             )
         )
+
+    distance_expr = Distance("geom_4326", subject_geom, spheroid=True)
+    qs = qs.annotate(
+        distance_sort=distance_expr,
+        distance_meters=distance_expr,
+    )
 
     # Only select fields needed later
     qs = qs.only(
@@ -398,6 +705,11 @@ def _base_queryset(subject: PropertySnapshot, radius_meters: Optional[float]) ->
         comp_deed_type=sale_sq_deed,
     ).filter(comp_sale_price__gt=0)
 
+    sale_cutoff = _sale_date_cutoff(max_sale_age_days)
+    if sale_cutoff is not None:
+        qs = qs.filter(comp_sale_date__isnull=False, comp_sale_date__gte=sale_cutoff)
+    else:
+        qs = qs.filter(comp_sale_date__isnull=False)
     # Pick latest roll per parcel
     qs = qs.annotate(
         parcel_rank=Window(
@@ -409,22 +721,6 @@ def _base_queryset(subject: PropertySnapshot, radius_meters: Optional[float]) ->
             ],
         )
     ).filter(parcel_rank=1)
-
-    # Distance annotations — uses centroid_geog (indexed)
-    qs = qs.annotate(
-        distance_sort=RawSQL(
-            "centroid_geog <-> %s::geography",
-            (subject_geom_param,)
-        ),
-        distance_meters=RawSQL(
-            "ST_Distance(centroid_geog, %s::geography)",
-            (subject_geom_param,)
-        ),
-    )
-
-    # Enforce radius again (cheap now)
-    if radius_meters is not None:
-        qs = qs.filter(distance_meters__lte=radius_meters)
 
     return qs.select_related()
 
@@ -455,125 +751,265 @@ def apply_filters(qs: Iterable[Assessor], filters: CmaFilters) -> Iterable[Asses
 
 def build_comparables(
     subject: PropertySnapshot,
-    filters: CmaFilters,
-    excluded: Sequence[str],
-    sort_field: str,
-    sort_direction: str,
-    limit: int = DEFAULT_COMPARABLE_LIMIT,
     *,
-    radius_meters: Optional[float] = 8000,
-    load_improvements: bool = True,
-    rollup_cache: Optional[RollupCache] = None,
-) -> CmaComputation:
-    if limit > MAX_COMPARABLE_LIMIT:
-        limit = MAX_COMPARABLE_LIMIT
+    filters=None,
+    excluded=None,
+    sort_field="score",
+    sort_direction="desc",
+    limit=DEFAULT_COMPARABLE_LIMIT,
+    load_improvements=False,
+    rollup_cache=None,
+    radius_meters=None,
+    max_sale_age_days: Optional[int] = DEFAULT_MAX_SALE_AGE_DAYS,
+    oversample_factor: int = 2,
+):
+    """
+    Optimized comparable selection with:
+    - SRID-safe distance calculation
+    - consistent recency filtering (default 540 days)
+    - safe filter handling
+    - improved ComparableResult construction
+    """
 
-    queryset = _base_queryset(subject, radius_meters)
-    queryset = apply_filters(queryset, filters)
-    queryset = queryset.order_by("distance_sort")[: max(limit, DEFAULT_COMPARABLE_LIMIT)]
+    import time
 
-    comparables: List[ComparableResult] = []
+    t0 = time.perf_counter()
 
-    for candidate in queryset:
-        if candidate.parcel_number in excluded:
-            continue
-        sale_price = _to_decimal(getattr(candidate, "comp_sale_price", None))
-        if sale_price is None or sale_price <= 0:
-            continue
-        difference_flags = _compute_difference_flags(subject, candidate)
-        assessed_value = _to_decimal(getattr(candidate, "assessed_value", None))
+    geom = _normalize_subject_geom(subject)
+    valuation_date = _subject_valuation_date(subject)
+    subject_metadata = _metadata_dict(subject)
+    subject_neighborhood = subject_metadata.get("neighborhood_code")
+    subject_city = subject_metadata.get("city_district")
 
-        distance_meters = getattr(candidate, "distance_meters", None)
-        distance_miles: Optional[Decimal] = None
-        if distance_meters:
-            distance_miles = (Decimal(str(distance_meters)) / Decimal("1609.344")).quantize(Decimal("0.01"))
+    # ---------------------------------------
+    # Determine search radius
+    # ---------------------------------------
+    if radius_meters is not None:
+        search_radius = radius_meters
+    else:
+        filter_radius = getattr(filters, "radius_meters", None)
+        search_radius = filter_radius if filter_radius else DEFAULT_RADIUS_METERS
 
-        candidate_roll_year = candidate.roll.year if getattr(candidate, "roll", None) else None
-        candidate_roll_id = candidate.roll_id if getattr(candidate, "roll_id", None) else None
-        candidate_style = getattr(candidate, "building_style", None)
+    # ---------------------------------------
+    # 1. Base queryset: spatial prune only
+    # ---------------------------------------
+    excluded = excluded or []
 
-        comp_market_group = resolve_market_group(candidate.neighborhood_code) or getattr(candidate, "city_district", None)
-
-        comp_snapshot = PropertySnapshot(
-            parcel_number=candidate.parcel_number,
-            address=candidate.address or "Unknown address",
-            sale_price=sale_price,
-            sale_date=_safe_date(getattr(candidate, "comp_sale_date", None)),
-            property_type=candidate.property_type,
-            living_area=_to_decimal(candidate.living_area),
-            bedrooms=_to_decimal(candidate.bedrooms),
-            bathrooms=_to_decimal(candidate.bathrooms),
-            year_built=int(candidate.year_built) if candidate.year_built else None,
-            effective_year_built=int(candidate.eff_year_built) if candidate.eff_year_built else None,
-            garage_sqft=_to_decimal(candidate.garage_sqft),
-            acres=_to_decimal(candidate.acres),
-            assessed_value=assessed_value,
-            geom=_ensure_wgs84(candidate.geom),
-            metadata={
-                "sale_deed_type": getattr(candidate, "comp_deed_type", None),
-                "neighborhood_code": candidate.neighborhood_code,
-                "city_district": getattr(candidate, "city_district", None),
-                "valuation_area": comp_market_group,
-                "roll_year": candidate_roll_year,
-                "roll_id": candidate_roll_id,
-                "assessor_building_style": candidate_style,
-                "assessed_value": float(assessed_value) if assessed_value is not None else None,
-                "finished_basement_sqft": float(candidate.finished_basement) if candidate.finished_basement else None,
-                "unfinished_basement_sqft": (
-                    float(candidate.unfinished_basement) if candidate.unfinished_basement else None
-                ),
-            },
+    qs = (
+        Assessor.objects
+        .filter(
+            geom__isnull=False,
+            property_type="R",
         )
-        has_basement = False
-        if candidate.finished_basement and candidate.finished_basement > 0:
-            has_basement = True
-        if candidate.unfinished_basement and candidate.unfinished_basement > 0:
-            has_basement = True
-        comp_snapshot.metadata["has_basement"] = has_basement
+        .exclude(parcel_number=subject.parcel_number)
+        .exclude(parcel_number__in=excluded)
+        .annotate(
+            geom_4326=Transform("geom", WGS84_SRID),
+        )
+        .select_related("roll")
+    )
 
-        # Attach improvement rollup for comparable display
-        if load_improvements:
-            comp_snapshot.metadata["improvements"] = get_improvement_rollup(
-                candidate.parcel_number,
-                roll_year=candidate_roll_year,
-                roll_id=candidate_roll_id,
-                assessor_building_style=candidate_style,
-                cache=rollup_cache,
-            )
-        else:
-            comp_snapshot.metadata["improvements"] = {}
-
-        comparables.append(
-            ComparableResult(
-                snapshot=comp_snapshot,
-                sale_price=sale_price.quantize(Decimal("0.01")),
-                assessed_value=assessed_value.quantize(Decimal("0.01")) if assessed_value is not None else None,
-                sale_date=_safe_date(getattr(candidate, "comp_sale_date", None)),
-                distance_meters=float(distance_meters) if distance_meters else None,
-                distance_miles=distance_miles,
-                difference_flags=difference_flags,
-                inclusion_rank=0,
+    if search_radius is not None:
+        qs = qs.filter(
+            geom_4326__distance_lte=(
+                geom,
+                D(m=search_radius),
             )
         )
 
-    comparables = _sort_comparables(comparables, sort_field, sort_direction)
+    distance_expr = Distance("geom_4326", geom, spheroid=True)
+    qs = qs.annotate(
+        distance_sort=distance_expr,
+        distance_meters=distance_expr,
+    )
 
-    for idx, comp in enumerate(comparables, start=1):
+    # ---------------------------------------
+    # 2. Structural filters (safe access)
+    # ---------------------------------------
+    min_acres = getattr(filters, "min_acres", None)
+    max_acres = getattr(filters, "max_acres", None)
+    min_year  = getattr(filters, "min_year", None)
+    max_year  = getattr(filters, "max_year", None)
+
+    if min_acres is not None:
+        qs = qs.filter(acres__gte=min_acres)
+    if max_acres is not None:
+        qs = qs.filter(acres__lte=max_acres)
+
+    if min_year is not None:
+        qs = qs.filter(eff_year_built__gte=min_year)
+    if max_year is not None:
+        qs = qs.filter(eff_year_built__lte=max_year)
+
+    # ---------------------------------------
+    # 3. Annotate: latest valid sale per parcel
+    # ---------------------------------------
+    sale_sq = (
+        Sales.objects
+        .filter(
+            parcel_number=OuterRef("parcel_number"),
+            sale_type__iregex=r"^\s*valid sale\s*$",
+        )
+        .order_by("-sale_date")
+    )
+
+    qs = qs.annotate(
+        comp_sale_price=Subquery(sale_sq.values("sale_price")[:1]),
+        comp_sale_date=Subquery(sale_sq.values("sale_date")[:1]),
+        comp_deed_type=Subquery(sale_sq.values("deed_type")[:1]),
+    ).exclude(comp_sale_price__isnull=True)
+
+    # ---------------------------------------
+    # 4. Recency filtering
+    # ---------------------------------------
+    sale_cutoff = _sale_date_cutoff(max_sale_age_days)
+    if sale_cutoff is not None:
+        qs = qs.filter(comp_sale_date__isnull=False, comp_sale_date__gte=sale_cutoff)
+    else:
+        qs = qs.filter(comp_sale_date__isnull=False)
+
+    # ---------------------------------------
+    # 5. Sorting
+    # ---------------------------------------
+    normalized_sort = (sort_field or "").strip().lower()
+    if normalized_sort == "sale_price":
+        order_by = ("-comp_sale_price",)
+    elif normalized_sort == "sale_date":
+        order_by = ("-comp_sale_date",)
+    else:
+        order_by = ("distance_meters",)
+
+    if (sort_direction or "").lower() == "desc":
+        order_by = tuple(
+            f"-{f}" if not f.startswith("-") else f[1:]
+            for f in order_by
+        )
+
+    oversample_factor = max(1, int(oversample_factor or 1))
+    distinct_order = ("parcel_number",) + order_by
+    qs = qs.order_by(*distinct_order).distinct("parcel_number")
+
+    total_needed = limit * oversample_factor
+    raw_rows: List[Assessor] = []
+    fetched_parcels: set[str] = set()
+
+    def _fetch_rows(base_qs, needed: int) -> None:
+        if needed <= 0:
+            return
+        rows = list(base_qs[:needed])
+        for row in rows:
+            parcel = getattr(row, "parcel_number", None)
+            if parcel:
+                fetched_parcels.add(parcel)
+        raw_rows.extend(rows)
+
+    if subject_neighborhood:
+        _fetch_rows(qs.filter(neighborhood_code=subject_neighborhood), total_needed)
+
+    if len(raw_rows) < total_needed and subject_city:
+        remaining = total_needed - len(raw_rows)
+        city_qs = qs.filter(city_district=subject_city)
+        if fetched_parcels:
+            city_qs = city_qs.exclude(parcel_number__in=list(fetched_parcels))
+        _fetch_rows(city_qs, remaining)
+
+    if len(raw_rows) < total_needed:
+        remaining = total_needed - len(raw_rows)
+        fallback_qs = qs
+        if fetched_parcels:
+            fallback_qs = fallback_qs.exclude(parcel_number__in=list(fetched_parcels))
+        _fetch_rows(fallback_qs, remaining)
+
+    # ---------------------------------------
+    # 6. Build ComparableResult structures
+    # ---------------------------------------
+    comps: List[ComparableResult] = []
+    seen_parcels: set[str] = set()
+    for row in raw_rows:
+        parcel_id = getattr(row, "parcel_number", None)
+        if not parcel_id or parcel_id in seen_parcels:
+            continue
+        snapshot = PropertySnapshot.from_assessor_row(row, rollup_cache=rollup_cache)
+
+        distance_measure = getattr(row, "distance_meters", None)
+        distance_value_m = None
+        if distance_measure is not None:
+            try:
+                distance_value_m = float(distance_measure.m)
+            except AttributeError:
+                distance_value_m = float(distance_measure)
+
+        if distance_value_m is not None:
+            snapshot.metadata.setdefault("distance_meters", distance_value_m)
+
+        comp_sale_date = _safe_date(row.comp_sale_date)
+        location_score = _compute_location_score(subject, snapshot, distance_value_m, search_radius)
+        time_score = _compute_time_score(comp_sale_date, valuation_date)
+        physical_score = _compute_physical_score(subject, snapshot)
+        score_obj = ComparableScore.from_components(location_score, time_score, physical_score)
+
+        comp = ComparableResult(
+            snapshot=snapshot,
+            sale_price=row.comp_sale_price,
+            assessed_value=_to_decimal(getattr(row, "assessed_value", None)),
+            sale_date=comp_sale_date,
+            distance_meters=distance_value_m,
+            distance_miles=(
+                Decimal(str(distance_value_m / 1609.34))
+                if distance_value_m is not None else None
+            ),
+            difference_flags=_compute_difference_flags(subject, row),
+            inclusion_rank=len(comps) + 1,
+            score=score_obj,
+        )
+
+        seen_parcels.add(parcel_id)
+        comps.append(comp)
+
+    # ---------------------------------------
+    # 7. Sort + prefetch improvements if requested
+    # ---------------------------------------
+    comps = _sort_comparables(comps, sort_field, sort_direction)
+    comps = comps[:limit]
+
+    for idx, comp in enumerate(comps, start=1):
         comp.inclusion_rank = idx
 
-    return CmaComputation(
-        subject=subject,
-        comparables=comparables[:limit],
-        filters=filters,
-        sort_field=sort_field,
-        sort_direction=sort_direction,
+    if load_improvements:
+        _prefetch_improvements(comps, rollup_cache)
+
+    t1 = time.perf_counter()
+    logger.info(
+        f"[CMA] build_comparables for {subject.parcel_number} "
+        f"returned {len(comps)} comps in {t1 - t0:.3f}s"
     )
+
+    return ComputationResult(subject, comps, filters, sort_field, sort_direction)
+
+def _prefetch_improvements(comps, rollup_cache):
+    """
+    Preload improvements into each ComparableResult.snapshot.metadata["improvements"].
+    Avoids N+1 queries.
+    """
+    for comp in comps:
+        snap = comp.snapshot
+        if "improvements" not in snap.metadata:
+            snap.metadata["improvements"] = get_improvement_rollup(
+                snap.parcel_number,
+                roll_year=snap.metadata.get("assessment_roll_year"),
+                roll_id=snap.metadata.get("roll_id"),
+                assessor_building_style=snap.metadata.get("assessor_building_style"),
+                cache=rollup_cache,
+            )
 
 
 def _sort_comparables(
     comparables: List[ComparableResult], sort_field: str, sort_direction: str
 ) -> List[ComparableResult]:
-    reverse = sort_direction.lower() == "desc"
+    normalized_field = (sort_field or "").strip().lower()
+    normalized_direction = (sort_direction or "").strip().lower()
+    if normalized_direction not in {"asc", "desc"}:
+        normalized_direction = "desc"
 
     key_map = {
         "sale_price": lambda c: c.sale_price,
@@ -583,7 +1019,22 @@ def _sort_comparables(
         "gpa": lambda c: Decimal("0"),
         "total_adjustment": lambda c: Decimal("0"),
     }
-    key_func = key_map.get(sort_field, key_map["distance"])
+
+    def score_key(comp: ComparableResult) -> Tuple[float, float, float, float, int, float]:
+        total = float(comp.score.total_score) if comp.score else 0.0
+        loc = float(comp.score.location_score) if comp.score else 0.0
+        time_comp = float(comp.score.time_score) if comp.score else 0.0
+        physical = float(comp.score.physical_score) if comp.score else 0.0
+        sale_ord = comp.sale_date.toordinal() if comp.sale_date else 0
+        distance = float(comp.distance_miles) if comp.distance_miles is not None else float("inf")
+        return (total, loc, time_comp, physical, sale_ord, -distance)
+
+    if normalized_field == "score" or normalized_field not in key_map:
+        reverse = normalized_direction != "asc"
+        return sorted(comparables, key=score_key, reverse=reverse)
+
+    reverse = normalized_direction == "desc"
+    key_func = key_map[normalized_field]
     return sorted(comparables, key=key_func, reverse=reverse)
 
 
@@ -681,7 +1132,7 @@ def fetch_sales_within_view(
     if not subject.geom or not filters.bbox:
         return []
 
-    queryset = _base_queryset(subject)
+    queryset = _base_queryset(subject, max_sale_age_days=DEFAULT_MAX_SALE_AGE_DAYS)
     queryset = apply_filters(queryset, filters)
     queryset = queryset.order_by("distance_sort")[:limit]
 

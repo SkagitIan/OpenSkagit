@@ -41,6 +41,7 @@ CMA_ALLOWED_SORT_FIELDS = {
     "sale_price",
     "sale_date",
     "adjusted_price",  # legacy alias; treated as sale_price
+    "score",
 }
 CMA_ALLOWED_SORT_DIRECTIONS = {"asc", "desc"}
 
@@ -168,8 +169,8 @@ def _get_parcel_state(request, parcel_number: str) -> Dict[str, Any]:
     if not isinstance(parcel_state, dict):
         parcel_state = {
             "excluded": [],
-            "sort_field": "distance",
-            "sort_direction": "asc",
+            "sort_field": "score",
+            "sort_direction": "desc",
         }
         state[parcel_number] = parcel_state
         request.session.modified = True
@@ -191,12 +192,12 @@ def _toggle_comparable_inclusion(request, parcel_number: str, comp_parcel: str) 
 def _current_sort(
     request, parcel_state: Dict[str, Any], requested_field: Optional[str], requested_direction: Optional[str]
 ):
-    field = requested_field or parcel_state.get("sort_field") or "distance"
-    direction = requested_direction or parcel_state.get("sort_direction") or "asc"
+    field = requested_field or parcel_state.get("sort_field") or "score"
+    direction = requested_direction or parcel_state.get("sort_direction") or "desc"
     if field not in CMA_ALLOWED_SORT_FIELDS:
-        field = "distance"
+        field = "score"
     if direction not in CMA_ALLOWED_SORT_DIRECTIONS:
-        direction = "asc"
+        direction = "desc"
     if parcel_state.get("sort_field") != field or parcel_state.get("sort_direction") != direction:
         parcel_state["sort_field"] = field
         parcel_state["sort_direction"] = direction
@@ -381,13 +382,34 @@ def _snapshot_adjustment_payload(
 ) -> Dict[str, Any]:
     metadata = _metadata_dict(snapshot)
     sale_date = snapshot.sale_date.isoformat() if snapshot.sale_date else None
+    lot_acres_val: Optional[float] = None
+    if snapshot.lot_acres is not None:
+        try:
+            lot_acres_val = float(snapshot.lot_acres)
+        except (TypeError, ValueError):
+            lot_acres_val = None
+    if lot_acres_val is None:
+        raw_lot = metadata.get("lot_acres")
+        try:
+            lot_acres_val = float(raw_lot) if raw_lot is not None else None
+        except (TypeError, ValueError):
+            lot_acres_val = None
+
+    age_val = metadata.get("age")
+    if age_val is None:
+        age_val = _calculate_age(snapshot, snapshot.sale_date)
+
+    has_garage_val = metadata.get("has_garage")
+    if has_garage_val is None:
+        has_garage_val = _boolean_flag(snapshot.garage_sqft)
+
     payload = {
         "GLA": float(snapshot.living_area) if snapshot.living_area is not None else None,
-        "lot_acres": float(snapshot.acres) if snapshot.acres is not None else None,
-        "age": _calculate_age(snapshot, snapshot.sale_date),
+        "lot_acres": lot_acres_val,
+        "age": age_val,
         "quality_score": _quality_score(metadata),
         "condition_score": _condition_score(metadata),
-        "has_garage": _boolean_flag(snapshot.garage_sqft),
+        "has_garage": has_garage_val,
         "has_basement": _has_basement(metadata),
         "is_view": _boolean_flag(metadata.get("has_view")),
         "sale_date": sale_date,
@@ -1728,8 +1750,8 @@ def cma_share(request, share_uuid):
         subject=subject,
         filters=filters,
         excluded=[],
-        sort_field="distance",
-        sort_direction="asc",
+        sort_field="score",
+        sort_direction="desc",
         limit=cma.MAX_COMPARABLE_LIMIT,
     )
 
