@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 import re
 
-from openskagit.models import Assessor
-from openskagit.models import Improvements
+from openskagit.models import Assessor, Improvements
 
 
 HOME_BASE = {
@@ -13,8 +13,11 @@ HOME_BASE = {
 BATH_MAP = {
     "MB": 1.0,
     "FB": 1.0,
+    "2FB": 2.0,
+    "3FB": 3.0, 
     "3QB": 0.75,
     "HB": 0.5,
+    "2HB": 1.0, 
 }
 
 
@@ -26,38 +29,34 @@ def normalize_code(raw):
     return c
 
 
-def is_home_improvement(raw):
-    code = normalize_code(raw)
-    if code in HOME_BASE:
-        return True
-    for b in HOME_BASE:
-        if code.startswith(b):
-            return True
-    return False
-
-
 class Command(BaseCommand):
-    help = "Calculate bathrooms from improvement plumbing codes."
+    help = "Calculate bathrooms from improvement plumbing codes (roll=2025)."
 
     def handle(self, *args, **options):
-        self.stdout.write("Calculating bathrooms with normalized improvement codes…")
+        self.stdout.write("Calculating bathrooms for roll=2025…")
 
-        # Get improvements that LOOK LIKE home improvements
-        improvements = Improvements.objects.filter(
-        roll__year=2025).values(
-            "parcel_number",
-            "plumbing_code",
-            "improvement_detail_type_code",
+        # Push as much filtering into SQL as possible
+        home_prefix_filter = (
+              Q(improvement_detail_type_code__istartswith="MA")
+            | Q(improvement_detail_type_code__istartswith="MA1.5")
+            | Q(improvement_detail_type_code__istartswith="MA2")
+            | Q(improvement_detail_type_code__istartswith="MA2.5")
+            | Q(improvement_detail_type_code__istartswith="UF")
+            | Q(improvement_detail_type_code__istartswith="SW")
+            | Q(improvement_detail_type_code__istartswith="MW")
+            | Q(improvement_detail_type_code__istartswith="PM")
+        )
+
+        improvements = (
+            Improvements.objects
+            .filter(roll__year=2025)
+            .filter(home_prefix_filter)
+            .values("parcel_number", "plumbing_code", "improvement_detail_type_code")
         )
 
         parcel_bath_totals = {}
 
-        for imp in improvements.iterator(chunk_size=2000):
-            raw_code = imp["improvement_detail_type_code"]
-
-            if not is_home_improvement(raw_code):
-                continue
-
+        for imp in improvements.iterator(chunk_size=5000):
             raw_plumbing = (imp["plumbing_code"] or "").strip()
             if not raw_plumbing:
                 continue
@@ -68,13 +67,18 @@ class Command(BaseCommand):
             pn = imp["parcel_number"]
             parcel_bath_totals[pn] = parcel_bath_totals.get(pn, 0) + bath_value
 
-        # Update assessor table
-        assessors = Assessor.objects.filter(parcel_number__in=list(parcel_bath_totals.keys()))
-        updated = 0
+        parcel_numbers = parcel_bath_totals.keys()
 
-        for a in assessors.iterator(chunk_size=1000):
-            a.bathrooms = parcel_bath_totals.get(a.parcel_number, 0)
-            a.save(update_fields=["bathrooms"])
-            updated += 1
+        assessors = Assessor.objects.filter(
+            roll__year=2025,
+            parcel_number__in=parcel_numbers
+        )
 
-        self.stdout.write(self.style.SUCCESS(f"Updated {updated} assessor rows."))
+        batch = []
+        for a in assessors:
+            a.bathrooms = parcel_bath_totals[a.parcel_number]
+            batch.append(a)
+
+        Assessor.objects.bulk_update(batch, ["bathrooms"], batch_size=1000)
+
+        self.stdout.write(self.style.SUCCESS(f"Updated {len(batch)} assessor rows."))

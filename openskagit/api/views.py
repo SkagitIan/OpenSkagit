@@ -1381,6 +1381,7 @@ class AppealComparablesView(APIView):
     @staticmethod
     def _serialize_comparable(comp: cma.ComparableResult) -> Dict[str, Any]:
         metadata = comp.snapshot.metadata if isinstance(comp.snapshot.metadata, dict) else {}
+        score_payload = comp.score
         return _normalize(
             {
                 "parcel_number": comp.snapshot.parcel_number,
@@ -1397,6 +1398,10 @@ class AppealComparablesView(APIView):
                 "effective_year_built": comp.snapshot.effective_year_built,
                 "metadata": metadata,
                 "rank": comp.inclusion_rank,
+                "score": score_payload.total_score if score_payload else None,
+                "location_score": score_payload.location_score if score_payload else None,
+                "time_score": score_payload.time_score if score_payload else None,
+                "physical_score": score_payload.physical_score if score_payload else None,
             }
         )
 

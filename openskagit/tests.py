@@ -224,6 +224,7 @@ class SubjectMarketGroupHelperTests(SimpleTestCase):
             sale_date=None,
             property_type=None,
             living_area=None,
+            lot_acres=None,
             bedrooms=None,
             bathrooms=None,
             year_built=None,

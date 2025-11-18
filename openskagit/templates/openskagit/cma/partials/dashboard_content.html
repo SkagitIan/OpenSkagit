@@ -1,4 +1,4 @@
-{% load humanize %}
+{% load humanize formatting %}
 {% if error %}
 <div class="bg-rose-500/10 border border-rose-500/30 text-rose-200 rounded-2xl px-6 py-4">
     {{ error }}
@@ -22,7 +22,7 @@
                         <dd class="mt-1 text-white font-semibold">
                             {% if subject.bedrooms %}{{ subject.bedrooms|floatformat:0 }} bd{% else %}—{% endif %}
                             /
-                            {% if subject.bathrooms %}{{ subject.bathrooms|floatformat:1 }} ba{% else %}—{% endif %}
+                            {% if subject.bathrooms %}{{ subject.bathrooms|quarter_baths }} ba{% else %}—{% endif %}
                         </dd>
                     </div>
                     <div>

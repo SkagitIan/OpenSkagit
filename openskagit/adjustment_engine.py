@@ -7,8 +7,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .models import AdjustmentCoefficient
 
+# Terms we store in the DB but do NOT expose as separate “adjustments”
 IGNORED_TERMS = {"const", "missing_quality", "missing_condition"}
 IGNORED_PREFIXES = ("pt_",)
+
+# These must exist in AdjustmentCoefficient for a market group to be usable
 REQUIRED_TERMS = {
     "log_area",
     "log_lot",
@@ -20,6 +23,8 @@ REQUIRED_TERMS = {
     "has_basement",
     "is_view",
 }
+
+# Keys we emit into the adjustments dict for each comparable
 ADJUSTMENT_KEYS = (
     "area",
     "lot",
@@ -32,6 +37,7 @@ ADJUSTMENT_KEYS = (
     "time",
 )
 
+# Same anchor you used in the regression scripts
 REGRESSION_ANCHOR_DATE = date(2015, 1, 1)
 
 
@@ -102,16 +108,25 @@ def compute_adjustments(
     for idx, comp in enumerate(comps or [], start=1):
         if not isinstance(comp, dict):
             continue
+
         comp_features = _extract_features(comp)
         base_price = _to_float(comp.get("sale_price")) or 0.0
+
         adjustments = _build_adjustments(
             subject_features=subject_features,
             comp_features=comp_features,
             coefficients=coefficients,
             subject_pred_price=subject_price,
         )
+
         total_adjustment = sum(adjustments.values())
-        comp_id = comp.get("comp_id") or comp.get("parcel_number") or comp.get("id") or f"comp_{idx}"
+        comp_id = (
+            comp.get("comp_id")
+            or comp.get("parcel_number")
+            or comp.get("id")
+            or f"comp_{idx}"
+        )
+
         comparable_payloads.append(
             {
                 "comp_id": str(comp_id),
@@ -136,8 +151,22 @@ def _build_adjustments(
     coefficients: Dict[str, float],
     subject_pred_price: float,
 ) -> Dict[str, float]:
-    adjustments = {key: 0.0 for key in ADJUSTMENT_KEYS}
+    """
+    Build per-feature dollar adjustments to apply to a comparable sale so that
+    the comp reflects the subject as if it had the same characteristics.
 
+    IMPORTANT:
+    - All deltas are computed as SUBJECT minus COMP.
+      * If the comp is superior on a feature, the adjustment will be negative.
+      * If the comp is inferior, the adjustment will be positive.
+    - Time adjustments are computed against an effective valuation date
+      (today), NOT the subject's sale date.
+    """
+    adjustments: Dict[str, float] = {key: 0.0 for key in ADJUSTMENT_KEYS}
+
+    # ------------------------------------------------------------------
+    # AREA, LOT, AGE – log-based continuous adjustments
+    # ------------------------------------------------------------------
     adjustments["area"] = _multiplicative_adjustment(
         coefficients.get("log_area"),
         _delta(subject_features.log_area, comp_features.log_area),
@@ -154,6 +183,9 @@ def _build_adjustments(
         subject_pred_price,
     )
 
+    # ------------------------------------------------------------------
+    # QUALITY / CONDITION
+    # ------------------------------------------------------------------
     adjustments["quality"] = _multiplicative_adjustment(
         coefficients.get("quality_score"),
         _delta(subject_features.quality_score, comp_features.quality_score),
@@ -165,6 +197,9 @@ def _build_adjustments(
         subject_pred_price,
     )
 
+    # ------------------------------------------------------------------
+    # BINARY FEATURES – GARAGE / BASEMENT / VIEW
+    # ------------------------------------------------------------------
     adjustments["garage"] = _multiplicative_adjustment(
         coefficients.get("has_garage"),
         _delta(subject_features.has_garage, comp_features.has_garage),
@@ -181,16 +216,42 @@ def _build_adjustments(
         subject_pred_price,
     )
 
-    months = _months_between(subject_features.sale_date, comp_features.sale_date)
-    adjustments["time"] = _multiplicative_adjustment(coefficients.get("t"), months, subject_pred_price)
+    # ------------------------------------------------------------------
+    # TIME TREND – RELATIVE TO EFFECTIVE VALUATION DATE
+    # ------------------------------------------------------------------
+    # We treat "today" as the effective date for the CMA. Time is measured on
+    # the same regression scale as the training data: months since 2015-01-01.
+    effective_date = date.today()
+    subject_t = _regression_time_value(effective_date)
+    comp_t = _regression_time_value(comp_features.sale_date)
+
+    if subject_t is not None and comp_t is not None:
+        months_delta = subject_t - comp_t  # SUBJECT minus COMP
+        # Guard against pathological dates producing insane deltas
+        if months_delta > 120:
+            months_delta = 120.0
+        elif months_delta < -120:
+            months_delta = -120.0
+    else:
+        months_delta = None
+
+    adjustments["time"] = _multiplicative_adjustment(
+        coefficients.get("t"),
+        months_delta,
+        subject_pred_price,
+    )
 
     return adjustments
 
 
 def _load_coefficients(
-    market_group: str, *, run_id: Optional[str] = None, include_all_terms: bool = False
+    market_group: str,
+    *,
+    run_id: Optional[str] = None,
+    include_all_terms: bool = False,
 ) -> Tuple[Dict[str, float], Optional[str]]:
     qs = AdjustmentCoefficient.objects.filter(market_group=market_group)
+
     target_run = run_id
     if not target_run:
         target_run = qs.order_by("-created_at").values_list("run_id", flat=True).first()
@@ -203,6 +264,7 @@ def _load_coefficients(
         if not include_all_terms and (term in IGNORED_TERMS or term.startswith(IGNORED_PREFIXES)):
             continue
         coeffs[term] = coeff.beta
+
     return coeffs, target_run
 
 
@@ -212,6 +274,11 @@ def predict_price(
     market_group: str,
     run_id: Optional[str] = None,
 ) -> Optional[float]:
+    """
+    Predict a sale price directly from coefficients for a given market group.
+
+    Used to generate the subject's `subject_pred_price` in your CMA flow.
+    """
     coeffs, _ = _load_coefficients(market_group, run_id=run_id, include_all_terms=True)
     if not coeffs:
         return None
@@ -228,10 +295,12 @@ def predict_price(
             return
         log_price += beta * value
 
+    # Core continuous features
     accumulate("log_area", features.log_area)
     accumulate("log_lot", features.log_lot)
     accumulate("log_age", features.log_age)
 
+    # Quality / condition
     if features.quality_score is None:
         accumulate("missing_quality", 1.0)
     else:
@@ -242,18 +311,22 @@ def predict_price(
     else:
         accumulate("condition_score", features.condition_score)
 
+    # Binary features
     accumulate("has_garage", float(features.has_garage) if features.has_garage is not None else None)
     accumulate("has_basement", float(features.has_basement) if features.has_basement is not None else None)
     accumulate("is_view", float(features.is_view) if features.is_view is not None else None)
 
+    # Time index on the regression scale
     time_index = _regression_time_value(features.sale_date)
     accumulate("t", time_index)
 
+    # Area × time interaction is used for prediction only (not displayed as a separate adjustment)
     if time_index is not None and features.log_area is not None:
         beta = coeffs.get("area_time")
         if beta is not None:
             log_price += beta * features.log_area * time_index
 
+    # Property-type dummies (pt_*)
     pt_term = _property_type_term(payload.get("property_type"))
     if pt_term is not None and pt_term in coeffs:
         log_price += coeffs[pt_term]
@@ -265,12 +338,15 @@ def predict_price(
 
 
 def _extract_features(payload: Dict[str, Any]) -> FeatureSnapshot:
+    """Normalize raw CMA payload into a typed FeatureSnapshot."""
     gla = _to_float(payload.get("GLA") or payload.get("gla") or payload.get("living_area"))
     if gla is not None and gla <= 0:
         gla = None
+
     lot_acres = _to_float(payload.get("lot_acres"))
     if lot_acres is not None and lot_acres < 0:
         lot_acres = None
+
     age = _to_float(payload.get("age"))
     if age is not None and age < 0:
         age = None
@@ -292,6 +368,15 @@ def _extract_features(payload: Dict[str, Any]) -> FeatureSnapshot:
 
 
 def _multiplicative_adjustment(beta: Optional[float], delta: Optional[float], subject_pred_price: float) -> float:
+    """
+    Dollarize a coefficient using the standard log-price adjustment:
+
+        new_price = subject_pred_price * exp(beta * delta)
+
+    We return the difference:
+
+        adjustment = subject_pred_price * (exp(beta * delta) - 1)
+    """
     if beta is None or delta is None or delta == 0:
         return 0.0
     delta_log_price = beta * delta
@@ -300,9 +385,21 @@ def _multiplicative_adjustment(beta: Optional[float], delta: Optional[float], su
 
 
 def _delta(subject_value: Optional[float], comp_value: Optional[float]) -> Optional[float]:
+    """
+    Compute SUBJECT minus COMP for a given feature.
+
+    This direction is intentional:
+
+    - If the comp is superior on a feature (e.g., larger GLA),
+      subject_value - comp_value will be negative and the adjustment
+      will reduce the comp's indicated value.
+
+    - If the comp is inferior (e.g., smaller GLA), the delta is positive
+      and the adjustment will increase the comp's indicated value.
+    """
     if subject_value is None or comp_value is None:
         return None
-    return comp_value - subject_value
+    return subject_value - comp_value
 
 
 def _regression_time_value(target_date: Optional[date]) -> Optional[float]:
@@ -312,11 +409,15 @@ def _regression_time_value(target_date: Optional[date]) -> Optional[float]:
 
 
 def _months_between(subject_date: Optional[date], comp_date: Optional[date]) -> Optional[float]:
+    """
+    Retained for backwards compatibility (not used in the new adjustment code).
+    Kept in case any external callers still reference it.
+    """
     subject_value = _regression_time_value(subject_date)
     comp_value = _regression_time_value(comp_date)
     if subject_value is None or comp_value is None:
         return None
-    return comp_value - subject_value
+    return subject_value - comp_value
 
 
 def _currency(value: float) -> float:
@@ -347,12 +448,12 @@ def _to_flag(value: Any) -> Optional[int]:
 
 
 def _parse_date(value: Any) -> Optional[date]:
-    if not value:
-        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
     if isinstance(value, datetime):
         return value.date()
-    if isinstance(value, date):
-        return value
+    if value in (None, "", "null"):
+        return None
     if isinstance(value, str):
         text = value.strip()
         if not text:

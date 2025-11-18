@@ -66,6 +66,16 @@
     return d.toLocaleDateString();
   }
 
+  function fmtQuarterBaths(v) {
+    if (v == null || v === '') return '—';
+    const num = Number(v);
+    if (Number.isNaN(num)) return v;
+    const rounded = Math.round(num / 0.25) * 0.25;
+    let str = rounded.toFixed(2);
+    str = str.replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return str;
+  }
+
   function setStep(activeIdx) {
     els.stepDots.forEach((dot, idx) => {
       if (idx === activeIdx) {
@@ -238,7 +248,7 @@
             <div class="text-xs text-zinc-500">${fmtDate(c.sale_date)}</div>
           </div>
         </div>
-        <div class="mt-1 text-xs text-zinc-600">Assessed ${fmtMoney(c.assessed_value)} • ${c.bedrooms ?? '—'} bd • ${c.bathrooms ?? '—'} ba • ${c.living_area_sqft ?? '—'} sf • ${c.year_built ?? '—'}</div>`;
+        <div class="mt-1 text-xs text-zinc-600">Assessed ${fmtMoney(c.assessed_value)} • ${c.bedrooms ?? '—'} bd • ${fmtQuarterBaths(c.bathrooms)} ba • ${c.living_area_sqft ?? '—'} sf • ${c.year_built ?? '—'}</div>`;
       els.compsList.appendChild(li);
     }
 

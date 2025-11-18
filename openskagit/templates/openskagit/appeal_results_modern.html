@@ -316,7 +316,7 @@
       <div class="property-stat__label">Bedrooms</div>
     </div>
     <div class="property-stat">
-      <div class="property-stat__value">{% if subject.bathrooms %}{{ subject.bathrooms|floatformat:"-1" }}{% else %}—{% endif %}</div>
+      <div class="property-stat__value">{% if subject.bathrooms %}{{ subject.bathrooms|quarter_baths }}{% else %}—{% endif %}</div>
       <div class="property-stat__label">Bathrooms</div>
     </div>
     <div class="property-stat">

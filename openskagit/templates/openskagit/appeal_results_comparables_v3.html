@@ -496,7 +496,7 @@
               <div class="comp-stat__label">Beds</div>
             </div>
             <div>
-              <div class="comp-stat__value">{{ comp.bathrooms|default:"—"|floatformat:"-1" }}</div>
+              <div class="comp-stat__value">{{ comp.bathrooms|quarter_baths|default:"—" }}</div>
               <div class="comp-stat__label">Baths</div>
             </div>
             <div>
@@ -566,7 +566,7 @@
               <div class="comp-stat__label">Beds</div>
             </div>
             <div>
-              <div class="comp-stat__value">{{ comp.bathrooms|default:"—"|floatformat:"-1" }}</div>
+              <div class="comp-stat__value">{{ comp.bathrooms|quarter_baths|default:"—" }}</div>
               <div class="comp-stat__label">Baths</div>
             </div>
             <div>
@@ -685,7 +685,7 @@
             date: "{{ comp.sale_date|date:"M j, Y" }}",
             distance: "{{ comp.distance_miles|floatformat:2 }}",
             beds: "{{ comp.bedrooms|default:"—"|floatformat:"-1" }}",
-            baths: "{{ comp.bathrooms|default:"—"|floatformat:"-1" }}",
+            baths: "{{ comp.bathrooms|quarter_baths|default:"—" }}",
             sqft: "{{ comp.living_area|default:"—"|floatformat:0|intcomma }}",
             adjusted_value: {{ comp.adjusted_value|default:"null" }},
             total_adjustment: {{ comp.total_adjustment|default:"null" }}

@@ -88,9 +88,9 @@
             <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.bathrooms %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
                 <p class="uppercase text-[10px] tracking-wide">Baths</p>
                 <p class="font-semibold">
-                    {% if subject.bathrooms %}{{ subject.bathrooms|floatformat:1 }}{% else %}—{% endif %}
+                    {% if subject.bathrooms %}{{ subject.bathrooms|quarter_baths }}{% else %}—{% endif %}
                     /
-                    {% if comparable.snapshot.bathrooms %}{{ comparable.snapshot.bathrooms|floatformat:1 }}{% else %}—{% endif %}
+                    {% if comparable.snapshot.bathrooms %}{{ comparable.snapshot.bathrooms|quarter_baths }}{% else %}—{% endif %}
                 </p>
             </div>
             <div class="rounded-lg px-3 py-2 border {% if comparable.difference_flags.garage_sqft %}border-amber-400/40 bg-amber-500/10 text-amber-200{% else %}border-slate-800 bg-slate-950/40 text-slate-300{% endif %}">
