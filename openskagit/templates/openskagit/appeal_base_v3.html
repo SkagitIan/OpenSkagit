@@ -172,6 +172,17 @@
       line-height: 1.7;
     }
 
+    .app-header__subtitle-full,
+    .app-header__subtitle-compact {
+      display: block;
+    }
+
+    .app-header__subtitle-compact {
+      display: none;
+      font-weight: 600;
+      color: var(--gray-700);
+    }
+
     /* === Progress Indicator === */
     .progress-stepper {
       display: flex;
@@ -339,6 +350,22 @@
         padding: var(--space-4) var(--space-3) var(--space-12);
       }
 
+      .app-header {
+        margin-bottom: var(--space-8);
+      }
+
+      .app-header__subtitle {
+        font-size: 1rem;
+      }
+
+      .app-header__subtitle-full {
+        display: none;
+      }
+
+      .app-header__subtitle-compact {
+        display: block;
+      }
+
       .progress-stepper {
         flex-direction: column;
         gap: var(--space-4);
@@ -372,6 +399,155 @@
         transition-duration: 0.01ms !important;
       }
     }
+
+    /* === Floating Chat Widget === */
+    .appeal-chat-widget {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 1.5rem;
+      z-index: 60;
+      display: inline-block;
+    }
+
+    .appeal-chat-widget__button {
+      background: var(--primary-600);
+      color: white;
+      border: none;
+      border-radius: var(--radius-full);
+      padding: var(--space-3) var(--space-5);
+      font-weight: 600;
+      box-shadow: var(--shadow-lg);
+      cursor: pointer;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .appeal-chat-widget__button:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-2xl);
+    }
+
+    .appeal-chat-widget__panel {
+      width: min(360px, calc(100vw - 2rem));
+      background: white;
+      border-radius: var(--radius-2xl);
+      border: 1px solid var(--gray-200);
+      box-shadow: var(--shadow-2xl);
+      padding: var(--space-5);
+      position: absolute;
+      bottom: calc(100% + var(--space-3));
+      left: 0;
+      transform: translateY(10px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform var(--transition-base), opacity var(--transition-base);
+    }
+
+    .appeal-chat-widget__panel.is-open {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .appeal-chat-widget__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .appeal-chat-widget__close {
+      background: transparent;
+      border: none;
+      color: var(--gray-500);
+      font-size: 1.25rem;
+      cursor: pointer;
+    }
+
+    .appeal-chat-widget__messages {
+      max-height: 280px;
+      overflow-y: auto;
+      margin-bottom: var(--space-3);
+    }
+
+    .appeal-chat-widget__form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .appeal-chat-widget__form textarea {
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: var(--space-3);
+      resize: none;
+      min-height: 72px;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    .appeal-chat-widget__actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+    }
+
+    .appeal-chat-widget__actions button {
+      border: none;
+      border-radius: var(--radius-full);
+      padding: var(--space-2) var(--space-4);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .appeal-chat-widget__actions button[type="submit"] {
+      background: var(--primary-600);
+      color: white;
+    }
+
+    .appeal-chat-widget__status {
+      font-size: 0.75rem;
+      color: var(--gray-500);
+    }
+
+    .appeal-chat-widget__error {
+      font-size: 0.75rem;
+      color: var(--error-600);
+      min-height: 1rem;
+    }
+
+    .appeal-chat-widget__suggestions {
+      margin-top: var(--space-3);
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .appeal-chat-widget__suggestions button {
+      border: 1px solid var(--gray-200);
+      background: white;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      padding: var(--space-1) var(--space-3);
+      cursor: pointer;
+      color: var(--gray-600);
+      transition: border var(--transition-fast), color var(--transition-fast);
+    }
+
+    .appeal-chat-widget__suggestions button:hover {
+      border-color: var(--primary-400);
+      color: var(--primary-600);
+    }
+
+    .thin-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .thin-scroll::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 999px;
+    }
   </style>
 </head>
 <body>
@@ -385,11 +561,18 @@
         Property Assessment Tool
       </div>
       <h1 class="app-header__title">{% block header_title %}Property Tax Appeal Helper{% endblock %}</h1>
-      <p class="app-header__subtitle">{% block header_teaser %}Data-driven insights to help you decide if appealing your property assessment is worth pursuing.{% endblock %}</p>
+      <p class="app-header__subtitle">
+        <span class="app-header__subtitle-full">
+          {% block header_teaser %}Data-driven insights to help you decide if appealing your property assessment is worth pursuing.{% endblock %}
+        </span>
+        <span class="app-header__subtitle-compact">
+          {% block header_teaser_compact %}Smart guidance on whether your assessment is worth appealing.{% endblock %}
+        </span>
+      </p>
     </header>
 
     <div class="progress-stepper">
-      <div class="progress-step {% if step == 1 %}progress-step--active{% endif %}">
+      <div class="progress-step {% if step == 1 %}progress-step--active{% elif step > 1 %}progress-step--completed{% endif %}">
         <div class="progress-step__circle">
           {% if step > 1 %}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -428,7 +611,85 @@
     {% block content %}{% endblock %}
   </div>
 
+  {% if chat_bootstrap %}
+    <div class="appeal-chat-widget" data-chat-widget>
+      <button type="button" class="appeal-chat-widget__button" data-chat-widget-toggle>
+        Need appeal help?
+      </button>
+      <div class="appeal-chat-widget__panel" data-chat-widget-panel>
+        <div class="appeal-chat-widget__header">
+          <div>
+            <p class="text-sm font-semibold text-[var(--primary-700)]">Appeal Copilot</p>
+            <p class="text-xs text-[var(--gray-500)]">Ask questions about valuations, comps, or next steps.</p>
+          </div>
+          <button type="button" class="appeal-chat-widget__close" data-chat-widget-close>&times;</button>
+        </div>
+        <div class="appeal-chat-widget__body thin-scroll"
+             data-chat-root
+             data-chat-style="widget"
+             data-send-url="{% url 'chat' %}"
+             data-new-url="{% url 'chat-new' %}"
+             data-conversation-id="{{ chat_bootstrap.conversation_id }}">
+          <div class="appeal-chat-widget__messages thin-scroll space-y-3"
+               data-chat-messages
+               data-chat-scroll>
+            {% if chat_bootstrap.messages %}
+              {% for m in chat_bootstrap.messages %}
+                {% include "partials/message.html" with role=m.role content=m.content sources=m.sources %}
+              {% endfor %}
+            {% else %}
+              <p class="text-sm text-[var(--gray-500)]">
+                No questions yet. Ask about comparable sales or assessment changes.
+              </p>
+            {% endif %}
+          </div>
+          <form class="appeal-chat-widget__form" data-chat-form>
+            {% csrf_token %}
+            <input type="hidden"
+                   name="conversation_id"
+                   value="{{ chat_bootstrap.conversation_id }}"
+                   data-chat-conversation-input>
+            <textarea name="prompt"
+                      placeholder="How do I contest my assessed value?"
+                      data-chat-input
+                      required></textarea>
+            <div class="appeal-chat-widget__actions">
+              <div class="appeal-chat-widget__status" data-chat-status>Ready when you are.</div>
+              <button type="submit">Send</button>
+            </div>
+            <div class="appeal-chat-widget__error" data-chat-error></div>
+          </form>
+          <div class="appeal-chat-widget__suggestions">
+            <button type="button" data-chat-suggestion="How do I start a property tax appeal in Skagit County?">
+              Start an appeal
+            </button>
+            <button type="button" data-chat-suggestion="What comps can support parcel P12345?">
+              Find comps
+            </button>
+            <button type="button" data-chat-suggestion="Explain the timeline for appeal hearings.">
+              Appeal timeline
+            </button>
+          </div>
+        </div>
+        <div class="appeal-chat-widget__footer mt-4 flex items-center justify-between gap-3 text-xs text-[var(--gray-500)]">
+          <button type="button"
+                  class="rounded-full border border-[var(--gray-200)] px-3 py-1 text-[var(--gray-600)]"
+                  data-chat-reset>
+            Start over
+          </button>
+          <a href="{% url 'chatbot' %}"
+             target="_blank"
+             rel="noopener"
+             class="font-semibold text-[var(--primary-600)] hover:text-[var(--primary-500)]">
+            Open full chat
+          </a>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
   {% block extra_js %}{% endblock %}
+  <script src="{% static 'openskagit/chat.js' %}" defer></script>
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </body>
 </html>

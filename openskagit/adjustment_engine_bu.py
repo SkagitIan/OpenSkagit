@@ -72,7 +72,6 @@ class FeatureSnapshot:
     is_view: Optional[int]
     sale_date: Optional[date]
 
-
 def compute_adjustments(
     *,
     subject: Dict[str, Any],
@@ -230,13 +229,13 @@ def _build_adjustments(
     )
 
     # TIME – IAAO-STYLE
-    years = _years_between(valuation_date, comp_features.sale_date)
+    # Trend comp sale to valuation_date using the 't' coefficient.
+    months = _months_between(valuation_date, comp_features.sale_date)
     adjustments["time"] = _time_adjustment(
         coefficients.get("t"),
-        years,
+        months,
         base_sale_price,
     )
-
 
     return adjustments
 
@@ -264,6 +263,9 @@ def _load_coefficients(
 
     return coeffs, target_run
 
+from datetime import date, datetime
+
+# ...
 
 def _get_valuation_date(subject: Dict[str, Any]) -> date:
     """
@@ -293,19 +295,26 @@ def _get_valuation_date(subject: Dict[str, Any]) -> date:
 
 def _time_adjustment(
     beta_t: Optional[float],
-    years: Optional[float],
+    months: Optional[float],
     base_sale_price: float,
 ) -> float:
-    if beta_t is None or years is None or years == 0 or base_sale_price <= 0:
+    """
+    IAAO-style time adjustment:
+      - use the regression time coefficient 't' as the *market time rate*
+      - apply it to the *comp's sale price*
+      - trend the comp from sale date to the valuation date
+
+    For small changes, exp(beta_t * Δmonths) ≈ 1 + rate * Δmonths.
+    """
+    if beta_t is None or months is None or months == 0 or base_sale_price <= 0:
         return 0.0
 
-    # cap extrapolation
-    years = max(min(years, 5.0), -5.0)     # instead of 60 months
+    # prevent crazy extrapolation on very old sales
+    months = max(min(months, 60.0), -60.0)
 
-    delta_log_price = beta_t * years
+    delta_log_price = beta_t * months
     factor = math.exp(delta_log_price) - 1.0
     return base_sale_price * factor
-
 
 
 def predict_price(
@@ -448,10 +457,16 @@ def _regression_time_value(target_date: Optional[date]) -> Optional[float]:
     return (target_date - REGRESSION_ANCHOR_DATE).days / 30.4375
 
 
-def _years_between(subject_date: Optional[date], comp_date: Optional[date]) -> Optional[float]:
-    if subject_date is None or comp_date is None:
+def _months_between(subject_date: Optional[date], comp_date: Optional[date]) -> Optional[float]:
+    """
+    Retained for backwards compatibility (not used in the new adjustment code).
+    Kept in case any external callers still reference it.
+    """
+    subject_value = _regression_time_value(subject_date)
+    comp_value = _regression_time_value(comp_date)
+    if subject_value is None or comp_value is None:
         return None
-    return (subject_date - comp_date).days / 365.25
+    return subject_value - comp_value
 
 
 def _currency(value: float) -> float:

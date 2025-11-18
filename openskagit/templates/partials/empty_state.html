@@ -4,26 +4,20 @@
     Ask about parcels, zoning, or recent sales. I’ll retrieve assessor context with pgvector and explain the findings.
   </p>
   <div class="mt-6 flex flex-wrap justify-center gap-2">
-    <form hx-post="/chat/" hx-target="#messages" hx-swap="beforeend" hx-indicator="#loading">
-      {% csrf_token %}
-      <input type="hidden" name="prompt" value="Summarize parcel P12345: zoning, assessed value, and recent sales." />
-      <button type="submit" class="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-[var(--ap-ink)] hover:border-[var(--ap-purple)]/40 hover:text-[var(--ap-purple)]">
-        Explain zoning rules
-      </button>
-    </form>
-    <form hx-post="/chat/" hx-target="#messages" hx-swap="beforeend" hx-indicator="#loading">
-      {% csrf_token %}
-      <input type="hidden" name="prompt" value="Compare the last three sales within half a mile of 123 Main St." />
-      <button type="submit" class="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-[var(--ap-ink)] hover:border-[var(--ap-purple)]/40 hover:text-[var(--ap-purple)]">
-        Nearby sales comps
-      </button>
-    </form>
-    <form hx-post="/chat/" hx-target="#messages" hx-swap="beforeend" hx-indicator="#loading">
-      {% csrf_token %}
-      <input type="hidden" name="prompt" value="Share a neighborhood overview for Sedro-Woolley with school districts and property types." />
-      <button type="submit" class="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-[var(--ap-ink)] hover:border-[var(--ap-purple)]/40 hover:text-[var(--ap-purple)]">
-        Neighborhood snapshot
-      </button>
-    </form>
+    <button type="button"
+            class="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-[var(--ap-ink)] hover:border-[var(--ap-purple)]/40 hover:text-[var(--ap-purple)]"
+            data-chat-suggestion="Summarize parcel P12345: zoning, assessed value, and recent sales.">
+      Explain zoning rules
+    </button>
+    <button type="button"
+            class="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-[var(--ap-ink)] hover:border-[var(--ap-purple)]/40 hover:text-[var(--ap-purple)]"
+            data-chat-suggestion="Compare the last three sales within half a mile of 123 Main St.">
+      Nearby sales comps
+    </button>
+    <button type="button"
+            class="rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-[var(--ap-ink)] hover:border-[var(--ap-purple)]/40 hover:text-[var(--ap-purple)]"
+            data-chat-suggestion="Share a neighborhood overview for Sedro-Woolley with school districts and property types.">
+      Neighborhood snapshot
+    </button>
   </div>
 </div>
