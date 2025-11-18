@@ -40,6 +40,14 @@ ADJUSTMENT_KEYS = (
 # Same anchor you used in the regression scripts
 REGRESSION_ANCHOR_DATE = date(2015, 1, 1)
 
+# Time-adjustment controls
+# - coefficients' time term `t` is on a MONTHS scale (via _regression_time_value)
+# - cap trending distance to avoid extreme extrapolation on stale sales
+# - optional shrink allows taming adjustments if market cooled vs. long-run fit
+TIME_CAP_MONTHS: float = 60.0
+TIME_SHRINK: float = 1.0  # set < 1.0 (e.g., 0.6) to dampen time adjustments
+INCLUDE_AREA_TIME_IN_TREND: bool = True  # incorporates `area_time` into time trending when present
+
 
 class AdjustmentEngineError(Exception):
     """Base exception for the adjustment engine."""
@@ -229,12 +237,14 @@ def _build_adjustments(
         subject_pred_price,
     )
 
-    # TIME – IAAO-STYLE
-    years = _years_between(valuation_date, comp_features.sale_date)
+    # TIME – IAAO-STYLE (use MONTHS on the regression scale)
+    months = _months_between(valuation_date, comp_features.sale_date)
     adjustments["time"] = _time_adjustment(
         coefficients.get("t"),
-        years,
+        months,
         base_sale_price,
+        beta_area_time=(coefficients.get("area_time") if INCLUDE_AREA_TIME_IN_TREND else None),
+        log_area=comp_features.log_area,
     )
 
 
@@ -293,16 +303,34 @@ def _get_valuation_date(subject: Dict[str, Any]) -> date:
 
 def _time_adjustment(
     beta_t: Optional[float],
-    years: Optional[float],
+    months: Optional[float],
     base_sale_price: float,
+    *,
+    beta_area_time: Optional[float] = None,
+    log_area: Optional[float] = None,
 ) -> float:
-    if beta_t is None or years is None or years == 0 or base_sale_price <= 0:
+    """
+    IAAO-style time adjustment on the comp's base sale price.
+
+    - `beta_t` is the regression time coefficient on a MONTH scale.
+    - We trend from comp sale date to the valuation date by Δmonths.
+    - Optionally include the area×time interaction so larger homes trend slightly
+      differently when the model provides an `area_time` coefficient.
+    """
+    if beta_t is None or months is None or months == 0 or base_sale_price <= 0:
         return 0.0
 
     # cap extrapolation
-    years = max(min(years, 5.0), -5.0)     # instead of 60 months
+    months = max(min(months, TIME_CAP_MONTHS), -TIME_CAP_MONTHS)
 
-    delta_log_price = beta_t * years
+    effective_beta = beta_t
+    if beta_area_time is not None and log_area is not None:
+        effective_beta += beta_area_time * log_area
+
+    # optional damping to avoid over-aggressive trending without refitting
+    effective_beta *= TIME_SHRINK
+
+    delta_log_price = effective_beta * months
     factor = math.exp(delta_log_price) - 1.0
     return base_sale_price * factor
 
@@ -446,6 +474,19 @@ def _regression_time_value(target_date: Optional[date]) -> Optional[float]:
     if target_date is None:
         return None
     return (target_date - REGRESSION_ANCHOR_DATE).days / 30.4375
+
+
+def _months_between(subject_date: Optional[date], comp_date: Optional[date]) -> Optional[float]:
+    """Difference in the regression time index measured in MONTHS.
+
+    This matches the scale used by `t` in the coefficient table and by
+    `predict_price()` where we accumulate `t * time_index` directly.
+    """
+    subject_value = _regression_time_value(subject_date)
+    comp_value = _regression_time_value(comp_date)
+    if subject_value is None or comp_value is None:
+        return None
+    return subject_value - comp_value
 
 
 def _years_between(subject_date: Optional[date], comp_date: Optional[date]) -> Optional[float]:
