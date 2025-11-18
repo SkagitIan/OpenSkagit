@@ -2083,3 +2083,109 @@ def appeal_result_comparables(request, parcel_number: str):
             "fetch_url": request.path,
         },
     )
+
+
+@require_GET
+def methodology_view(request):
+    """
+    Public-facing page explaining the regression methodology used for property valuations.
+    Shows real coefficients and model performance metrics for transparency.
+    """
+    from .models import AdjustmentCoefficient
+    from django.db.models import Max
+
+    latest_run = AdjustmentCoefficient.objects.aggregate(Max('created_at'))['created_at__max']
+
+    market_groups = AdjustmentCoefficient.objects.values('market_group').distinct().order_by('market_group')
+
+    coefficients_by_group = {}
+    for mg in market_groups:
+        group_name = mg['market_group']
+        coeffs = AdjustmentCoefficient.objects.filter(
+            market_group=group_name,
+            created_at=latest_run
+        ).order_by('term')
+
+        coefficients_by_group[group_name] = list(coeffs)
+
+    model_stats = {
+        'ANACORTES': {'n': 4798, 'r2': 0.928, 'adj_r2': 0.928, 'COD': 6.92, 'PRD': 1.181, 'median_ratio': 0.995},
+        'BURLINGTON': {'n': 2852, 'r2': 0.931, 'adj_r2': 0.930, 'COD': 5.65, 'PRD': 1.151, 'median_ratio': 0.998},
+        'CONCRETE': {'n': 833, 'r2': 0.923, 'adj_r2': 0.921, 'COD': 7.40, 'PRD': 1.216, 'median_ratio': 0.992},
+        'LACONNER_CONWAY': {'n': 698, 'r2': 0.937, 'adj_r2': 0.936, 'COD': 6.78, 'PRD': 1.179, 'median_ratio': 1.000},
+        'MOUNT_VERNON': {'n': 9012, 'r2': 0.935, 'adj_r2': 0.935, 'COD': 4.92, 'PRD': 1.130, 'median_ratio': 1.000},
+        'SEDRO_WOOLLEY': {'n': 5215, 'r2': 0.929, 'adj_r2': 0.928, 'COD': 7.12, 'PRD': 1.178, 'median_ratio': 0.995},
+    }
+
+    feature_explanations = [
+        {
+            'term': 'log_area',
+            'simple': 'Living Area (Square Feet)',
+            'explanation': 'Larger homes typically sell for more. We use a logarithmic transformation because each additional square foot has diminishing returns.',
+            'example': 'A 2,000 sq ft home vs 1,500 sq ft might be worth $50,000 more, but going from 3,000 to 3,500 sq ft adds less.'
+        },
+        {
+            'term': 'log_lot',
+            'simple': 'Lot Size (Acres)',
+            'explanation': 'Larger lots generally increase property value, especially in rural areas.',
+            'example': 'A half-acre lot is worth more than a quarter-acre, but the premium decreases as lots get very large.'
+        },
+        {
+            'term': 'log_age',
+            'simple': 'Property Age (Years)',
+            'explanation': 'Newer homes typically command higher prices, though well-maintained older homes can hold value.',
+            'example': 'A 5-year-old home might sell for more than a 25-year-old home of similar size.'
+        },
+        {
+            'term': 't',
+            'simple': 'Time Trend',
+            'explanation': 'Market conditions change over time. This captures whether prices are rising or falling.',
+            'example': 'Properties sold in 2023 might have different values than identical properties sold in 2021.'
+        },
+        {
+            'term': 'quality_score',
+            'simple': 'Construction Quality',
+            'explanation': 'Higher quality materials and finishes increase home value.',
+            'example': 'Granite counters and hardwood floors vs laminate counters and vinyl flooring.'
+        },
+        {
+            'term': 'condition_score',
+            'simple': 'Property Condition',
+            'explanation': 'Well-maintained properties are worth more than those needing repairs.',
+            'example': 'A home with a new roof and fresh paint vs one needing significant updates.'
+        },
+        {
+            'term': 'has_garage',
+            'simple': 'Garage Present',
+            'explanation': 'Properties with garages typically sell for more than those without.',
+            'example': 'An attached 2-car garage adds value for storage and convenience.'
+        },
+        {
+            'term': 'has_basement',
+            'simple': 'Basement Present',
+            'explanation': 'Finished or unfinished basements add usable space and value.',
+            'example': 'Additional storage, living space, or potential for future expansion.'
+        },
+        {
+            'term': 'is_view',
+            'simple': 'View Premium',
+            'explanation': 'Properties with water, mountain, or other desirable views command premium prices.',
+            'example': 'Homes with Puget Sound views or mountain vistas in specific neighborhoods.'
+        },
+        {
+            'term': 'area_time',
+            'simple': 'Size × Time Interaction',
+            'explanation': 'How the market values home size can change over time. Larger homes may appreciate differently than smaller ones.',
+            'example': 'During certain market periods, larger homes may see stronger price growth.'
+        },
+    ]
+
+    context = {
+        'coefficients_by_group': coefficients_by_group,
+        'model_stats': model_stats,
+        'feature_explanations': feature_explanations,
+        'last_updated': latest_run,
+        'total_observations': sum(stats['n'] for stats in model_stats.values()),
+    }
+
+    return render(request, 'openskagit/methodology.html', context)

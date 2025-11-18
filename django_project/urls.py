@@ -49,6 +49,7 @@ urlpatterns = [
     path("cma/<str:parcel_number>/", openskagit_views.cma_dashboard_view, name="cma-detail"),
     path("api/", include("openskagit.api.urls")),
     path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
+    path("methodology/", openskagit_views.methodology_view, name="methodology"),
     # Citizen Appeal Helper
 
     path("appeal/new/", openskagit_views.appeal_new, name="appeal-new"),
