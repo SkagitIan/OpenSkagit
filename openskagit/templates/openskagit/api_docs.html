@@ -1,130 +1,1147 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" x-data="apiDocs()">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>OpenSkagit API Reference</title>
+    <title>API Documentation | OpenSkagit</title>
     <link rel="stylesheet" href="{% static 'openskagit/home.css' %}">
+    <script src="https://unpkg.com/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
     <style>
-        body { font-family: "Inter", system-ui, sans-serif; margin: 0; background: #f4f7fb; color: #1f2933; }
-        header { background: linear-gradient(135deg, #1f3c88, #39a0ff); color: #fff; padding: 3rem 1.5rem; }
-        header h1 { margin: 0 0 0.5rem; font-size: 2.5rem; font-weight: 700; }
-        main { padding: 2rem 1.5rem 3rem; max-width: 1100px; margin: -2rem auto 0; }
-        section { background: #fff; border-radius: 18px; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08); margin-bottom: 2rem; padding: 2rem 2.5rem; }
-        h2 { margin-top: 0; font-size: 1.6rem; color: #102a43; }
-        pre { background: #0f172a; color: #f8fafc; padding: 1.25rem; border-radius: 14px; overflow-x: auto; font-size: 0.95rem; line-height: 1.45; }
-        code.path { font-size: 0.95rem; display: inline-block; padding: 0.35rem 0.6rem; border-radius: 0.5rem; background: #0ea5e9; color: #fff; margin-left: 0.5rem; }
-        span.method { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.12em; color: #0ea5e9; font-weight: 700; }
-        article.endpoint { border: 1px solid #e5e7eb; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.5rem; background: #f9fbff; }
-        nav.endpoint-nav { margin-bottom: 1.5rem; }
-        ol.endpoint-index { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.35rem 1.25rem; padding-left: 1.5rem; margin: 0; }
-        ol.endpoint-index li { margin: 0; font-weight: 600; }
-        ol.endpoint-index a { color: #0ea5e9; text-decoration: none; }
-        ol.endpoint-index a:hover { text-decoration: underline; }
-        details { margin-top: 1rem; }
-        summary { cursor: pointer; font-weight: 600; color: #2563eb; }
-        ul.notes { list-style: disc; margin-left: 1.5rem; }
-        p.instructions { margin: 0.75rem 0 0; font-weight: 500; color: #1f2933; }
-        p.use-case { margin: 0.35rem 0 0; color: #0f172a; font-size: 0.95rem; }
-        p.use-case strong { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: #0ea5e9; margin-right: 0.35rem; }
-        table.param-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.92rem; }
-        table.param-table th { text-align: left; font-size: 0.8rem; letter-spacing: 0.08em; color: #64748b; text-transform: uppercase; }
-        table.param-table th, table.param-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-        table.param-table tr:last-child td { border-bottom: none; }
-        table.param-table td strong { font-weight: 600; color: #0f172a; }
+        :root {
+            --ap-purple: #B993D6;
+            --ap-orange: #f08000;
+            --ap-teal: #58B09C;
+            --ap-ink: #49475B;
+            --ap-black: #14080E;
+        }
+
+        [x-cloak] { display: none !important; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #f7f9ff 0%, #eef2ff 40%, #f9fafb 100%);
+            font-family: "Inter", system-ui, sans-serif;
+            color: var(--ap-ink);
+        }
+
+        .api-header {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(18px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            padding: 1.5rem clamp(1.5rem, 4vw, 3rem);
+        }
+
+        .api-header__content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .api-header__brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .api-header__logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--ap-purple), var(--ap-teal));
+            color: white;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .api-header__title h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--ap-black);
+        }
+
+        .api-header__title p {
+            margin: 0.25rem 0 0;
+            font-size: 0.9rem;
+            color: var(--ap-ink);
+            opacity: 0.7;
+        }
+
+        .api-header__search {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .api-header__search input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 0.95rem;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 0.75rem center;
+            background-size: 20px;
+        }
+
+        .api-header__search input:focus {
+            outline: none;
+            border-color: var(--ap-purple);
+            box-shadow: 0 0 0 3px rgba(185, 147, 214, 0.15);
+        }
+
+        .api-header__actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .api-header__link {
+            padding: 0.75rem 1.25rem;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            color: var(--ap-ink);
+            font-weight: 600;
+            font-size: 0.9rem;
+            background: white;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .api-header__link:hover {
+            border-color: var(--ap-purple);
+            transform: translateY(-1px);
+        }
+
+        .api-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            max-width: 1400px;
+            margin: 0 auto;
+            gap: 2rem;
+            padding: 2rem clamp(1.5rem, 4vw, 3rem) 4rem;
+        }
+
+        .api-sidebar {
+            position: sticky;
+            top: 120px;
+            height: fit-content;
+            max-height: calc(100vh - 140px);
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        }
+
+        .api-sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .api-sidebar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 999px;
+        }
+
+        .api-sidebar__section {
+            margin-bottom: 1.5rem;
+        }
+
+        .api-sidebar__section h3 {
+            margin: 0 0 0.75rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--ap-ink);
+            opacity: 0.6;
+        }
+
+        .api-sidebar__nav {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 0.25rem;
+        }
+
+        .api-sidebar__nav-item {
+            padding: 0.6rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--ap-ink);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 2px solid transparent;
+        }
+
+        .api-sidebar__nav-item:hover {
+            background: rgba(185, 147, 214, 0.08);
+            border-left-color: var(--ap-purple);
+        }
+
+        .api-sidebar__nav-item.active {
+            background: rgba(185, 147, 214, 0.15);
+            border-left-color: var(--ap-purple);
+            color: var(--ap-black);
+            font-weight: 600;
+        }
+
+        .api-content {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .api-intro {
+            padding: 2rem;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        }
+
+        .api-intro h2 {
+            margin: 0 0 1rem;
+            font-size: 1.8rem;
+            color: var(--ap-black);
+        }
+
+        .api-intro p {
+            margin: 0 0 1.5rem;
+            color: var(--ap-ink);
+            line-height: 1.6;
+        }
+
+        .api-intro__meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .api-intro__meta-item {
+            padding: 1rem;
+            background: rgba(185, 147, 214, 0.08);
+            border-radius: 10px;
+            border: 1px solid rgba(185, 147, 214, 0.2);
+        }
+
+        .api-intro__meta-item strong {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--ap-ink);
+            opacity: 0.7;
+            margin-bottom: 0.35rem;
+        }
+
+        .api-intro__meta-item code {
+            font-family: "Menlo", "Consolas", monospace;
+            font-size: 0.9rem;
+            color: var(--ap-black);
+        }
+
+        .api-endpoint {
+            padding: 2rem;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+            scroll-margin-top: 100px;
+        }
+
+        .api-endpoint__header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .api-endpoint__method {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.4rem 0.9rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .api-endpoint__method--get {
+            background: rgba(88, 176, 156, 0.15);
+            color: var(--ap-teal);
+        }
+
+        .api-endpoint__method--post {
+            background: rgba(240, 128, 0, 0.15);
+            color: var(--ap-orange);
+        }
+
+        .api-endpoint__path {
+            font-family: "Menlo", "Consolas", monospace;
+            font-size: 1rem;
+            color: var(--ap-black);
+            font-weight: 600;
+        }
+
+        .api-endpoint__title {
+            margin: 0 0 0.5rem;
+            font-size: 1.5rem;
+            color: var(--ap-black);
+        }
+
+        .api-endpoint__description {
+            margin: 0 0 1rem;
+            color: var(--ap-ink);
+            line-height: 1.6;
+        }
+
+        .api-endpoint__use-case {
+            padding: 1rem;
+            background: rgba(88, 176, 156, 0.08);
+            border-radius: 10px;
+            border-left: 3px solid var(--ap-teal);
+            margin: 1rem 0;
+        }
+
+        .api-endpoint__use-case strong {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--ap-teal);
+            margin-bottom: 0.35rem;
+        }
+
+        .api-endpoint__use-case p {
+            margin: 0;
+            color: var(--ap-ink);
+            font-size: 0.95rem;
+        }
+
+        .api-endpoint__section {
+            margin-top: 1.5rem;
+        }
+
+        .api-endpoint__section h4 {
+            margin: 0 0 1rem;
+            font-size: 1.1rem;
+            color: var(--ap-black);
+        }
+
+        .api-params {
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .api-params table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .api-params thead {
+            background: rgba(248, 250, 252, 0.9);
+        }
+
+        .api-params th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--ap-ink);
+            opacity: 0.7;
+            font-weight: 600;
+        }
+
+        .api-params td {
+            padding: 1rem;
+            border-top: 1px solid rgba(148, 163, 184, 0.15);
+            font-size: 0.9rem;
+        }
+
+        .api-params__name {
+            font-family: "Menlo", "Consolas", monospace;
+            color: var(--ap-black);
+            font-weight: 600;
+        }
+
+        .api-params__badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .api-params__badge--required {
+            background: rgba(240, 128, 0, 0.15);
+            color: var(--ap-orange);
+        }
+
+        .api-params__badge--optional {
+            background: rgba(148, 163, 184, 0.15);
+            color: var(--ap-ink);
+        }
+
+        .api-playground {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: rgba(248, 250, 252, 0.9);
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .api-playground__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .api-playground__header h5 {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--ap-black);
+            font-weight: 600;
+        }
+
+        .api-playground__toggle {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(185, 147, 214, 0.3);
+            background: white;
+            color: var(--ap-purple);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .api-playground__toggle:hover {
+            background: rgba(185, 147, 214, 0.08);
+        }
+
+        .api-playground__form {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .api-playground__field label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--ap-ink);
+            margin-bottom: 0.5rem;
+        }
+
+        .api-playground__field input,
+        .api-playground__field textarea,
+        .api-playground__field select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            border-radius: 8px;
+            background: white;
+            font-size: 0.9rem;
+            font-family: inherit;
+        }
+
+        .api-playground__field textarea {
+            font-family: "Menlo", "Consolas", monospace;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .api-playground__field input:focus,
+        .api-playground__field textarea:focus,
+        .api-playground__field select:focus {
+            outline: none;
+            border-color: var(--ap-purple);
+            box-shadow: 0 0 0 3px rgba(185, 147, 214, 0.15);
+        }
+
+        .api-playground__actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .api-playground__btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .api-playground__btn--primary {
+            background: linear-gradient(135deg, var(--ap-purple), var(--ap-teal));
+            color: white;
+        }
+
+        .api-playground__btn--primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(185, 147, 214, 0.3);
+        }
+
+        .api-playground__btn--secondary {
+            background: white;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            color: var(--ap-ink);
+        }
+
+        .api-playground__btn--secondary:hover {
+            background: rgba(248, 250, 252, 0.9);
+        }
+
+        .api-playground__response {
+            margin-top: 1.5rem;
+        }
+
+        .api-playground__response-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .api-playground__response-meta {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: var(--ap-ink);
+        }
+
+        .api-playground__response-status {
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .api-playground__response-status--success {
+            background: rgba(88, 176, 156, 0.15);
+            color: var(--ap-teal);
+        }
+
+        .api-playground__response-status--error {
+            background: rgba(239, 68, 68, 0.15);
+            color: #dc2626;
+        }
+
+        .api-playground__response-body {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        .api-playground__response-body pre {
+            margin: 0;
+            font-family: "Menlo", "Consolas", monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #f8fafc;
+        }
+
+        .api-code-example {
+            margin-top: 1rem;
+        }
+
+        .api-code-example__tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .api-code-example__tab {
+            padding: 0.6rem 1rem;
+            border: none;
+            background: none;
+            color: var(--ap-ink);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .api-code-example__tab:hover {
+            color: var(--ap-purple);
+        }
+
+        .api-code-example__tab.active {
+            color: var(--ap-purple);
+            border-bottom-color: var(--ap-purple);
+        }
+
+        .api-code-example__content {
+            position: relative;
+        }
+
+        .api-code-example__copy {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            border: 1px solid rgba(248, 250, 252, 0.2);
+            background: rgba(15, 23, 42, 0.7);
+            color: white;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .api-code-example__copy:hover {
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        .api-code-example pre {
+            margin: 0;
+            padding: 1rem;
+            background: #0f172a;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: "Menlo", "Consolas", monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #f8fafc;
+        }
+
+        .api-presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .api-preset {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            border: 1px solid rgba(88, 176, 156, 0.3);
+            background: rgba(88, 176, 156, 0.08);
+            color: var(--ap-teal);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .api-preset:hover {
+            background: rgba(88, 176, 156, 0.15);
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 1024px) {
+            .api-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .api-sidebar {
+                position: relative;
+                top: 0;
+                max-height: none;
+            }
+
+            .api-header__search {
+                max-width: none;
+            }
+        }
+
         @media (max-width: 768px) {
-            section { padding: 1.5rem; }
-            header { padding: 2.5rem 1rem; }
-            header h1 { font-size: 2rem; }
-            ol.endpoint-index { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); padding-left: 1rem; }
-            table.param-table { font-size: 0.85rem; }
+            .api-header__content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .api-header__search {
+                width: 100%;
+            }
+
+            .api-header__actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .api-layout {
+                padding: 1.5rem 1rem 3rem;
+            }
+
+            .api-endpoint {
+                padding: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>OpenSkagit Internal API</h1>
-        <p>Authenticated staff can use these endpoints to power the frontend applications.</p>
-        <p><a href="{% url 'api-dashboard' %}" style="color:#fff;text-decoration:underline;">Open the API Dashboard ↗</a></p>
+    <header class="api-header">
+        <div class="api-header__content">
+            <div class="api-header__brand">
+                <div class="api-header__logo">OS</div>
+                <div class="api-header__title">
+                    <h1>API Documentation</h1>
+                    <p>OpenSkagit Property Data API</p>
+                </div>
+            </div>
+            <div class="api-header__search">
+                <input
+                    type="text"
+                    placeholder="Search endpoints..."
+                    x-model="searchQuery"
+                    @input="filterEndpoints()">
+            </div>
+            <div class="api-header__actions">
+                <a href="{% url 'api-dashboard' %}" class="api-header__link">Full Playground →</a>
+            </div>
+        </div>
     </header>
-    <main>
-        <section>
-            <h2>Schema Introspection</h2>
-            <p>Use this query to inspect available tables and columns in the Postgres schema.</p>
-            <pre><code>{{ schema_sql }}</code></pre>
-        </section>
 
-        <section>
-            <h2>Endpoints</h2>
-            <nav class="endpoint-nav">
-                <ol class="endpoint-index">
-                    {% for endpoint in endpoints %}
-                        <li><a href="#{{ endpoint.key }}">{{ endpoint.name }}</a></li>
-                    {% endfor %}
-                </ol>
-            </nav>
-            {% for endpoint in endpoints %}
-                <article class="endpoint" id="{{ endpoint.key }}">
-                    <header>
-                        <span class="method">{{ endpoint.method }}</span>
-                        <code class="path">{{ endpoint.display_path|default:endpoint.path }}</code>
-                    </header>
-                    <p>{{ endpoint.description }}</p>
-                    {% if endpoint.instructions %}
-                        <p class="instructions">{{ endpoint.instructions }}</p>
-                    {% endif %}
-                    {% if endpoint.use_case %}
-                        <p class="use-case"><strong>Use Case</strong> {{ endpoint.use_case }}</p>
-                    {% endif %}
-                    {% if endpoint.parameters %}
-                        <table class="param-table">
-                            <thead>
-                                <tr>
-                                    <th>Parameter</th>
-                                    <th>Where</th>
-                                    <th>Type</th>
-                                    <th>Required?</th>
-                                    <th>Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for param in endpoint.parameters %}
-                                    <tr>
-                                        <td><strong>{{ param.name }}</strong></td>
-                                        <td>{{ param.location|title }}</td>
-                                        <td>{{ param.type }}</td>
-                                        <td>{% if param.required %}Required{% else %}Optional{% endif %}</td>
-                                        <td>{{ param.description }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    {% endif %}
-                    {% if endpoint.payload_json %}
-                        <details>
-                            <summary>{{ endpoint.payload_label|default:"Sample Payload" }}</summary>
-                            <pre><code>{{ endpoint.payload_json }}</code></pre>
-                        </details>
-                    {% endif %}
-                    {% if endpoint.sample_json %}
-                        <details>
-                            <summary>Sample Response</summary>
-                            <pre><code>{{ endpoint.sample_json }}</code></pre>
-                        </details>
-                    {% endif %}
+    <div class="api-layout">
+        <aside class="api-sidebar">
+            <div class="api-sidebar__section">
+                <h3>Quick Start</h3>
+                <ul class="api-sidebar__nav">
+                    <li class="api-sidebar__nav-item"
+                        :class="{ 'active': activeSection === 'intro' }"
+                        @click="scrollToSection('intro')">
+                        Introduction
+                    </li>
+                </ul>
+            </div>
+            <div class="api-sidebar__section">
+                <h3>Endpoints (<span x-text="filteredEndpoints.length"></span>)</h3>
+                <ul class="api-sidebar__nav">
+                    <template x-for="endpoint in filteredEndpoints" :key="endpoint.key">
+                        <li class="api-sidebar__nav-item"
+                            :class="{ 'active': activeSection === endpoint.key }"
+                            @click="scrollToSection(endpoint.key)"
+                            x-text="endpoint.name">
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="api-content">
+            <section id="intro" class="api-intro">
+                <h2>Welcome to the OpenSkagit API</h2>
+                <p>Access comprehensive property data for Skagit County including parcels, assessments, improvements, and sales records. All endpoints return JSON responses optimized for frontend integration.</p>
+
+                <div class="api-intro__meta">
+                    <div class="api-intro__meta-item">
+                        <strong>Base URL</strong>
+                        <code>{{ request.scheme }}://{{ request.get_host }}/api</code>
+                    </div>
+                    <div class="api-intro__meta-item">
+                        <strong>Authentication</strong>
+                        <code>Staff login required</code>
+                    </div>
+                    <div class="api-intro__meta-item">
+                        <strong>Format</strong>
+                        <code>application/json</code>
+                    </div>
+                </div>
+
+                <div class="api-endpoint__section">
+                    <h4>Implementation Notes</h4>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; color: var(--ap-ink); line-height: 1.8;">
+                        {% for note in notes %}
+                            <li>{{ note }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </section>
+
+            <template x-for="endpoint in filteredEndpoints" :key="endpoint.key">
+                <article :id="endpoint.key" class="api-endpoint">
+                    <div class="api-endpoint__header">
+                        <span class="api-endpoint__method"
+                              :class="'api-endpoint__method--' + endpoint.method.toLowerCase()"
+                              x-text="endpoint.method">
+                        </span>
+                        <code class="api-endpoint__path" x-text="endpoint.path"></code>
+                    </div>
+
+                    <h3 class="api-endpoint__title" x-text="endpoint.name"></h3>
+                    <p class="api-endpoint__description" x-text="endpoint.description"></p>
+
+                    <template x-if="endpoint.instructions">
+                        <p class="api-endpoint__description" style="font-size: 0.95rem; opacity: 0.9;" x-text="endpoint.instructions"></p>
+                    </template>
+
+                    <template x-if="endpoint.use_case">
+                        <div class="api-endpoint__use-case">
+                            <strong>Use Case</strong>
+                            <p x-text="endpoint.use_case"></p>
+                        </div>
+                    </template>
+
+                    <template x-if="endpoint.parameters && endpoint.parameters.length > 0">
+                        <div class="api-endpoint__section">
+                            <h4>Parameters</h4>
+                            <div class="api-params">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Type</th>
+                                            <th>In</th>
+                                            <th>Required</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="param in endpoint.parameters" :key="param.name">
+                                            <tr>
+                                                <td><span class="api-params__name" x-text="param.name"></span></td>
+                                                <td><code x-text="param.type"></code></td>
+                                                <td x-text="param.location"></td>
+                                                <td>
+                                                    <span class="api-params__badge"
+                                                          :class="param.required ? 'api-params__badge--required' : 'api-params__badge--optional'"
+                                                          x-text="param.required ? 'Required' : 'Optional'">
+                                                    </span>
+                                                </td>
+                                                <td x-text="param.description"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div class="api-playground" x-data="playground(endpoint)">
+                        <div class="api-playground__header">
+                            <h5>🚀 Try it now</h5>
+                            <button class="api-playground__toggle"
+                                    @click="expanded = !expanded"
+                                    x-text="expanded ? 'Hide Playground' : 'Show Playground'">
+                            </button>
+                        </div>
+
+                        <div x-show="expanded" x-cloak>
+                            <div class="api-playground__form">
+                                <template x-if="pathParams.length > 0">
+                                    <div>
+                                        <strong style="display: block; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--ap-ink);">Path Parameters</strong>
+                                        <div style="display: grid; gap: 0.75rem;">
+                                            <template x-for="param in pathParams" :key="param.name">
+                                                <div class="api-playground__field">
+                                                    <label x-text="param.name"></label>
+                                                    <input type="text"
+                                                           x-model="param.value"
+                                                           :placeholder="param.name">
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template x-if="queryParams.length > 0">
+                                    <div>
+                                        <strong style="display: block; margin-bottom: 0.75rem; font-size: 0.9rem; color: var(--ap-ink);">Query Parameters</strong>
+                                        <div style="display: grid; gap: 0.75rem;">
+                                            <template x-for="param in queryParams" :key="param.name">
+                                                <div class="api-playground__field">
+                                                    <label x-text="param.name"></label>
+                                                    <input type="text"
+                                                           x-model="param.value"
+                                                           :placeholder="param.description || param.name">
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <template x-if="endpoint.method !== 'GET'">
+                                    <div class="api-playground__field">
+                                        <label>Request Body (JSON)</label>
+                                        <textarea x-model="requestBody" placeholder="{}"></textarea>
+                                    </div>
+                                </template>
+
+                                <div class="api-playground__actions">
+                                    <button class="api-playground__btn api-playground__btn--primary"
+                                            @click="executeRequest()">
+                                        Send Request
+                                    </button>
+                                    <button class="api-playground__btn api-playground__btn--secondary"
+                                            @click="reset()">
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
+
+                            <template x-if="response">
+                                <div class="api-playground__response">
+                                    <div class="api-playground__response-header">
+                                        <div class="api-playground__response-meta">
+                                            <span class="api-playground__response-status"
+                                                  :class="response.ok ? 'api-playground__response-status--success' : 'api-playground__response-status--error'"
+                                                  x-text="'Status: ' + response.status">
+                                            </span>
+                                            <span x-text="'Time: ' + response.time + 'ms'"></span>
+                                        </div>
+                                    </div>
+                                    <div class="api-playground__response-body">
+                                        <pre x-text="response.body"></pre>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="api-code-example">
+                            <div class="api-code-example__tabs">
+                                <button class="api-code-example__tab"
+                                        :class="{ 'active': activeTab === 'curl' }"
+                                        @click="activeTab = 'curl'">
+                                    cURL
+                                </button>
+                                <button class="api-code-example__tab"
+                                        :class="{ 'active': activeTab === 'javascript' }"
+                                        @click="activeTab = 'javascript'">
+                                    JavaScript
+                                </button>
+                            </div>
+                            <div class="api-code-example__content">
+                                <button class="api-code-example__copy" @click="copyCode()">Copy</button>
+                                <pre x-show="activeTab === 'curl'" x-text="curlExample()"></pre>
+                                <pre x-show="activeTab === 'javascript'" x-text="jsExample()"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <template x-if="endpoint.sample_json">
+                        <div class="api-endpoint__section">
+                            <h4>Example Response</h4>
+                            <div style="background: #0f172a; border-radius: 8px; padding: 1rem; overflow-x: auto;">
+                                <pre style="margin: 0; font-family: 'Menlo', 'Consolas', monospace; font-size: 0.85rem; line-height: 1.5; color: #f8fafc;" x-text="endpoint.sample_json"></pre>
+                            </div>
+                        </div>
+                    </template>
                 </article>
-            {% endfor %}
-        </section>
+            </template>
+        </main>
+    </div>
 
-        <section>
-            <h2>Implementation Notes</h2>
-            <ul class="notes">
-                {% for note in notes %}
-                    <li>{{ note }}</li>
-                {% endfor %}
-            </ul>
-        </section>
-    </main>
+    <script>
+        const ENDPOINTS = {{ endpoints_json|safe }};
+
+        function apiDocs() {
+            return {
+                searchQuery: '',
+                activeSection: 'intro',
+                filteredEndpoints: ENDPOINTS,
+
+                init() {
+                    this.observeScroll();
+                },
+
+                filterEndpoints() {
+                    const query = this.searchQuery.toLowerCase();
+                    if (!query) {
+                        this.filteredEndpoints = ENDPOINTS;
+                        return;
+                    }
+                    this.filteredEndpoints = ENDPOINTS.filter(ep =>
+                        ep.name.toLowerCase().includes(query) ||
+                        ep.description.toLowerCase().includes(query) ||
+                        ep.path.toLowerCase().includes(query)
+                    );
+                },
+
+                scrollToSection(id) {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        this.activeSection = id;
+                    }
+                },
+
+                observeScroll() {
+                    const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                            if (entry.isIntersecting) {
+                                this.activeSection = entry.target.id;
+                            }
+                        });
+                    }, { rootMargin: '-100px 0px -80% 0px' });
+
+                    document.querySelectorAll('[id]').forEach(el => {
+                        observer.observe(el);
+                    });
+                }
+            };
+        }
+
+        function playground(endpoint) {
+            return {
+                expanded: false,
+                endpoint: endpoint,
+                pathParams: [],
+                queryParams: [],
+                requestBody: '',
+                response: null,
+                activeTab: 'curl',
+
+                init() {
+                    this.parseParameters();
+                    this.loadDefaults();
+                },
+
+                parseParameters() {
+                    if (!this.endpoint.parameters) return;
+
+                    this.pathParams = this.endpoint.parameters
+                        .filter(p => p.location === 'path')
+                        .map(p => ({ ...p, value: '' }));
+
+                    this.queryParams = this.endpoint.parameters
+                        .filter(p => p.location === 'query')
+                        .map(p => ({ ...p, value: '' }));
+                },
+
+                loadDefaults() {
+                    if (this.endpoint.default_path_params) {
+                        this.pathParams.forEach(p => {
+                            if (this.endpoint.default_path_params[p.name]) {
+                                p.value = this.endpoint.default_path_params[p.name];
+                            }
+                        });
+                    }
+
+                    if (this.endpoint.default_body) {
+                        this.requestBody = this.endpoint.default_body;
+                    }
+                },
+
+                buildUrl() {
+                    let url = this.endpoint.path;
+
+                    this.pathParams.forEach(p => {
+                        url = url.replace(`{${p.name}}`, encodeURIComponent(p.value || ''));
+                    });
+
+                    const queryString = this.queryParams
+                        .filter(p => p.value)
+                        .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.value)}`)
+                        .join('&');
+
+                    return url + (queryString ? '?' + queryString : '');
+                },
+
+                async executeRequest() {
+                    const url = this.buildUrl();
+                    const options = {
+                        method: this.endpoint.method,
+                        headers: {},
+                        credentials: 'same-origin'
+                    };
+
+                    if (this.endpoint.method !== 'GET' && this.requestBody) {
+                        options.headers['Content-Type'] = 'application/json';
+                        options.headers['X-CSRFToken'] = this.getCsrfToken();
+                        options.body = this.requestBody;
+                    }
+
+                    const start = performance.now();
+                    try {
+                        const response = await fetch(url, options);
+                        const time = Math.round(performance.now() - start);
+                        const text = await response.text();
+                        let body;
+                        try {
+                            body = JSON.stringify(JSON.parse(text), null, 2);
+                        } catch {
+                            body = text;
+                        }
+
+                        this.response = {
+                            status: response.status,
+                            ok: response.ok,
+                            time: time,
+                            body: body
+                        };
+                    } catch (error) {
+                        this.response = {
+                            status: 0,
+                            ok: false,
+                            time: Math.round(performance.now() - start),
+                            body: `Error: ${error.message}`
+                        };
+                    }
+                },
+
+                reset() {
+                    this.pathParams.forEach(p => p.value = '');
+                    this.queryParams.forEach(p => p.value = '');
+                    this.requestBody = '';
+                    this.response = null;
+                    this.loadDefaults();
+                },
+
+                getCsrfToken() {
+                    const cookies = document.cookie.split(';');
+                    for (let cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'csrftoken') return value;
+                    }
+                    return '';
+                },
+
+                curlExample() {
+                    const url = window.location.origin + this.buildUrl();
+                    let cmd = `curl -X ${this.endpoint.method} "${url}"`;
+
+                    if (this.endpoint.method !== 'GET' && this.requestBody) {
+                        cmd += `\n  -H "Content-Type: application/json"`;
+                        cmd += `\n  -d '${this.requestBody}'`;
+                    }
+
+                    return cmd;
+                },
+
+                jsExample() {
+                    const url = this.buildUrl();
+                    let code = `fetch("${url}", {\n  method: "${this.endpoint.method}"`;
+
+                    if (this.endpoint.method !== 'GET' && this.requestBody) {
+                        code += `,\n  headers: {\n    "Content-Type": "application/json"\n  }`;
+                        code += `,\n  body: '${this.requestBody}'`;
+                    }
+
+                    code += `\n})\n  .then(res => res.json())\n  .then(data => console.log(data))\n  .catch(err => console.error(err));`;
+
+                    return code;
+                },
+
+                copyCode() {
+                    const code = this.activeTab === 'curl' ? this.curlExample() : this.jsExample();
+                    navigator.clipboard.writeText(code).then(() => {
+                        alert('Copied to clipboard!');
+                    });
+                }
+            };
+        }
+    </script>
 </body>
 </html>

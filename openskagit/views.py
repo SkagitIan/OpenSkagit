@@ -1452,6 +1452,7 @@ def api_docs(request):
 
     context = {
         "endpoints": endpoints,
+        "endpoints_json": json.dumps(endpoints),
         "schema_sql": """
 SELECT table_name, column_name, data_type
 FROM information_schema.columns
