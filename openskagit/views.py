@@ -2050,7 +2050,10 @@ def methodology_view(request):
             created_at=latest_run
         ).order_by('term')
 
-        coefficients_by_group[group_name] = list(coeffs)
+        coefficients_by_group[group_name] = {
+            'coefficients': list(coeffs),
+            'display_name': group_name.replace('_', ' ').title()
+        }
 
     model_stats = {
         'ANACORTES': {'n': 4798, 'r2': 0.928, 'adj_r2': 0.928, 'COD': 6.92, 'PRD': 1.181, 'median_ratio': 0.995},

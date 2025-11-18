@@ -510,11 +510,11 @@
     area below to see the actual coefficients we use and model performance statistics.
   </p>
 
-  {% for group_name, coeffs in coefficients_by_group.items %}
+  {% for group_name, group_data in coefficients_by_group.items %}
   {% with stats=model_stats|get_item:group_name %}
   <div class="market-group">
     <div class="market-group-header" onclick="toggleMarketGroup('{{ group_name }}')">
-      <div class="market-group-title">{{ group_name|title|replace:"_":" " }}</div>
+      <div class="market-group-title">{{ group_data.display_name }}</div>
       {% if stats %}
       <div class="market-group-stats">
         <div class="market-group-stat">
@@ -543,7 +543,7 @@
       {% if stats %}
       <p>
         <strong>Model Performance:</strong> This model was built using {{ stats.n|intcomma }} verified residential
-        sales in the {{ group_name|title|replace:"_":" " }} market area. It explains {{ stats.r2|floatformat:1 }}%
+        sales in the {{ group_data.display_name }} market area. It explains {{ stats.r2|floatformat:1 }}%
         of sale price variation with a COD of {{ stats.COD|floatformat:2 }}%, indicating
         {% if stats.COD < 6.0 %}excellent{% elif stats.COD < 10.0 %}good{% else %}acceptable{% endif %} uniformity.
       </p>
@@ -559,7 +559,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for coeff in coeffs %}
+          {% for coeff in group_data.coefficients %}
           <tr>
             <td><strong>{{ coeff.term }}</strong></td>
             <td>{{ coeff.beta|floatformat:4 }}</td>
