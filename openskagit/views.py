@@ -10,7 +10,6 @@ import re
 import time
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -18,8 +17,8 @@ from django.contrib.humanize.templatetags.humanize import intcomma
 from django.db import connection
 from django.db.models import OuterRef, Q, Subquery
 from django.db.models.functions import Upper
-from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse, StreamingHttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -29,8 +28,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 logger = logging.getLogger(__name__)
 
-from . import adjustment_engine, appeals, cma, llm
-from .models import Assessor, CmaAnalysis, CmaComparableSelection, Parcel
+from . import adjustment_engine, appeals, cma, chat as chat_service, llm
+from .models import Assessor, CmaAnalysis, CmaComparableSelection, NeighborhoodGeom, Parcel
 from .improvement_utils import QUALITY_WEIGHTS
 from .valuation_areas import resolve_market_group
 
@@ -44,9 +43,6 @@ CMA_ALLOWED_SORT_FIELDS = {
     "score",
 }
 CMA_ALLOWED_SORT_DIRECTIONS = {"asc", "desc"}
-
-CHAT_SESSION_KEY = "rag_conversations"
-CHAT_ACTIVE_KEY = "rag_active_conversation"
 
 CONDITION_SCORE_MAP = {
     "P": 1,
@@ -93,65 +89,6 @@ def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metad
     if details:
         message = f"{message} {details}"
     logger.info(message)
-
-
-def _chat_store(request) -> Dict[str, Any]:
-    store = request.session.get(CHAT_SESSION_KEY)
-    if not isinstance(store, dict):
-        store = {}
-        request.session[CHAT_SESSION_KEY] = store
-        request.session.modified = True
-    return store
-
-
-def _create_conversation_record() -> Dict[str, Any]:
-    timestamp = timezone.now().timestamp()
-    return {
-        "title": "New conversation",
-        "created_ts": timestamp,
-        "updated_ts": timestamp,
-        "messages": [],
-    }
-
-
-def _ensure_conversation(request, conversation_id: Optional[str] = None) -> str:
-    store = _chat_store(request)
-    convo_id = conversation_id
-    if convo_id and convo_id in store:
-        return convo_id
-
-    if convo_id and convo_id not in store:
-        convo_id = None
-
-    if convo_id is None:
-        convo_id = request.session.get(CHAT_ACTIVE_KEY)
-        if convo_id and convo_id in store:
-            return convo_id
-
-    if store:
-        # Pick the most recently updated conversation.
-        convo_id = max(store.items(), key=lambda item: item[1].get("updated_ts", 0))[0]
-    else:
-        convo_id = uuid4().hex
-        store[convo_id] = _create_conversation_record()
-        request.session[CHAT_SESSION_KEY] = store
-
-    request.session[CHAT_ACTIVE_KEY] = convo_id
-    request.session.modified = True
-    return convo_id
-
-
-def _touch_conversation(request, conversation_id: str) -> Dict[str, Any]:
-    store = _chat_store(request)
-    convo = store.get(conversation_id)
-    if convo is None:
-        convo = _create_conversation_record()
-        store[conversation_id] = convo
-    convo["updated_ts"] = timezone.now().timestamp()
-    request.session[CHAT_SESSION_KEY] = store
-    request.session[CHAT_ACTIVE_KEY] = conversation_id
-    request.session.modified = True
-    return convo
 
 
 def _get_cma_root_state(request) -> Dict[str, Any]:
@@ -1243,16 +1180,30 @@ def home(request):
     """
     Render the OpenSkagit portal homepage with chatbot-first interface.
     """
+    manager = chat_service.ConversationManager(request)
     requested_id = request.GET.get("cid")
-    conversation_id = _ensure_conversation(request, requested_id)
-    store = _chat_store(request)
-    messages = store.get(conversation_id, {}).get("messages", [])
-
-    context = {
-        "conversation_id": conversation_id,
-        "messages": messages,
-    }
+    conversation_id = manager.ensure(requested_id)
+    context = manager.bootstrap(conversation_id)
     return render(request, "openskagit/home_portal.html", context)
+
+
+@require_GET
+def chatbot(request):
+    """
+    Dedicated chat experience with conversation history and streaming responses.
+    """
+
+    manager = chat_service.ConversationManager(request)
+    requested_id = request.GET.get("cid")
+    initial_prompt = (request.GET.get("prompt") or "").strip()
+    if initial_prompt:
+        initial_prompt = initial_prompt[:1000]
+        conversation_id = manager.new()
+    else:
+        conversation_id = manager.ensure(requested_id)
+
+    context = manager.bootstrap(conversation_id, initial_prompt=initial_prompt)
+    return render(request, "openskagit/home.html", context)
 
 
 @require_GET
@@ -1261,23 +1212,9 @@ def history(request):
     Return the conversation history sidebar HTML.
     """
 
-    store = _chat_store(request)
-    active_id = request.session.get(CHAT_ACTIVE_KEY)
-
-    conversations = []
-    for cid, data in store.items():
-        title = (data.get("title") or "").strip() or "New conversation"
-        if len(title) > 60:
-            title = f"{title[:57]}…"
-        conversations.append(
-            {
-                "id": cid,
-                "title": title,
-                "updated_ts": data.get("updated_ts") or data.get("created_ts") or 0,
-            }
-        )
-
-    conversations.sort(key=lambda item: item["updated_ts"], reverse=True)
+    manager = chat_service.ConversationManager(request)
+    conversations = manager.list_conversations()
+    active_id = manager.active_id
 
     html = render_to_string(
         "partials/history.html",
@@ -1293,103 +1230,80 @@ def history(request):
 @require_POST
 def chat(request):
     """
-    Handle chat prompts via HTMX, returning user + assistant message bubbles.
+    Stream chat prompts via OpenAI Responses, emitting newline-delimited JSON chunks.
     """
 
     prompt = (request.POST.get("prompt") or "").strip()
-    conversation_id = request.POST.get("conversation_id") or None
+    requested_id = request.POST.get("conversation_id") or None
 
     if not prompt:
         return HttpResponseBadRequest("Prompt is required.")
 
-    store = _chat_store(request)
-    if not conversation_id or conversation_id not in store:
-        conversation_id = uuid4().hex
-        store[conversation_id] = _create_conversation_record()
+    manager = chat_service.ConversationManager(request)
+    conversation_id = manager.ensure(requested_id)
+    manager.append_user_message(conversation_id, prompt)
+    history_messages = manager.model_history(conversation_id)
 
-    conversation = _touch_conversation(request, conversation_id)
-    history_messages = [
-        {"role": msg.get("role"), "content": msg.get("content")}
-        for msg in conversation.get("messages", [])
-        if msg.get("role") in {"user", "assistant"}
-    ]
+    streamer = chat_service.StreamingCompletion(prompt, history=history_messages)
 
-    # Persist the latest user message before calling the model.
-    user_message = {"role": "user", "content": prompt}
-    conversation.setdefault("messages", []).append(user_message)
+    def event_stream():
+        yield chat_service.render_stream_event({"type": "conversation", "conversation_id": conversation_id})
+        try:
+            for delta in streamer.stream():
+                if delta:
+                    yield chat_service.render_stream_event({"type": "delta", "text": delta})
+        except (chat_service.MissingDependency, chat_service.MissingCredentials) as exc:
+            error_text = str(exc)
+            manager.append_assistant_message(conversation_id, error_text, sources=[])
+            yield chat_service.render_stream_event({"type": "error", "message": error_text})
+        except chat_service.OpenAIError as exc:
+            error_text = str(exc) or "The model was unable to finish the response."
+            manager.append_assistant_message(conversation_id, error_text, sources=[])
+            yield chat_service.render_stream_event({"type": "error", "message": error_text})
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Chat streaming failed: %s", exc)
+            error_text = "Something went wrong while contacting the language model. Please try again in a moment."
+            manager.append_assistant_message(conversation_id, error_text, sources=[])
+            yield chat_service.render_stream_event({"type": "error", "message": error_text})
+        else:
+            final_text = streamer.full_text or "I wasn't able to craft a response."
+            manager.append_assistant_message(
+                conversation_id,
+                final_text,
+                sources=streamer.sources,
+                model=streamer.model_name,
+            )
+            yield chat_service.render_stream_event(
+                {
+                    "type": "final",
+                    "text": final_text,
+                    "model": streamer.model_name,
+                    "sources": streamer.sources,
+                }
+            )
 
-    try:
-        result = llm.generate_rag_response(prompt, history=history_messages)
-        answer = result.get("answer") or "I wasn't able to craft a response."
-        sources = result.get("sources") or []
-        model_name = result.get("model")
-    except llm.MissingDependency as exc:
-        answer = str(exc)
-        sources = []
-        model_name = None
-    except llm.MissingCredentials as exc:
-        answer = str(exc)
-        sources = []
-        model_name = None
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.exception("Chat generation failed: %s", exc)
-        answer = "Something went wrong while contacting the language model. Please try again in a moment."
-        sources = []
-        model_name = None
-
-    assistant_message = {
-        "role": "assistant",
-        "content": answer,
-        "sources": sources,
-        "model": model_name,
-    }
-    conversation["messages"].append(assistant_message)
-
-    if conversation.get("title", "").startswith("New conversation") or not conversation.get("title"):
-        trimmed = prompt[:60]
-        conversation["title"] = f"{trimmed}…" if len(prompt) > 60 else trimmed
-
-    conversation["updated_ts"] = timezone.now().timestamp()
-
-    store[conversation_id] = conversation
-    request.session[CHAT_SESSION_KEY] = store
-    request.session[CHAT_ACTIVE_KEY] = conversation_id
-    request.session.modified = True
-
-    html_user = render_to_string(
-        "partials/message_portal.html",
-        {"role": "user", "content": prompt},
-        request=request,
-    )
-    html_assistant = render_to_string(
-        "partials/message_portal.html",
-        {"role": "assistant", "content": answer, "sources": sources},
-        request=request,
-    )
-
-    response = HttpResponse(html_user + html_assistant)
-    response["HX-Trigger"] = json.dumps({"set-conversation": {"id": conversation_id}, "reload-history": True})
+    response = StreamingHttpResponse(event_stream(), content_type="application/x-ndjson")
+    response["Cache-Control"] = "no-cache"
     return response
 
 
 @require_POST
 def chat_new(request):
     """
-    Initialize a new empty conversation and return the default empty state.
+    Initialize a new empty conversation.
     """
 
-    store = _chat_store(request)
-    conversation_id = uuid4().hex
-    store[conversation_id] = _create_conversation_record()
+    manager = chat_service.ConversationManager(request)
+    conversation_id = manager.new()
 
-    request.session[CHAT_SESSION_KEY] = store
-    request.session[CHAT_ACTIVE_KEY] = conversation_id
-    request.session.modified = True
+    accepts_json = "application/json" in (request.headers.get("Accept") or "")
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
-    html = render_to_string("partials/empty_state.html", request=request)
-    response = HttpResponse(html)
-    response["HX-Trigger"] = json.dumps({"set-conversation": {"id": conversation_id}, "reload-history": True})
-    return response
+    if accepts_json or is_ajax:
+        return JsonResponse({"conversation_id": conversation_id})
+
+    chat_url = f"{reverse('chatbot')}?cid={conversation_id}"
+    return redirect(chat_url)
 
 
 @staff_member_required
@@ -1794,14 +1708,20 @@ def appeal_home(request):
     """
     Minimal, citizen-friendly entry with a single address/parcel search box.
     """
-    return render(request, "openskagit/appeal_home_v3.html", {"step": 1})
+    manager = chat_service.ConversationManager(request)
+    conversation_id = manager.ensure(request.GET.get("cid"))
+    chat_bootstrap = manager.bootstrap(conversation_id)
+    return render(request, "openskagit/appeal_home_v3.html", {"step": 1, "chat_bootstrap": chat_bootstrap})
 
 
 @require_GET
 def appeal_new(request):
     """API-only, mobile-first appeal homepage (no ORM)."""
     # Intentionally avoid ORM usage; all data is fetched via XHR from /api endpoints.
-    return render(request, "openskagit/appeal_home_v3.html", {"step": 1})
+    manager = chat_service.ConversationManager(request)
+    conversation_id = manager.ensure(request.GET.get("cid"))
+    chat_bootstrap = manager.bootstrap(conversation_id)
+    return render(request, "openskagit/appeal_home_v3.html", {"step": 1, "chat_bootstrap": chat_bootstrap})
 
 
 APPEAL_SEARCH_LIMIT = 15
@@ -1851,6 +1771,10 @@ def appeal_parcel_search(request):
               .order_by("parcel_number")[:APPEAL_SEARCH_LIMIT]
         )
 
+    manager = chat_service.ConversationManager(request)
+    conversation_id = manager.ensure(request.GET.get("cid"))
+    chat_bootstrap = manager.bootstrap(conversation_id)
+
     return render(
         request,
         "openskagit/appeal_parcel_search_results_v3.html",
@@ -1859,6 +1783,7 @@ def appeal_parcel_search(request):
             "results": results,
             "query_too_short": query_too_short,
             "min_search_length": APPEAL_MIN_QUERY_LENGTH,
+            "chat_bootstrap": chat_bootstrap,
         },
     )
 
@@ -1873,7 +1798,19 @@ def appeal_result(request, parcel_number: str):
     neighborhood = appeals.get_subject_neighborhood_snapshot(subject)
     subject_year_built = subject.year_built or subject.effective_year_built
 
+    neighborhood_geom_geojson = None
+    if neighborhood and neighborhood.get("code"):
+        try:
+            geom = NeighborhoodGeom.objects.get(code=neighborhood["code"])
+            neighborhood_geom_geojson = json.loads(geom.geom_4326.geojson)
+        except NeighborhoodGeom.DoesNotExist:
+            neighborhood_geom_geojson = None
+
     comparables_url = request.path + "comparables/"
+    manager = chat_service.ConversationManager(request)
+    conversation_id = manager.ensure(request.GET.get("cid"))
+    chat_bootstrap = manager.bootstrap(conversation_id)
+
     return render(
         request,
         "openskagit/appeal_results_v3.html",
@@ -1881,9 +1818,11 @@ def appeal_result(request, parcel_number: str):
             "subject": subject,
             "parcel_number": parcel_number,
             "neighborhood": neighborhood,
+            "neighborhood_geom_geojson": neighborhood_geom_geojson,
             "subject_year_built": subject_year_built,
             "comparables_url": comparables_url,
             "step": 2,
+            "chat_bootstrap": chat_bootstrap,
         },
     )
 
@@ -2060,6 +1999,10 @@ def appeal_result_comparables(request, parcel_number: str):
     except Exception:
         pass
 
+    manager = chat_service.ConversationManager(request)
+    conversation_id = manager.ensure(request.GET.get("cid"))
+    chat_bootstrap = manager.bootstrap(conversation_id)
+
     return render(
         request,
         "openskagit/appeal_results_comparables_v3.html",
@@ -2081,6 +2024,7 @@ def appeal_result_comparables(request, parcel_number: str):
             "adjustment_labels": ADJUSTMENT_LABELS,
             "radius_meters_used": radius_used,
             "fetch_url": request.path,
+            "chat_bootstrap": chat_bootstrap,
         },
     )
 

@@ -78,17 +78,107 @@
     font-weight: 500;
   }
 
+  /* Neighborhood Comparison Flip */
+  .neighborhood-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .neighborhood-card__inner {
+    position: relative;
+    width: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+  }
+
+  .neighborhood-card__front,
+  .neighborhood-card__back {
+    width: 100%;
+    backface-visibility: hidden;
+    min-height: 100%;
+  }
+
+  .neighborhood-card.flipped .neighborhood-card__inner {
+    transform: rotateY(180deg);
+  }
+
+  .neighborhood-card__front {
+    position: relative;
+    padding: var(--space-6);
+    background: white;
+  }
+
+  .neighborhood-card__back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: var(--space-6);
+    transform: rotateY(180deg);
+    min-height: 100%;
+    background: white;
+  }
+
+  .neighborhood-flip-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: none;
+    background: var(--gray-50);
+    color: var(--gray-700);
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-full);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  }
+
+  .neighborhood-flip-button svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .neighborhood-flip-button:hover {
+    background: var(--primary-50);
+    color: var(--primary-600);
+    transform: translateY(-1px);
+  }
+
+  .map-front-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-500);
+    margin-bottom: var(--space-1);
+  }
+
+  .neighborhood-map {
+    width: 100%;
+    height: 280px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--gray-100);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+    margin-top: var(--space-4);
+  }
+
+  .map-instructions {
+    font-size: 0.9375rem;
+    color: var(--gray-600);
+    margin-top: var(--space-2);
+  }
+
   /* Flippable Gauge Cards */
   .gauge-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: var(--space-6);
     margin-top: var(--space-8);
   }
 
   .gauge-card {
     perspective: 1000px;
-    height: 420px;
+    height: 400px;
     position: relative;
   }
 
@@ -115,6 +205,11 @@
     border-radius: var(--radius-xl);
     padding: var(--space-6);
     box-shadow: var(--shadow-lg);
+  }
+
+  .gauge-card__front {
+    display: flex;
+    flex-direction: column;
   }
 
   .gauge-card__back {
@@ -164,8 +259,10 @@
     position: relative;
     display: flex;
     justify-content: center;
-    margin: var(--space-6) 0;
-    height: 140px;
+    align-items: center;
+    margin: var(--space-4) 0;
+    height: 180px;
+    flex: 1;
   }
 
   .gauge-value {
@@ -178,7 +275,8 @@
 
   .gauge-status {
     text-align: center;
-    margin-top: var(--space-4);
+    margin-top: auto;
+    padding-top: var(--space-3);
   }
 
   .status-badge {
@@ -295,6 +393,18 @@
     .property-hero__header {
       flex-direction: column;
     }
+
+    .gauge-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .gauge-card {
+      height: 360px;
+    }
+  }
+
+  @media (max-width: 520px) {
     .gauge-grid {
       grid-template-columns: 1fr;
     }
@@ -355,29 +465,42 @@
   </div>
 </div>
 
-<div class="card">
-  <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-8);">
-    <div style="width: 2.5rem; height: 2.5rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe)); color: white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="1" x2="12" y2="23"></line>
-        <line x1="17" y1="5" x2="9.5" y2="5"></line>
-        <line x1="17" y1="13" x2="9.5" y2="13"></line>
-        <path d="M9.5 5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-      </svg>
-    </div>
-    <div>
-      <h3 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900); margin: 0;">Neighborhood Comparison</h3>
-      <p style="font-size: 0.9375rem; color: var(--gray-600); margin: var(--space-1) 0 0;">Click any card to learn more about these assessment metrics</p>
-    </div>
-  </div>
+<div class="card neighborhood-card{% if neighborhood_geom_geojson %} neighborhood-card--flippable{% endif %}" id="neighborhood-section-card">
+  <div class="neighborhood-card__inner">
+    <div class="neighborhood-card__front">
+      <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-8); justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: var(--space-3);">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe)); color: white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <line x1="17" y1="5" x2="9.5" y2="5"></line>
+              <line x1="17" y1="13" x2="9.5" y2="13"></line>
+              <path d="M9.5 5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900); margin: 0;">Neighborhood Comparison</h3>
+            <p style="font-size: 0.9375rem; color: var(--gray-600); margin: var(--space-1) 0 0;">Click any card to learn more about these assessment metrics</p>
+          </div>
+        </div>
+        {% if neighborhood_geom_geojson %}
+          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection()" aria-label="Flip to view neighborhood map">
+            <span>View map</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+        {% endif %}
+      </div>
 
-  <div class="gauge-grid">
-    <!-- COD Card -->
-    <div class="gauge-card" id="cod-card">
-      <div class="gauge-card__inner">
-        <div class="gauge-card__front">
-          <div class="gauge-card__header">
-            <h4 class="gauge-card__title">Coefficient of Dispersion (COD)</h4>
+      <div class="gauge-grid">
+        <!-- COD Card -->
+        <div class="gauge-card" id="cod-card">
+          <div class="gauge-card__inner">
+            <div class="gauge-card__front">
+              <div class="gauge-card__header">
+                <h4 class="gauge-card__title">Coefficient of Dispersion (COD)</h4>
             <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip to see details">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
@@ -463,12 +586,12 @@
             {% endif %}
           </div>
         </div>
-        <div class="gauge-card__back">
-          <div class="gauge-card__header">
-            <h4 class="gauge-card__title">What is PRD?</h4>
-            <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip back">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="1 4 1 10 7 10"></polyline>
+            <div class="gauge-card__back">
+              <div class="gauge-card__header">
+                <h4 class="gauge-card__title">What is PRD?</h4>
+                <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip back">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="1 4 1 10 7 10"></polyline>
                 <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
               </svg>
             </button>
@@ -504,13 +627,13 @@
       </div>
     </div>
 
-    <!-- Sales Ratio Card -->
-    <div class="gauge-card" id="sales-ratio-card">
-      <div class="gauge-card__inner">
-        <div class="gauge-card__front">
-          <div class="gauge-card__header">
-            <h4 class="gauge-card__title">Assessment to Sales Ratio</h4>
-            <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip to see details">
+        <!-- Sales Ratio Card -->
+        <div class="gauge-card" id="sales-ratio-card">
+          <div class="gauge-card__inner">
+            <div class="gauge-card__front">
+              <div class="gauge-card__header">
+                <h4 class="gauge-card__title">Assessment to Sales Ratio</h4>
+                <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip to see details">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -569,6 +692,27 @@
         </div>
       </div>
     </div>
+      </div>
+    </div>
+    {% if neighborhood_geom_geojson %}
+      <div class="neighborhood-card__back">
+        <div class="gauge-card__header">
+          <div>
+            <div class="map-front-label">Neighborhood Footprint</div>
+            <h4 class="gauge-card__title" style="font-size: 1.25rem; color: var(--gray-900);">{{ neighborhood.name|default:"Neighborhood Outline" }}</h4>
+            <p class="map-instructions">Explore the official neighborhood boundary. Zoom or pan to understand how your property sits within the broader market area.</p>
+          </div>
+          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection()" aria-label="Flip back to metrics">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="1 4 1 10 7 10"></polyline>
+              <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+            </svg>
+            <span>Back to metrics</span>
+          </button>
+        </div>
+        <div class="neighborhood-map" id="neighborhood-map"></div>
+      </div>
+    {% endif %}
   </div>
 </div>
 
@@ -586,12 +730,15 @@
 {% endblock %}
 
 {% block extra_js %}
+{% if neighborhood_geom_geojson %}
+  {{ neighborhood_geom_geojson|json_script:"neighborhood-geom-data" }}
+{% endif %}
 <script>
   function flipCard(cardId) {
     const card = document.getElementById(cardId);
     if (!card) return;
     
-    card.classList.toggle('flipped');
+    const flipped = card.classList.toggle('flipped');
   }
 
   function createGauge(canvasId, value, min, max, idealMin, idealMax) {
@@ -657,6 +804,114 @@
       drawGauge(value);
     }
   }
+
+  let neighborhoodMap = null;
+  let neighborhoodMapInitialized = false;
+
+  function flipNeighborhoodSection() {
+    const card = document.getElementById('neighborhood-section-card');
+    if (!card) return;
+    const flipped = card.classList.toggle('flipped');
+    if (flipped) {
+      setTimeout(() => {
+        initNeighborhoodMap();
+        updateNeighborhoodCardHeight();
+      }, 200);
+    } else {
+      card.style.height = "";
+      if (neighborhoodMap) {
+        setTimeout(() => neighborhoodMap.invalidateSize(), 200);
+      }
+    }
+  }
+
+  function initNeighborhoodMap() {
+    if (neighborhoodMapInitialized && neighborhoodMap) {
+      neighborhoodMap.invalidateSize();
+      return;
+    }
+
+    const mapContainer = document.getElementById('neighborhood-map');
+    const geomElement = document.getElementById('neighborhood-geom-data');
+    if (!mapContainer || !geomElement) {
+      return;
+    }
+
+    let geometry;
+    try {
+      geometry = JSON.parse(geomElement.textContent);
+    } catch (error) {
+      console.warn('Unable to parse neighborhood geometry', error);
+      return;
+    }
+    if (!geometry) {
+      return;
+    }
+
+    neighborhoodMap = L.map('neighborhood-map', {
+      scrollWheelZoom: false,
+      zoomControl: true,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(neighborhoodMap);
+
+    const hoodLayer = L.geoJSON(geometry, {
+      style: () => ({
+        color: '#6c698d',
+        weight: 2,
+        fillColor: '#c9c6de',
+        fillOpacity: 0.25,
+      }),
+    }).addTo(neighborhoodMap);
+
+    const bounds = hoodLayer.getBounds();
+    if (bounds.isValid()) {
+      neighborhoodMap.fitBounds(bounds, { padding: [20, 20] });
+    } else {
+      neighborhoodMap.setView([48.5, -122.5], 11);
+    }
+
+    {% if subject.latitude and subject.longitude %}
+      const subjectMarker = L.circleMarker([{{ subject.latitude }}, {{ subject.longitude }}], {
+        radius: 8,
+        fillColor: '#ef4444',
+        color: '#ffffff',
+        weight: 2,
+        fillOpacity: 1,
+      }).addTo(neighborhoodMap);
+      subjectMarker.bindPopup('<strong>Your Property</strong><div>{{ subject.address|default:""|escapejs }}</div>');
+    {% endif %}
+
+    neighborhoodMapInitialized = true;
+    setTimeout(() => {
+      neighborhoodMap.invalidateSize();
+      updateNeighborhoodCardHeight();
+    }, 150);
+  }
+
+  function updateNeighborhoodCardHeight() {
+    const card = document.getElementById('neighborhood-section-card');
+    if (!card) return;
+    const front = card.querySelector('.neighborhood-card__front');
+    const back = card.querySelector('.neighborhood-card__back');
+    const target = card.classList.contains('flipped') ? back : front;
+    if (!target) {
+      card.style.height = "";
+      return;
+    }
+    card.style.height = `${target.scrollHeight}px`;
+  }
+
+  window.addEventListener('resize', () => {
+    const card = document.getElementById('neighborhood-section-card');
+    if (!card || !card.classList.contains('flipped')) {
+      return;
+    }
+    updateNeighborhoodCardHeight();
+  });
 
   (function () {
     const button = document.getElementById('comparables-button');

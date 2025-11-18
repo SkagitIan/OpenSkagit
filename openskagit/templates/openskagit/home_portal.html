@@ -525,18 +525,7 @@
         {% endif %}
       </div>
 
-      <div id="loading" class="loading-indicator">Thinking...</div>
-
-      <form id="chat-form"
-            hx-post="/chat/"
-            hx-target="#chat-messages"
-            hx-swap="beforeend"
-            hx-indicator="#loading"
-            hx-include="[name='conversation_id']">
-        {% csrf_token %}
-        {% if conversation_id %}
-          <input type="hidden" name="conversation_id" value="{{ conversation_id }}">
-        {% endif %}
+      <form id="chat-form" method="get" action="{% url 'chatbot' %}">
         <div class="chat-input-wrapper">
           <textarea
             id="prompt"
@@ -556,15 +545,24 @@
       </form>
 
       <div class="example-prompts">
-        <button class="example-prompt" onclick="setPrompt('Find my property tax assessment')">
-          Find my property tax assessment
-        </button>
-        <button class="example-prompt" onclick="setPrompt('Show me recent home sales in my area')">
-          Show recent home sales
-        </button>
-        <button class="example-prompt" onclick="setPrompt('Help me understand my property value')">
-          Understand property values
-        </button>
+        <form method="get" action="{% url 'chatbot' %}">
+          <input type="hidden" name="prompt" value="Find my property tax assessment">
+          <button class="example-prompt" type="submit">
+            Find my property tax assessment
+          </button>
+        </form>
+        <form method="get" action="{% url 'chatbot' %}">
+          <input type="hidden" name="prompt" value="Show me recent home sales in my area">
+          <button class="example-prompt" type="submit">
+            Show recent home sales
+          </button>
+        </form>
+        <form method="get" action="{% url 'chatbot' %}">
+          <input type="hidden" name="prompt" value="Help me understand my property value">
+          <button class="example-prompt" type="submit">
+            Understand property values
+          </button>
+        </form>
       </div>
     </div>
 
@@ -648,51 +646,5 @@
     </div>
   </footer>
 
-  <script>
-    function setPrompt(text) {
-      const input = document.getElementById('prompt');
-      input.value = text;
-      input.focus();
-      input.style.height = 'auto';
-      input.style.height = (input.scrollHeight) + 'px';
-    }
-
-    document.addEventListener('htmx:afterSwap', (event) => {
-      if (event.target && event.target.id === 'chat-messages') {
-        const messagesDiv = document.getElementById('chat-messages');
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-        const alpine = Alpine;
-        if (alpine && alpine.store) {
-          messagesDiv.classList.add('active');
-        }
-      }
-    });
-
-    document.addEventListener('htmx:afterRequest', (event) => {
-      if (event.detail?.target?.id === 'chat-messages') {
-        const promptField = document.getElementById('prompt');
-        if (promptField) {
-          promptField.value = '';
-          promptField.style.height = 'auto';
-          promptField.focus({ preventScroll: true });
-        }
-      }
-    });
-
-    document.addEventListener('htmx:beforeRequest', (event) => {
-      const loading = document.getElementById('loading');
-      if (loading) {
-        loading.classList.add('active');
-      }
-    });
-
-    document.addEventListener('htmx:afterRequest', (event) => {
-      const loading = document.getElementById('loading');
-      if (loading) {
-        loading.classList.remove('active');
-      }
-    });
-  </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 {% if conversations %}
   {% for convo in conversations %}
-    <a href="/?cid={{ convo.id }}"
+    <a href="{% url 'chatbot' %}?cid={{ convo.id }}"
        class="block rounded-lg px-3 py-2 transition hover:bg-neutral-100 {% if convo.id == active_id %}bg-[var(--ap-purple)]/10 text-[var(--ap-purple)] font-semibold{% else %}text-[var(--ap-ink)]{% endif %}">
       {{ convo.title }}
     </a>

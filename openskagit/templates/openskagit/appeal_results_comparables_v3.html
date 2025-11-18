@@ -85,9 +85,9 @@
   }
 
   .view-btn--active {
-    background: white;
-    color: var(--primary-600);
-    box-shadow: var(--shadow-sm);
+    background: var(--primary-50);
+    color: var(--primary-700);
+    box-shadow: none;
   }
 
   .view-btn:hover:not(.view-btn--active) {
@@ -97,10 +97,10 @@
 
   /* Mode Switcher */
   .mode-switcher {
-    min-width: 260px;
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+    align-items: flex-start;
   }
 
   .mode-toggle {
@@ -126,9 +126,9 @@
   }
 
   .mode-btn--active {
-    background: white;
-    color: var(--primary-600);
-    box-shadow: var(--shadow-sm);
+    background: var(--primary-50);
+    color: var(--primary-700);
+    box-shadow: none;
   }
 
   .mode-btn:hover:not(.mode-btn--active) {
@@ -258,12 +258,18 @@
 
   .comp-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: var(--space-4);
-    padding: var(--space-4);
-    background: var(--gray-50);
-    border-radius: var(--radius-lg);
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: var(--space-3);
     margin-top: var(--space-4);
+  }
+
+  .comp-stat {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    text-align: center;
+    box-shadow: var(--shadow-sm);
   }
 
   .comp-stat__value {
@@ -314,6 +320,7 @@
   .adjustment-chip--down {
     background: var(--rose-50);
     color: var(--rose-700);
+    border: 1px solid var(--rose-200);
   }
 
   /* Grid View */
@@ -435,19 +442,8 @@
           <button class="mode-btn {% if not advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('standard')">Standard</button>
           <button class="mode-btn {% if advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('advanced')">Advanced</button>
         </div>
-        {% if advanced_mode %}
-          {% if advanced_summary %}
-            <p class="mode-note">
-              Adjusting against {{ advanced_summary.market_group|default:"market" }} baseline
-              {% if advanced_summary.subject_pred_price %}
-                ({{ advanced_summary.subject_pred_price|floatformat:0|intcomma }})
-              {% endif %}
-            </p>
-          {% elif advanced_error %}
-            <p class="mode-note mode-note--warning">{{ advanced_error }}</p>
-          {% endif %}
-        {% else %}
-          <p class="mode-note">Use advanced mode to view regression-based adjustments.</p>
+        {% if advanced_error %}
+          <p class="mode-note mode-note--warning">{{ advanced_error }}</p>
         {% endif %}
       </div>
     </div>
@@ -491,23 +487,23 @@
           </div>
 
           <div class="comp-stats">
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</div>
               <div class="comp-stat__label">Beds</div>
             </div>
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">{{ comp.bathrooms|quarter_baths|default:"—" }}</div>
               <div class="comp-stat__label">Baths</div>
             </div>
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">{{ comp.living_area|default:"—"|floatformat:0|intcomma }}</div>
               <div class="comp-stat__label">Sq Ft</div>
             </div>
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">{{ comp.year_built|default:"—" }}</div>
               <div class="comp-stat__label">Built</div>
             </div>
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">${{ comp.price_per_sqft|default:"—"|floatformat:0|intcomma }}</div>
               <div class="comp-stat__label">$/Sq Ft</div>
             </div>
@@ -561,15 +557,15 @@
           </div>
 
           <div class="comp-stats">
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</div>
               <div class="comp-stat__label">Beds</div>
             </div>
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">{{ comp.bathrooms|quarter_baths|default:"—" }}</div>
               <div class="comp-stat__label">Baths</div>
             </div>
-            <div>
+            <div class="comp-stat">
               <div class="comp-stat__value">{{ comp.living_area|default:"—"|floatformat:0|intcomma }}</div>
               <div class="comp-stat__label">Sq Ft</div>
             </div>

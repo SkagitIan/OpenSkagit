@@ -314,3 +314,26 @@ class CmaComparableSelection(models.Model):
 
     def __str__(self) -> str:
         return f"{self.parcel_number} in CMA {self.analysis_id}"
+
+
+class NeighborhoodGeom(gis_models.Model):
+    code = gis_models.CharField(max_length=20, unique=True, db_index=True)
+    name = gis_models.CharField(max_length=100, blank=True)
+    geom_3857 = gis_models.MultiPolygonField(srid=3857)   # for analysis
+    geom_4326 = gis_models.MultiPolygonField(srid=4326)   # for Leaflet
+
+    def __str__(self):
+        return self.code
+
+# openskagit/models.py
+
+class NeighborhoodProfile(models.Model):
+    hood_id = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=200, null=True, blank=True)
+    city = models.CharField(max_length=50, null=True, blank=True)
+
+    json_data = models.JSONField(default=dict)  # all computed stats
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.hood_id} – {self.name}"
