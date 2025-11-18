@@ -57,3 +57,35 @@ def absolute(value):
             return abs(float(value))
         except (TypeError, ValueError):
             return value
+
+
+@register.filter
+def multiply(value, arg):
+    """
+    Multiply the value by the argument.
+    """
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return 0
+
+
+@register.filter
+def get_item(dictionary, key):
+    """
+    Get an item from a dictionary using a key.
+    """
+    if dictionary is None:
+        return None
+    return dictionary.get(key)
+
+
+@register.filter
+def replace(value, arg):
+    """
+    Replace a substring with another. Usage: {{ value|replace:"old,new" }}
+    """
+    if not arg or ',' not in arg:
+        return value
+    old, new = arg.split(',', 1)
+    return str(value).replace(old, new)
