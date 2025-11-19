@@ -567,6 +567,7 @@
       </p>
     </header>
 
+    {% if step %}
     <div class="progress-stepper">
       <div class="progress-step {% if step == 1 %}progress-step--active{% elif step > 1 %}progress-step--completed{% endif %}">
         <div class="progress-step__circle">
@@ -603,6 +604,7 @@
         <span class="progress-step__label">View Analysis</span>
       </div>
     </div>
+    {% endif %}
 
     {% block content %}{% endblock %}
   </div>

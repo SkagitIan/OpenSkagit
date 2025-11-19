@@ -51,6 +51,7 @@ urlpatterns = [
     path("api/", include("openskagit.api.urls")),
     path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
     path("methodology/", openskagit_views.methodology_view, name="methodology"),
+    path("faq/", openskagit_views.faq_view, name="faq"),
     # Citizen Appeal Helper
 
     path("appeal/new/", openskagit_views.appeal_new, name="appeal-new"),
