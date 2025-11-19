@@ -1,0 +1,417 @@
+{% load humanize formatting %}
+<style>
+  .fairness-card {
+    margin-top: var(--space-8);
+    padding: var(--space-6);
+    border-radius: var(--radius-2xl);
+    background: linear-gradient(135deg, #f9fafb, #eef2ff);
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-lg);
+    animation: fadeInUp 0.45s var(--transition-base);
+  }
+
+  .fairness-card__header {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    align-items: flex-start;
+    margin-bottom: var(--space-4);
+  }
+
+  .fairness-card__title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .fairness-card__subtitle {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    margin-top: var(--space-2);
+  }
+
+  .fairness-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .fairness-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+
+  .fairness-pill--ok {
+    background: var(--success-50);
+    color: var(--success-700);
+    border-color: var(--success-200);
+  }
+
+  .fairness-pill--watch {
+    background: var(--warning-50);
+    color: var(--warning-700);
+    border-color: var(--warning-200);
+  }
+
+  .fairness-pill--concern {
+    background: var(--rose-50);
+    color: var(--rose-700);
+    border-color: var(--rose-200);
+  }
+
+  .fairness-pill--unknown {
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border-color: var(--gray-300);
+  }
+
+  .fairness-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: var(--space-6);
+  }
+
+  .fairness-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-700);
+    margin-bottom: var(--space-2);
+  }
+
+  .fairness-summary {
+    font-size: 0.95rem;
+    color: var(--gray-800);
+    line-height: 1.6;
+    margin-bottom: var(--space-4);
+  }
+
+  .fairness-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .fairness-list li {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    font-size: 0.9rem;
+    color: var(--gray-700);
+  }
+
+  .fairness-bullet {
+    margin-top: 0.35rem;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: var(--primary-500);
+    flex-shrink: 0;
+  }
+
+  .fairness-flags {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .fairness-flag {
+    padding: var(--space-3);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--gray-200);
+    background: white;
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .fairness-flag__label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gray-900);
+  }
+
+  .fairness-flag__severity {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .fairness-flag__severity--info {
+    color: var(--primary-600);
+  }
+
+  .fairness-flag__severity--watch {
+    color: var(--warning-700);
+  }
+
+  .fairness-flag__severity--concern {
+    color: var(--rose-700);
+  }
+
+  .fairness-flag__detail {
+    font-size: 0.88rem;
+    color: var(--gray-700);
+  }
+
+  .fairness-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .fairness-metric {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    border: 1px solid var(--gray-200);
+  }
+
+  .fairness-metric__label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-600);
+    margin-bottom: 0.25rem;
+  }
+
+  .fairness-metric__value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .fairness-disclaimer {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--gray-200);
+    font-size: 0.8rem;
+    color: var(--gray-600);
+  }
+
+  .fairness-error {
+    padding: var(--space-3);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--rose-200);
+    background: var(--rose-50);
+    color: var(--rose-800);
+    font-size: 0.9rem;
+    margin-top: var(--space-3);
+  }
+
+  @media (max-width: 900px) {
+    .fairness-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
+
+<div class="fairness-card">
+  <div class="fairness-card__header">
+    <div>
+      <div class="fairness-card__title">Fairness Analysis (IAAO-style)</div>
+      <p class="fairness-card__subtitle">
+        Based on your property, neighborhood statistics, and nearby comparable sales. This focuses on level, uniformity,
+        and price-related equity – the core IAAO fairness signals.
+      </p>
+    </div>
+  </div>
+
+  {% if analysis_error %}
+    <div class="fairness-error">
+      We weren't able to run the automated fairness analysis right now:
+      <strong>{{ analysis_error }}</strong>.
+      You can still review the neighborhood metrics and comparable sales above.
+    </div>
+  {% endif %}
+
+  <div class="fairness-pill-row">
+    {% with level=level_status severity=level_status.severity %}
+      <div class="fairness-pill fairness-pill--{{ severity|default:'unknown' }}">
+        <span>Level (Sales Ratio)</span>
+        <span>•</span>
+        <span>{{ level.label }}</span>
+      </div>
+    {% endwith %}
+    {% with cod=cod_status severity=cod_status.severity %}
+      <div class="fairness-pill fairness-pill--{{ severity|default:'unknown' }}">
+        <span>Uniformity (COD)</span>
+        <span>•</span>
+        <span>{{ cod.label }}</span>
+      </div>
+    {% endwith %}
+    {% with prd=prd_status severity=prd_status.severity %}
+      <div class="fairness-pill fairness-pill--{{ severity|default:'unknown' }}">
+        <span>Vertical Equity (PRD)</span>
+        <span>•</span>
+        <span>{{ prd.label }}</span>
+      </div>
+    {% endwith %}
+  </div>
+
+  <div class="fairness-layout">
+    <div>
+      <div class="fairness-section-title">Summary</div>
+      <div class="fairness-summary">
+        {% if analysis.summary %}
+          {{ analysis.summary }}
+        {% else %}
+          This section summarizes how fairly your assessment appears when we compare your home to neighborhood statistics
+          and recent comparable sales.
+        {% endif %}
+      </div>
+
+      <div class="fairness-section-title">Subject vs Neighborhood</div>
+      <ul class="fairness-list">
+        {% for line in analysis.subject_vs_neighborhood %}
+          <li>
+            <span class="fairness-bullet"></span>
+            <span>{{ line }}</span>
+          </li>
+        {% empty %}
+          <li>
+            <span class="fairness-bullet"></span>
+            <span>
+              Your neighborhood's COD, PRD, and sales-ratio metrics help show whether assessments in this area are broadly
+              aligned with IAAO guidelines.
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+
+      <div class="fairness-section-title" style="margin-top: var(--space-4);">Subject vs Comparable Sales</div>
+      <ul class="fairness-list">
+        {% for line in analysis.subject_vs_comparables %}
+          <li>
+            <span class="fairness-bullet"></span>
+            <span>{{ line }}</span>
+          </li>
+        {% empty %}
+          <li>
+            <span class="fairness-bullet"></span>
+            <span>
+              We compare your assessed value to the pattern of nearby sales to understand whether your parcel appears
+              meaningfully above or below the market benchmark.
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div>
+      <div class="fairness-section-title">IAAO Signals & Metrics</div>
+      <div class="fairness-metric-grid">
+        <div class="fairness-metric">
+          <div class="fairness-metric__label">Neighborhood Sales Ratio</div>
+          <div class="fairness-metric__value">
+            {% if metrics.sales_ratio %}
+              {{ metrics.sales_ratio|floatformat:0 }}%
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+        <div class="fairness-metric">
+          <div class="fairness-metric__label">COD</div>
+          <div class="fairness-metric__value">
+            {% if metrics.cod %}
+              {{ metrics.cod|floatformat:1 }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+        <div class="fairness-metric">
+          <div class="fairness-metric__label">PRD</div>
+          <div class="fairness-metric__value">
+            {% if metrics.prd %}
+              {{ metrics.prd|floatformat:2 }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+        <div class="fairness-metric">
+          <div class="fairness-metric__label">Over / Under vs Comps</div>
+          <div class="fairness-metric__value">
+            {% if metrics.over_assessment_pct %}
+              {% if metrics.over_assessment_pct > 0 %}
+                +{{ metrics.over_assessment_pct|floatformat:1 }}%
+              {% else %}
+                {{ metrics.over_assessment_pct|floatformat:1 }}%
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="fairness-section-title">Fairness Flags</div>
+      <div class="fairness-flags">
+        {% if analysis.fairness_flags %}
+          {% for flag in analysis.fairness_flags %}
+            <div class="fairness-flag">
+              <div class="fairness-flag__label">{{ flag.label }}</div>
+              {% if flag.severity %}
+                <div class="fairness-flag__severity fairness-flag__severity--{{ flag.severity|default:'info' }}">
+                  {{ flag.severity|title }}
+                </div>
+              {% endif %}
+              {% if flag.detail %}
+                <div class="fairness-flag__detail">{{ flag.detail }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="fairness-flag">
+            <div class="fairness-flag__label">No strong fairness warnings detected</div>
+            <div class="fairness-flag__detail">
+              Based on the available data, we do not see clear red flags under typical IAAO fairness metrics. Individual
+              parcels can still differ, so it may be worth reviewing your specific property facts.
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="fairness-section-title" style="margin-top: var(--space-4);">Next Steps</div>
+      <ul class="fairness-list">
+        {% for step in analysis.next_steps %}
+          <li>
+            <span class="fairness-bullet"></span>
+            <span>{{ step }}</span>
+          </li>
+        {% empty %}
+          <li>
+            <span class="fairness-bullet"></span>
+            <span>
+              Consider saving this report, reviewing the comparable sales in more detail, and contacting the assessor's
+              office if you have questions about how your value was set.
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+
+      <div class="fairness-disclaimer">
+        {% if analysis.disclaimer %}
+          {{ analysis.disclaimer }}
+        {% else %}
+          This fairness analysis is an informational aid based on IAAO-style mass appraisal concepts. It is not a formal
+          appraisal, legal advice, or a guarantee of appeal outcomes. Always review official guidance and, if needed,
+          consult qualified professionals before filing an appeal.
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+

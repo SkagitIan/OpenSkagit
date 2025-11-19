@@ -63,4 +63,9 @@ urlpatterns = [
         openskagit_views.appeal_result_comparables,
         name="appeal-result-comparables",
     ),
+    path(
+        "appeal/result/<str:parcel_number>/fairness/",
+        openskagit_views.appeal_fairness_analysis,
+        name="appeal-result-fairness",
+    ),
 ]

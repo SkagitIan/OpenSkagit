@@ -83,7 +83,7 @@ class MissingDependency(OpenAIError):
     pass
 
 
-def get_openai_client() -> OpenAI:
+def get_openai_client():
     """
     Return a singleton OpenAI client configured with API key from .env or settings.
     """

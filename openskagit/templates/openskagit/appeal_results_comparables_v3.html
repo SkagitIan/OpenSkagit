@@ -737,3 +737,169 @@
     }
   });
 </script>
+
+<style>
+  .fairness-trigger-card {
+    margin-top: var(--space-8);
+    padding: var(--space-5);
+    border-radius: var(--radius-2xl);
+    border: 1px dashed var(--gray-300);
+    background: radial-gradient(circle at top left, #eef2ff, #f9fafb);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .fairness-trigger-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .fairness-trigger-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+  }
+
+  .fairness-trigger-subtitle {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    max-width: 36rem;
+  }
+
+  .fairness-trigger-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .fairness-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    border-radius: 999px;
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+    color: #fff;
+    box-shadow: var(--shadow-md);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+  }
+
+  .fairness-btn[disabled] {
+    opacity: 0.7;
+    cursor: default;
+    box-shadow: none;
+  }
+
+  .fairness-btn:not([disabled]):hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .fairness-spinner {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.5);
+    border-top-color: #fff;
+    animation: fairness-spin 0.6s linear infinite;
+  }
+
+  @keyframes fairness-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .fairness-trigger-note {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+  }
+</style>
+
+<div class="fairness-trigger-card">
+  <div class="fairness-trigger-header">
+    <div>
+      <div class="fairness-trigger-title">Run Fairness Analysis</div>
+      <p class="fairness-trigger-subtitle">
+        Bring together your subject, neighborhood metrics, and comparable sales into a single IAAO-style fairness
+        checklist. This can help you decide whether an appeal feels reasonable.
+      </p>
+    </div>
+    <div class="fairness-trigger-actions">
+      <button
+        id="fairness-analysis-button"
+        class="fairness-btn"
+        type="button"
+        data-url="{% url 'appeal-result-fairness' parcel_number %}"
+      >
+        <span>Run Fairness Analysis</span>
+        <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 11 12 14 22 4"></polyline>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+        </svg>
+      </button>
+      <div class="fairness-trigger-note">
+        Uses anonymous neighborhood statistics and a model tuned to IAAO fairness concepts. No legal advice.
+      </div>
+    </div>
+  </div>
+  <div id="fairness-analysis-result"></div>
+</div>
+
+<script>
+  (function () {
+    const button = document.getElementById('fairness-analysis-button');
+    const resultContainer = document.getElementById('fairness-analysis-result');
+
+    if (!button || !resultContainer) {
+      return;
+    }
+
+    function setLoading(isLoading) {
+      if (isLoading) {
+        button.disabled = true;
+        button.innerHTML = '<div class="fairness-spinner"></div><span>Running analysis…</span>';
+      } else {
+        button.disabled = false;
+        button.innerHTML = '<span>Run Fairness Analysis</span>' +
+          '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          '<polyline points="9 11 12 14 22 4"></polyline>' +
+          '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' +
+          '</svg>';
+      }
+    }
+
+    button.addEventListener('click', () => {
+      const url = button.dataset.url;
+      if (!url || button.disabled) {
+        return;
+      }
+      setLoading(true);
+      resultContainer.innerHTML = '';
+
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Unable to run fairness analysis');
+          }
+          return response.text();
+        })
+        .then((html) => {
+          resultContainer.innerHTML = html;
+        })
+        .catch(() => {
+          resultContainer.innerHTML = '<div class="fairness-error">Unable to run the fairness analysis right now. Please try again in a few minutes.</div>';
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    });
+  })();
+</script>
