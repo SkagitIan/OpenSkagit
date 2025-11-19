@@ -1,4 +1,4 @@
-import statistics
+import json
 from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -6,19 +6,10 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 from django.db import connection
 from django.db.models import Q
-
-from openskagit.models import (
-    Assessor,
-    Sales,
-    NeighborhoodProfile,
-    NeighborhoodGeom,
-)
-
+# Ensure these match your actual app name
+from openskagit.models import Assessor, NeighborhoodProfile, Sales 
 
 def convert_decimals(obj):
-    """
-    Recursively convert Decimal instances to float for JSON storage.
-    """
     if isinstance(obj, Decimal):
         return float(obj)
     elif isinstance(obj, dict):
@@ -27,644 +18,485 @@ def convert_decimals(obj):
         return [convert_decimals(i) for i in obj]
     return obj
 
-
 class Command(BaseCommand):
-    help = "Build complete neighborhood snapshot JSON for all neighborhoods (fast, aggregated)."
+    help = "High-performance builder for neighborhood snapshot JSON."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--hood",
-            type=str,
-            help="Optional: build profile for a single neighborhood code.",
-        )
-
-    # ==============================================================
-    # MAIN HANDLE
-    # ==============================================================
+        parser.add_argument("--hood", type=str, help="Process a specific neighborhood code.")
 
     def handle(self, *args, **options):
-        only_hood = options.get("hood")
-
-        # Neighborhood filter (your allowed groups)
-        allowed = (
-            Q(neighborhood_code__startswith="20B")
-            | Q(neighborhood_code__startswith="21B")
-            | Q(neighborhood_code__startswith="22B")
-            | Q(neighborhood_code__startswith="23B")
-            | Q(neighborhood_code__startswith="26B")
-            | Q(neighborhood_code__startswith="27B")
-            | Q(neighborhood_code__startswith="20LC")
-            | Q(neighborhood_code__startswith="21LC")
-            | Q(neighborhood_code__startswith="22LC")
-            | Q(neighborhood_code__startswith="23LC")
-            | Q(neighborhood_code__startswith="20CON")
-            | Q(neighborhood_code__startswith="22CON")
-            | Q(neighborhood_code__startswith="20A")
-            | Q(neighborhood_code__startswith="21A")
-            | Q(neighborhood_code__startswith="22A")
-            | Q(neighborhood_code__startswith="23A")
-            | Q(neighborhood_code__startswith="20FID")
-            | Q(neighborhood_code__startswith="22FID")
-            | Q(neighborhood_code__startswith="20GUEM")
-            | Q(neighborhood_code__startswith="22GUEM")
-            | Q(neighborhood_code__startswith="20SW")
-            | Q(neighborhood_code__startswith="21SW")
-            | Q(neighborhood_code__startswith="22SW")
-            | Q(neighborhood_code__startswith="23SW")
-            | Q(neighborhood_code__startswith="20CC")
-            | Q(neighborhood_code__startswith="22CC")
-            | Q(neighborhood_code__startswith="10CC")
-            | Q(neighborhood_code__startswith="20MV")
-            | Q(neighborhood_code__startswith="21MV")
-            | Q(neighborhood_code__startswith="22MV")
-            | Q(neighborhood_code__startswith="23MV")
+        start_time = datetime.now()
+        
+        # ---------------------------------------------------------
+        # 1. DEFINE SCOPE
+        # ---------------------------------------------------------
+        # (Truncated your filter list for brevity, but logic applies to all)
+        filters = (
+            Q(neighborhood_code__startswith="20B") | Q(neighborhood_code__startswith="21B") |
+            Q(neighborhood_code__startswith="22B") | Q(neighborhood_code__startswith="23B") |
+            Q(neighborhood_code__startswith="26B") | Q(neighborhood_code__startswith="27B") |
+            Q(neighborhood_code__startswith="20LC") | Q(neighborhood_code__startswith="21LC") |
+            Q(neighborhood_code__startswith="22LC") | Q(neighborhood_code__startswith="23LC") |
+            Q(neighborhood_code__startswith="20CON") | Q(neighborhood_code__startswith="22CON") |
+            Q(neighborhood_code__startswith="20A") | Q(neighborhood_code__startswith="21A") |
+            Q(neighborhood_code__startswith="22A") | Q(neighborhood_code__startswith="23A") |
+            Q(neighborhood_code__startswith="20FID") | Q(neighborhood_code__startswith="22FID") |
+            Q(neighborhood_code__startswith="20GUEM") | Q(neighborhood_code__startswith="22GUEM") |
+            Q(neighborhood_code__startswith="20SW") | Q(neighborhood_code__startswith="21SW") |
+            Q(neighborhood_code__startswith="22SW") | Q(neighborhood_code__startswith="23SW") |
+            Q(neighborhood_code__startswith="20CC") | Q(neighborhood_code__startswith="22CC") |
+            Q(neighborhood_code__startswith="10CC") | Q(neighborhood_code__startswith="20MV") |
+            Q(neighborhood_code__startswith="21MV") | Q(neighborhood_code__startswith="22MV") |
+            Q(neighborhood_code__startswith="23MV")
         )
 
-        # ----------------------------------------------------------
-        # LOAD ALL PARCELS ONCE
-        # ----------------------------------------------------------
-        base_qs = (
-            Assessor.objects.filter(allowed)
+        if options["hood"]:
+            filters = Q(neighborhood_code=options["hood"])
+
+        valid_hoods = list(
+            Assessor.objects.filter(filters)
             .exclude(neighborhood_code__isnull=True)
             .exclude(neighborhood_code__exact="")
+            .values_list("neighborhood_code", flat=True)
+            .distinct()
         )
 
-        if only_hood:
-            base_qs = base_qs.filter(neighborhood_code=only_hood)
-
-        # Only pull fields we need for per-hood stats.
-        parcel_rows = list(
-            base_qs.values(
-                "id",
-                "parcel_number",
-                "neighborhood_code",
-                "neighborhood_code_description",
-                "year_built",
-                "living_area",
-                "acres",
-                "bathrooms",
-                "finished_basement",
-                "unfinished_basement",
-                "garage_sqft",
-                "building_style",
-                "centroid_geog",
-            )
-        )
-
-        if not parcel_rows:
-            self.stdout.write(self.style.WARNING("No parcels found for allowed neighborhoods."))
+        if not valid_hoods:
+            self.stdout.write(self.style.WARNING("No neighborhoods found matching criteria."))
             return
 
-        # Maps
-        hood_parcels = defaultdict(list)  # hood -> list of row dicts
-        hood_by_id = {}  # parcel_id -> hood
-        parcel_ids = []  # all parcel ids for spatial queries
-        hoods_set = set()
+        self.stdout.write(f"Processing {len(valid_hoods)} neighborhoods...")
 
-        for row in parcel_rows:
-            hood = row["neighborhood_code"]
-            pid = row["id"]
-            hood_parcels[hood].append(row)
-            hood_by_id[pid] = hood
-            parcel_ids.append(pid)
-            hoods_set.add(hood)
+        # ---------------------------------------------------------
+        # 2. FETCH AGGREGATED STATISTICS
+        # ---------------------------------------------------------
+        
+        self.stdout.write("  - Aggregating main structural stats (inc. Taxes)...")
+        main_stats = self.get_main_parcel_stats(valid_hoods)
 
-        hoods = sorted(hoods_set)
-        self.stdout.write(f"Found {len(hoods)} neighborhoods with parcels.")
+        self.stdout.write("  - Aggregating distributions (Bed/Bath/Style)...")
+        bath_dist = self.get_distribution(valid_hoods, "bathrooms")
+        bed_dist = self.get_distribution(valid_hoods, "bedrooms")
+        style_dist = self.get_distribution(valid_hoods, "building_style")
 
-        # Neighborhood geom names (one query)
-        geom_name_map = dict(
-            NeighborhoodGeom.objects.filter(code__in=hoods).values_list("code", "name")
-        )
+        self.stdout.write("  - Aggregating sales history (2020-2025)...")
+        sales_history = self.get_sales_history(valid_hoods)
 
-        # ----------------------------------------------------------
-        # PRECOMPUTE GLOBAL SPATIAL + SALES STATISTICS
-        # ----------------------------------------------------------
-        self.stdout.write("Precomputing flood stats…")
-        flood_stats = self.build_flood_stats(parcel_ids)
+        self.stdout.write("  - Calculating spatial stats...")
+        flood_stats = self.get_flood_stats(valid_hoods)
+        slope_stats = self.get_slope_stats(valid_hoods)
+        census_stats = self.get_census_stats(valid_hoods)
+        amenity_stats = self.get_amenity_stats_optimized(valid_hoods)
+        
+        # ---------------------------------------------------------
+        # 3. ASSEMBLE AND SAVE
+        # ---------------------------------------------------------
+        self.stdout.write("  - Assembling JSON...")
+        profiles_to_upsert = []
+        
+        for hood in valid_hoods:
+            if hood not in main_stats:
+                continue
+                
+            base = main_stats[hood]
+            hood_sales_hist = sales_history.get(hood, {})
+            
+            # Get current year (2024/2025) sales for the summary block
+            # We use the history dict to get the most recent relevant data
+            current_year = str(datetime.now().year)
+            last_year = str(datetime.now().year - 1)
+            
+            # Fallback: if 2025 is empty, look at 2024 for summary stats
+            recent_sale_data = hood_sales_hist.get(current_year)
+            if not recent_sale_data or recent_sale_data['count'] == 0:
+                 recent_sale_data = hood_sales_hist.get(last_year, {"count": 0, "median_price": None})
 
-        self.stdout.write("Precomputing slope stats…")
-        slope_stats = self.build_slope_stats(parcel_ids)
-
-        self.stdout.write("Precomputing census stats…")
-        census_stats = self.build_census_stats(parcel_ids)
-
-        self.stdout.write("Precomputing amenity stats…")
-        amenity_stats = self.build_amenity_stats(parcel_ids)
-
-        self.stdout.write("Precomputing sales stats…")
-        sale_stats = self.build_sale_stats(hoods)
-
-        # ----------------------------------------------------------
-        # BUILD PROFILES PER HOOD (PURE PYTHON)
-        # ----------------------------------------------------------
-        for hood in hoods:
-            rows = hood_parcels[hood]
-            if not rows:
+            # Calculate Total Historical Sales for the filter (Safety Check)
+            total_recorded_sales = sum(d['count'] for d in hood_sales_hist.values())
+            
+            if total_recorded_sales < 10:
+                # self.stdout.write(f"Skipping {hood} (Low Sales Volume)")
                 continue
 
-            self.stdout.write(f"Processing hood {hood}…")
+            # Calculate Turnover Rate (Sales in last 12 months / Total Parcels)
+            # We'll roughly use last year's count for this metric
+            last_year_sales = hood_sales_hist.get(last_year, {}).get('count', 0)
+            turnover_rate = round((last_year_sales / base["count"]) * 100, 2) if base["count"] > 0 else 0
 
-            json_blob = {}
+            json_blob = {
+                "neighborhood_name": base.get("desc") or hood,
+                "parcel_count": base["count"],
+                "turnover_rate": turnover_rate,
+                
+                # --- AGE ---
+                "median_year_built": base["med_year"],
+                "oldest_year_built": base["min_year"],
+                "newest_year_built": base["max_year"],
+                "age_distribution": {
+                    "0_20": base["age_0_20"],
+                    "20_40": base["age_20_40"],
+                    "40_60": base["age_40_60"],
+                    "60_plus": base["age_60_plus"],
+                },
+                "new_builds": {
+                    "2023": base["built_2023"],
+                    "2024": base["built_2024"],
+                    "2025": base["built_2025"],
+                },
 
-            # BASIC COUNTS
-            parcel_count = len(rows)
-            json_blob["parcel_count"] = parcel_count
+                # --- STRUCTURE ---
+                "living_area_stats": {
+                    "median": base["med_sqft"],
+                    "p25": base["sqft_p25"],
+                    "p75": base["sqft_p75"],
+                    "sample_size": base["cnt_sqft"]
+                },
+                "lot_size": {
+                    "median_acres": base["med_acres"],
+                    "p25": base["acres_p25"],
+                    "p75": base["acres_p75"],
+                    "sample_size": base["cnt_acres"]
+                },
+                "garage": {
+                    "median_sqft": base["med_garage"],
+                    "sample_size": base["cnt_garage"]
+                },
+                "basement_pct": base["pct_basement"],
 
-            # NEIGHBORHOOD NAME
-            first_row = rows[0]
-            nbhd_desc = first_row.get("neighborhood_code_description") or None
-            json_blob["neighborhood_name"] = nbhd_desc or hood
+                # --- ROOMS ---
+                "bathrooms": {
+                    "median": base["med_bath"],
+                    "sample_size": base["cnt_bath"],
+                    "distribution": bath_dist.get(hood, [])
+                },
+                "bedrooms": {
+                    "median": base["med_bed"],
+                    "sample_size": base["cnt_bed"],
+                    "distribution": bed_dist.get(hood, [])
+                },
+                "styles": {
+                    "sample_size": base["cnt_style"],
+                    "summary": style_dist.get(hood, [])
+                },
 
-            # geom name if available
-            if hood in geom_name_map and geom_name_map[hood]:
-                json_blob["geom_name"] = geom_name_map[hood]
+                # --- FINANCIALS ---
+                "tax_stats": {
+                    "median_tax_amount": base["med_tax"],
+                    "median_assessed_value": base["med_assessed"],
+                    # Effective Tax Rate = Tax / Assessed Value
+                    "effective_tax_rate": round((base["med_tax"] / base["med_assessed"] * 100), 2) if base["med_assessed"] and base["med_tax"] else None
+                },
+                "sales_summary": {
+                    "median_price": recent_sale_data.get("median_price"),
+                    "median_ppsf": recent_sale_data.get("median_ppsf"),
+                    "last_year_sales_count": recent_sale_data.get("count")
+                },
+                "sales_history": hood_sales_hist,
 
-            # YEAR BUILT / AGE BANDS
-            years = [r["year_built"] for r in rows if r["year_built"] is not None]
-            if years:
-                json_blob["median_year_built"] = statistics.median(years)
-                json_blob["oldest_year_built"] = min(years)
-                json_blob["newest_year_built"] = max(years)
-            else:
-                json_blob["median_year_built"] = None
-                json_blob["oldest_year_built"] = None
-                json_blob["newest_year_built"] = None
-
-            agebands = {"0_20": 0, "20_40": 0, "40_60": 0, "60_plus": 0}
-            now_year = datetime.now().year
-            for y in years:
-                age = now_year - y
-                if age <= 20:
-                    agebands["0_20"] += 1
-                elif age <= 40:
-                    agebands["20_40"] += 1
-                elif age <= 60:
-                    agebands["40_60"] += 1
-                else:
-                    agebands["60_plus"] += 1
-            json_blob["age_distribution"] = agebands
-
-            # NEW BUILD COUNTS (hard-coded last 3 years)
-            new_build_counts = {}
-            for year in (2023, 2024, 2025):
-                new_build_counts[str(year)] = sum(1 for r in rows if r["year_built"] == year)
-            json_blob["new_builds"] = new_build_counts
-
-            # LIVING AREA
-            glas = [r["living_area"] for r in rows if r["living_area"] is not None]
-            if glas:
-                glas_sorted = sorted(glas)
-                n = len(glas_sorted)
-                json_blob["living_area_stats"] = {
-                    "median": statistics.median(glas_sorted),
-                    "p25": glas_sorted[n // 4],
-                    "p75": glas_sorted[(3 * n) // 4],
-                    "sample_size": n,
-                }
-            else:
-                json_blob["living_area_stats"] = None
-
-            # LOT SIZE (ACRES)
-            acres = [r["acres"] for r in rows if r["acres"] is not None]
-            if acres:
-                acres_sorted = sorted(acres)
-                n = len(acres_sorted)
-                json_blob["lot_size"] = {
-                    "median_acres": statistics.median(acres_sorted),
-                    "p25": acres_sorted[n // 4],
-                    "p75": acres_sorted[(3 * n) // 4],
-                    "sample_size": n,
-                }
-            else:
-                json_blob["lot_size"] = None
-
-            # BATHROOMS
-            baths = [r["bathrooms"] for r in rows if r["bathrooms"] is not None]
-            if baths:
-                baths_sorted = sorted(baths)
-                median_baths = statistics.median(baths_sorted)
-                distribution = []
-                unique_vals = sorted(set(baths_sorted))
-                for val in unique_vals:
-                    count = sum(1 for b in baths_sorted if b == val)
-                    label = f"{float(val):g} baths"
-                    distribution.append(
-                        {
-                            "bathrooms": float(val),
-                            "count": count,
-                            "label": label,
-                        }
-                    )
-                json_blob["bathrooms"] = {
-                    "median": median_baths,
-                    "distribution": distribution,
-                    "sample_size": len(baths_sorted),
-                }
-            else:
-                json_blob["bathrooms"] = {
-                    "median": None,
-                    "distribution": [],
-                    "sample_size": 0,
-                }
-
-            # BASEMENT PCT
-            finished_count = sum(
-                1 for r in rows if r["finished_basement"] and r["finished_basement"] > 0
-            )
-            unfinished_count = sum(
-                1 for r in rows if r["unfinished_basement"] and r["unfinished_basement"] > 0
-            )
-            total = parcel_count
-            if total > 0:
-                pct = round(((finished_count + unfinished_count) / total) * 100, 2)
-            else:
-                pct = None
-            json_blob["basement_pct"] = pct
-
-            # GARAGE
-            garages = [r["garage_sqft"] for r in rows if r["garage_sqft"] is not None]
-            json_blob["garage"] = {
-                "median_sqft": statistics.median(garages) if garages else None,
-                "sample_size": len(garages),
+                # --- SPATIAL ---
+                "flood_profile": flood_stats.get(hood, {}),
+                #"slope_stats": slope_stats.get(hood, {}),
+                "census": census_stats.get(hood, {}),
+                "amenities": amenity_stats.get(hood, {})
             }
 
-            # BUILDING STYLE
-            styles = [r["building_style"] for r in rows if r["building_style"]]
-            if styles:
-                total_styles = len(styles)
-                counts = defaultdict(int)
-                for st in styles:
-                    counts[st] += 1
-
-                style_summary = []
-                for st in sorted(counts.keys()):
-                    count = counts[st]
-                    pct = round((count / total_styles) * 100, 2)
-                    style_summary.append(
-                        {
-                            "style": st,
-                            "count": count,
-                            "percent": pct,
-                        }
-                    )
-                json_blob["styles"] = {
-                    "summary": style_summary,
-                    "sample_size": total_styles,
-                }
-            else:
-                json_blob["styles"] = {
-                    "summary": [],
-                    "sample_size": 0,
-                }
-
-            # FLOOD / SLOPE / CENSUS / AMENITIES / SALES (from precomputed maps)
-            json_blob["flood_profile"] = flood_stats.get(hood, {})
-            json_blob["slope_stats"] = slope_stats.get(hood, {})
-            json_blob["census"] = census_stats.get(hood, {})
-            json_blob["amenities"] = amenity_stats.get(hood, {})
-
-            hood_sale_info = sale_stats.get(hood, {"sale_count": 0})
-            json_blob["sales"] = hood_sale_info
-
-            sale_count = hood_sale_info.get("sale_count", 0)
-            if sale_count < 15:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Skipping {hood}: only {sale_count} sales (< 15 required)"
-                    )
+            profiles_to_upsert.append(
+                NeighborhoodProfile(
+                    hood_id=hood,
+                    json_data=convert_decimals(json_blob)
                 )
-                continue
-
-            # SAVE PROFILE
-            NeighborhoodProfile.objects.update_or_create(
-                hood_id=hood,
-                defaults={"json_data": convert_decimals(json_blob)},
             )
 
-            self.stdout.write(self.style.SUCCESS(f"✓ Hood {hood} saved."))
+        self.stdout.write(f"  - Saving {len(profiles_to_upsert)} profiles...")
+        
+        NeighborhoodProfile.objects.bulk_create(
+            profiles_to_upsert,
+            update_conflicts=True,
+            unique_fields=['hood_id'],
+            update_fields=['json_data']
+        )
 
-        self.stdout.write("Done building neighborhood snapshots.")
+        duration = datetime.now() - start_time
+        self.stdout.write(self.style.SUCCESS(f"Done! Processed in {duration}."))
 
-    # ==============================================================
-    # PRECOMPUTE HELPERS (GLOBAL QUERIES)
-    # ==============================================================
+    # ==========================================================================
+    # SQL HELPERS
+    # ==========================================================================
 
-    def build_flood_stats(self, parcel_ids):
+    def get_main_parcel_stats(self, hoods):
+        now_year = datetime.now().year
+        
+        # NOTE: We use REGEXP_REPLACE to clean total_taxes (e.g., "$3,400.00" -> "3400.00")
+        
+        sql = f"""
+        SELECT
+            neighborhood_code,
+            MAX(neighborhood_code_description) as desc,
+            COUNT(*) as count,
+            
+            -- Year Built
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY year_built) as med_year,
+            MIN(year_built) as min_year,
+            MAX(year_built) as max_year,
+            
+            -- Age Buckets
+            COUNT(*) FILTER (WHERE ({now_year} - year_built) <= 20) as age_0_20,
+            COUNT(*) FILTER (WHERE ({now_year} - year_built) BETWEEN 21 AND 40) as age_20_40,
+            COUNT(*) FILTER (WHERE ({now_year} - year_built) BETWEEN 41 AND 60) as age_40_60,
+            COUNT(*) FILTER (WHERE ({now_year} - year_built) > 60) as age_60_plus,
+            
+            -- Recent Builds
+            COUNT(*) FILTER (WHERE year_built = 2023) as built_2023,
+            COUNT(*) FILTER (WHERE year_built = 2024) as built_2024,
+            COUNT(*) FILTER (WHERE year_built = 2025) as built_2025,
+
+            -- Size
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY living_area) as med_sqft,
+            PERCENTILE_CONT(0.25) WITHIN GROUP(ORDER BY living_area) as sqft_p25,
+            PERCENTILE_CONT(0.75) WITHIN GROUP(ORDER BY living_area) as sqft_p75,
+            COUNT(living_area) as cnt_sqft,
+
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY acres) as med_acres,
+            PERCENTILE_CONT(0.25) WITHIN GROUP(ORDER BY acres) as acres_p25,
+            PERCENTILE_CONT(0.75) WITHIN GROUP(ORDER BY acres) as acres_p75,
+            COUNT(acres) as cnt_acres,
+
+            -- Rooms / Garage
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY bathrooms) as med_bath,
+            COUNT(bathrooms) as cnt_bath,
+            
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY bedrooms) as med_bed,
+            COUNT(bedrooms) as cnt_bed,
+            
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY garage_sqft) as med_garage,
+            COUNT(garage_sqft) as cnt_garage,
+            
+            -- Financials (Cleaning Text Fields)
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY assessed_value) as med_assessed,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY 
+                CAST(NULLIF(REGEXP_REPLACE(total_taxes, '[^0-9.]', '', 'g'), '') AS NUMERIC)
+            ) as med_tax,
+            
+            -- Basement
+            SUM(CASE WHEN finished_basement > 0 OR unfinished_basement > 0 THEN 1 ELSE 0 END) as basement_count,
+            
+            -- Style
+            COUNT(building_style) as cnt_style
+
+        FROM assessor
+        WHERE neighborhood_code = ANY(%s)
+        GROUP BY neighborhood_code
         """
-        Return dict[hood] -> { fld_zone: pct_of_parcels_in_that_zone }.
-        Uses centroid_geog for intersect.
-        """
-        if not parcel_ids:
-            return {}
+        
+        results = {}
+        with connection.cursor() as cur:
+            cur.execute(sql, (hoods,))
+            cols = [desc[0] for desc in cur.description]
+            for row in cur.fetchall():
+                data = dict(zip(cols, row))
+                total = data['count']
+                bsmt = data.pop('basement_count') or 0
+                data['pct_basement'] = round((bsmt / total) * 100, 2) if total else 0
+                results[data['neighborhood_code']] = data
+        return results
 
+    def get_distribution(self, hoods, field_name):
+        """
+        Generic grouper. Works for 'bathrooms', 'bedrooms', 'building_style'.
+        """
+        sql = f"""
+        SELECT 
+            neighborhood_code, 
+            {field_name} as val, 
+            COUNT(*) as cnt
+        FROM assessor
+        WHERE neighborhood_code = ANY(%s) AND {field_name} IS NOT NULL
+        GROUP BY neighborhood_code, {field_name}
+        ORDER BY neighborhood_code, {field_name}
+        """
+        
+        totals = defaultdict(int)
+        temp_data = defaultdict(list)
+        
+        with connection.cursor() as cur:
+            cur.execute(sql, (hoods,))
+            for hood, val, cnt in cur.fetchall():
+                totals[hood] += cnt
+                
+                # Formatting label based on field type
+                if field_name in ['bathrooms', 'bedrooms']:
+                    label = f"{val:g} {field_name}"
+                    key = field_name
+                else:
+                    label = str(val)
+                    key = "style"
+                
+                temp_data[hood].append({
+                    key: float(val) if field_name in ['bathrooms', 'bedrooms'] else val,
+                    "count": cnt,
+                    "label": label
+                })
+
+        results = {}
+        for hood, items in temp_data.items():
+            total = totals[hood]
+            final_list = []
+            for item in items:
+                item['percent'] = round((item['count'] / total) * 100, 2) if total else 0
+                final_list.append(item)
+            results[hood] = final_list
+            
+        return results
+
+    def get_sales_history(self, hoods):
+        """
+        Groups sales by year (2020-2025).
+        Joins Sales -> Assessor to calculate PPSF (Price / Living Area).
+        """
+        start_year = 2020
+        start_date = datetime(start_year, 1, 1)
+
+        sql = """
+        SELECT 
+            a.neighborhood_code,
+            EXTRACT(YEAR FROM s.sale_date)::int as sale_year,
+            COUNT(*) as sale_count,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY s.sale_price) as med_price,
+            -- PPSF Calculation: Price / Living Area (Null if area is 0 or null)
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY (s.sale_price / NULLIF(a.living_area, 0))) as med_ppsf
+        FROM sales s
+        JOIN assessor a ON a.parcel_number = s.parcel_number
+        WHERE a.neighborhood_code = ANY(%s)
+          AND s.sale_price > 0
+          AND s.sale_date >= %s
+          AND a.living_area > 0 
+          AND s.deed_type IN ('WARRANTY DEED', 'STATUTORY WARRANTY DEED')
+        GROUP BY a.neighborhood_code, sale_year
+        ORDER BY a.neighborhood_code, sale_year DESC
+        """
+
+        results = defaultdict(dict)
+        with connection.cursor() as cur:
+            cur.execute(sql, (hoods, start_date))
+            for hood, year, count, price, ppsf in cur.fetchall():
+                results[hood][str(year)] = {
+                    "count": count,
+                    "median_price": price,
+                    "median_ppsf": round(ppsf, 2) if ppsf else None
+                }
+        
+        # Fill missing years for consistency
+        current_year = datetime.now().year
+        all_years = [str(y) for y in range(start_year, current_year + 2)]
+        
+        for hood in results:
+            for y in all_years:
+                if y not in results[hood]:
+                    results[hood][y] = {"count": 0, "median_price": None, "median_ppsf": None}
+
+        return results
+
+    def get_flood_stats(self, hoods):
         sql = """
         SELECT 
             a.neighborhood_code,
             f.fld_zone,
-            COUNT(*) AS cnt
-        FROM flood_skagit_fema AS f
-        JOIN assessor AS a
-          ON a.centroid_geog IS NOT NULL
-         AND a.centroid_geog::geometry && f.geom
-         AND ST_Intersects(a.centroid_geog::geometry, f.geom)
-        WHERE a.id = ANY(%s)
-        GROUP BY a.neighborhood_code, f.fld_zone;
-        """
-
-        hood_counts = defaultdict(lambda: defaultdict(int))
-
-        with connection.cursor() as cur:
-            cur.execute(sql, (parcel_ids,))
-            for hood, fld_zone, cnt in cur.fetchall():
-                if hood is None or fld_zone is None:
-                    continue
-                hood_counts[hood][fld_zone] += cnt
-
-        result = {}
-        for hood, zone_counts in hood_counts.items():
-            total = sum(zone_counts.values()) or 1
-            result[hood] = {
-                zone: round((count / total) * 100, 2)
-                for zone, count in zone_counts.items()
-            }
-        return result
-
-    def build_slope_stats(self, parcel_ids):
-        """
-        Return dict[hood] -> {median, p75, count}.
-        Uses dem_slope_tiles and centroid_geog for sampling.
-        """
-        if not parcel_ids:
-            return {}
-
-        sql = """
-        SELECT 
-            a.neighborhood_code,
-            ST_Value(t.rast, a.centroid_geog::geometry) AS slope
-        FROM dem_slope_tiles AS t
-        JOIN assessor AS a
-          ON a.centroid_geog IS NOT NULL
-         AND ST_Intersects(t.rast, a.centroid_geog::geometry)
-        WHERE a.id = ANY(%s);
-        """
-
-        hood_slopes = defaultdict(list)
-
-        with connection.cursor() as cur:
-            cur.execute(sql, (parcel_ids,))
-            for hood, slope in cur.fetchall():
-                if hood is None or slope is None:
-                    continue
-                hood_slopes[hood].append(float(slope))
-
-        result = {}
-        for hood, slopes in hood_slopes.items():
-            if not slopes:
-                continue
-            slopes_sorted = sorted(slopes)
-            n = len(slopes_sorted)
-            result[hood] = {
-                "median": statistics.median(slopes_sorted),
-                "p75": slopes_sorted[int(n * 0.75)],
-                "count": n,
-            }
-        return result
-
-    def build_census_stats(self, parcel_ids):
-        """
-        Return dict[hood] -> census summary based on centroid_geog -> block group.
-        """
-        if not parcel_ids:
-            return {}
-
-        sql = """
-        SELECT 
-            a.neighborhood_code,
-            acs.median_income,
-            acs.population,
-            acs.edu_bachelor,
-            acs.edu_master,
-            acs.edu_professional,
-            acs.edu_doctorate
-        FROM assessor AS a
-        JOIN census.bg_skagit AS bg
-          ON a.centroid_geog IS NOT NULL
-         AND ST_Intersects(
-                bg.geom,
-                ST_Transform(a.centroid_geog::geometry, 2285)
-             )
-        JOIN census.acs_bg_skagit AS acs
-          ON bg.geoid = acs.geoid
-        WHERE a.id = ANY(%s);
-        """
-
-        hood_income = defaultdict(list)
-        hood_pop = defaultdict(list)
-        hood_bach = defaultdict(list)
-        hood_mast = defaultdict(list)
-        hood_prof = defaultdict(list)
-        hood_doc = defaultdict(list)
-
-        with connection.cursor() as cur:
-            cur.execute(sql, (parcel_ids,))
-            for (
-                hood,
-                median_income,
-                population,
-                edu_b,
-                edu_m,
-                edu_p,
-                edu_d,
-            ) in cur.fetchall():
-                if hood is None:
-                    continue
-                if median_income is not None:
-                    hood_income[hood].append(float(median_income))
-                if population is not None:
-                    hood_pop[hood].append(float(population))
-                if edu_b is not None:
-                    hood_bach[hood].append(float(edu_b))
-                if edu_m is not None:
-                    hood_mast[hood].append(float(edu_m))
-                if edu_p is not None:
-                    hood_prof[hood].append(float(edu_p))
-                if edu_d is not None:
-                    hood_doc[hood].append(float(edu_d))
-
-        result = {}
-        for hood in set(
-            list(hood_income.keys())
-            + list(hood_pop.keys())
-            + list(hood_bach.keys())
-            + list(hood_mast.keys())
-            + list(hood_prof.keys())
-            + list(hood_doc.keys())
-        ):
-            def med_or_none(arr):
-                return statistics.median(arr) if arr else None
-
-            result[hood] = {
-                "median_income": med_or_none(hood_income.get(hood, [])),
-                "median_population": med_or_none(hood_pop.get(hood, [])),
-                "education": {
-                    "bachelor": med_or_none(hood_bach.get(hood, [])),
-                    "master": med_or_none(hood_mast.get(hood, [])),
-                    "professional": med_or_none(hood_prof.get(hood, [])),
-                    "doctorate": med_or_none(hood_doc.get(hood, [])),
-                },
-                "samples": len(hood_income.get(hood, []))
-                or len(hood_pop.get(hood, []))
-                or 0,
-            }
-
-        return result
-
-    def build_amenity_stats(self, parcel_ids):
-        """
-        Return dict[hood] -> median distances to school / park / major road.
-        Uses centroid_geog as geography.
-        """
-        if not parcel_ids:
-            return {}
-
-        def median_or_none(arr):
-            return statistics.median(arr) if arr else None
-
-        hood_school = defaultdict(list)
-        hood_park = defaultdict(list)
-        hood_road = defaultdict(list)
-
-        # Schools
-        sql_schools = """
-        SELECT
-            a.neighborhood_code,
-            MIN(
-                ST_Distance(
-                    a.centroid_geog,
-                    ST_Transform(s.geom, 4326)::geography
-                )
-            ) AS dist_m
-        FROM assessor AS a
-        JOIN osm.osm_schools AS s
-        ON a.centroid_geog IS NOT NULL
-        WHERE a.id = ANY(%s)
-        GROUP BY a.neighborhood_code, a.id;
-
-        """
-
-        # Parks
-        sql_parks = """
-            SELECT
-                a.neighborhood_code,
-                MIN(
-                    ST_Distance(
-                        a.centroid_geog,
-                        ST_Transform(p.geom, 4326)::geography
-                    )
-                ) AS dist_m
-            FROM assessor AS a
-            JOIN osm.osm_parks AS p
-            ON a.centroid_geog IS NOT NULL
-            WHERE a.id = ANY(%s)
-            GROUP BY a.neighborhood_code, a.id;
-
-        """
-
-        # Major roads
-        sql_roads = """
-       SELECT
-            a.neighborhood_code,
-            MIN(
-                ST_Distance(
-                    a.centroid_geog,
-                    ST_Transform(r.geom, 4326)::geography
-                )
-            ) AS dist_m
-        FROM assessor AS a
-        JOIN osm.osm_major_roads AS r
-        ON a.centroid_geog IS NOT NULL
-        WHERE a.id = ANY(%s)
-        GROUP BY a.neighborhood_code, a.id;
-
-        """
-
-        with connection.cursor() as cur:
-            # Schools
-            cur.execute(sql_schools, (parcel_ids,))
-            for hood, dist_m in cur.fetchall():
-                if hood is None or dist_m is None:
-                    continue
-                hood_school[hood].append(float(dist_m))
-
-            # Parks
-            cur.execute(sql_parks, (parcel_ids,))
-            for hood, dist_m in cur.fetchall():
-                if hood is None or dist_m is None:
-                    continue
-                hood_park[hood].append(float(dist_m))
-
-            # Roads
-            cur.execute(sql_roads, (parcel_ids,))
-            for hood, dist_m in cur.fetchall():
-                if hood is None or dist_m is None:
-                    continue
-                hood_road[hood].append(float(dist_m))
-
-        result = {}
-        all_hoods = set(
-            list(hood_school.keys())
-            + list(hood_park.keys())
-            + list(hood_road.keys())
-        )
-
-        for hood in all_hoods:
-            result[hood] = {
-                "dist_school_m": median_or_none(hood_school.get(hood, [])),
-                "dist_park_m": median_or_none(hood_park.get(hood, [])),
-                "dist_major_road_m": median_or_none(hood_road.get(hood, [])),
-            }
-
-        return result
-
-    def build_sale_stats(self, hoods):
-        """
-        Return dict[hood] -> {"sale_count": int, "median_sale_price": float}.
-        Uses last 2 years of sales and filters > 0.
-        """
-        if not hoods:
-            return {}
-
-        two_years_ago = datetime.now() - timedelta(days=730)
-
-        sql = """
-        SELECT 
-            a.neighborhood_code,
-            s.sale_price
-        FROM sales AS s
-        JOIN assessor AS a
-          ON a.parcel_number = s.parcel_number
+            COUNT(*) 
+        FROM assessor a
+        JOIN flood_skagit_fema f 
+          ON a.centroid_geog && f.geom 
+          AND ST_Intersects(a.centroid_geog, f.geom)
         WHERE a.neighborhood_code = ANY(%s)
-          AND s.sale_price > 0
-          AND s.sale_date >= %s;
+        GROUP BY a.neighborhood_code, f.fld_zone
         """
-
-        hood_prices = defaultdict(list)
-
+        data = defaultdict(dict)
+        totals = defaultdict(int)
         with connection.cursor() as cur:
-            cur.execute(sql, (hoods, two_years_ago))
-            for hood, price in cur.fetchall():
-                if hood is None or price is None:
-                    continue
-                hood_prices[hood].append(float(price))
+            cur.execute(sql, (hoods,))
+            for hood, zone, cnt in cur.fetchall():
+                data[hood][zone] = cnt
+                totals[hood] += cnt
+        results = {}
+        for hood, zones in data.items():
+            t = totals[hood]
+            results[hood] = {z: round((c/t)*100, 2) for z, c in zones.items()}
+        return results
 
-        result = {}
-        for hood, prices in hood_prices.items():
-            if not prices:
-                continue
-            result[hood] = {
-                "sale_count": len(prices),
-                "median_sale_price": statistics.median(prices),
-            }
+    def get_slope_stats(self, hoods):
+        sql = """
+        SELECT 
+            a.neighborhood_code,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY ST_Value(t.rast, a.centroid_geog::geometry)) as med,
+            PERCENTILE_CONT(0.75) WITHIN GROUP(ORDER BY ST_Value(t.rast, a.centroid_geog::geometry)) as p75,
+            COUNT(*)
+        FROM dem_slope_tiles t
+        JOIN assessor a ON ST_Intersects(t.rast, a.centroid_geog::geometry)
+        WHERE a.neighborhood_code = ANY(%s)
+        GROUP BY a.neighborhood_code
+        """
+        results = {}
+        with connection.cursor() as cur:
+            cur.execute(sql, (hoods,))
+            for hood, med, p75, cnt in cur.fetchall():
+                results[hood] = {"median": med, "p75": p75, "count": cnt}
+        return results
 
-        return result
+    def get_census_stats(self, hoods):
+        sql = """
+        SELECT 
+            a.neighborhood_code,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY acs.median_income) as inc,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY acs.population) as pop,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY acs.edu_bachelor) as bach,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY acs.edu_master) as mast,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY acs.edu_professional) as prof,
+            PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY acs.edu_doctorate) as doc,
+            COUNT(*)
+        FROM assessor a
+        JOIN census.bg_skagit bg 
+          ON ST_Intersects(bg.geom, ST_Transform(a.centroid_geog::geometry, 2285))
+        JOIN census.acs_bg_skagit acs ON bg.geoid = acs.geoid
+        WHERE a.neighborhood_code = ANY(%s)
+        GROUP BY a.neighborhood_code
+        """
+        results = {}
+        with connection.cursor() as cur:
+            cur.execute(sql, (hoods,))
+            for row in cur.fetchall():
+                results[row[0]] = {
+                    "median_income": row[1],
+                    "median_population": row[2],
+                    "education": {
+                        "bachelor": row[3], "master": row[4], "professional": row[5], "doctorate": row[6]
+                    },
+                    "samples": row[7]
+                }
+        return results
+
+    def get_amenity_stats_optimized(self, hoods):
+        tables = {
+            "dist_school_m": "osm.osm_schools",
+            "dist_park_m": "osm.osm_parks",
+            "dist_major_road_m": "osm.osm_major_roads"
+        }
+        final_results = defaultdict(dict)
+        for json_key, table_name in tables.items():
+            sql = f"""
+            SELECT 
+                a.neighborhood_code,
+                PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY nearest.dist)
+            FROM assessor a
+            CROSS JOIN LATERAL (
+                SELECT ST_Distance(a.centroid_geog, ST_Transform(t.geom, 4326)::geography) as dist
+                FROM {table_name} t
+                ORDER BY a.centroid_geog <-> ST_Transform(t.geom, 4326)::geography
+                LIMIT 1
+            ) nearest
+            WHERE a.neighborhood_code = ANY(%s)
+            GROUP BY a.neighborhood_code
+            """
+            with connection.cursor() as cur:
+                cur.execute(sql, (hoods,))
+                for hood, dist in cur.fetchall():
+                    final_results[hood][json_key] = dist
+        return final_results

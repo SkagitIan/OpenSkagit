@@ -992,7 +992,9 @@ GET /api/neighborhoods/ANA/stats/</code></pre>
       visibleQuestions: new Set(),
 
       init() {
-        this.filterFAQs();
+        // Defer filtering until Alpine has finished
+        // rendering the template content into the DOM.
+        this.$nextTick(() => this.filterFAQs());
       },
 
       toggleItem(id) {
@@ -1059,4 +1061,8 @@ GET /api/neighborhoods/ANA/stats/</code></pre>
     }
   }
 </script>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="https://unpkg.com/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
 {% endblock %}

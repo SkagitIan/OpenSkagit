@@ -3,6 +3,37 @@ from django.contrib import admin
 from .models import Assessor, Improvements, Land, Sales, AssessmentRoll, AdjustmentCoefficient,NeighborhoodGeom, NeighborhoodProfile
 from leaflet.admin import LeafletGeoAdmin
 
+# openskagit/admin.py
+
+from django.contrib import admin
+from .models import ParcelHistory
+
+
+@admin.register(ParcelHistory)
+class ParcelHistoryAdmin(admin.ModelAdmin):
+    list_display = ("parcel_number", "scraped_at", "row_count")
+    search_fields = ("parcel_number",)
+    readonly_fields = ("scraped_at",)
+    list_filter = ("scraped_at",)
+    ordering = ("parcel_number",)
+
+    fieldsets = (
+        ("Parcel", {
+            "fields": ("parcel_number",)
+        }),
+        ("History Data", {
+            "classes": ("collapse",),
+            "fields": ("rows",)
+        }),
+        ("Metadata", {
+            "fields": ("scraped_at",),
+        }),
+    )
+
+    def row_count(self, obj):
+        return len(obj.rows)
+    row_count.short_description = "Row Count"
+
 
 @admin.register(AdjustmentCoefficient)
 class AdjustmentCoefficientAdmin(admin.ModelAdmin):
