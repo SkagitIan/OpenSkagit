@@ -2406,3 +2406,11 @@ def methodology_view(request):
     }
 
     return render(request, 'openskagit/methodology.html', context)
+
+
+@require_GET
+def faq_view(request):
+    """
+    Frequently Asked Questions page with searchable, categorized content.
+    """
+    return render(request, 'openskagit/faq.html')

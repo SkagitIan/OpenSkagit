@@ -1,0 +1,1062 @@
+{% extends "openskagit/appeal_base_v3.html" %}
+{% load static %}
+
+{% block page_title %}Frequently Asked Questions — OpenSkagit{% endblock %}
+
+{% block content %}
+<div x-data="faqApp()">
+  <style>
+    .faq-hero {
+      background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+      color: white;
+      padding: var(--space-12) var(--space-8);
+      border-radius: var(--radius-2xl);
+      margin-bottom: var(--space-8);
+      text-align: center;
+    }
+
+    .faq-hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: var(--space-4);
+      line-height: 1.1;
+    }
+
+    .faq-hero p {
+      font-size: 1.25rem;
+      opacity: 0.95;
+      max-width: 700px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .faq-search-section {
+      background: white;
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      margin-bottom: var(--space-6);
+      box-shadow: var(--shadow-md);
+    }
+
+    .search-wrapper {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto var(--space-6);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gray-400);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 0.875rem 1rem 0.875rem 3rem;
+      border: 2px solid var(--gray-300);
+      border-radius: var(--radius-lg);
+      font-size: 1rem;
+      transition: all var(--transition-base);
+      font-family: inherit;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--dusty-grape);
+      box-shadow: 0 0 0 3px rgba(108, 105, 141, 0.1);
+    }
+
+    .category-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      justify-content: center;
+      margin-bottom: var(--space-4);
+    }
+
+    .category-btn {
+      padding: var(--space-2) var(--space-4);
+      border: 2px solid var(--gray-300);
+      background: white;
+      color: var(--gray-700);
+      border-radius: var(--radius-lg);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      font-family: inherit;
+    }
+
+    .category-btn:hover {
+      border-color: var(--dusty-grape);
+      color: var(--dusty-grape);
+      transform: translateY(-1px);
+    }
+
+    .category-btn.active {
+      background: var(--dusty-grape);
+      border-color: var(--dusty-grape);
+      color: white;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: var(--space-3);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      padding: var(--space-2) var(--space-3);
+      background: var(--gray-100);
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      color: var(--gray-700);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      font-family: inherit;
+      font-weight: 500;
+    }
+
+    .action-btn:hover {
+      background: var(--gray-200);
+    }
+
+    .faq-content {
+      background: white;
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      box-shadow: var(--shadow-md);
+    }
+
+    .faq-category {
+      margin-bottom: var(--space-8);
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+      padding-bottom: var(--space-3);
+      border-bottom: 3px solid var(--primary-200);
+    }
+
+    .category-icon {
+      width: 3rem;
+      height: 3rem;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: var(--shadow-md);
+    }
+
+    .category-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--dusty-grape);
+      margin: 0;
+    }
+
+    .faq-item {
+      margin-bottom: var(--space-4);
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: all var(--transition-base);
+    }
+
+    .faq-item:hover {
+      border-color: var(--dusty-grape);
+    }
+
+    .faq-question {
+      padding: var(--space-4);
+      background: white;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      transition: all var(--transition-fast);
+      user-select: none;
+    }
+
+    .faq-question:hover {
+      background: var(--gray-50);
+    }
+
+    .faq-question-text {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin: 0;
+      flex: 1;
+    }
+
+    .faq-chevron {
+      width: 1.5rem;
+      height: 1.5rem;
+      color: var(--dusty-grape);
+      transition: transform var(--transition-base);
+      flex-shrink: 0;
+    }
+
+    .faq-item.open .faq-chevron {
+      transform: rotate(180deg);
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height var(--transition-base);
+    }
+
+    .faq-item.open .faq-answer {
+      max-height: 2000px;
+    }
+
+    .faq-answer-content {
+      padding: var(--space-4);
+      background: var(--gray-50);
+      color: var(--gray-700);
+      line-height: 1.7;
+    }
+
+    .faq-answer-content p {
+      margin-bottom: var(--space-3);
+    }
+
+    .faq-answer-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    .faq-answer-content ul {
+      margin: var(--space-3) 0;
+      padding-left: var(--space-6);
+    }
+
+    .faq-answer-content li {
+      margin-bottom: var(--space-2);
+    }
+
+    .faq-answer-content a {
+      color: var(--dusty-grape);
+      text-decoration: underline;
+      font-weight: 600;
+    }
+
+    .faq-answer-content a:hover {
+      color: var(--dusty-taupe);
+    }
+
+    .faq-answer-content code {
+      background: var(--gray-200);
+      padding: 0.125rem 0.375rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.875em;
+      font-family: 'Courier New', monospace;
+    }
+
+    .faq-answer-content pre {
+      background: var(--gray-800);
+      color: white;
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      margin: var(--space-3) 0;
+    }
+
+    .faq-answer-content pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+
+    .highlight {
+      background: rgba(255, 235, 59, 0.4);
+      padding: 0.125rem 0;
+      border-radius: 2px;
+    }
+
+    .no-results {
+      text-align: center;
+      padding: var(--space-12) var(--space-6);
+    }
+
+    .no-results-icon {
+      font-size: 4rem;
+      margin-bottom: var(--space-4);
+      opacity: 0.3;
+    }
+
+    .no-results h3 {
+      font-size: 1.5rem;
+      color: var(--gray-700);
+      margin-bottom: var(--space-3);
+    }
+
+    .no-results p {
+      color: var(--gray-600);
+      margin-bottom: var(--space-6);
+    }
+
+    .cta-box {
+      background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+      color: white;
+      padding: var(--space-8);
+      border-radius: var(--radius-xl);
+      text-align: center;
+      margin-top: var(--space-8);
+    }
+
+    .cta-box h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: var(--space-3);
+    }
+
+    .cta-box p {
+      font-size: 1.125rem;
+      margin-bottom: var(--space-6);
+      opacity: 0.95;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-6);
+      background: white;
+      color: var(--dusty-grape);
+      border: none;
+      border-radius: var(--radius-lg);
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all var(--transition-base);
+      text-decoration: none;
+      font-family: inherit;
+    }
+
+    .cta-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    @media (max-width: 768px) {
+      .faq-hero h1 {
+        font-size: 2rem;
+      }
+
+      .faq-hero p {
+        font-size: 1rem;
+      }
+
+      .category-title {
+        font-size: 1.5rem;
+      }
+
+      .faq-question-text {
+        font-size: 1rem;
+      }
+    }
+  </style>
+
+  <div class="faq-hero">
+    <h1>Frequently Asked Questions</h1>
+    <p>Find answers to common questions about OpenSkagit's data, tools, and services</p>
+  </div>
+
+  <div class="faq-search-section">
+    <div class="search-wrapper">
+      <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Search questions..."
+        x-model="searchQuery"
+        @input="filterFAQs()"
+      />
+    </div>
+
+    <div class="category-filters">
+      <button
+        class="category-btn"
+        :class="{ 'active': activeCategory === 'all' }"
+        @click="setCategory('all')"
+      >
+        All Questions
+      </button>
+      <button
+        class="category-btn"
+        :class="{ 'active': activeCategory === 'getting-started' }"
+        @click="setCategory('getting-started')"
+      >
+        Getting Started
+      </button>
+      <button
+        class="category-btn"
+        :class="{ 'active': activeCategory === 'appeals' }"
+        @click="setCategory('appeals')"
+      >
+        Property Appeals
+      </button>
+      <button
+        class="category-btn"
+        :class="{ 'active': activeCategory === 'chatbot' }"
+        @click="setCategory('chatbot')"
+      >
+        AI Chatbot
+      </button>
+      <button
+        class="category-btn"
+        :class="{ 'active': activeCategory === 'data' }"
+        @click="setCategory('data')"
+      >
+        Data & Methodology
+      </button>
+      <button
+        class="category-btn"
+        :class="{ 'active': activeCategory === 'tools' }"
+        @click="setCategory('tools')"
+      >
+        Tools & Features
+      </button>
+      <button
+        class="category-btn"
+        :class="{ 'active': activeCategory === 'api' }"
+        @click="setCategory('api')"
+      >
+        API & Technical
+      </button>
+    </div>
+
+    <div class="quick-actions">
+      <button class="action-btn" @click="expandAll()">Expand All</button>
+      <button class="action-btn" @click="collapseAll()">Collapse All</button>
+    </div>
+  </div>
+
+  <div class="faq-content">
+    <template x-if="hasResults">
+      <div>
+        <template x-if="showCategory('getting-started')">
+          <div class="faq-category">
+            <div class="category-header">
+              <div class="category-icon">🚀</div>
+              <h2 class="category-title">Getting Started</h2>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('gs-1') }" x-show="showQuestion('gs-1')">
+              <div class="faq-question" @click="toggleItem('gs-1')">
+                <h3 class="faq-question-text" x-html="highlight('What is OpenSkagit and what can I do here?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>OpenSkagit is an AI-enhanced public data portal for Skagit County, Washington. We make county data accessible and useful through intelligent tools and natural language interactions.</p>
+                  <p>You can:</p>
+                  <ul>
+                    <li>Search property assessments and tax information</li>
+                    <li>Analyze property values using our regression-based methodology</li>
+                    <li>Generate property tax appeal documentation with comparable properties</li>
+                    <li>Ask questions about county data using our AI chatbot</li>
+                    <li>Access neighborhood statistics and market trends</li>
+                    <li>Use our API to integrate county data into your applications</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('gs-2') }" x-show="showQuestion('gs-2')">
+              <div class="faq-question" @click="toggleItem('gs-2')">
+                <h3 class="faq-question-text" x-html="highlight('How do I search for my property information?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>There are several ways to find your property:</p>
+                  <ul>
+                    <li><strong>Property Tax Appeal Helper:</strong> Visit the <a href="{% url 'appeal-home' %}">appeal tool</a> and enter your address or parcel number</li>
+                    <li><strong>AI Chatbot:</strong> Ask the chatbot on the <a href="{% url 'home' %}">homepage</a> something like "Find my property at 123 Main Street"</li>
+                    <li><strong>Direct Search:</strong> If you know your parcel number, you can search directly in any of our tools</li>
+                  </ul>
+                  <p>The system uses fuzzy matching, so you don't need to enter your address exactly. It will suggest the closest matches.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('gs-3') }" x-show="showQuestion('gs-3')">
+              <div class="faq-question" @click="toggleItem('gs-3')">
+                <h3 class="faq-question-text" x-html="highlight('Do I need to create an account to use OpenSkagit?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>No, you don't need an account! All of OpenSkagit's tools and data are freely accessible without registration.</p>
+                  <p>Your chat conversations and tool usage are stored in your browser session, so you can continue where you left off during your visit. However, this data is not saved permanently across different devices or browsers.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('gs-4') }" x-show="showQuestion('gs-4')">
+              <div class="faq-question" @click="toggleItem('gs-4')">
+                <h3 class="faq-question-text" x-html="highlight('Is OpenSkagit free to use?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Yes, OpenSkagit is completely free for public use. We believe in making government data accessible to all citizens.</p>
+                  <p>All features including the Property Tax Appeal Helper, AI chatbot, neighborhood statistics, and API access are provided at no cost.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="showCategory('appeals')">
+          <div class="faq-category">
+            <div class="category-header">
+              <div class="category-icon">⚖️</div>
+              <h2 class="category-title">Property Tax Appeals</h2>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('ap-1') }" x-show="showQuestion('ap-1')">
+              <div class="faq-question" @click="toggleItem('ap-1')">
+                <h3 class="faq-question-text" x-html="highlight('How does the Property Tax Appeal Helper work?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>The Property Tax Appeal Helper uses advanced statistical methods to analyze your property assessment:</p>
+                  <ul>
+                    <li><strong>Step 1:</strong> Enter your property address or parcel number</li>
+                    <li><strong>Step 2:</strong> Our system retrieves your property details and current assessment</li>
+                    <li><strong>Step 3:</strong> We identify similar properties that have sold recently using machine learning</li>
+                    <li><strong>Step 4:</strong> A regression model estimates your property's market value based on comparable sales</li>
+                    <li><strong>Step 5:</strong> We generate a detailed report with supporting documentation for your appeal</li>
+                  </ul>
+                  <p>The tool follows IAAO (International Association of Assessing Officers) standards and uses the same valuation methodology as professional appraisers.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('ap-2') }" x-show="showQuestion('ap-2')">
+              <div class="faq-question" @click="toggleItem('ap-2')">
+                <h3 class="faq-question-text" x-html="highlight('What information do I need to file an appeal?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>To file a property tax appeal, you typically need:</p>
+                  <ul>
+                    <li>Your property's parcel number and address</li>
+                    <li>Evidence that your assessment is higher than market value</li>
+                    <li>Comparable property sales data (which we provide)</li>
+                    <li>Your property's assessment notice</li>
+                    <li>Any relevant photos or documentation of property condition</li>
+                  </ul>
+                  <p>Our tool generates most of this documentation automatically. You can download a complete report with comparable sales, statistical analysis, and valuation estimates to support your appeal.</p>
+                  <p><strong>Important:</strong> Check with your county assessor's office for specific appeal deadlines and filing procedures.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('ap-3') }" x-show="showQuestion('ap-3')">
+              <div class="faq-question" @click="toggleItem('ap-3')">
+                <h3 class="faq-question-text" x-html="highlight('How are comparable properties selected for my appeal?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>We use a sophisticated similarity algorithm that considers:</p>
+                  <ul>
+                    <li><strong>Geographic proximity:</strong> Properties within your neighborhood or similar market areas</li>
+                    <li><strong>Property characteristics:</strong> Living area, lot size, age, bedrooms, bathrooms, and quality</li>
+                    <li><strong>Sale recency:</strong> Recent sales (typically within the last 12-24 months)</li>
+                    <li><strong>Property type:</strong> Single-family homes are compared to other single-family homes</li>
+                    <li><strong>Special features:</strong> Garages, basements, views, waterfront, etc.</li>
+                  </ul>
+                  <p>The system uses semantic embeddings and vector similarity search to find properties that are most similar to yours across all these dimensions simultaneously.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('ap-4') }" x-show="showQuestion('ap-4')">
+              <div class="faq-question" @click="toggleItem('ap-4')">
+                <h3 class="faq-question-text" x-html="highlight('What is a regression-based valuation and how accurate is it?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Regression-based valuation is a statistical method that analyzes thousands of property sales to understand how different features affect property values.</p>
+                  <p><strong>How it works:</strong> The model learns from actual sale prices how much each property characteristic (size, age, location, etc.) contributes to value. It then applies these patterns to estimate your property's value.</p>
+                  <p><strong>Accuracy:</strong> Our models typically achieve:</p>
+                  <ul>
+                    <li>R-squared values of 0.92-0.94 (explaining 92-94% of price variation)</li>
+                    <li>COD (Coefficient of Dispersion) values of 5-7%, indicating excellent uniformity</li>
+                    <li>Median prediction ratios near 1.0 (unbiased estimates)</li>
+                  </ul>
+                  <p>These metrics meet or exceed IAAO standards for residential property assessment. View our <a href="{% url 'methodology' %}">full methodology</a> for detailed statistics.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('ap-5') }" x-show="showQuestion('ap-5')">
+              <div class="faq-question" @click="toggleItem('ap-5')">
+                <h3 class="faq-question-text" x-html="highlight('Can I download my appeal documentation?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Yes! The appeal results page includes options to:</p>
+                  <ul>
+                    <li>Print the complete analysis report</li>
+                    <li>Save comparable property listings</li>
+                    <li>Export statistical summaries</li>
+                    <li>Generate PDF documentation (using your browser's print-to-PDF feature)</li>
+                  </ul>
+                  <p>The report includes all comparable sales, property details, valuation estimates, and fairness analysis metrics you'll need for your appeal.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="showCategory('chatbot')">
+          <div class="faq-category">
+            <div class="category-header">
+              <div class="category-icon">🤖</div>
+              <h2 class="category-title">AI Chatbot</h2>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('cb-1') }" x-show="showQuestion('cb-1')">
+              <div class="faq-question" @click="toggleItem('cb-1')">
+                <h3 class="faq-question-text" x-html="highlight('How does the AI chatbot work?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Our AI chatbot uses RAG (Retrieval-Augmented Generation) technology to answer questions about Skagit County data:</p>
+                  <ul>
+                    <li><strong>Step 1:</strong> Your question is analyzed to understand what information you need</li>
+                    <li><strong>Step 2:</strong> Relevant data is retrieved from our PostgreSQL database with vector search</li>
+                    <li><strong>Step 3:</strong> An AI model generates a natural language answer based on the retrieved data</li>
+                    <li><strong>Step 4:</strong> The response includes citations to source data for transparency</li>
+                  </ul>
+                  <p>The chatbot has access to property records, sales data, assessment information, and neighborhood statistics.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('cb-2') }" x-show="showQuestion('cb-2')">
+              <div class="faq-question" @click="toggleItem('cb-2')">
+                <h3 class="faq-question-text" x-html="highlight('What kind of questions can I ask the chatbot?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>The chatbot can help with questions about:</p>
+                  <ul>
+                    <li>Finding specific properties by address or parcel number</li>
+                    <li>Property values, assessments, and tax information</li>
+                    <li>Recent home sales in specific neighborhoods</li>
+                    <li>Market trends and statistics</li>
+                    <li>Understanding your property assessment</li>
+                    <li>How to use the various tools on the site</li>
+                    <li>General information about Skagit County</li>
+                  </ul>
+                  <p><strong>Example questions:</strong></p>
+                  <ul>
+                    <li>"Find my property at 123 Main Street"</li>
+                    <li>"What are recent home sales in Anacortes?"</li>
+                    <li>"How is my property value calculated?"</li>
+                    <li>"Show me properties similar to mine"</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('cb-3') }" x-show="showQuestion('cb-3')">
+              <div class="faq-question" @click="toggleItem('cb-3')">
+                <h3 class="faq-question-text" x-html="highlight('Is my conversation with the chatbot private?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Yes, your privacy is important to us:</p>
+                  <ul>
+                    <li>Conversations are stored only in your browser session</li>
+                    <li>We don't link conversations to individual user identities</li>
+                    <li>Chat data is used only to improve the service</li>
+                    <li>All property data accessed is already public record</li>
+                    <li>We don't share your queries with third parties</li>
+                  </ul>
+                  <p>Since we don't require accounts, there's no personal information tied to your usage of the chatbot.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="showCategory('data')">
+          <div class="faq-category">
+            <div class="category-header">
+              <div class="category-icon">📊</div>
+              <h2 class="category-title">Data & Methodology</h2>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('dt-1') }" x-show="showQuestion('dt-1')">
+              <div class="faq-question" @click="toggleItem('dt-1')">
+                <h3 class="faq-question-text" x-html="highlight('Where does OpenSkagit get its data?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>All data comes from official Skagit County public records:</p>
+                  <ul>
+                    <li><strong>Assessor Database:</strong> Property characteristics, assessments, and ownership information</li>
+                    <li><strong>Sales Records:</strong> Verified real estate transactions from county records</li>
+                    <li><strong>Tax Records:</strong> Property tax information and assessment history</li>
+                    <li><strong>Geographic Data:</strong> Parcel boundaries, neighborhoods, and location data</li>
+                  </ul>
+                  <p>We import this data directly from Skagit County's official databases and systems. No data is modified or estimated—we only analyze and present the official county records.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('dt-2') }" x-show="showQuestion('dt-2')">
+              <div class="faq-question" @click="toggleItem('dt-2')">
+                <h3 class="faq-question-text" x-html="highlight('How often is the data updated?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Data is updated on a regular schedule:</p>
+                  <ul>
+                    <li><strong>Property Records:</strong> Updated quarterly from the assessor's office</li>
+                    <li><strong>Sales Data:</strong> Updated monthly as new transactions are recorded</li>
+                    <li><strong>Assessment Values:</strong> Updated annually after the county's revaluation cycle</li>
+                    <li><strong>Regression Models:</strong> Retrained quarterly with the latest sales data</li>
+                  </ul>
+                  <p>The most recent data update date is displayed on each tool and in the methodology documentation.</p>
+                  <p><strong>Note:</strong> There may be a small lag between when the county records a transaction and when it appears in our system.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('dt-3') }" x-show="showQuestion('dt-3')">
+              <div class="faq-question" @click="toggleItem('dt-3')">
+                <h3 class="faq-question-text" x-html="highlight('What is the regression methodology used for property valuations?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>We use hedonic regression analysis, a standard method in real estate valuation:</p>
+                  <ul>
+                    <li><strong>Log-linear models:</strong> Account for the multiplicative nature of property features</li>
+                    <li><strong>Market segmentation:</strong> Separate models for different geographic areas and property types</li>
+                    <li><strong>Time adjustments:</strong> Account for market trends over time</li>
+                    <li><strong>Multiple features:</strong> Living area, lot size, age, quality, condition, special features</li>
+                  </ul>
+                  <p>Each model is trained on thousands of verified sales and meets IAAO standards for assessment uniformity.</p>
+                  <p>For complete technical details, model performance metrics, and actual coefficients, visit our <a href="{% url 'methodology' %}">Methodology page</a>.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('dt-4') }" x-show="showQuestion('dt-4')">
+              <div class="faq-question" @click="toggleItem('dt-4')">
+                <h3 class="faq-question-text" x-html="highlight('What do R-squared, COD, and PRD metrics mean?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>These are standard statistical measures of model quality:</p>
+                  <ul>
+                    <li><strong>R-squared (R²):</strong> Percentage of price variation explained by the model. Higher is better (0.90+ is excellent for residential property)</li>
+                    <li><strong>COD (Coefficient of Dispersion):</strong> Measures uniformity of assessments. Lower is better (&lt;10% is excellent, &lt;15% is acceptable for residential)</li>
+                    <li><strong>PRD (Price-Related Differential):</strong> Measures fairness between high and low-value properties. Should be close to 1.00 (0.98-1.03 is acceptable)</li>
+                  </ul>
+                  <p>Our models consistently achieve excellent ratings on all three metrics, indicating accurate and fair valuations across all price ranges.</p>
+                  <p><strong>Example:</strong> R² = 0.93 means 93% of the variation in sale prices is explained by property characteristics in our model.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="showCategory('tools')">
+          <div class="faq-category">
+            <div class="category-header">
+              <div class="category-icon">🛠️</div>
+              <h2 class="category-title">Tools & Features</h2>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('tl-1') }" x-show="showQuestion('tl-1')">
+              <div class="faq-question" @click="toggleItem('tl-1')">
+                <h3 class="faq-question-text" x-html="highlight('What is a Comparative Market Analysis (CMA)?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>A Comparative Market Analysis (CMA) is a detailed comparison of your property against similar properties that have recently sold.</p>
+                  <p><strong>Our CMA tool provides:</strong></p>
+                  <ul>
+                    <li>Side-by-side comparison grids of property features</li>
+                    <li>Interactive maps showing comparable properties</li>
+                    <li>Detailed improvement and land characteristics</li>
+                    <li>Price per square foot analysis</li>
+                    <li>Ability to select and deselect comparables</li>
+                    <li>Shareable reports for real estate professionals</li>
+                  </ul>
+                  <p>The CMA tool is used by real estate agents, appraisers, and property owners to understand market values.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('tl-2') }" x-show="showQuestion('tl-2')">
+              <div class="faq-question" @click="toggleItem('tl-2')">
+                <h3 class="faq-question-text" x-html="highlight('What other tools and reports are available?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p><strong>Currently Available:</strong></p>
+                  <ul>
+                    <li><strong>Property Tax Appeal Helper:</strong> Generate appeal documentation with comparable sales and statistical analysis</li>
+                    <li><strong>CMA Tool:</strong> Create detailed comparative market analyses</li>
+                    <li><strong>AI Chatbot:</strong> Ask questions about any property or neighborhood in natural language</li>
+                    <li><strong>Neighborhood Snapshots:</strong> View market statistics and trends by area</li>
+                    <li><strong>API Access:</strong> Programmatic access to all county data</li>
+                  </ul>
+                  <p><strong>Coming Soon:</strong></p>
+                  <ul>
+                    <li>Budget Insights - County spending and financial data</li>
+                    <li>Job Outlook - Employment trends and economic indicators</li>
+                    <li>Market Analysis - Real estate trends over time</li>
+                    <li>Custom Reports - Build your own data visualizations</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="showCategory('api')">
+          <div class="faq-category">
+            <div class="category-header">
+              <div class="category-icon">⚡</div>
+              <h2 class="category-title">API & Technical</h2>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('ap-1') }" x-show="showQuestion('api-1')">
+              <div class="faq-question" @click="toggleItem('api-1')">
+                <h3 class="faq-question-text" x-html="highlight('Does OpenSkagit have an API I can use?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Yes! We provide a comprehensive REST API for accessing Skagit County data programmatically.</p>
+                  <p><strong>Available endpoints include:</strong></p>
+                  <ul>
+                    <li>Property search and details</li>
+                    <li>Sales data queries</li>
+                    <li>Neighborhood statistics</li>
+                    <li>Comparable property search</li>
+                    <li>Assessment history</li>
+                  </ul>
+                  <p>The API is free to use and doesn't require authentication for public data endpoints.</p>
+                  <p>Visit our <a href="{% url 'api-docs' %}">API Documentation</a> for complete details, examples, and interactive testing.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item" :class="{ 'open': openItems.includes('api-2') }" x-show="showQuestion('api-2')">
+              <div class="faq-question" @click="toggleItem('api-2')">
+                <h3 class="faq-question-text" x-html="highlight('How can developers integrate OpenSkagit data?')"></h3>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+              <div class="faq-answer">
+                <div class="faq-answer-content">
+                  <p>Developers can integrate OpenSkagit data in several ways:</p>
+                  <p><strong>REST API:</strong></p>
+                  <pre><code>GET /api/properties/?address=123+Main+St
+GET /api/sales/?neighborhood=ANACORTES&limit=50
+GET /api/neighborhoods/ANA/stats/</code></pre>
+                  <p><strong>Common use cases:</strong></p>
+                  <ul>
+                    <li>Real estate websites displaying property valuations</li>
+                    <li>Mobile apps for property search</li>
+                    <li>Market analysis tools and dashboards</li>
+                    <li>Automated valuation models (AVMs)</li>
+                    <li>Research and data analysis projects</li>
+                  </ul>
+                  <p><strong>Best practices:</strong></p>
+                  <ul>
+                    <li>Cache responses when possible to reduce load</li>
+                    <li>Use pagination for large result sets</li>
+                    <li>Include descriptive User-Agent headers</li>
+                    <li>Respect rate limits (if implemented)</li>
+                  </ul>
+                  <p>Check the <a href="{% url 'api-docs' %}">API documentation</a> for complete integration guides and code examples.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <template x-if="!hasResults">
+      <div class="no-results">
+        <div class="no-results-icon">🔍</div>
+        <h3>No questions match your search</h3>
+        <p>Try different keywords or browse all categories</p>
+        <button class="action-btn" @click="searchQuery = ''; filterFAQs()">Clear Search</button>
+      </div>
+    </template>
+  </div>
+
+  <div class="cta-box">
+    <h2>Still Have Questions?</h2>
+    <p>Ask our AI chatbot anything about Skagit County data, property values, or how to use our tools</p>
+    <a href="{% url 'home' %}" class="cta-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+      Chat with AI
+    </a>
+  </div>
+</div>
+
+<script>
+  function faqApp() {
+    return {
+      searchQuery: '',
+      activeCategory: 'all',
+      openItems: [],
+      hasResults: true,
+      visibleQuestions: new Set(),
+
+      init() {
+        this.filterFAQs();
+      },
+
+      toggleItem(id) {
+        const index = this.openItems.indexOf(id);
+        if (index > -1) {
+          this.openItems.splice(index, 1);
+        } else {
+          this.openItems.push(id);
+        }
+      },
+
+      expandAll() {
+        const allIds = ['gs-1', 'gs-2', 'gs-3', 'gs-4', 'ap-1', 'ap-2', 'ap-3', 'ap-4', 'ap-5', 'cb-1', 'cb-2', 'cb-3', 'dt-1', 'dt-2', 'dt-3', 'dt-4', 'tl-1', 'tl-2', 'api-1', 'api-2'];
+        this.openItems = allIds.filter(id => this.visibleQuestions.has(id));
+      },
+
+      collapseAll() {
+        this.openItems = [];
+      },
+
+      setCategory(category) {
+        this.activeCategory = category;
+        this.filterFAQs();
+      },
+
+      showCategory(category) {
+        if (this.activeCategory === 'all') return true;
+        return this.activeCategory === category;
+      },
+
+      showQuestion(id) {
+        return this.visibleQuestions.has(id);
+      },
+
+      filterFAQs() {
+        const query = this.searchQuery.toLowerCase().trim();
+        const questions = document.querySelectorAll('.faq-item');
+
+        this.visibleQuestions.clear();
+        let matchCount = 0;
+
+        questions.forEach(item => {
+          const questionText = item.querySelector('.faq-question-text').textContent.toLowerCase();
+          const answerText = item.querySelector('.faq-answer-content').textContent.toLowerCase();
+          const itemId = item.getAttribute('x-show').match(/'([^']+)'/)[1];
+
+          const matchesSearch = !query || questionText.includes(query) || answerText.includes(query);
+
+          if (matchesSearch) {
+            this.visibleQuestions.add(itemId);
+            matchCount++;
+          }
+        });
+
+        this.hasResults = matchCount > 0;
+      },
+
+      highlight(text) {
+        if (!this.searchQuery.trim()) return text;
+
+        const regex = new RegExp(`(${this.searchQuery.trim()})`, 'gi');
+        return text.replace(regex, '<span class="highlight">$1</span>');
+      }
+    }
+  }
+</script>
+{% endblock %}
