@@ -337,3 +337,11 @@ class NeighborhoodProfile(models.Model):
 
     def __str__(self):
         return f"{self.hood_id} – {self.name}"
+
+class ParcelHistory(models.Model):
+    parcel_number = models.CharField(max_length=20, unique=True)
+    rows = models.JSONField(default=list)      # list of dicts (history rows)
+    scraped_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.parcel_number

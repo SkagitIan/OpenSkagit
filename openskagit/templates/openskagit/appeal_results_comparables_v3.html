@@ -162,10 +162,11 @@
 
   .comp-card {
     background: white;
-    border: 2px solid var(--gray-100);
-    border-radius: var(--radius-xl);
-    padding: var(--space-6);
-    transition: all var(--transition-base);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-2xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     animation: slideInRight 0.4s var(--transition-base);
     animation-fill-mode: both;
   }
@@ -179,21 +180,25 @@
   .comp-card:nth-child(7) { animation-delay: 0.35s; }
 
   .comp-card:hover {
-    border-color: var(--primary-300);
-    box-shadow: var(--shadow-xl);
-    transform: translateX(4px);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
   }
 
   .comp-card__header {
+    padding: var(--space-5);
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .comp-card__header-content {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: var(--space-4);
     gap: var(--space-4);
+    align-items: flex-start;
   }
 
   .comp-card__title {
-    font-size: 1.125rem;
+    font-size: 1.05rem;
     font-weight: 600;
     color: var(--gray-900);
     margin-bottom: var(--space-2);
@@ -202,39 +207,129 @@
   .comp-card__meta {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    font-size: 0.875rem;
+    gap: var(--space-4);
+    font-size: 0.85rem;
     color: var(--gray-600);
     flex-wrap: wrap;
   }
 
-  .comp-card__price {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--primary-600);
-    line-height: 1;
+  .comp-card__meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 
-  .comp-card__price-label {
-    font-size: 0.8125rem;
+  .comp-card__meta-item svg {
+    width: 0.9rem;
+    height: 0.9rem;
     color: var(--gray-500);
-    margin-top: var(--space-1);
   }
 
   .comp-price-block {
     text-align: right;
   }
 
-  .comp-adjusted {
-    margin-top: var(--space-2);
-    text-align: right;
+  .comp-card__price {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1.1;
+  }
+
+  .comp-card__price-label {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: 0.1rem;
+  }
+
+  .comp-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .comp-stat {
+    padding: var(--space-4) var(--space-2);
+    text-align: center;
+    border-right: 1px solid var(--gray-100);
+  }
+
+  .comp-stat:last-child {
+    border-right: none;
+  }
+
+  .comp-stat__value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .comp-stat__label {
+    font-size: 0.7rem;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: var(--space-1);
+  }
+
+  .comp-card__adjustments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: center;
+    padding: var(--space-4) var(--space-5);
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 0.85rem;
+  }
+
+  .adjustments-label {
+    font-weight: 600;
+    color: var(--gray-600);
+  }
+
+  .adjustments-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    color: var(--gray-700);
+  }
+
+  .adjustment-entry {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+  }
+
+  .adjustment-entry--muted {
+    color: var(--gray-500);
+    font-weight: 500;
+  }
+
+  .adjustment-amount--up {
+    color: var(--success-600);
+    font-weight: 600;
+  }
+
+  .adjustment-amount--down {
+    color: var(--rose-600);
+    font-weight: 600;
+  }
+
+  .comp-card__adjusted-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-4) var(--space-5);
+    background: white;
   }
 
   .comp-adjusted__label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
+    font-size: 0.65rem;
+    font-weight: 600;
     color: var(--gray-500);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
   }
 
   .comp-adjusted__value {
@@ -244,83 +339,23 @@
   }
 
   .comp-adjusted__delta {
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     font-weight: 600;
+    margin-left: var(--space-2);
   }
 
   .comp-adjusted__delta--up {
-    color: var(--emerald-600);
+    color: var(--success-600);
   }
 
   .comp-adjusted__delta--down {
     color: var(--rose-600);
   }
 
-  .comp-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: var(--space-3);
-    margin-top: var(--space-4);
-  }
-
-  .comp-stat {
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-lg);
-    padding: var(--space-3);
-    text-align: center;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .comp-stat__value {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--gray-900);
-  }
-
-  .comp-stat__label {
-    font-size: 0.75rem;
-    color: var(--gray-600);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: var(--space-1);
-  }
-
-  .adjustments-breakdown {
-    margin-top: var(--space-4);
-  }
-
-  .adjustments-title {
-    font-size: 0.8125rem;
+  .comp-adjusted__missing {
+    font-size: 0.85rem;
     font-weight: 600;
-    color: var(--gray-600);
-    margin-bottom: var(--space-2);
-  }
-
-  .adjustment-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .adjustment-chip {
-    padding: 0.35rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    background: var(--gray-100);
-    color: var(--gray-700);
-  }
-
-  .adjustment-chip--up {
-    background: var(--success-50);
-    color: var(--success-700);
-  }
-
-  .adjustment-chip--down {
-    background: var(--rose-50);
-    color: var(--rose-700);
-    border: 1px solid var(--rose-200);
+    color: var(--rose-600);
   }
 
   /* Grid View */
@@ -455,34 +490,32 @@
       {% for comp in comparables %}
         <div class="comp-card">
           <div class="comp-card__header">
-            <div style="flex: 1;">
-              <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
-              <div class="comp-card__meta">
-                <span>📍 {{ comp.distance_miles|floatformat:2 }} mi away</span>
-                <span>📅 Sold {{ comp.sale_date|date:"M Y" }}</span>
+            <div class="comp-card__header-content">
+              <div style="flex: 1;">
+                <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+                <div class="comp-card__meta">
+                  <span class="comp-card__meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 21s7-4.5 7-11A7 7 0 0 0 5 10c0 6.5 7 11 7 11z"></path>
+                      <circle cx="12" cy="10" r="2.5"></circle>
+                    </svg>
+                    {{ comp.distance_miles|floatformat:2 }} mi
+                  </span>
+                  <span class="comp-card__meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                      <line x1="16" y1="3" x2="16" y2="7"></line>
+                      <line x1="8" y1="3" x2="8" y2="7"></line>
+                      <line x1="3" y1="11" x2="21" y2="11"></line>
+                    </svg>
+                    Sold {{ comp.sale_date|date:"M Y" }}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div class="comp-price-block">
-              <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
-              <div class="comp-card__price-label">Sale Price</div>
-              {% if advanced_mode and comp.adjusted_value %}
-                <div class="comp-adjusted">
-                  <div class="comp-adjusted__label">Adjusted Value</div>
-                  <div class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</div>
-                  {% if comp.total_adjustment %}
-                    {% if comp.total_adjustment > 0 %}
-                      <div class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</div>
-                    {% elif comp.total_adjustment < 0 %}
-                      <div class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</div>
-                    {% endif %}
-                  {% endif %}
-                </div>
-              {% elif advanced_mode and advanced_error %}
-                <div class="comp-adjusted">
-                  <div class="comp-adjusted__label">Adjusted Value</div>
-                  <div class="comp-adjusted__delta comp-adjusted__delta--down">Unavailable</div>
-                </div>
-              {% endif %}
+              <div class="comp-price-block">
+                <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+                <div class="comp-card__price-label">Sale Price</div>
+              </div>
             </div>
           </div>
 
@@ -508,17 +541,46 @@
               <div class="comp-stat__label">$/Sq Ft</div>
             </div>
           </div>
-          {% if advanced_mode and comp.adjustments %}
-            <div class="adjustments-breakdown">
-              <div class="adjustments-title">Adjustments</div>
-              <div class="adjustment-chips">
-                {% for item in comp.adjustments %}
-                  {% if item.amount %}
-                    <span class="adjustment-chip {% if item.amount > 0 %}adjustment-chip--up{% elif item.amount < 0 %}adjustment-chip--down{% endif %}">
-                      {{ item.label }} {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
-                    </span>
+
+          {% if advanced_mode %}
+            <div class="comp-card__adjustments">
+              <span class="adjustments-label">Adjustments:</span>
+              {% if comp.adjustments %}
+                <div class="adjustments-line">
+                  {% for item in comp.adjustments %}
+                    {% if item.amount %}
+                      <span class="adjustment-entry">
+                        {{ item.label }}
+                        <span class="{% if item.amount > 0 %}adjustment-amount--up{% else %}adjustment-amount--down{% endif %}">
+                          {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                        </span>
+                      </span>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              {% elif advanced_error %}
+                <span class="adjustment-entry adjustment-entry--muted">{{ advanced_error }}</span>
+              {% else %}
+                <span class="adjustment-entry adjustment-entry--muted">Not available</span>
+              {% endif %}
+            </div>
+            <div class="comp-card__adjusted-row">
+              <span class="comp-adjusted__label">Adjusted Value</span>
+              <div>
+                {% if comp.adjusted_value %}
+                  <span class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</span>
+                  {% if comp.total_adjustment %}
+                    {% if comp.total_adjustment > 0 %}
+                      <span class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</span>
+                    {% elif comp.total_adjustment < 0 %}
+                      <span class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</span>
+                    {% endif %}
                   {% endif %}
-                {% endfor %}
+                {% elif advanced_error %}
+                  <span class="comp-adjusted__missing">Unavailable</span>
+                {% else %}
+                  <span class="comp-adjusted__missing">Not calculated</span>
+                {% endif %}
               </div>
             </div>
           {% endif %}
@@ -532,28 +594,34 @@
     <div class="comp-grid">
       {% for comp in comparables %}
         <div class="comp-card">
-          <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
-          <div class="comp-card__meta">
-            <span>{{ comp.distance_miles|floatformat:2 }} mi</span>
-            <span>{{ comp.sale_date|date:"M Y" }}</span>
-          </div>
-
-          <div style="text-align: center; margin: var(--space-4) 0;">
-            <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
-            <div class="comp-card__price-label">Sale Price</div>
-            {% if advanced_mode and comp.adjusted_value %}
-              <div class="comp-adjusted" style="text-align:center;">
-                <div class="comp-adjusted__label">Adjusted Value</div>
-                <div class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</div>
-                {% if comp.total_adjustment %}
-                  {% if comp.total_adjustment > 0 %}
-                    <div class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</div>
-                  {% elif comp.total_adjustment < 0 %}
-                    <div class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</div>
-                  {% endif %}
-                {% endif %}
+          <div class="comp-card__header">
+            <div class="comp-card__header-content">
+              <div style="flex: 1;">
+                <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+                <div class="comp-card__meta">
+                  <span class="comp-card__meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 21s7-4.5 7-11A7 7 0 0 0 5 10c0 6.5 7 11 7 11z"></path>
+                      <circle cx="12" cy="10" r="2.5"></circle>
+                    </svg>
+                    {{ comp.distance_miles|floatformat:2 }} mi
+                  </span>
+                  <span class="comp-card__meta-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                      <line x1="16" y1="3" x2="16" y2="7"></line>
+                      <line x1="8" y1="3" x2="8" y2="7"></line>
+                      <line x1="3" y1="11" x2="21" y2="11"></line>
+                    </svg>
+                    Sold {{ comp.sale_date|date:"M Y" }}
+                  </span>
+                </div>
               </div>
-            {% endif %}
+              <div class="comp-price-block">
+                <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+                <div class="comp-card__price-label">Sale Price</div>
+              </div>
+            </div>
           </div>
 
           <div class="comp-stats">
@@ -569,18 +637,54 @@
               <div class="comp-stat__value">{{ comp.living_area|default:"—"|floatformat:0|intcomma }}</div>
               <div class="comp-stat__label">Sq Ft</div>
             </div>
+            <div class="comp-stat">
+              <div class="comp-stat__value">{{ comp.year_built|default:"—" }}</div>
+              <div class="comp-stat__label">Built</div>
+            </div>
+            <div class="comp-stat">
+              <div class="comp-stat__value">${{ comp.price_per_sqft|default:"—"|floatformat:0|intcomma }}</div>
+              <div class="comp-stat__label">$/Sq Ft</div>
+            </div>
           </div>
-          {% if advanced_mode and comp.adjustments %}
-            <div class="adjustments-breakdown">
-              <div class="adjustments-title">Adjustments</div>
-              <div class="adjustment-chips">
-                {% for item in comp.adjustments %}
-                  {% if item.amount %}
-                    <span class="adjustment-chip {% if item.amount > 0 %}adjustment-chip--up{% elif item.amount < 0 %}adjustment-chip--down{% endif %}">
-                      {{ item.label }} {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
-                    </span>
+          {% if advanced_mode %}
+            <div class="comp-card__adjustments">
+              <span class="adjustments-label">Adjustments:</span>
+              {% if comp.adjustments %}
+                <div class="adjustments-line">
+                  {% for item in comp.adjustments %}
+                    {% if item.amount %}
+                      <span class="adjustment-entry">
+                        {{ item.label }}
+                        <span class="{% if item.amount > 0 %}adjustment-amount--up{% else %}adjustment-amount--down{% endif %}">
+                          {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                        </span>
+                      </span>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              {% elif advanced_error %}
+                <span class="adjustment-entry adjustment-entry--muted">{{ advanced_error }}</span>
+              {% else %}
+                <span class="adjustment-entry adjustment-entry--muted">Not available</span>
+              {% endif %}
+            </div>
+            <div class="comp-card__adjusted-row">
+              <span class="comp-adjusted__label">Adjusted Value</span>
+              <div>
+                {% if comp.adjusted_value %}
+                  <span class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</span>
+                  {% if comp.total_adjustment %}
+                    {% if comp.total_adjustment > 0 %}
+                      <span class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</span>
+                    {% elif comp.total_adjustment < 0 %}
+                      <span class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</span>
+                    {% endif %}
                   {% endif %}
-                {% endfor %}
+                {% elif advanced_error %}
+                  <span class="comp-adjusted__missing">Unavailable</span>
+                {% else %}
+                  <span class="comp-adjusted__missing">Not calculated</span>
+                {% endif %}
               </div>
             </div>
           {% endif %}
