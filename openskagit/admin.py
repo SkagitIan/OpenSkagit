@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib import admin
-from .models import Assessor, Improvements, Land, Sales, AssessmentRoll, AdjustmentCoefficient
+from .models import Assessor, Improvements, Land, Sales, AssessmentRoll, AdjustmentCoefficient,NeighborhoodGeom, NeighborhoodProfile
 from leaflet.admin import LeafletGeoAdmin
 
 
@@ -113,3 +113,38 @@ class RegressionResultAdmin(admin.ModelAdmin):
         }),
         ("Timestamps", {"fields": ("run_date",)}),
     )
+
+
+@admin.register(NeighborhoodGeom)
+class NeighborhoodGeomAdmin(admin.ModelAdmin):
+    """
+    Admin for neighborhood geometries.
+    Uses GeoDjango's OSMGeoAdmin so you can see/edit shapes on a map.
+    """
+    list_display = ("code", "name")
+    search_fields = ("code", "name")
+
+    # Optional: starting map view (tune these to Skagit extents if you want)
+    # default_lon, default_lat expect Web Mercator (3857)
+    default_lon = -13600000
+    default_lat =  6100000
+    default_zoom = 9
+
+    # Only show the analysis geom in the map widget; 4326 is derived/secondary.
+    fields = ("code", "name", "geom_3857", "geom_4326")
+    readonly_fields = ("geom_4326",)  # if you're deriving 4326 in code
+
+
+@admin.register(NeighborhoodProfile)
+class NeighborhoodProfileAdmin(admin.ModelAdmin):
+    """
+    Simple admin for neighborhood-level stats and metadata.
+    JSON stays raw for now; you can swap in a JSON editor widget later.
+    """
+    list_display = ("hood_id", "name", "city", "updated_at","ai_summary")
+    search_fields = ("hood_id", "name", "city")
+    list_filter = ("city",)
+    readonly_fields = ("updated_at",)
+
+    # Keeps the form simple and predictable.
+    fields = ("hood_id", "name", "city", "json_data", "updated_at","ai_summary")

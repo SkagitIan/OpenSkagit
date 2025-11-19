@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 
 from django.core.management.base import BaseCommand
 from django.db import connection
-from django.contrib.gis.db.models.functions import Centroid, Distance
 
 from openskagit.models import (
     Assessor,
@@ -11,20 +10,83 @@ from openskagit.models import (
     Land,
     Sales,
     NeighborhoodProfile,
-    NeighborhoodGeom
+    NeighborhoodGeom,
 )
+from django.db.models import Q
+from decimal import Decimal
+
+def convert_decimals(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_decimals(i) for i in obj]
+    return obj
 
 
 class Command(BaseCommand):
     help = "Build complete neighborhood snapshot JSON for all neighborhoods."
-
+    def add_arguments(self, parser):
+            parser.add_argument(
+                "--hood",
+                type=str,
+                help="Optional: build profile for a single neighborhood code.",
+            )
     def handle(self, *args, **options):
+        only_hood = options.get("hood")
+        allowed = (
+            Q(neighborhood_code__startswith="20B")  |
+            Q(neighborhood_code__startswith="21B")  |
+            Q(neighborhood_code__startswith="22B")  |
+            Q(neighborhood_code__startswith="23B")  |
+            Q(neighborhood_code__startswith="26B")  |
+            Q(neighborhood_code__startswith="27B")  |
 
-        hoods = (
-            Assessor.objects.exclude(neighborhood_code__isnull=True)
-            .values_list("neighborhood_code", flat=True)
-            .distinct()
+            Q(neighborhood_code__startswith="20LC") |
+            Q(neighborhood_code__startswith="21LC") |
+            Q(neighborhood_code__startswith="22LC") |
+            Q(neighborhood_code__startswith="23LC") |
+            Q(neighborhood_code__startswith="20CON") |
+            Q(neighborhood_code__startswith="22CON") |
+
+            Q(neighborhood_code__startswith="20A")  |
+            Q(neighborhood_code__startswith="21A")  |
+            Q(neighborhood_code__startswith="22A")  |
+            Q(neighborhood_code__startswith="23A")  |
+            Q(neighborhood_code__startswith="20FID") |
+            Q(neighborhood_code__startswith="22FID") |
+            Q(neighborhood_code__startswith="20GUEM") |
+            Q(neighborhood_code__startswith="22GUEM") |
+
+            Q(neighborhood_code__startswith="20SW") |
+            Q(neighborhood_code__startswith="21SW") |
+            Q(neighborhood_code__startswith="22SW") |
+            Q(neighborhood_code__startswith="23SW") |
+
+            Q(neighborhood_code__startswith="20CC") |
+            Q(neighborhood_code__startswith="22CC") |
+            Q(neighborhood_code__startswith="10CC") |
+
+            Q(neighborhood_code__startswith="20MV") |
+            Q(neighborhood_code__startswith="21MV") |
+            Q(neighborhood_code__startswith="22MV") |
+            Q(neighborhood_code__startswith="23MV")
         )
+
+        if only_hood:
+            hoods = [only_hood]
+        else:
+            hoods = (
+                Assessor.objects
+                .filter(allowed)
+                .exclude(neighborhood_code__isnull=True)
+                .values_list("neighborhood_code", flat=True)
+                .distinct()
+            )
+
+
+
 
         self.stdout.write(f"Found {len(hoods)} neighborhoods.")
 
@@ -39,25 +101,28 @@ class Command(BaseCommand):
             json_blob = {}
 
             # ----------------------------------------------------------
-            # BASIC PARCEL COUNTS & LAND USE
+            # BASIC PARCEL COUNT
             # ----------------------------------------------------------
             json_blob["parcel_count"] = parcels.count()
 
-            # Land use mix
-            json_blob["land_use_mix"] = {
-                lu: parcels.filter(land_use_code=lu).count()
-                for lu in parcels.values_list("land_use_code", flat=True).distinct()
-                if lu
-            }
+            # ----------------------------------------------------------
+            # NEIGHBORHOOD NAME (from Assessor, as requested)
+            # ----------------------------------------------------------
+            first_parcel = parcels.first()
+            nbhd_desc = (
+                getattr(first_parcel, "neighborhood_code_description", None)
+                if first_parcel
+                else None
+            )
+            json_blob["neighborhood_name"] = nbhd_desc or hood
 
-            # ----------------------------------------------------------
-            # NEIGHBORHOOD NAME
-            # ----------------------------------------------------------
+            # Optional: keep geom name separately if you want it later
             ngeo = NeighborhoodGeom.objects.filter(code=hood).first()
-            json_blob["neighborhood_name"] = ngeo.name if ngeo else hood
+            if ngeo:
+                json_blob["geom_name"] = ngeo.name
 
             # ----------------------------------------------------------
-            # YEAR BUILT + AGE BANDS
+            # YEAR BUILT + AGE BANDS + OLDEST / NEWEST + NEW BUILDS
             # ----------------------------------------------------------
             years = list(
                 parcels.exclude(year_built__isnull=True)
@@ -66,6 +131,11 @@ class Command(BaseCommand):
 
             json_blob["median_year_built"] = statistics.median(years) if years else None
 
+            # Oldest / newest
+            json_blob["oldest_year_built"] = min(years) if years else None
+            json_blob["newest_year_built"] = max(years) if years else None
+
+            # Age bands
             agebands = {"0_20": 0, "20_40": 0, "40_60": 0, "60_plus": 0}
             now = datetime.now().year
 
@@ -82,6 +152,13 @@ class Command(BaseCommand):
 
             json_blob["age_distribution"] = agebands
 
+            # New building activity (hard-coded recent years)
+            new_build_counts = {
+                str(year): parcels.filter(year_built=year).count()
+                for year in (2023, 2024, 2025)
+            }
+            json_blob["new_builds"] = new_build_counts
+
             # ----------------------------------------------------------
             # LIVING AREA
             # ----------------------------------------------------------
@@ -96,6 +173,7 @@ class Command(BaseCommand):
                     "median": statistics.median(s),
                     "p25": s[len(s) // 4],
                     "p75": s[(len(s) * 3) // 4],
+                    "sample_size": len(s),
                 }
             else:
                 json_blob["living_area_stats"] = None
@@ -114,22 +192,46 @@ class Command(BaseCommand):
                     "median_acres": statistics.median(s),
                     "p25": s[len(s) // 4],
                     "p75": s[(len(s) * 3) // 4],
+                    "sample_size": len(s),
                 }
             else:
                 json_blob["lot_size"] = None
 
             # ----------------------------------------------------------
-            # BATHROOMS (Assessor only)
+            # BATHROOMS (Assessor only, more descriptive)
             # ----------------------------------------------------------
             baths = list(
                 parcels.exclude(bathrooms__isnull=True)
                 .values_list("bathrooms", flat=True)
             )
 
-            json_blob["bathrooms"] = {
-                "median": statistics.median(baths) if baths else None,
-                "dist": {str(b): baths.count(b) for b in set(baths)} if baths else {},
-            }
+            if baths:
+                baths_sorted = sorted(baths)
+                median_baths = statistics.median(baths_sorted)
+                # More descriptive distribution
+                distribution = []
+                for val in sorted(set(baths_sorted)):
+                    count = baths_sorted.count(val)
+                    # label like "1 bath", "1.75 baths"
+                    label = f"{float(val):g} baths"
+                    distribution.append(
+                        {
+                            "bathrooms": float(val),
+                            "count": count,
+                            "label": label,
+                        }
+                    )
+                json_blob["bathrooms"] = {
+                    "median": median_baths,
+                    "distribution": distribution,
+                    "sample_size": len(baths_sorted),
+                }
+            else:
+                json_blob["bathrooms"] = {
+                    "median": None,
+                    "distribution": [],
+                    "sample_size": 0,
+                }
 
             # ----------------------------------------------------------
             # BASEMENT %
@@ -154,20 +256,46 @@ class Command(BaseCommand):
             )
 
             json_blob["garage"] = {
-                "median_sqft": statistics.median(garages) if garages else None
+                "median_sqft": statistics.median(garages) if garages else None,
+                "sample_size": len(garages),
             }
 
             # ----------------------------------------------------------
-            # BUILDING STYLE (Assessor)
+            # BUILDING STYLE (more descriptive structure)
             # ----------------------------------------------------------
-            styles = list(
+            style_values = list(
                 parcels.exclude(building_style__isnull=True)
                 .values_list("building_style", flat=True)
             )
-            json_blob["styles"] = {
-                st: styles.count(st)
-                for st in set(styles)
-            }
+
+            if style_values:
+                total_styles = len(style_values)
+                counts = {}
+                for st in style_values:
+                    counts[st] = counts.get(st, 0) + 1
+
+                style_summary = []
+                for st in sorted(counts.keys()):
+                    count = counts[st]
+                    pct = round((count / total_styles) * 100, 2)
+                    style_summary.append(
+                        {
+                            "style": st,
+                            "count": count,
+                            "percent": pct,
+                        }
+                    )
+                json_blob["styles"] = {
+                    "summary": style_summary,
+                    "sample_size": total_styles,
+                }
+            else:
+                json_blob["styles"] = {
+                    "summary": [],
+                    "sample_size": 0,
+                }
+
+            # NOTE: land_use_mix DROPPED per your request
 
             # ----------------------------------------------------------
             # FLOOD (FEMA)
@@ -180,7 +308,7 @@ class Command(BaseCommand):
             json_blob["slope_stats"] = self.get_slope_stats(parcels)
 
             # ----------------------------------------------------------
-            # CENSUS
+            # CENSUS (fixed for SRID 2285)
             # ----------------------------------------------------------
             json_blob["census"] = self.get_census_stats(parcels)
 
@@ -190,24 +318,35 @@ class Command(BaseCommand):
             json_blob["amenities"] = self.get_amenity_stats(parcels)
 
             # ----------------------------------------------------------
-            # SALES
+            # SALES (ignore zero prices)
             # ----------------------------------------------------------
             json_blob["sales"] = self.get_sale_stats(parcels)
+
+            # Skip neighborhoods with insufficient sales
+            sale_info = json_blob.get("sales", {})
+            sale_count = sale_info.get("sale_count", 0)
+
+            if sale_count < 15:
+                self.stdout.write(
+                    self.style.WARNING(f"Skipping {hood}: only {sale_count} sales (< 15 required)")
+                )
+                continue
 
             # ----------------------------------------------------------
             # SAVE
             # ----------------------------------------------------------
             NeighborhoodProfile.objects.update_or_create(
                 hood_id=hood,
-                defaults={"json_data": json_blob},
+                defaults={"json_data": convert_decimals(json_blob)},
             )
+
 
             self.stdout.write(f"✓ Hood {hood} saved.")
 
         self.stdout.write("Done building neighborhood snapshots.")
 
-    # ==============================================================
-    # SUB-FUNCTIONS
+    # ==============================================================  
+    # SUB-FUNCTIONS  
     # ==============================================================
 
     def get_flood_stats(self, parcels):
@@ -256,6 +395,9 @@ class Command(BaseCommand):
         }
 
     def get_census_stats(self, parcels):
+        """
+        Join assessor → bg_skagit (geom, SRID 2285) → acs_bg_skagit (attributes).
+        """
         sql = """
         SELECT 
             acs.median_income,
@@ -264,13 +406,16 @@ class Command(BaseCommand):
             acs.edu_master,
             acs.edu_professional,
             acs.edu_doctorate
-        FROM census.bg_skagit bg
+        FROM assessor a
+        JOIN census.bg_skagit bg
+          ON ST_Intersects(
+                bg.geom,
+                ST_Transform(ST_Centroid(a.geom), 2285)
+             )
         JOIN census.acs_bg_skagit acs
-        ON bg.geoid = acs.geoid
-        JOIN assessor a
-        ON a.id = ANY(%s)
-        WHERE a.geom IS NOT NULL
-        AND ST_Intersects(bg.geom, ST_Centroid(a.geom))
+          ON bg.geoid = acs.geoid
+        WHERE a.id = ANY(%s)
+          AND a.geom IS NOT NULL;
         """
 
         ids = list(parcels.values_list("id", flat=True))
@@ -379,15 +524,16 @@ class Command(BaseCommand):
             "dist_major_road_m": median_or_none(road_dists),
         }
 
-
-
     def get_sale_stats(self, parcels):
         two_years_ago = datetime.now() - timedelta(days=730)
 
-        sales = Sales.objects.filter(
-            parcel_number__in=parcels.values_list("parcel_number", flat=True),
-            sale_date__gte=two_years_ago
-        ).exclude(sale_price__isnull=True)
+        sales = (
+            Sales.objects.filter(
+                parcel_number__in=parcels.values_list("parcel_number", flat=True),
+                sale_date__gte=two_years_ago,
+            )
+            .filter(sale_price__gt=0)
+        )
 
         if not sales.exists():
             return {}

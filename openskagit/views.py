@@ -2030,6 +2030,276 @@ def appeal_result_comparables(request, parcel_number: str):
 
 
 @require_GET
+def appeal_fairness_analysis(request, parcel_number: str):
+    """
+    Run an on-demand fairness analysis that blends subject, neighborhood,
+    and comparable sales metrics using IAAO-style concepts.
+    """
+    pn = (parcel_number or "").strip()
+    if not pn:
+        return HttpResponseBadRequest("Parcel number is required.")
+
+    try:
+        subject, _ = appeals.load_subject_with_roll_context(pn)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    summary = appeals.citizen_assessment_summary(subject)
+    comparables = summary.get("comparables") or []
+    neighborhood = summary.get("neighborhood") or {}
+
+    def _to_float(value: Any) -> Optional[float]:
+        if value in (None, "", "null"):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError, InvalidOperation):
+            return None
+
+    def _serialize_subject(snapshot: cma.PropertySnapshot) -> Dict[str, Any]:
+        metadata = snapshot.metadata if isinstance(snapshot.metadata, dict) else {}
+        return {
+            "parcel_number": snapshot.parcel_number,
+            "address": snapshot.address,
+            "assessed_value": _to_float(snapshot.assessed_value or metadata.get("assessed_value")),
+            "sale_price": _to_float(snapshot.sale_price),
+            "sale_date": snapshot.sale_date.isoformat() if snapshot.sale_date else None,
+            "bedrooms": _to_float(snapshot.bedrooms),
+            "bathrooms": _to_float(snapshot.bathrooms),
+            "living_area_sqft": _to_float(snapshot.living_area),
+            "year_built": snapshot.year_built or snapshot.effective_year_built,
+            "neighborhood_code": metadata.get("neighborhood_code"),
+            "valuation_area": metadata.get("valuation_area"),
+            "assessment_roll_year": metadata.get("assessment_roll_year"),
+        }
+
+    def _serialize_comparable(comp: cma.ComparableResult) -> Dict[str, Any]:
+        snapshot = getattr(comp, "snapshot", None)
+        address = getattr(snapshot, "address", None) if snapshot else None
+        bedrooms = getattr(snapshot, "bedrooms", None) if snapshot else None
+        bathrooms = getattr(snapshot, "bathrooms", None) if snapshot else None
+        living_area = getattr(snapshot, "living_area", None) if snapshot else None
+        year_built = getattr(snapshot, "year_built", None) if snapshot else None
+        return {
+            "parcel_number": getattr(snapshot, "parcel_number", None) if snapshot else None,
+            "address": address,
+            "sale_price": _to_float(comp.sale_price),
+            "sale_date": comp.sale_date.isoformat() if comp.sale_date else None,
+            "assessed_value": _to_float(comp.assessed_value),
+            "distance_miles": _to_float(comp.distance_miles),
+            "bedrooms": _to_float(bedrooms),
+            "bathrooms": _to_float(bathrooms),
+            "living_area_sqft": _to_float(living_area),
+            "year_built": year_built,
+        }
+
+    serialized_comps = [_serialize_comparable(c) for c in comparables]
+
+    # Basic fairness metrics grounded in IAAO concepts:
+    #   - level (sales ratio / median ratio)
+    #   - uniformity (COD)
+    #   - vertical equity (PRD)
+    neighborhood_cod = _to_float(neighborhood.get("cod"))
+    neighborhood_prd = _to_float(neighborhood.get("prd"))
+    neighborhood_sales_ratio = _to_float(neighborhood.get("sales_ratio"))
+    over_assessment_pct = summary.get("over_assessment_pct")
+    comp_count = summary.get("comp_count") or 0
+    score = summary.get("score")
+    rating = summary.get("rating")
+
+    metrics: Dict[str, Any] = {
+        "over_assessment_pct": _to_float(over_assessment_pct),
+        "comp_count": comp_count,
+        "appeal_score": _to_float(score),
+        "appeal_rating": rating,
+        "cod": neighborhood_cod,
+        "prd": neighborhood_prd,
+        "sales_ratio": neighborhood_sales_ratio,
+    }
+
+    # Status buckets for quick visual flags
+    def _level_status(ratio: Optional[float]) -> Dict[str, Any]:
+        if ratio is None:
+            return {
+                "label": "Level unknown",
+                "severity": "unknown",
+                "description": "We could not calculate a neighborhood sales ratio.",
+            }
+        if 90 <= ratio <= 110:
+            return {
+                "label": "Within IAAO range",
+                "severity": "ok",
+                "description": "Neighborhood level is broadly aligned with the IAAO 90–110% target range.",
+            }
+        return {
+            "label": "Outside IAAO range",
+            "severity": "watch",
+            "description": "Neighborhood level appears outside the typical 90–110% IAAO range.",
+        }
+
+    def _cod_status(cod_value: Optional[float]) -> Dict[str, Any]:
+        if cod_value is None:
+            return {
+                "label": "Uniformity unknown",
+                "severity": "unknown",
+                "description": "We do not have a COD metric for this neighborhood.",
+            }
+        if cod_value < 10:
+            return {
+                "label": "Excellent uniformity",
+                "severity": "ok",
+                "description": "COD below ~10 suggests very consistent assessments among similar properties.",
+            }
+        if cod_value < 15:
+            return {
+                "label": "Acceptable uniformity",
+                "severity": "ok",
+                "description": "COD between ~10–15 is generally viewed as acceptable for residential property.",
+            }
+        return {
+            "label": "Patchy uniformity",
+            "severity": "watch",
+            "description": "COD above ~15 suggests assessments vary more than IAAO guidelines recommend.",
+        }
+
+    def _prd_status(prd_value: Optional[float]) -> Dict[str, Any]:
+        if prd_value is None:
+            return {
+                "label": "Vertical equity unknown",
+                "severity": "unknown",
+                "description": "We do not have a PRD metric for this neighborhood.",
+            }
+        if 0.98 <= prd_value <= 1.03:
+            return {
+                "label": "Balanced by value",
+                "severity": "ok",
+                "description": "High- and low-value properties appear to be assessed at similar ratios.",
+            }
+        if prd_value > 1.03:
+            return {
+                "label": "Regressive pattern",
+                "severity": "concern",
+                "description": "Higher-value properties tend to be under-assessed relative to lower-value homes.",
+            }
+        return {
+            "label": "Progressive pattern",
+            "severity": "watch",
+            "description": "Higher-value properties tend to be over-assessed relative to lower-value homes.",
+        }
+
+    level_status = _level_status(neighborhood_sales_ratio)
+    cod_status = _cod_status(neighborhood_cod)
+    prd_status = _prd_status(neighborhood_prd)
+
+    context_payload = {
+        "subject": _serialize_subject(subject),
+        "neighborhood": {
+            "code": neighborhood.get("code"),
+            "name": neighborhood.get("name"),
+            "year": neighborhood.get("year"),
+            "cod": neighborhood_cod,
+            "prd": neighborhood_prd,
+            "sales_ratio": neighborhood_sales_ratio,
+            "reliability": neighborhood.get("reliability"),
+            "reliability_display": neighborhood.get("reliability_display"),
+            "valid_sales": neighborhood.get("valid_sales"),
+            "parcels": neighborhood.get("parcels"),
+        },
+        "comparables": serialized_comps,
+        "metrics": metrics,
+    }
+
+    system_prompt = (
+        "You are a property tax fairness reviewer for a county assessor's office. "
+        "Use IAAO mass appraisal standards around level, uniformity (COD), and price-related bias (PRD). "
+        "Explain findings for residents in plain language, without legal advice."
+        "talk to a citizen that doesn't have a lot of knowledge about all this.  instead of the subject, say, your house."
+        "talk directly to home owner"
+    )
+
+    context_json = json.dumps(context_payload, ensure_ascii=False)
+
+    user_prompt = (
+        "Review this property-tax context and provide a fairness analysis.\n\n"
+        "Context JSON (read-only):\n"
+        f"{context_json}\n\n"
+        "Using IAAO concepts:\n"
+        "  - Level: Are assessments near 100% of market value (90–110% band)?\n"
+        "  - Uniformity: Is COD in an acceptable range for residential property?\n"
+        "  - Vertical equity: Does PRD suggest regressivity or progressivity?\n\n"
+        "Return STRICT JSON with this exact shape and no extra commentary:\n"
+        "{\n"
+        '  "summary": "2–3 sentence plain-language overview.",\n'
+        '  "subject_vs_neighborhood": ["bullet-style insight", "..."],\n'
+        '  "subject_vs_comparables": ["bullet-style insight", "..."],\n'
+        '  "fairness_flags": [\n'
+        '    {"label": "Horizontal equity", "severity": "info|watch|concern", "detail": "..."}\n'
+        "  ],\n"
+        '  "iaao_signals": "Short explanation of what COD, PRD, and sales ratios suggest.",\n'
+        '  "next_steps": ["Concrete, non-legal suggestions for the homeowner"],\n'
+        '  "disclaimer": "Short reminder that this is not legal advice."\n'
+        "}\n"
+    )
+
+    analysis: Dict[str, Any] = {
+        "summary": "",
+        "subject_vs_neighborhood": [],
+        "subject_vs_comparables": [],
+        "fairness_flags": [],
+        "iaao_signals": "",
+        "next_steps": [],
+        "disclaimer": "",
+    }
+    analysis_error: Optional[str] = None
+    raw_text: str = ""
+
+    try:
+        client = llm.get_openai_client()
+        model_name = getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4.1-mini")
+        response = client.responses.create(
+            model=model_name,
+            input=str(f"System Prompt {system_prompt}, User Prompt: {user_prompt}"),
+            temperature=0.2,
+        )
+        raw_text = getattr(response, "output_text", "") or ""
+        text = raw_text.strip()
+        try:
+            if text:
+                parsed = json.loads(text)
+                if isinstance(parsed, dict):
+                    analysis.update(parsed)
+                else:
+                    analysis["summary"] = text
+        except json.JSONDecodeError:
+            # Fall back to wrapping the model text as a simple summary.
+            analysis["summary"] = text
+    except llm.MissingCredentials as exc:
+        analysis_error = str(exc)
+    except llm.MissingDependency as exc:
+        analysis_error = str(exc)
+    except llm.OpenAIError as exc:
+        analysis_error = str(exc)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("Unexpected error during fairness analysis for parcel %s", pn)
+        analysis_error = str(exc)
+
+    context = {
+        "subject": subject,
+        "parcel_number": pn,
+        "neighborhood": neighborhood,
+        "metrics": metrics,
+        "level_status": level_status,
+        "cod_status": cod_status,
+        "prd_status": prd_status,
+        "analysis": analysis,
+        "analysis_error": analysis_error,
+        "analysis_raw_text": raw_text,
+    }
+
+    return render(request, "openskagit/appeal_fairness_analysis_v3.html", context)
+
+
+@require_GET
 def methodology_view(request):
     """
     Public-facing page explaining the regression methodology used for property valuations.

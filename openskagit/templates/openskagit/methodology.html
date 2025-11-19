@@ -514,6 +514,7 @@
   {% with stats=model_stats|get_item:group_name %}
   <div class="market-group">
     <div class="market-group-header" onclick="toggleMarketGroup('{{ group_name }}')">
+      <div class="market-group-title">{{ group_name|title|replace:"_, " }}</div>
       <div class="market-group-title">{{ group_data.display_name }}</div>
       {% if stats %}
       <div class="market-group-stats">

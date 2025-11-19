@@ -331,7 +331,7 @@ class NeighborhoodProfile(models.Model):
     hood_id = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=200, null=True, blank=True)
     city = models.CharField(max_length=50, null=True, blank=True)
-
+    ai_summary = models.TextField(null=True, blank=True)
     json_data = models.JSONField(default=dict)  # all computed stats
     updated_at = models.DateTimeField(auto_now=True)
 
