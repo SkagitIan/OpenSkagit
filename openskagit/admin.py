@@ -179,3 +179,39 @@ class NeighborhoodProfileAdmin(admin.ModelAdmin):
 
     # Keeps the form simple and predictable.
     fields = ("hood_id", "name", "city", "json_data", "updated_at","ai_summary")
+
+from .models import NeighborhoodTrend
+
+
+@admin.register(NeighborhoodTrend)
+class NeighborhoodTrendAdmin(admin.ModelAdmin):
+    # Columns you see in the changelist
+    list_display = (
+        "hood_id",
+        "value_year",
+        "median_market_total",
+        "median_land_market",
+        "median_building",
+        "median_tax_amount",
+        "yoy_change_total",
+        "stability_score",
+        "boom_bust_flag",
+    )
+
+    # Sidebar filters
+    list_filter = (
+        "hood_id",
+        "value_year",
+        "boom_bust_flag",
+    )
+
+    # Search box
+    search_fields = ("hood_id",)
+
+    # Default ordering
+    ordering = ("hood_id", "value_year")
+
+    # Don’t let anyone edit timestamps
+    readonly_fields = ("created_at", "updated_at")
+
+    list_per_page = 50

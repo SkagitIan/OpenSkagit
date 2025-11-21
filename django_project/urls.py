@@ -51,6 +51,8 @@ urlpatterns = [
     path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
     path("methodology/", openskagit_views.methodology_view, name="methodology"),
     path("faq/", openskagit_views.faq_view, name="faq"),
+    path("hood-trends/", openskagit_views.hood_trend_list, name="hood_trend_list"),
+    path("hood-trends/<str:hood_id>/", openskagit_views.hood_trend_detail, name="hood_trend_detail"),
     # Citizen Appeal Helper
 
     path("appeal/new/", openskagit_views.appeal_new, name="appeal-new"),

@@ -15,7 +15,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib.humanize.templatetags.humanize import intcomma
 from django.db import connection
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import Avg, Count, Max, Min, OuterRef, Q, Subquery
 from django.db.models.functions import Upper
 from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -35,6 +35,7 @@ from .models import (
     CmaComparableSelection,
     NeighborhoodGeom,
     NeighborhoodMetrics,
+    NeighborhoodTrend,
     Parcel,
 )
 from .improvement_utils import QUALITY_WEIGHTS
@@ -2663,3 +2664,51 @@ def faq_view(request):
     Frequently Asked Questions page with searchable, categorized content.
     """
     return render(request, 'openskagit/faq.html')
+
+
+def hood_trend_list(request):
+    """
+    Left-hand panel: list of hoods that have trends.
+    HTMX will pull the detail view on click.
+    """
+    hoods = (
+        NeighborhoodTrend.objects.values("hood_id")
+        .annotate(
+            first_year=Min("value_year"),
+            last_year=Max("value_year"),
+            n_years=Count("id"),
+            avg_stability=Avg("stability_score"),
+        )
+        .order_by("hood_id")
+    )
+
+    return render(request, "trends/hood_trend_list.html", {"hoods": hoods})
+
+
+def hood_trend_detail(request, hood_id):
+    """
+    Right-hand panel: full time series for one hood.
+    """
+    qs = NeighborhoodTrend.objects.filter(hood_id=hood_id).order_by("value_year")
+    if not qs.exists():
+        return render(
+            request, "trends/hood_trend_detail.html", {"hood": hood_id, "rows": []}
+        )
+
+    rows = list(qs)
+
+    first_year = rows[0].value_year
+    last_year = rows[-1].value_year
+    avg_stability = sum(r.stability_score or 0 for r in rows) / max(
+        len([r for r in rows if r.stability_score is not None]), 1
+    )
+
+    context = {
+        "hood": hood_id,
+        "rows": rows,
+        "first_year": first_year,
+        "last_year": last_year,
+        "avg_stability": round(avg_stability, 1),
+    }
+
+    return render(request, "trends/hood_trend_detail.html", context)
