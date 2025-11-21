@@ -60,7 +60,7 @@
       this.bindSuggestionButtons();
       this.bindResetButtons();
       this.conversationId = this.conversationId || this.conversationInput?.value || "";
-      this.resizeInput();
+      this.checkInitialMode();
 
       if (this.initialPrompt) {
         const prompt = this.initialPrompt;
@@ -95,14 +95,14 @@
     fillInput(text) {
       if (!this.inputEl) return;
       this.inputEl.value = text;
-      this.resizeInput();
       this.inputEl.focus();
     }
 
-    resizeInput() {
-      if (!this.inputEl) return;
-      this.inputEl.style.height = "auto";
-      this.inputEl.style.height = `${this.inputEl.scrollHeight}px`;
+    checkInitialMode() {
+      const hasMessages = this.messagesEl && this.messagesEl.children.length > 0;
+      if (hasMessages) {
+        this.switchToConversationMode();
+      }
     }
 
     updateStatus(message) {
@@ -261,13 +261,12 @@
         const data = await response.json();
         this.setConversationId(data.conversation_id);
         this.messagesEl.innerHTML = "";
-        const placeholder = document.createElement("p");
-        placeholder.className = "chat-placeholder";
-        placeholder.setAttribute("data-chat-placeholder", "true");
-        placeholder.textContent = "New conversation started. Ask any question below.";
-        this.messagesEl.appendChild(placeholder);
         this.updateStatus("Ready when you are.");
         this.clearError();
+        this.switchToHeroMode();
+        if (this.inputEl) {
+          this.inputEl.value = "";
+        }
         if (this.historyUrl) {
           this.refreshHistory();
         }
@@ -283,14 +282,70 @@
     }
 
     switchToConversationMode() {
-      const heroSection = this.root.querySelector("section:not([id])");
-      const messagesWrap = this.root.querySelector("#messages-wrap");
-      const footer = this.root.querySelector("[data-chat-footer]");
+      const mainEl = document.querySelector('.main');
+      const heroModeWrapper = document.querySelector('.hero-mode');
+      const heroSection = document.querySelector('.hero');
+      const suggestionsEl = document.querySelector('[data-suggestions]');
+      const toolsSection = document.querySelector('.tools-section');
 
-      if (heroSection && messagesWrap && footer) {
-        heroSection.classList.add("hidden");
-        messagesWrap.classList.remove("hidden");
-        footer.classList.remove("hidden");
+      if (mainEl) {
+        mainEl.classList.remove('hero-mode');
+        mainEl.classList.add('conversation-mode');
+      }
+
+      if (heroModeWrapper) {
+        heroModeWrapper.style.minHeight = 'auto';
+        heroModeWrapper.style.display = 'block';
+      }
+
+      if (heroSection) {
+        heroSection.style.display = 'none';
+      }
+
+      if (suggestionsEl) {
+        suggestionsEl.style.display = 'none';
+      }
+
+      if (toolsSection) {
+        toolsSection.style.display = 'block';
+      }
+
+      if (this.messagesEl) {
+        this.messagesEl.style.display = 'flex';
+      }
+    }
+
+    switchToHeroMode() {
+      const mainEl = document.querySelector('.main');
+      const heroModeWrapper = document.querySelector('.hero-mode');
+      const heroSection = document.querySelector('.hero');
+      const suggestionsEl = document.querySelector('[data-suggestions]');
+      const toolsSection = document.querySelector('.tools-section');
+
+      if (mainEl) {
+        mainEl.classList.add('hero-mode');
+        mainEl.classList.remove('conversation-mode');
+      }
+
+      if (heroModeWrapper) {
+        heroModeWrapper.style.minHeight = 'calc(100vh - 80px)';
+        heroModeWrapper.style.display = 'flex';
+      }
+
+      if (heroSection) {
+        heroSection.style.display = 'block';
+      }
+
+      if (suggestionsEl) {
+        suggestionsEl.style.display = 'grid';
+      }
+
+      if (toolsSection) {
+        toolsSection.style.display = 'none';
+      }
+
+      if (this.messagesEl) {
+        this.messagesEl.style.display = 'none';
       }
     }
 
