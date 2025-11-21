@@ -933,13 +933,22 @@
       });
     }
 
-    function buildUrl(viewMode) {
+    function buildUrl(viewMode = 'standard', params = {}) {
       if (!baseUrl) return null;
-      const mode = viewMode && viewMode !== 'standard' ? viewMode : null;
-      return mode ? `${baseUrl}?view_mode=${encodeURIComponent(mode)}` : baseUrl;
+      const search = new URLSearchParams();
+      if (viewMode && viewMode !== 'standard') {
+        search.set('view_mode', viewMode);
+      }
+      Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          search.set(key, value);
+        }
+      });
+      const query = search.toString();
+      return query ? `${baseUrl}?${query}` : baseUrl;
     }
 
-    function fetchComparables(url, { fromButton }) {
+    function fetchComparables(url, { fromButton } = {}) {
       if (!url || !placeholder) return;
       if (fromButton) {
         if (!button || button.dataset.loading === 'running') return;
@@ -975,13 +984,13 @@
         });
     }
 
-    window.appealFetchComparables = function (viewMode = 'standard') {
-      const url = buildUrl(viewMode);
+    window.appealFetchComparables = function (viewMode = 'standard', params = {}) {
+      const url = buildUrl(viewMode, params);
       fetchComparables(url, { fromButton: true });
     };
 
-    window.appealUpdateComparables = function (viewMode = 'standard') {
-      const url = buildUrl(viewMode);
+    window.appealUpdateComparables = function (viewMode = 'standard', params = {}) {
+      const url = buildUrl(viewMode, params);
       fetchComparables(url, { fromButton: false });
     };
   })();

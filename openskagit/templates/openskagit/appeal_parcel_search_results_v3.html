@@ -10,25 +10,27 @@
 {% elif query %}
   {% if results %}
     {% for parcel in results %}
-      {% with sale_price=parcel.sale_price sale_date=parcel.sale_date %}
+      {% with sale_price=parcel.sale_price %}
         <a class="autocomplete-result"
            href="{% url 'appeal-result' parcel.parcel_number %}"
            data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
            data-parcel="{{ parcel.parcel_number|escape }}"
-           data-details="{% if sale_price and sale_date %}Last sold for ${{ sale_price|floatformat:0|intcomma }} on {{ sale_date|date:'M j, Y' }}{% elif sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% elif sale_date %}Last recorded sale {{ sale_date|date:'M j, Y' }}{% endif %}">
+           data-details="{% if sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% endif %}">
           <div class="result-address">{{ parcel.address|default:"Address unavailable" }}</div>
           <div class="result-parcel">Parcel {{ parcel.parcel_number }}</div>
-          {% if sale_price or sale_date %}
+          {% if sale_price %}
             <div class="result-sale-info">
-              {% if sale_price %}Last sale ${{ sale_price|floatformat:0|intcomma }}{% if sale_date %} on {{ sale_date|date:"M j, Y" }}{% endif %}{% elif sale_date %}Last sale {{ sale_date|date:"M j, Y" }}{% endif %}
+              Last sale ${{ sale_price|floatformat:0|intcomma }}
             </div>
           {% endif %}
           <div class="result-cta">
-            Select to continue → Jump directly to Step 2
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
+            <span class="cta-button">
+              Continue
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </span>
           </div>
         </a>
       {% endwith %}

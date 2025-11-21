@@ -1,9 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OpenSkagit.com - AI-Enhanced Data Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
   <script src="https://unpkg.com/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
   <style>
@@ -132,8 +134,9 @@
       border-radius: 16px;
       padding: 2.5rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
-      margin-bottom: 3rem;
+      margin: 0 auto 3rem;
       border: 1px solid var(--os-light-gray);
+      width: min(720px, 100%);
     }
 
     .chatbot-label {
@@ -220,30 +223,55 @@
       height: 24px;
     }
 
-    .example-prompts {
+    .chatbot-header {
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      justify-content: center;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
     }
 
-    .example-prompt {
-      background: var(--os-off-white);
-      border: 1px solid var(--os-light-gray);
-      padding: 0.5rem 1rem;
-      border-radius: 20px;
-      font-size: 0.875rem;
-      color: var(--os-warm-gray);
+    .chatbot-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--os-charcoal);
+      letter-spacing: -0.02em;
+    }
+
+    .chatbot-reset {
+      border: 1px solid var(--os-teal);
+      background: rgba(91, 154, 153, 0.08);
+      color: var(--os-teal);
+      border-radius: 999px;
+      padding: 0.45rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
-    .example-prompt:hover {
-      background: white;
-      border-color: var(--os-sage);
-      color: var(--os-sage-dark);
-      transform: translateY(-1px);
+    .chatbot-reset:hover {
+      background: var(--os-teal);
+      color: white;
     }
+
+    .chat-window {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .chat-messages-panel {
+      min-height: 220px;
+      background: rgba(247, 246, 244, 0.9);
+      border-radius: 14px;
+      border: 1px solid var(--os-light-gray);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
 
     .tools-section {
       margin-bottom: 3rem;
@@ -431,62 +459,38 @@
       }
     }
 
-    .chat-messages {
-      max-height: 400px;
-      overflow-y: auto;
-      margin-bottom: 1rem;
-      padding: 1rem;
-      background: var(--os-off-white);
-      border-radius: 8px;
-      display: none;
+    @media (max-width: 480px) {
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+
+      .chatbot-section {
+        padding: 1.25rem;
+      }
+
+      .chat-input-wrapper {
+        position: static;
+        margin-bottom: 1rem;
+      }
+
+      .chat-input {
+        padding: 1rem;
+        padding-right: 1.25rem;
+      }
+
+      .chat-submit {
+        position: static;
+        width: 100%;
+        margin-top: 0.75rem;
+        height: auto;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(122, 157, 122, 0.3);
+      }
+
     }
 
-    .chat-messages.active {
-      display: block;
-    }
-
-    .message {
-      margin-bottom: 1rem;
-      padding: 0.75rem;
-      border-radius: 8px;
-    }
-
-    .message.user {
-      background: white;
-      border-left: 3px solid var(--os-sage);
-    }
-
-    .message.assistant {
-      background: white;
-      border-left: 3px solid var(--os-teal);
-    }
-
-    .message-role {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 0.5rem;
-      color: var(--os-warm-gray);
-    }
-
-    .message-content {
-      font-size: 0.9375rem;
-      line-height: 1.6;
-      color: var(--os-text);
-    }
-
-    .loading-indicator {
-      display: none;
-      text-align: center;
-      padding: 1rem;
-      color: var(--os-warm-gray);
-      font-size: 0.875rem;
-    }
-
-    .loading-indicator.active {
-      display: block;
-    }
   </style>
 </head>
 <body>
@@ -508,31 +512,46 @@
       </p>
     </div>
 
-    <div class="chatbot-section" x-data="{ hasMessages: false }">
-      <div class="chatbot-label">
-        <span>Ask me anything</span>
-        <span class="ai-badge">AI POWERED</span>
+    <section
+      class="chatbot-section"
+      data-chat-root
+      data-chat-style="portal"
+      data-send-url="{% url 'chat' %}"
+      data-history-url="{% url 'chat-history' %}"
+      data-new-url="{% url 'chat-new' %}"
+      data-conversation-id="{{ conversation_id }}"
+      data-initial-prompt="{{ initial_prompt|default:''|escape }}"
+    >
+      <div class="chatbot-header">
+        <p class="chatbot-title">Ask me anything</p>
+        <button type="button" class="chatbot-reset" data-chat-reset>New conversation</button>
       </div>
 
-      <div id="chat-messages" class="chat-messages" :class="{ 'active': hasMessages }">
-        {% if messages %}
-          {% for m in messages %}
-            <div class="message {{ m.role }}">
-              <div class="message-role">{{ m.role }}</div>
-              <div class="message-content">{{ m.content }}</div>
-            </div>
-          {% endfor %}
-        {% endif %}
-      </div>
+      <div class="chat-window">
+        <div id="messages" class="chat-messages-panel" data-chat-messages data-chat-scroll>
+          {% if messages %}
+            {% for m in messages %}
+              {% include "partials/message.html" with role=m.role content=m.content sources=m.sources %}
+            {% endfor %}
+          {% else %}
+            {% include "partials/empty_state.html" %}
+          {% endif %}
+        </div>
 
-      <form id="chat-form" method="get" action="{% url 'chatbot' %}">
-        <div class="chat-input-wrapper">
+        <form id="chat-form" class="chat-input-wrapper" data-chat-form method="post">
+          {% csrf_token %}
+          {% if conversation_id %}
+            <input type="hidden" name="conversation_id" value="{{ conversation_id }}" data-chat-conversation-input>
+          {% else %}
+            <input type="hidden" name="conversation_id" value="" data-chat-conversation-input>
+          {% endif %}
+          <label class="sr-only" for="prompt">Ask a question</label>
           <textarea
             id="prompt"
             name="prompt"
-            class="chat-input"
-            placeholder="Search property records, ask about tax assessments, or explore county data..."
             rows="1"
+            placeholder="Search property records, ask about tax assessments, or explore county data..."
+            class="chat-input"
             required
             oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"
           ></textarea>
@@ -541,30 +560,9 @@
               <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
           </button>
-        </div>
-      </form>
-
-      <div class="example-prompts">
-        <form method="get" action="{% url 'chatbot' %}">
-          <input type="hidden" name="prompt" value="Find my property tax assessment">
-          <button class="example-prompt" type="submit">
-            Find my property tax assessment
-          </button>
-        </form>
-        <form method="get" action="{% url 'chatbot' %}">
-          <input type="hidden" name="prompt" value="Show me recent home sales in my area">
-          <button class="example-prompt" type="submit">
-            Show recent home sales
-          </button>
-        </form>
-        <form method="get" action="{% url 'chatbot' %}">
-          <input type="hidden" name="prompt" value="Help me understand my property value">
-          <button class="example-prompt" type="submit">
-            Understand property values
-          </button>
         </form>
       </div>
-    </div>
+    </section>
 
     <div class="tools-section">
       <h2 class="section-title">Tools & Reports</h2>
@@ -660,5 +658,6 @@
     </div>
   </footer>
 
+  <script src="{% static 'openskagit/chat.js' %}" defer></script>
 </body>
 </html>

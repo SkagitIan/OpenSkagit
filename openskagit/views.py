@@ -29,7 +29,14 @@ from django.views.decorators.http import require_GET, require_POST
 logger = logging.getLogger(__name__)
 
 from . import adjustment_engine, appeals, cma, chat as chat_service, llm
-from .models import Assessor, CmaAnalysis, CmaComparableSelection, NeighborhoodGeom, Parcel
+from .models import (
+    Assessor,
+    CmaAnalysis,
+    CmaComparableSelection,
+    NeighborhoodGeom,
+    NeighborhoodMetrics,
+    Parcel,
+)
 from .improvement_utils import QUALITY_WEIGHTS
 from .valuation_areas import resolve_market_group
 
@@ -80,6 +87,36 @@ ADJUSTMENT_LABELS = [
     ("time", "Time trend"),
 ]
 
+ADJUSTMENT_STORYBOARD_CONFIG = {
+    "size": {
+        "label": "Size adjustments",
+        "components": ("area", "lot"),
+        "formula": "subject_pred_price × (exp(coef × Δlog(size)) - 1)",
+    },
+    "quality": {
+        "label": "Quality adjustments",
+        "components": ("quality",),
+        "formula": "subject_pred_price × (exp(coef × Δquality_score) - 1)",
+    },
+    "condition": {
+        "label": "Condition adjustments",
+        "components": ("condition",),
+        "formula": "subject_pred_price × (exp(coef × Δcondition_score) - 1)",
+    },
+    "time": {
+        "label": "Time adjustments",
+        "components": ("time",),
+        "formula": "sale_price × (exp(beta_t × Δmonths) - 1)",
+    },
+    "location": {
+        "label": "Location adjustments",
+        "components": ("view",),
+        "formula": "subject_pred_price × (exp(coef × Δview_flag) - 1)",
+    },
+}
+
+ADJUSTMENT_STORYBOARD_ORDER = ["size", "quality", "condition", "time", "location"]
+
 
 def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metadata: object) -> None:
     details = " ".join(
@@ -89,6 +126,19 @@ def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metad
     if details:
         message = f"{message} {details}"
     logger.info(message)
+
+
+def _centroid_lat_lon(geom) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Derive a representative latitude/longitude pair from a parcel geometry.
+    Fall back to the geometry's own x/y when no centroid is available.
+    """
+    if geom is None:
+        return None, None
+    centroid = getattr(geom, "centroid", None)
+    if centroid is not None:
+        return getattr(centroid, "y", None), getattr(centroid, "x", None)
+    return getattr(geom, "y", None), getattr(geom, "x", None)
 
 
 def _get_cma_root_state(request) -> Dict[str, Any]:
@@ -414,6 +464,189 @@ def _compute_adjustment_summary(
             )
         comp["adjustment_list"] = detail_list
     return raw_payload, None
+
+
+def _load_neighborhood_sales_ratio_history(code: Optional[str], *, limit: int = 10) -> List[Dict[str, Any]]:
+    if not code:
+        return []
+    normalized = str(code or "").strip()
+    if not normalized:
+        return []
+    normalized_upper = normalized.upper()
+    qs = (
+        NeighborhoodMetrics.objects.filter(neighborhood_code__iexact=normalized_upper)
+        .order_by("-year")
+    )
+    history = []
+    for metric in qs[:limit]:
+        history.append(
+            {
+                "year": metric.year,
+                "sales_ratio": float(metric.sales_ratio) if metric.sales_ratio is not None else None,
+                "median_ratio": float(metric.median_ratio) if metric.median_ratio is not None else None,
+            }
+        )
+    return sorted(history, key=lambda item: item["year"])
+
+
+def _prepare_adjustment_storyboard(
+    adjustment_payload: Dict[str, Any],
+    subject: cma.PropertySnapshot,
+    comparables: List[cma.ComparableResult],
+) -> List[Dict[str, Any]]:
+    story_items: List[Dict[str, Any]] = []
+    market_group = _subject_market_group(subject)
+    subject_payload = _snapshot_adjustment_payload(subject, market_group=market_group)
+    comp_payloads: List[Dict[str, Any]] = []
+    for comp in comparables:
+        snapshot = getattr(comp, "snapshot", None)
+        if not isinstance(snapshot, cma.PropertySnapshot):
+            continue
+        comp_payloads.append(_snapshot_adjustment_payload(snapshot))
+    comp_count = len(comp_payloads)
+    if comp_count == 0:
+        return story_items
+
+    def _average(field: str) -> Optional[float]:
+        values = []
+        for payload in comp_payloads:
+            value = payload.get(field)
+            if value in (None, "", "null"):
+                continue
+            try:
+                values.append(float(value))
+            except (TypeError, ValueError):
+                continue
+        if not values:
+            return None
+        return sum(values) / len(values)
+
+    def _format_sqft(value: Optional[float]) -> str:
+        if value is None:
+            return "data unavailable"
+        try:
+            rounded = int(round(value))
+            return f"{rounded:,} sq ft"
+        except Exception:
+            return "data unavailable"
+
+    def _format_acres(value: Optional[float]) -> str:
+        if value is None:
+            return "data unavailable"
+        try:
+            return f"{value:.2f} acres"
+        except Exception:
+            return "data unavailable"
+
+    def _format_score(value: Optional[float]) -> str:
+        if value is None:
+            return "unreported"
+        try:
+            return f"{value:.1f}"
+        except Exception:
+            return "unreported"
+
+    def _parse_date(value: Optional[str]) -> Optional[dt.date]:
+        if not value:
+            return None
+        try:
+            return dt.date.fromisoformat(value)
+        except ValueError:
+            try:
+                return dt.date.fromisoformat(value.split("T")[0])
+            except Exception:
+                return None
+
+    subject_area_text = _format_sqft(subject_payload.get("GLA"))
+    subject_lot_text = _format_acres(subject_payload.get("lot_acres"))
+    subject_quality_text = _format_score(subject_payload.get("quality_score"))
+    subject_condition_text = _format_score(subject_payload.get("condition_score"))
+    subject_view_flag = subject_payload.get("is_view")
+    subject_view_text = (
+        "has a view"
+        if subject_view_flag == 1
+        else "does not have a view"
+        if subject_view_flag == 0
+        else "view data unavailable"
+    )
+
+    comp_area_text = _format_sqft(_average("GLA"))
+    comp_lot_text = _format_acres(_average("lot_acres"))
+    comp_quality_text = _format_score(_average("quality_score"))
+    comp_condition_text = _format_score(_average("condition_score"))
+
+    view_flags = [payload.get("is_view") for payload in comp_payloads if payload.get("is_view") in (0, 1)]
+    comp_view_percent = None
+    if view_flags:
+        comp_view_percent = (sum(view_flags) / len(view_flags)) * 100
+    comp_view_text = (
+        f"{round(comp_view_percent)}% of comparables" if comp_view_percent is not None else "view data unavailable"
+    )
+
+    subject_sale_date = _parse_date(subject_payload.get("sale_date"))
+    if subject_sale_date:
+        subject_date_text = subject_sale_date.strftime("%b %Y")
+    else:
+        subject_date_text = "valuation date"
+
+    comp_sale_dates = sorted(
+        [d for d in (_parse_date(payload.get("sale_date")) for payload in comp_payloads) if d is not None]
+    )
+    if comp_sale_dates:
+        start = comp_sale_dates[0].strftime("%b %Y")
+        end = comp_sale_dates[-1].strftime("%b %Y")
+        sale_range_text = start if start == end else f"{start} – {end}"
+    else:
+        sale_range_text = "sale dates unavailable"
+
+    detail_lines: Dict[str, List[str]] = {
+        "size": [
+            ADJUSTMENT_STORYBOARD_CONFIG["size"]["formula"],
+            f"Source: Your home is {subject_area_text} on {subject_lot_text}; comparables average {comp_area_text} on {comp_lot_text}.",
+        ],
+        "quality": [
+            ADJUSTMENT_STORYBOARD_CONFIG["quality"]["formula"],
+            f"Source: Your quality score is {subject_quality_text} vs comparables averaging {comp_quality_text}.",
+        ],
+        "condition": [
+            ADJUSTMENT_STORYBOARD_CONFIG["condition"]["formula"],
+            f"Source: Your condition score is {subject_condition_text} vs comparables averaging {comp_condition_text}.",
+        ],
+        "time": [
+            ADJUSTMENT_STORYBOARD_CONFIG["time"]["formula"],
+            f"Source: Comps sold between {sale_range_text} trended to {subject_date_text}.",
+        ],
+        "location": [
+            ADJUSTMENT_STORYBOARD_CONFIG["location"]["formula"],
+            f"Source: Your property {subject_view_text}; {comp_view_text} reported the same view flag.",
+        ],
+    }
+
+    for story_id in ADJUSTMENT_STORYBOARD_ORDER:
+        config = ADJUSTMENT_STORYBOARD_CONFIG.get(story_id)
+        if not config:
+            continue
+        amounts: List[float] = []
+        for comp in adjustment_payload.get("comparables", []):
+            total = 0.0
+            for entry in comp.get("adjustment_list", []):
+                if entry.get("key") in config["components"]:
+                    amount = entry.get("amount")
+                    if isinstance(amount, (int, float)):
+                        total += float(amount)
+            amounts.append(total)
+        if not amounts:
+            continue
+        avg_amount = sum(amounts) / len(amounts)
+        story_items.append(
+            {
+                "id": story_id,
+                "label": config["label"],
+                "amount": avg_amount,
+                "details": detail_lines.get(story_id, []),
+            }
+        )
+    return story_items
 
 
 API_ENDPOINTS = [
@@ -1182,8 +1415,14 @@ def home(request):
     """
     manager = chat_service.ConversationManager(request)
     requested_id = request.GET.get("cid")
-    conversation_id = manager.ensure(requested_id)
-    context = manager.bootstrap(conversation_id)
+    initial_prompt = (request.GET.get("prompt") or "").strip()
+    if initial_prompt:
+        initial_prompt = initial_prompt[:1000]
+        conversation_id = manager.new()
+    else:
+        conversation_id = manager.ensure(requested_id)
+
+    context = manager.bootstrap(conversation_id, initial_prompt=initial_prompt or None)
     return render(request, "openskagit/home_portal.html", context)
 
 
@@ -1952,8 +2191,7 @@ def appeal_result_comparables(request, parcel_number: str):
         living_area = getattr(snapshot, "living_area", None) if snapshot else None
         year_built = getattr(snapshot, "year_built", None) if snapshot else None
         geom = getattr(snapshot, "geom", None) if snapshot else None
-        lat = getattr(geom, "y", None) if geom is not None else None
-        lon = getattr(geom, "x", None) if geom is not None else None
+        lat, lon = _centroid_lat_lon(geom)
         try:
             sqft = float(living_area) if living_area not in (None, 0) else None
         except Exception:
@@ -1993,9 +2231,15 @@ def appeal_result_comparables(request, parcel_number: str):
 
     # Expose subject coordinates for map rendering if available
     try:
-        if getattr(subject, "geom", None) is not None and not hasattr(subject, "latitude"):
-            setattr(subject, "latitude", subject.geom.y)
-            setattr(subject, "longitude", subject.geom.x)
+        geom = getattr(subject, "geom", None)
+        lat, lon = _centroid_lat_lon(geom)
+        existing_lat = getattr(subject, "latitude", None)
+        existing_lon = getattr(subject, "longitude", None)
+        if lat is not None and lon is not None and (
+            existing_lat is None or existing_lon is None
+        ):
+            setattr(subject, "latitude", lat)
+            setattr(subject, "longitude", lon)
     except Exception:
         pass
 
@@ -2283,6 +2527,38 @@ def appeal_fairness_analysis(request, parcel_number: str):
         logger.exception("Unexpected error during fairness analysis for parcel %s", pn)
         analysis_error = str(exc)
 
+    history_points = _load_neighborhood_sales_ratio_history(neighborhood.get("code"))
+
+    subject_over_pct = metrics.get("over_assessment_pct")
+    subject_ratio_pct = None if subject_over_pct is None else 100 + subject_over_pct
+    distribution_context = {
+        "subject_ratio": subject_ratio_pct,
+        "neighborhood_median_ratio": neighborhood.get("median_ratio_pct"),
+        "iaao_range": {"low": 90, "high": 110},
+    }
+
+    adjustment_payload, adjustment_error = _compute_adjustment_summary(subject, comparables)
+    adjustment_storyboard = []
+    if adjustment_payload:
+        adjustment_storyboard = _prepare_adjustment_storyboard(adjustment_payload, subject, comparables)
+
+    horizontal_diff = None
+    if subject_ratio_pct is not None and neighborhood_sales_ratio is not None:
+        horizontal_diff = subject_ratio_pct - neighborhood_sales_ratio
+
+    radar_data = {
+        "level_ratio": neighborhood_sales_ratio,
+        "uniformity": neighborhood_cod,
+        "horizontal_diff": horizontal_diff,
+        "vertical_prd": neighborhood_prd,
+        "over_under_pct": metrics.get("over_assessment_pct"),
+    }
+
+    appeal_gauge = {
+        "score": metrics.get("appeal_score"),
+        "rating": metrics.get("appeal_rating") or rating,
+    }
+
     context = {
         "subject": subject,
         "parcel_number": pn,
@@ -2291,6 +2567,12 @@ def appeal_fairness_analysis(request, parcel_number: str):
         "level_status": level_status,
         "cod_status": cod_status,
         "prd_status": prd_status,
+        "history_points": history_points,
+        "distribution_context": distribution_context,
+        "adjustment_storyboard": adjustment_storyboard,
+        "adjustment_error": adjustment_error,
+        "radar_data": radar_data,
+        "appeal_gauge": appeal_gauge,
         "analysis": analysis,
         "analysis_error": analysis_error,
         "analysis_raw_text": raw_text,

@@ -145,7 +145,7 @@ class PropertySnapshot:
     metadata: Dict[str, object] = field(default_factory=dict)
 
     @classmethod
-    def from_assessor_row(cls, row, rollup_cache=None):
+    def from_assessor_row(cls, row, *, rollup_cache=None, address_override=None):
         """
         Build a PropertySnapshot from an Assessor row used in comparable selection.
         Mirrors load_subject(), ensuring consistent metadata for CMA and adjustments.
@@ -162,6 +162,8 @@ class PropertySnapshot:
             row, "city_district", None
         )
 
+        market_value = current_property_value(row)
+
         metadata: Dict[str, Optional[object]] = {
             "neighborhood_code": getattr(row, "neighborhood_code", None),
             "neighborhood": getattr(row, "neighborhood_code_description", None),
@@ -173,7 +175,9 @@ class PropertySnapshot:
             "roll_year": roll_year,
             "roll_id": roll_id,
             "assessor_building_style": getattr(row, "building_style", None),
-            "assessed_value": float(row.assessed_value) if getattr(row, "assessed_value", None) is not None else None,
+            "assessed_value": float(market_value) if market_value is not None else None,
+            "total_market_value": float(getattr(row, "total_market_value", None)) if getattr(row, "total_market_value", None) is not None else None,
+            "county_assessed_value": float(getattr(row, "assessed_value", None)) if getattr(row, "assessed_value", None) is not None else None,
             "finished_basement_sqft": float(row.finished_basement) if getattr(row, "finished_basement", None) else None,
             "unfinished_basement_sqft": float(row.unfinished_basement) if getattr(row, "unfinished_basement", None) else None,
         }
@@ -187,9 +191,15 @@ class PropertySnapshot:
         has_garage = bool(_to_decimal(garage_sqft_val) not in (None, Decimal("0")))
         has_basement = bool(getattr(row, "finished_basement", 0) or getattr(row, "unfinished_basement", 0))
 
+        address_value = (
+            address_override
+            if address_override is not None
+            else _clean_address(getattr(row, "address", None)) or ""
+        )
+
         snapshot = cls(
             parcel_number=row.parcel_number,
-            address=row.address or "",
+            address=address_value,
             sale_price=_to_decimal(getattr(row, "comp_sale_price", None)),
             sale_date=_safe_date(getattr(row, "comp_sale_date", None)),
             property_type=row.property_type,
@@ -201,7 +211,7 @@ class PropertySnapshot:
             effective_year_built=effective_year,
             garage_sqft=_to_decimal(row.garage_sqft),
             acres=_to_decimal(row.acres),
-            assessed_value=_to_decimal(row.assessed_value),
+            assessed_value=market_value,
             geom=snapshot_geom,
             metadata=metadata,
         )
@@ -366,6 +376,20 @@ def _to_decimal(value: Optional[object]) -> Optional[Decimal]:
         return None
 
 
+def current_property_value(record: Optional[object]) -> Optional[Decimal]:
+    """
+    Prefer the assessor's total_market_value but fall back to assessed_value when needed.
+    """
+    if record is None:
+        return None
+    for attr in ("total_market_value", "assessed_value"):
+        if hasattr(record, attr):
+            attr_value = getattr(record, attr)
+            if attr_value not in (None, ""):
+                return _to_decimal(attr_value)
+    return None
+
+
 def _safe_date(value: Optional[dt.datetime]) -> Optional[dt.date]:
     if value is None:
         return None
@@ -374,6 +398,18 @@ def _safe_date(value: Optional[dt.datetime]) -> Optional[dt.date]:
     if isinstance(value, dt.date):
         return value
     return None
+
+
+def _clean_address(value: Optional[object]) -> Optional[str]:
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    lowered = s.lower()
+    if lowered in {"nan", "nan nan, nan", "none", "null", "n/a"}:
+        return None
+    return s
 
 
 def _metadata_dict(snapshot: PropertySnapshot) -> Dict[str, object]:
@@ -575,6 +611,8 @@ def load_subject(
 
     subject_market_group = resolve_market_group(assessor.neighborhood_code) or assessor.city_district
 
+    market_value = current_property_value(assessor)
+
     snapshot = PropertySnapshot(
         parcel_number=assessor.parcel_number,
         address=assessor.address or "Unknown address",
@@ -589,7 +627,7 @@ def load_subject(
         effective_year_built=int(assessor.eff_year_built) if assessor.eff_year_built else None,
         garage_sqft=_to_decimal(assessor.garage_sqft),
         acres=_to_decimal(assessor.acres),
-        assessed_value=_to_decimal(assessor.assessed_value),
+        assessed_value=market_value,
         geom=subject_geom,
         metadata={
             "neighborhood_code": assessor.neighborhood_code,
@@ -600,7 +638,9 @@ def load_subject(
             "roll_year": subject_roll_year,
             "roll_id": subject_roll_id,
             "assessor_building_style": assessor.building_style,
-            "assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
+            "assessed_value": float(market_value) if market_value is not None else None,
+            "total_market_value": float(assessor.total_market_value) if assessor.total_market_value is not None else None,
+            "county_assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
             "finished_basement_sqft": float(assessor.finished_basement) if assessor.finished_basement else None,
             "unfinished_basement_sqft": float(assessor.unfinished_basement) if assessor.unfinished_basement else None,
             "quality_score": getattr(assessor, "quality_score", None),
@@ -693,6 +733,7 @@ def _base_queryset(
         "building_style",
         "city_district",
         "assessed_value",
+        "total_market_value",
     )
 
     # Exclude subject parcel
@@ -780,6 +821,7 @@ def build_comparables(
     subject_metadata = _metadata_dict(subject)
     subject_neighborhood = subject_metadata.get("neighborhood_code")
     subject_city = subject_metadata.get("city_district")
+    subject_land_use = (subject_metadata.get("land_use_code") or "").strip()
 
     # ---------------------------------------
     # Determine search radius
@@ -808,6 +850,16 @@ def build_comparables(
         )
         .select_related("roll")
     )
+
+    qs = qs.filter(
+        bedrooms__isnull=False,
+        bathrooms__isnull=False,
+        living_area__isnull=False,
+        year_built__isnull=False,
+    )
+
+    if subject_land_use:
+        qs = qs.filter(land_use_code__iexact=subject_land_use)
 
     if search_radius is not None:
         qs = qs.filter(
@@ -929,7 +981,14 @@ def build_comparables(
         parcel_id = getattr(row, "parcel_number", None)
         if not parcel_id or parcel_id in seen_parcels:
             continue
-        snapshot = PropertySnapshot.from_assessor_row(row, rollup_cache=rollup_cache)
+        clean_address = _clean_address(getattr(row, "address", None))
+        if clean_address is None:
+            continue
+        snapshot = PropertySnapshot.from_assessor_row(
+            row,
+            rollup_cache=rollup_cache,
+            address_override=clean_address,
+        )
 
         distance_measure = getattr(row, "distance_meters", None)
         distance_value_m = None
@@ -951,7 +1010,7 @@ def build_comparables(
         comp = ComparableResult(
             snapshot=snapshot,
             sale_price=row.comp_sale_price,
-            assessed_value=_to_decimal(getattr(row, "assessed_value", None)),
+            assessed_value=current_property_value(row),
             sale_date=comp_sale_date,
             distance_meters=distance_value_m,
             distance_miles=(
