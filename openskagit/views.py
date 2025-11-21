@@ -88,8 +88,6 @@ ADJUSTMENT_LABELS = [
     ("time", "Time trend"),
 ]
 
-ADJUSTMENT_SUMMARY_MAX_ITEMS = 3
-
 ADJUSTMENT_STORYBOARD_CONFIG = {
     "size": {
         "label": "Size adjustments",
@@ -509,30 +507,6 @@ def _compute_adjustment_summary(
             )
         comp["adjustment_list"] = detail_list
     return raw_payload, None
-
-
-def _build_adjustment_excerpt(detail_list: Optional[List[Dict[str, Any]]]) -> List[str]:
-    """
-    Pick the largest non-zero adjustments and format them for a collapsed summary.
-    """
-    if not detail_list:
-        return []
-    non_zero = [item for item in detail_list if item.get("amount")]
-    if not non_zero:
-        return []
-    sorted_items = sorted(non_zero, key=lambda item: abs(item["amount"]), reverse=True)
-    excerpt: List[str] = []
-    for entry in sorted_items[:ADJUSTMENT_SUMMARY_MAX_ITEMS]:
-        amount = entry.get("amount")
-        if amount is None:
-            continue
-        sign = "+" if amount > 0 else "-"
-        try:
-            formatted = f"{abs(amount):,.0f}"
-        except (TypeError, ValueError):
-            formatted = str(abs(amount))
-        excerpt.append(f"{sign}${formatted}")
-    return excerpt
 
 
 def _load_neighborhood_sales_ratio_history(code: Optional[str], *, limit: int = 10) -> List[Dict[str, Any]]:
@@ -2241,9 +2215,6 @@ def appeal_result_comparables(request, parcel_number: str):
         comp_id = getattr(snapshot, "parcel_number", None) if snapshot else None
         adjustments = adjustment_map.get(str(comp_id)) if comp_id else None
         comp_meta = getattr(snapshot, "metadata", {}) or {}
-        adjustment_excerpt = _build_adjustment_excerpt(
-            adjustments.get("adjustment_list") if adjustments else None
-        )
         comp_living_area = _safe_float_value(living_area)
         comp_lot_value = _safe_float_value(
             getattr(snapshot, "acres", None)
@@ -2315,7 +2286,6 @@ def appeal_result_comparables(request, parcel_number: str):
                 "adjusted_value": adjustments.get("adjusted_value") if adjustments else None,
                 "total_adjustment": adjustments.get("total_adjustment") if adjustments else None,
                 "adjustments": adjustments.get("adjustment_list") if adjustments else [],
-                "adjustments_excerpt": adjustment_excerpt,
                 "similarity": similarity,
             }
         )

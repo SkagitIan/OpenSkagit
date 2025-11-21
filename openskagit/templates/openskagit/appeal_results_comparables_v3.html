@@ -221,6 +221,7 @@
     display: flex;
     align-items: flex-start;
     gap: var(--space-3);
+    overflow: visible;
   }
 
   .comp-card__header-content {
@@ -229,10 +230,6 @@
     gap: var(--space-4);
     align-items: flex-start;
     flex: 1;
-  }
-
-  .comp-card__header-gauge {
-    width: 100px;
   }
 
   .comp-card__title {
@@ -425,21 +422,6 @@
     cursor: pointer;
   }
 
-  .comp-card__adjustments-summary-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-
-  .adjustments-summary-text {
-    color: var(--gray-700);
-    font-size: 0.85rem;
-    font-weight: 600;
-    min-width: 0;
-  }
-
   .comp-card__adjustments-summary-indicator {
     display: inline-flex;
     align-items: center;
@@ -517,12 +499,20 @@
     width: 100%;
   }
 
-  .comp-similarity__trigger {
+  .comp-similarity__summary {
+    list-style: none;
+    margin: 0;
     border: none;
     background: transparent;
     padding: 0;
-    display: block;
+    display: flex;
+    justify-content: center;
     cursor: pointer;
+  }
+
+  .comp-similarity__summary::-webkit-details-marker,
+  .comp-similarity__summary::marker {
+    display: none;
   }
 
   .comp-similarity__gauge {
@@ -567,41 +557,59 @@
 
   .comp-similarity__tooltip {
     position: absolute;
-    top: calc(100% + var(--space-2));
+    bottom: calc(100% + var(--space-2));
     left: 0;
-    z-index: 2;
+    z-index: 999;
     background: white;
     border-radius: var(--radius-lg);
     border: 1px solid rgba(39, 39, 42, 0.1);
     padding: var(--space-3) var(--space-4);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-2xl);
     min-width: 220px;
     display: none;
-  }
-
-  .comp-similarity.is-open .comp-similarity__tooltip {
-    display: block;
   }
 
   .comp-similarity__tooltip table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.75rem;
+    font-size: 0.9rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     color: var(--gray-600);
+  }
+
+  .comp-similarity__tooltip th,
+  .comp-similarity__tooltip td {
+    padding: 0.25rem 0;
   }
 
   .comp-similarity__tooltip th {
     text-align: left;
     padding-right: var(--space-2);
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .comp-similarity__tooltip td {
     text-align: right;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--gray-900);
+  }
+
+  .comp-similarity__tooltip:before {
+    content: "";
+    position: absolute;
+    bottom: -6px;
+    left: 24px;
+    width: 12px;
+    height: 12px;
+    background: white;
+    transform: rotate(45deg);
+    border-left: 1px solid rgba(39, 39, 42, 0.1);
+    border-top: 1px solid rgba(39, 39, 42, 0.1);
+    z-index: -1;
+  }
+  .comp-similarity[open] .comp-similarity__tooltip {
+    display: block;
   }
 
   /* Grid View */
@@ -738,8 +746,8 @@
         <div class="comp-card">
           <div class="comp-card__header">
             <div class="comp-card__header-gauge">
-              <div class="comp-similarity">
-                <button class="comp-similarity__trigger" type="button" aria-expanded="false">
+              <details class="comp-similarity">
+                <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
                   <div class="comp-similarity__gauge" style="--value: {{ comp.similarity.overall|default_if_none:0 }}%;">
                     <div class="comp-similarity__gauge-inner">
                       <span class="comp-similarity__value">
@@ -751,17 +759,17 @@
                       </span>
                     </div>
                   </div>
-                </button>
-              <div class="comp-similarity__tooltip" role="tooltip">
-                <table>
-                  <tr><th>Time</th><td>{% if comp.similarity.time is not None %}{{ comp.similarity.time }}%{% else %}&mdash;{% endif %}</td></tr>
-                  <tr><th>Proximity</th><td>{% if comp.similarity.proximity is not None %}{{ comp.similarity.proximity }}%{% else %}&mdash;{% endif %}</td></tr>
-                  <tr><th>Size</th><td>{% if comp.similarity.size is not None %}{{ comp.similarity.size }}%{% else %}&mdash;{% endif %}</td></tr>
-                  <tr><th>Quality</th><td>{% if comp.similarity.quality_condition is not None %}{{ comp.similarity.quality_condition }}%{% else %}&mdash;{% endif %}</td></tr>
-                  <tr><th>Land</th><td>{% if comp.similarity.land is not None %}{{ comp.similarity.land }}%{% else %}&mdash;{% endif %}</td></tr>
-                </table>
-              </div>
-              </div>
+                </summary>
+                <div class="comp-similarity__tooltip" role="tooltip">
+                  <table>
+                    <tr><th>Time</th><td>{% if comp.similarity.time is not None %}{{ comp.similarity.time }}%{% else %}&mdash;{% endif %}</td></tr>
+                    <tr><th>Proximity</th><td>{% if comp.similarity.proximity is not None %}{{ comp.similarity.proximity }}%{% else %}&mdash;{% endif %}</td></tr>
+                    <tr><th>Size</th><td>{% if comp.similarity.size is not None %}{{ comp.similarity.size }}%{% else %}&mdash;{% endif %}</td></tr>
+                    <tr><th>Quality</th><td>{% if comp.similarity.quality_condition is not None %}{{ comp.similarity.quality_condition }}%{% else %}&mdash;{% endif %}</td></tr>
+                    <tr><th>Land</th><td>{% if comp.similarity.land is not None %}{{ comp.similarity.land }}%{% else %}&mdash;{% endif %}</td></tr>
+                  </table>
+                </div>
+              </details>
             </div>
             <div class="comp-card__header-content">
               <div>
@@ -817,7 +825,7 @@
 
           {% if advanced_mode %}
             <div class="comp-card__adjustments">
-              <span class="adjustments-label">Adjustments:</span>
+            
               {% if comp.adjustments %}
                 <div class="adjustments-badges">
                   {% for item in comp.adjustments %}
@@ -892,23 +900,6 @@
 
         <div class="comp-card">
           <div class="comp-card__header">
-            <div class="comp-card__header-gauge">
-              <div class="comp-similarity">
-                <button class="comp-similarity__trigger" type="button" aria-expanded="false">
-                  <div class="comp-similarity__gauge" style="--value: {{ comp.similarity.overall|default_if_none:0 }}%;">
-                    <div class="comp-similarity__gauge-inner">
-                      <span class="comp-similarity__value">
-                        {% if comp.similarity.overall is not None %}
-                          {{ comp.similarity.overall }}%
-                        {% else %}
-                          0%
-                        {% endif %}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
             <div class="comp-card__header-content">
               <div>
                 <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
@@ -919,7 +910,6 @@
               </div>
             </div>
           </div>
-
           <div class="comp-card__meta comp-card__meta--grid">
             <span class="comp-card__meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -965,16 +955,7 @@
             {% if comp.adjustments %}
               <details class="comp-card__adjustments comp-card__adjustments--collapsible">
                 <summary class="comp-card__adjustments-summary">
-                  <div class="comp-card__adjustments-summary-row">
-                    <span class="adjustments-label">Adjustments:</span>
-                    <span class="adjustments-summary-text">
-                      {% if comp.adjustments_excerpt %}
-                        {{ comp.adjustments_excerpt|join:" | " }}
-                      {% else %}
-                        No adjustments applied
-                      {% endif %}
-                    </span>
-                  </div>
+                  <span class="adjustments-label">Adjustments</span>
                   <span class="comp-card__adjustments-summary-indicator" aria-hidden="true">
                     <i class="fa-solid fa-chevron-down"></i>
                   </span>
@@ -1207,49 +1188,12 @@
       });
     }
 
-    const similarityContainers = Array.from(document.querySelectorAll('.comp-similarity'));
-    const similarityTriggers = document.querySelectorAll('.comp-similarity__trigger');
+  });
 
-    const closeAllSimilarity = () => {
-      similarityContainers.forEach((container) => {
-        container.classList.remove('is-open');
-        const trigger = container.querySelector('.comp-similarity__trigger');
-        if (trigger) {
-          trigger.setAttribute('aria-expanded', 'false');
-        }
-      });
-    };
-
-    similarityTriggers.forEach((trigger) => {
-      trigger.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const container = trigger.closest('.comp-similarity');
-        if (!container) {
-          return;
-        }
-        const currentlyOpen = container.classList.contains('is-open');
-        closeAllSimilarity();
-        if (!currentlyOpen) {
-          container.classList.add('is-open');
-          trigger.setAttribute('aria-expanded', 'true');
-        }
-      });
-    });
-
-    similarityContainers.forEach((container) => {
-      const tooltip = container.querySelector('.comp-similarity__tooltip');
-      if (tooltip) {
-        tooltip.addEventListener('click', (event) => {
-          event.stopPropagation();
-        });
-      }
-    });
-
-    document.addEventListener('click', () => closeAllSimilarity());
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        closeAllSimilarity();
+  document.addEventListener('click', (event) => {
+    document.querySelectorAll('.comp-similarity[open]').forEach((details) => {
+      if (!details.contains(event.target)) {
+        details.removeAttribute('open');
       }
     });
   });
