@@ -1484,43 +1484,41 @@ def chat(request):
     manager.append_user_message(conversation_id, prompt)
     history_messages = manager.model_history(conversation_id)
 
-    streamer = chat_service.StreamingCompletion(prompt, history=history_messages)
-
     def event_stream():
         yield chat_service.render_stream_event({"type": "conversation", "conversation_id": conversation_id})
         try:
-            for delta in streamer.stream():
-                if delta:
-                    yield chat_service.render_stream_event({"type": "delta", "text": delta})
-        except (chat_service.MissingDependency, chat_service.MissingCredentials) as exc:
-            error_text = str(exc)
-            manager.append_assistant_message(conversation_id, error_text, sources=[])
-            yield chat_service.render_stream_event({"type": "error", "message": error_text})
-        except chat_service.OpenAIError as exc:
-            error_text = str(exc) or "The model was unable to finish the response."
-            manager.append_assistant_message(conversation_id, error_text, sources=[])
-            yield chat_service.render_stream_event({"type": "error", "message": error_text})
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.exception("Chat streaming failed: %s", exc)
-            error_text = "Something went wrong while contacting the language model. Please try again in a moment."
-            manager.append_assistant_message(conversation_id, error_text, sources=[])
-            yield chat_service.render_stream_event({"type": "error", "message": error_text})
-        else:
-            final_text = streamer.full_text or "I wasn't able to craft a response."
+            rag_response = llm.generate_rag_response(prompt, history=history_messages)
+            final_text = (rag_response.get("answer") or "").strip() or "I wasn't able to craft a response."
+            sources = rag_response.get("sources") or []
+            model_name = rag_response.get("model") or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4.1-mini")
+
             manager.append_assistant_message(
                 conversation_id,
                 final_text,
-                sources=streamer.sources,
-                model=streamer.model_name,
+                sources=sources,
+                model=model_name,
             )
             yield chat_service.render_stream_event(
                 {
                     "type": "final",
                     "text": final_text,
-                    "model": streamer.model_name,
-                    "sources": streamer.sources,
+                    "model": model_name,
+                    "sources": sources,
                 }
             )
+        except (llm.MissingDependency, llm.MissingCredentials) as exc:
+            error_text = str(exc)
+            manager.append_assistant_message(conversation_id, error_text, sources=[])
+            yield chat_service.render_stream_event({"type": "error", "message": error_text})
+        except llm.OpenAIError as exc:
+            error_text = str(exc) or "The model was unable to finish the response."
+            manager.append_assistant_message(conversation_id, error_text, sources=[])
+            yield chat_service.render_stream_event({"type": "error", "message": error_text})
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Chat request failed: %s", exc)
+            error_text = "Something went wrong while contacting the language model. Please try again in a moment."
+            manager.append_assistant_message(conversation_id, error_text, sources=[])
+            yield chat_service.render_stream_event({"type": "error", "message": error_text})
 
     response = StreamingHttpResponse(event_stream(), content_type="application/x-ndjson")
     response["Cache-Control"] = "no-cache"
@@ -2712,3 +2710,184 @@ def hood_trend_detail(request, hood_id):
     }
 
     return render(request, "trends/hood_trend_detail.html", context)
+
+
+NEIGHBORHOOD_TRENDS_SEARCH_LIMIT = 15
+NEIGHBORHOOD_TRENDS_MIN_QUERY_LENGTH = 3
+
+
+@require_GET
+def neighborhood_trends_page(request):
+    """
+    Entry point for the Neighborhood Trends tool.
+    """
+    hoods = (
+        NeighborhoodTrend.objects.values("hood_id")
+        .annotate(
+            first_year=Min("value_year"),
+            last_year=Max("value_year"),
+            avg_stability=Avg("stability_score"),
+        )
+        .order_by("hood_id")
+    )
+
+    return render(
+        request,
+        "openskagit/neighborhood_trends_page.html",
+        {"hoods": hoods},
+    )
+
+
+@require_GET
+def neighborhood_trend_data(request, hood_id):
+    """
+    Chart-specific JSON payload with yearly trend arrays.
+    """
+    rows = list(
+        NeighborhoodTrend.objects.filter(hood_id=hood_id).order_by("value_year")
+    )
+    if not rows:
+        empty_series = {
+            "years": [],
+            "median_market_total": [],
+            "median_land_market": [],
+            "median_building": [],
+            "median_tax_amount": [],
+            "yoy_change_total": [],
+            "tax_percent_of_value": [],
+        }
+        return JsonResponse(
+            {
+                "hood_id": hood_id,
+                "years": [],
+                "series": empty_series,
+                "summary": {"first_year": None, "last_year": None, "avg_stability": None},
+            }
+        )
+
+    series = {
+        "median_market_total": [],
+        "median_land_market": [],
+        "median_building": [],
+        "median_tax_amount": [],
+        "yoy_change_total": [],
+        "tax_percent_of_value": [],
+    }
+    stability_values = []
+
+    for row in rows:
+        series["median_market_total"].append(row.median_market_total)
+        series["median_land_market"].append(row.median_land_market)
+        series["median_building"].append(row.median_building)
+        series["median_tax_amount"].append(row.median_tax_amount)
+        series["yoy_change_total"].append(row.yoy_change_total)
+
+        if row.median_market_total and row.median_tax_amount:
+            series["tax_percent_of_value"].append(
+                round(row.median_tax_amount / row.median_market_total * 100, 2)
+            )
+        else:
+            series["tax_percent_of_value"].append(None)
+
+        if row.stability_score is not None:
+            stability_values.append(row.stability_score)
+
+    avg_stability = (
+        round(sum(stability_values) / len(stability_values), 1)
+        if stability_values
+        else None
+    )
+
+    summary = {
+        "first_year": rows[0].value_year,
+        "last_year": rows[-1].value_year,
+        "avg_stability": avg_stability,
+    }
+
+    return JsonResponse(
+        {
+            "hood_id": hood_id,
+            "years": [row.value_year for row in rows],
+            "series": series,
+            "summary": summary,
+        }
+    )
+
+
+@require_GET
+def neighborhood_trend_geom(request, hood_id):
+    """
+    GeoJSON payload for the selected neighborhood polygon.
+    """
+    try:
+        geom_record = NeighborhoodGeom.objects.get(code=hood_id)
+    except NeighborhoodGeom.DoesNotExist:
+        return JsonResponse(
+            {"hood_id": hood_id, "name": None, "geom": None, "centroid": None}
+        )
+
+    geom_obj = getattr(geom_record, "geom_4326", None)
+    centroid_lat, centroid_lon = _centroid_lat_lon(geom_obj)
+
+    return JsonResponse(
+        {
+            "hood_id": hood_id,
+            "name": geom_record.name or geom_record.code,
+            "geom": json.loads(geom_obj.geojson) if geom_obj else None,
+            "centroid": {"lat": centroid_lat, "lng": centroid_lon},
+        }
+    )
+
+
+@require_GET
+def neighborhood_trend_address_search(request):
+    """
+    Address autocomplete for selecting a neighborhood via parcel search.
+    """
+    query = (request.GET.get("q") or "").strip()
+    query_too_short = len(query) < NEIGHBORHOOD_TRENDS_MIN_QUERY_LENGTH
+    results = []
+
+    if not query_too_short:
+        qs = (
+            Parcel.objects.filter(
+                neighborhood_code__isnull=False
+            )
+            .exclude(neighborhood_code__exact="")
+            .exclude(address__isnull=True)
+            .exclude(address__exact="")
+        )
+
+        is_parcel_like = bool(re.match(r"^[Pp]\s*\d+\s*$", query))
+        if is_parcel_like:
+            normalized = query.upper().replace(" ", "")
+            digits_only = re.sub(r"\D", "", query)
+            filters = []
+            if normalized:
+                filters.append(Q(parcel_number__startswith=normalized))
+            if digits_only:
+                filters.append(Q(parcel_number__startswith=f"P{digits_only}"))
+            if filters:
+                qs = qs.filter(functools.reduce(operator.or_, filters))
+        else:
+            starts_with_number = bool(re.match(r"^\s*\d+", query))
+            if starts_with_number:
+                qs = qs.filter(address__istartswith=query)
+            else:
+                qs = qs.filter(address__icontains=query)
+
+        results = (
+            qs.order_by("address")
+            [:NEIGHBORHOOD_TRENDS_SEARCH_LIMIT]
+        )
+
+    return render(
+        request,
+        "openskagit/neighborhood_trends_search_results.html",
+        {
+            "query": query,
+            "query_too_short": query_too_short,
+            "results": results,
+            "min_search_length": NEIGHBORHOOD_TRENDS_MIN_QUERY_LENGTH,
+        },
+    )

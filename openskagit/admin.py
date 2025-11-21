@@ -215,3 +215,55 @@ class NeighborhoodTrendAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     list_per_page = 50
+
+# openskagit/admin.py (or wherever you're registering models)
+
+from django.contrib import admin
+from .models import Parcel
+
+
+@admin.register(Parcel)
+class ParcelAdmin(admin.ModelAdmin):
+    """
+    Admin config for Parcel records.
+    Keeps the list view fast + searchable for day-to-day work.
+    """
+
+    # Columns shown in the main changelist
+    list_display = (
+        "parcel_number",
+        "address",
+        "neighborhood_code",
+        "land_use_code",
+        "property_type",
+        "created_at",
+        "updated_at",
+    )
+
+    # Quick filters on the right-hand side
+    list_filter = (
+        "property_type",
+        "neighborhood_code",
+        "land_use_code",
+        "created_at",
+    )
+
+    # Search box at the top
+    search_fields = (
+        "parcel_number",
+        "address",
+        "neighborhood_code",
+        "land_use_code",
+    )
+
+    # Make timestamps read-only so they don't get edited by hand
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+    # Default ordering in the admin list (model Meta also enforces this at DB/queryset level)
+    ordering = ("parcel_number",)
+
+    # Optional: how many rows per page in the changelist
+    list_per_page = 100

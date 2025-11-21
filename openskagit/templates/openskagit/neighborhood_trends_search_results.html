@@ -1,0 +1,29 @@
+{% load humanize %}
+{% if query_too_short %}
+  <div class="empty-results text-center px-4 py-6 text-xs text-neutral-500">
+    Enter at least {{ min_search_length }} characters to search
+  </div>
+{% elif results %}
+  {% for parcel in results %}
+    <button
+      type="button"
+      class="autocomplete-result search-result"
+      data-hood-code="{{ parcel.neighborhood_code }}"
+      data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
+      data-parcel="{{ parcel.parcel_number }}"
+    >
+      <div class="result-address">{{ parcel.address|default:"Address unavailable" }}</div>
+      <div class="result-parcel">
+        Parcel {{ parcel.parcel_number }} · {{ parcel.neighborhood_code }}
+      </div>
+    </button>
+  {% endfor %}
+{% elif query %}
+  <div class="empty-results text-center px-4 py-6 text-xs text-neutral-500">
+    No results were found for “{{ query }}”. Try another street or parcel number.
+  </div>
+{% else %}
+  <div class="empty-results text-center px-4 py-6 text-xs text-neutral-500">
+    Start typing your address, parcel number, or POI.
+  </div>
+{% endif %}

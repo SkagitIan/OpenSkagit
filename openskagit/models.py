@@ -81,6 +81,7 @@ class Parcel(models.Model):
     parcel_number = models.CharField(max_length=20, unique=True, db_index=True)
     address = models.CharField(max_length=255, blank=True, null=True)  # includes city & ZIP
     neighborhood_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    neighborhood_description = models.CharField(max_length=255,blank=True,null=True,)
     land_use_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # e.g. 110, 112
     property_type = models.CharField(
         max_length=1,
