@@ -1,0 +1,98 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Neighborhood Trends</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+        :root {
+            --purple: #B993D6;
+            --orange: #f08000;
+            --teal:   #58B09C;
+            --ink:    #49475B;
+            --black:  #14080E;
+        }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f5f7;
+            color: var(--black);
+            margin: 0;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: 100vh;
+        }
+        .sidebar {
+            border-right: 1px solid #ddd;
+            background: white;
+        }
+        .sidebar-header {
+            padding: 1rem;
+            background: var(--purple);
+            color: white;
+            font-weight: 600;
+        }
+        .hood-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .hood-item {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .hood-item:hover {
+            background: #f0ebff;
+        }
+        .hood-meta {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        .content {
+            padding: 1rem 1.5rem;
+        }
+        .placeholder {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            Neighborhood Trends
+        </div>
+        <ul class="hood-list">
+            {% for h in hoods %}
+            <li class="hood-item"
+                hx-get="{% url 'hood_trend_detail' h.hood_id %}"
+                hx-target="#hood-detail"
+                hx-push-url="true">
+                <div>
+                    <strong>{{ h.hood_id }}</strong>
+                </div>
+                <div class="hood-meta">
+                    {{ h.first_year }}–{{ h.last_year }} ·
+                    {{ h.n_years }} years ·
+                    Stability: {{ h.avg_stability|floatformat:1 }}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </aside>
+
+    <main class="content">
+        <div id="hood-detail" class="placeholder">
+            Select a hood on the left to see its trend.
+        </div>
+    </main>
+</div>
+</body>
+</html>
