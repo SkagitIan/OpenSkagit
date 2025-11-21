@@ -279,6 +279,19 @@
     clearPlaceholders() {
       if (!this.messagesEl) return;
       this.messagesEl.querySelectorAll("[data-chat-placeholder]").forEach((node) => node.remove());
+      this.switchToConversationMode();
+    }
+
+    switchToConversationMode() {
+      const heroSection = this.root.querySelector("section:not([id])");
+      const messagesWrap = this.root.querySelector("#messages-wrap");
+      const footer = this.root.querySelector("[data-chat-footer]");
+
+      if (heroSection && messagesWrap && footer) {
+        heroSection.classList.add("hidden");
+        messagesWrap.classList.remove("hidden");
+        footer.classList.remove("hidden");
+      }
     }
 
     async sendPrompt(prompt) {
