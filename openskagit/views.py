@@ -1572,39 +1572,6 @@ def documents_upload(request):
     return HttpResponse(guidance)
 
 
-@require_POST
-def chat_completion(request):
-    """Proxy chat requests to the OpenAI Responses API with pgvector retrieval."""
-    try:
-        payload = json.loads(request.body.decode("utf-8")) if request.body else {}
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
-
-    message = (payload.get("message") or "").strip()
-    history = payload.get("history") or []
-
-    if not message:
-        return JsonResponse({"error": "Message is required."}, status=400)
-
-    try:
-        result = llm.generate_rag_response(message, history=history)
-    except llm.MissingDependency as exc:
-        return JsonResponse({"error": str(exc)}, status=500)
-    except llm.MissingCredentials as exc:
-        return JsonResponse({"reply": str(exc)}, status=200)
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.exception("OpenAI chat completion failed: %s", exc)
-        return JsonResponse({"error": "Unable to reach OpenAI. Verify credentials or try again."}, status=502)
-
-    return JsonResponse(
-        {
-            "reply": result.get("answer"),
-            "model": result.get("model"),
-            "sources": result.get("sources"),
-        }
-    )
-
-
 @staff_member_required
 def api_docs(request):
     """

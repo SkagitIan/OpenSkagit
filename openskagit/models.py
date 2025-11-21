@@ -345,3 +345,60 @@ class ParcelHistory(models.Model):
 
     def __str__(self):
         return self.parcel_number
+
+
+class Conversation(models.Model):
+    """
+    Stores chat conversations with titles and metadata.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session_key = models.CharField(max_length=255, db_index=True, null=True, blank=True)
+    title = models.CharField(max_length=255, default="New conversation")
+    context_data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "conversations"
+        ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["-updated_at"]),
+            models.Index(fields=["session_key", "-updated_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.id})"
+
+
+class ConversationMessage(models.Model):
+    """
+    Stores individual messages within a conversation.
+    """
+    id = models.BigAutoField(primary_key=True)
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name="messages"
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=[
+            ("user", "User"),
+            ("assistant", "Assistant"),
+            ("system", "System"),
+        ]
+    )
+    content = models.TextField()
+    sources = models.JSONField(default=list, blank=True)
+    model = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "conversation_messages"
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["conversation", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.role}: {self.content[:50]}"

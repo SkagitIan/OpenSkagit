@@ -26,7 +26,6 @@ urlpatterns = [
     path('chat/new', openskagit_views.chat_new, name='chat-new'),
     path('documents/upload/', openskagit_views.documents_upload, name='documents-upload'),
     path('admin/', admin.site.urls),
-    path("api/chat/", openskagit_views.chat_completion, name="api-chat"),
     path("api/dashboard/", openskagit_views.api_dashboard, name="api-dashboard"),
     path("api/docs/", openskagit_views.api_docs, name="api-docs"),
     path("api/sales/top25/", openskagit_views.top_sales_widget, name="top-sales-partial"),
