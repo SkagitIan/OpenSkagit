@@ -11,6 +11,7 @@ This module wraps:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -42,6 +43,8 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     SentenceTransformer = None  # type: ignore
 
 from .models import Assessor
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables once when Django starts.
 load_dotenv()
@@ -232,15 +235,23 @@ def generate_rag_response(
     if not prompt.strip():
         raise ValueError("Prompt cannot be empty.")
 
-    query_vector = embed_text(prompt)
-    parcels = search_similar_parcels(query_vector, limit=limit)
-    context_rows = build_context_rows(parcels)
+    parcels: List[RetrievedParcel] = []
+    context_rows = ""
+    try:
+        query_vector = embed_text(prompt)
+        parcels = search_similar_parcels(query_vector, limit=limit)
+        context_rows = build_context_rows(parcels)
+    except MissingDependency as exc:
+        logger.warning(
+            "Embedding model unavailable; generating response without semantic context: %s",
+            exc,
+        )
 
     client = get_openai_client()
     model_name = model or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4.1-mini")
 
     response = client.responses.create(
-        model=model_name,
+        model="gpt-5-mini",
         input=build_response_input(prompt, context_rows, history=history),
         temperature=0.2,
     )

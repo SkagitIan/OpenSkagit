@@ -340,10 +340,6 @@
         suggestionsEl.style.display = 'grid';
       }
 
-      if (toolsSection) {
-        toolsSection.style.display = 'none';
-      }
-
       if (this.messagesEl) {
         this.messagesEl.style.display = 'none';
       }

@@ -14,6 +14,9 @@ import os
 import sys
 import netifaces
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
@@ -72,6 +75,8 @@ LEAFLET_CONFIG = {
     "MAX_ZOOM": 19,
     "SCALE": "metric",
 }
+
+CESIUM_ION_TOKEN = os.getenv("CESIUM_API_KEY")
 
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)

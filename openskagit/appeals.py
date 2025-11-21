@@ -5,11 +5,11 @@ import logging
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from django.core.cache import cache
+from django.contrib.gis.geos import Point
 from django.utils import timezone
 
 from . import cma
-from .models import AssessmentRoll, Assessor
+from .models import AssessmentRoll, Assessor, ComparableCache
 from .neighborhood import get_neighborhood_snapshot
 
 
@@ -52,6 +52,189 @@ SECONDARY_RADIUS_M = 4828  # meters (~3 miles)
 INITIAL_COMPARABLE_LIMIT = 7
 EXTENDED_COMPARABLE_LIMIT = 15
 COMPARABLES_CACHE_TTL = 5 * 60
+
+
+def _decimal_to_str(value: Optional[Decimal]) -> Optional[str]:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _deserialize_decimal(value: Any) -> Optional[Decimal]:
+    if value in (None, "", "null"):
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _serialize_date(value: Optional[dt.date]) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, dt.date):
+        return value.isoformat()
+    return str(value)
+
+
+def _deserialize_date(value: Any) -> Optional[dt.date]:
+    if value in (None, "", "null"):
+        return None
+    if isinstance(value, dt.date):
+        return value
+    try:
+        return dt.date.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _int_or_none(value: Any) -> Optional[int]:
+    if value in (None, "", "null"):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_or_none(value: Any) -> Optional[float]:
+    if value in (None, "", "null"):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _centroid_lat_lon(geom) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Grab a representative latitude/longitude from the geometry or its centroid.
+    """
+    if geom is None:
+        return None, None
+    centroid = getattr(geom, "centroid", None)
+    if centroid is not None:
+        return getattr(centroid, "y", None), getattr(centroid, "x", None)
+    return getattr(geom, "y", None), getattr(geom, "x", None)
+
+
+def _snapshot_payload(snapshot: cma.PropertySnapshot) -> Dict[str, Any]:
+    metadata = dict(snapshot.metadata) if isinstance(snapshot.metadata, dict) else {}
+    lat, lon = _centroid_lat_lon(snapshot.geom)
+    return {
+        "parcel_number": snapshot.parcel_number,
+        "address": snapshot.address,
+        "sale_price": _decimal_to_str(snapshot.sale_price),
+        "sale_date": _serialize_date(snapshot.sale_date),
+        "property_type": snapshot.property_type,
+        "living_area": _decimal_to_str(snapshot.living_area),
+        "lot_acres": _decimal_to_str(snapshot.lot_acres),
+        "bedrooms": _decimal_to_str(snapshot.bedrooms),
+        "bathrooms": _decimal_to_str(snapshot.bathrooms),
+        "year_built": snapshot.year_built,
+        "effective_year_built": snapshot.effective_year_built,
+        "garage_sqft": _decimal_to_str(snapshot.garage_sqft),
+        "acres": _decimal_to_str(snapshot.acres),
+        "assessed_value": _decimal_to_str(snapshot.assessed_value),
+        "metadata": metadata,
+        "latitude": lat,
+        "longitude": lon,
+    }
+
+
+def _score_payload(score: Optional[cma.ComparableScore]) -> Optional[Dict[str, Any]]:
+    if score is None:
+        return None
+    return {
+        "location_score": _decimal_to_str(score.location_score),
+        "time_score": _decimal_to_str(score.time_score),
+        "physical_score": _decimal_to_str(score.physical_score),
+        "total_score": _decimal_to_str(score.total_score),
+    }
+
+
+def _comparable_payload(comp: cma.ComparableResult) -> Dict[str, Any]:
+    return {
+        "snapshot": _snapshot_payload(comp.snapshot),
+        "sale_price": _decimal_to_str(comp.sale_price),
+        "sale_date": _serialize_date(comp.sale_date),
+        "assessed_value": _decimal_to_str(comp.assessed_value),
+        "distance_meters": _float_or_none(comp.distance_meters),
+        "distance_miles": _decimal_to_str(comp.distance_miles),
+        "difference_flags": comp.difference_flags,
+        "inclusion_rank": comp.inclusion_rank,
+        "score": _score_payload(comp.score),
+    }
+
+
+def _snapshot_from_payload(payload: Dict[str, Any]) -> cma.PropertySnapshot:
+    metadata = dict(payload.get("metadata") or {})
+    latitude = _float_or_none(payload.get("latitude"))
+    longitude = _float_or_none(payload.get("longitude"))
+    geom = None
+    if latitude is not None and longitude is not None:
+        try:
+            geom = Point(longitude, latitude, srid=4326)
+        except (TypeError, ValueError):
+            geom = None
+    if latitude is not None:
+        metadata.setdefault("latitude", latitude)
+    if longitude is not None:
+        metadata.setdefault("longitude", longitude)
+    return cma.PropertySnapshot(
+        parcel_number=payload.get("parcel_number") or "",
+        address=payload.get("address") or "",
+        sale_price=_deserialize_decimal(payload.get("sale_price")),
+        sale_date=_deserialize_date(payload.get("sale_date")),
+        property_type=payload.get("property_type"),
+        living_area=_deserialize_decimal(payload.get("living_area")),
+        lot_acres=_deserialize_decimal(payload.get("lot_acres")),
+        bedrooms=_deserialize_decimal(payload.get("bedrooms")),
+        bathrooms=_deserialize_decimal(payload.get("bathrooms")),
+        year_built=_int_or_none(payload.get("year_built")),
+        effective_year_built=_int_or_none(payload.get("effective_year_built")),
+        garage_sqft=_deserialize_decimal(payload.get("garage_sqft")),
+        acres=_deserialize_decimal(payload.get("acres")),
+        assessed_value=_deserialize_decimal(payload.get("assessed_value")),
+        geom=geom,
+        metadata=metadata,
+    )
+
+
+def _score_from_payload(payload: Optional[Dict[str, Any]]) -> Optional[cma.ComparableScore]:
+    if not isinstance(payload, dict):
+        return None
+    location = _deserialize_decimal(payload.get("location_score"))
+    time_score = _deserialize_decimal(payload.get("time_score"))
+    physical = _deserialize_decimal(payload.get("physical_score"))
+    total = _deserialize_decimal(payload.get("total_score"))
+    if location is None and time_score is None and physical is None:
+        return None
+    return cma.ComparableScore(
+        location_score=location or Decimal("0"),
+        time_score=time_score or Decimal("0"),
+        physical_score=physical or Decimal("0"),
+        total_score=total or Decimal("0"),
+    )
+
+
+def _comparable_from_payload(payload: Dict[str, Any]) -> cma.ComparableResult:
+    return cma.ComparableResult(
+        snapshot=_snapshot_from_payload(payload.get("snapshot") or {}),
+        sale_price=_deserialize_decimal(payload.get("sale_price")),
+        sale_date=_deserialize_date(payload.get("sale_date")),
+        assessed_value=_deserialize_decimal(payload.get("assessed_value")),
+        distance_meters=_float_or_none(payload.get("distance_meters")),
+        distance_miles=_deserialize_decimal(payload.get("distance_miles")),
+        difference_flags=payload.get("difference_flags") or {},
+        inclusion_rank=_int_or_none(payload.get("inclusion_rank")) or 0,
+        score=_score_from_payload(payload.get("score")),
+    )
+
+
+def _cache_entry_valid(entry: ComparableCache) -> bool:
+    expires_at = entry.last_refreshed + dt.timedelta(seconds=COMPARABLES_CACHE_TTL)
+    return timezone.now() < expires_at
 
 
 def _coerce_percent(value: Any) -> Optional[float]:
@@ -254,17 +437,38 @@ def _months_ago(months: int) -> dt.date:
     return dt.date(year if month <= today.month else year - 1, month, 1)
 
 
-def _cache_key_for_comps(subject: cma.PropertySnapshot, radius_meters: float, limit: int) -> str:
-    roll_year = _subject_roll_year(subject) or 0
-    return f"appeal_comps:{subject.parcel_number}:{roll_year}:{int(radius_meters)}:{limit}"
-
-
 def _cached_comparables(subject: cma.PropertySnapshot, radius_meters: float, limit: int) -> List[cma.ComparableResult]:
-    key = _cache_key_for_comps(subject, radius_meters, limit)
-    comps = cache.get(key)
-    if comps is None:
-        comps = choose_citizen_comps(subject, radius_meters=radius_meters, limit=limit)
-        cache.set(key, comps, COMPARABLES_CACHE_TTL)
+    roll_year = _subject_roll_year(subject) or 0
+    entry = ComparableCache.objects.filter(
+        parcel_number=subject.parcel_number,
+        roll_year=roll_year,
+        radius_meters=int(radius_meters),
+        limit=limit,
+    ).first()
+    if entry and _cache_entry_valid(entry):
+        stored = entry.comparables or []
+        if not stored:
+            return []
+        deserialized: List[cma.ComparableResult] = []
+        for payload in stored:
+            if not isinstance(payload, dict):
+                continue
+            try:
+                deserialized.append(_comparable_from_payload(payload))
+            except Exception:
+                deserialized = []
+                break
+        if deserialized:
+            return deserialized
+    comps = choose_citizen_comps(subject, radius_meters=radius_meters, limit=limit)
+    payload_list = [_comparable_payload(comp) for comp in comps]
+    ComparableCache.objects.update_or_create(
+        parcel_number=subject.parcel_number,
+        roll_year=roll_year,
+        radius_meters=int(radius_meters),
+        limit=limit,
+        defaults={"comparables": payload_list},
+    )
     return comps
 
 

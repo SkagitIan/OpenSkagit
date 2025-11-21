@@ -81,6 +81,19 @@ def get_item(dictionary, key):
 
 
 @register.filter
+def get_attr(value, attr_name):
+    """
+    Safely retrieve an attribute from an object for templates.
+    """
+    if value is None or not attr_name:
+        return None
+    try:
+        return getattr(value, attr_name, None)
+    except Exception:
+        return None
+
+
+@register.filter
 def replace(value, arg):
     """
     Replace a substring with another. Usage: {{ value|replace:"old,new" }}

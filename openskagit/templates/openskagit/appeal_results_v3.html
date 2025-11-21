@@ -104,8 +104,7 @@
 
   .neighborhood-card__front {
     position: relative;
-    padding: var(--space-6);
-    background: white;
+    padding: var(--space-3);
   }
 
   .neighborhood-card__back {
@@ -172,7 +171,7 @@
   .gauge-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: var(--space-6);
+    gap: var(--space-3);
     margin-top: var(--space-8);
   }
 
@@ -416,10 +415,8 @@
     <div>
       <h2 class="property-hero__title">{{ subject.address|default:"Address unavailable" }}</h2>
       <div class="property-hero__subtitle">
-        <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-        </svg>
-        Parcel {{ subject.parcel_number }}
+        <i class="fa-solid fa-house-chimney me-2"></i>
+         {{ subject.parcel_number }}
       </div>
     </div>
   </div>
@@ -431,7 +428,7 @@
       —
     {% endif %}
   </div>
-  <div class="property-hero__label">Assessed Value</div>
+  <div class="property-hero__label">Total Market Value</div>
 
   <div class="property-stats" style="margin-top: var(--space-6);">
     <div class="property-stat">
@@ -471,12 +468,7 @@
       <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-8); justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: var(--space-3);">
           <div style="width: 2.5rem; height: 2.5rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe)); color: white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="1" x2="12" y2="23"></line>
-              <line x1="17" y1="5" x2="9.5" y2="5"></line>
-              <line x1="17" y1="13" x2="9.5" y2="13"></line>
-              <path d="M9.5 5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
+<i class="fa-solid fa-mountain-city"></i>
           </div>
           <div>
             <h3 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900); margin: 0;">Neighborhood Comparison</h3>

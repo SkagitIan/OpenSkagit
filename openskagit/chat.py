@@ -236,10 +236,19 @@ class StreamingCompletion:
         self.full_text: str = ""
 
     def _stream_events(self) -> Iterator[str]:
-        query_vector = llm.embed_text(self.prompt)
-        parcels = llm.search_similar_parcels(query_vector, limit=5)
-        self.sources = [parcel.to_metadata() for parcel in parcels]
-        context_rows = llm.build_context_rows(parcels)
+        parcels: List[llm.RetrievedParcel] = []
+        context_rows = ""
+        try:
+            query_vector = llm.embed_text(self.prompt)
+            parcels = llm.search_similar_parcels(query_vector, limit=5)
+            self.sources = [parcel.to_metadata() for parcel in parcels]
+            context_rows = llm.build_context_rows(parcels)
+        except MissingDependency as exc:
+            self.sources = []
+            logger.warning(
+                "Embedding model unavailable for streaming responses; continuing without retrieval context: %s",
+                exc,
+            )
 
         client = llm.get_openai_client()
         stream_manager = client.responses.stream(
