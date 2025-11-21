@@ -30,9 +30,21 @@
       box-sizing: border-box;
     }
 
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      background: var(--os-off-white);
+      background: linear-gradient(135deg, #f8f9fa 0%, #f0f4f3 50%, #f5f7f6 100%);
       color: var(--os-text);
       line-height: 1.6;
       min-height: 100vh;
@@ -103,8 +115,18 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 3rem 1.5rem;
-      max-width: 1200px;
+      width: 100%;
+      position: relative;
+    }
+
+    .hero-mode {
+      min-height: calc(100vh - 80px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+      max-width: 900px;
       width: 100%;
       margin: 0 auto;
     }
@@ -112,119 +134,228 @@
     .hero {
       text-align: center;
       margin-bottom: 3rem;
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .hero-title {
-      font-size: 2.5rem;
-      font-weight: 700;
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 800;
       color: var(--os-charcoal);
-      margin-bottom: 1rem;
-      letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+    }
+
+    .hero-gradient-text {
+      background: linear-gradient(135deg, var(--os-sage), var(--os-teal));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .hero-subtitle {
-      font-size: 1.125rem;
+      font-size: clamp(1.125rem, 2vw, 1.375rem);
       color: var(--os-warm-gray);
-      max-width: 600px;
-      margin: 0 auto 2rem;
+      max-width: 650px;
+      margin: 0 auto;
       line-height: 1.7;
+      font-weight: 400;
     }
 
     .chatbot-section {
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      transition: all 0.3s ease;
+    }
+
+    .chatbot-section--hero {
+      animation: scaleIn 0.6s ease-out 0.3s both;
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .hero-mode .chatbot-section {
+      padding: 0;
+    }
+
+    .conversation-mode {
+      padding: 2rem 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .conversation-mode .chatbot-section {
       background: white;
       border-radius: 16px;
-      padding: 2.5rem;
+      padding: 2rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
-      margin: 0 auto 3rem;
       border: 1px solid var(--os-light-gray);
-      width: min(720px, 100%);
-    }
-
-    .chatbot-label {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--os-warm-gray);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .ai-badge {
-      background: linear-gradient(135deg, var(--os-sage-light), var(--os-teal-light));
-      color: white;
-      padding: 0.25rem 0.625rem;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.03em;
     }
 
     .chat-input-wrapper {
       position: relative;
-      margin-bottom: 1.5rem;
+      width: 100%;
+    }
+
+    .hero-mode .chat-input-wrapper {
+      margin-bottom: 2rem;
+    }
+
+    .chat-input-container {
+      background: white;
+      border: 2px solid var(--os-light-gray);
+      border-radius: 24px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .hero-mode .chat-input-container {
+      border-radius: 28px;
+      box-shadow: 0 8px 32px rgba(122, 157, 122, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .chat-input-container:focus-within {
+      border-color: var(--os-teal);
+      box-shadow: 0 8px 32px rgba(91, 154, 153, 0.18), 0 0 0 4px rgba(91, 154, 153, 0.08);
     }
 
     .chat-input {
       width: 100%;
-      padding: 1.25rem 4.5rem 1.25rem 1.25rem;
-      font-size: 1.125rem;
-      border: 2px solid var(--os-light-gray);
-      border-radius: 12px;
-      background: var(--os-off-white);
+      padding: 1.5rem 1.75rem;
+      font-size: 1.0625rem;
+      border: none;
+      background: transparent;
       color: var(--os-text);
       transition: all 0.2s ease;
       resize: none;
       font-family: inherit;
-      line-height: 1.5;
+      line-height: 1.6;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .hero-mode .chat-input {
+      padding: 2rem 2.25rem;
+      font-size: 1.125rem;
+      min-height: 120px;
     }
 
     .chat-input:focus {
       outline: none;
-      border-color: var(--os-sage);
-      background: white;
-      box-shadow: 0 0 0 3px rgba(122, 157, 122, 0.1);
     }
 
     .chat-input::placeholder {
       color: var(--os-warm-gray);
+      opacity: 0.8;
     }
 
-    .chat-submit {
-      position: absolute;
-      right: 0.75rem;
-      bottom: 0.75rem;
-      background: linear-gradient(135deg, var(--os-sage), var(--os-teal));
-      color: white;
+    .chat-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.875rem 1.75rem 1.25rem;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .hero-mode .chat-actions {
+      padding: 1rem 2.25rem 1.5rem;
+    }
+
+    .chat-actions-left {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .chat-action-btn {
+      background: none;
       border: none;
-      width: 48px;
-      height: 48px;
-      border-radius: 10px;
+      color: var(--os-warm-gray);
       cursor: pointer;
+      padding: 0.5rem;
+      border-radius: 8px;
+      transition: all 0.2s ease;
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .chat-action-btn:hover {
+      background: var(--os-off-white);
+      color: var(--os-sage-dark);
+    }
+
+    .chat-action-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .chat-submit {
+      background: linear-gradient(135deg, var(--os-sage), var(--os-teal));
+      color: white;
+      border: none;
+      padding: 0.75rem 1.75rem;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9375rem;
+      font-weight: 600;
       transition: all 0.2s ease;
-      box-shadow: 0 2px 6px rgba(122, 157, 122, 0.3);
+      box-shadow: 0 2px 8px rgba(122, 157, 122, 0.3);
     }
 
-    .chat-submit:hover {
+    .hero-mode .chat-submit {
+      padding: 0.875rem 2rem;
+      font-size: 1rem;
+      border-radius: 14px;
+    }
+
+    .chat-submit:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(122, 157, 122, 0.4);
+      box-shadow: 0 6px 20px rgba(122, 157, 122, 0.4);
     }
 
-    .chat-submit:active {
+    .chat-submit:active:not(:disabled) {
       transform: translateY(0);
     }
 
-    .chat-submit svg {
-      width: 24px;
-      height: 24px;
+    .chat-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
-    .chatbot-header {
+    .chat-submit svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .hero-mode .chatbot-header {
+      display: none;
+    }
+
+    .conversation-mode .chatbot-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -264,6 +395,8 @@
 
     .chat-messages-panel {
       min-height: 220px;
+      max-height: 500px;
+      overflow-y: auto;
       background: rgba(247, 246, 244, 0.9);
       border-radius: 14px;
       border: 1px solid var(--os-light-gray);
@@ -271,11 +404,80 @@
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .hero-mode .chat-messages-panel {
+      display: none;
+    }
+
+    .suggestion-pills {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .hero-mode .suggestion-pills {
+      animation: fadeInUp 0.6s ease-out 0.5s both;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .conversation-mode .suggestion-pills {
+      display: none;
+    }
+
+    .suggestion-pill {
+      background: white;
+      border: 2px solid var(--os-light-gray);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .suggestion-pill:hover {
+      border-color: var(--os-sage);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(122, 157, 122, 0.15);
+    }
+
+    .suggestion-pill-icon {
+      font-size: 1.75rem;
+      flex-shrink: 0;
+    }
+
+    .suggestion-pill-text {
+      font-size: 0.9375rem;
+      color: var(--os-text);
+      line-height: 1.5;
+      font-weight: 500;
     }
 
 
     .tools-section {
-      margin-bottom: 3rem;
+      padding: 3rem 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .hero-mode .tools-section {
+      display: none;
     }
 
     .section-title {
@@ -446,17 +648,43 @@
       color: var(--os-sage);
     }
 
+    @media (max-width: 768px) {
+      .suggestion-pills {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-mode {
+        min-height: auto;
+        padding: 3rem 1.5rem;
+      }
+
+      .hero {
+        margin-bottom: 2rem;
+      }
+    }
+
     @media (max-width: 640px) {
       .hero-title {
         font-size: 2rem;
       }
 
-      .chatbot-section {
-        padding: 1.5rem;
+      .hero-subtitle {
+        font-size: 1.0625rem;
       }
 
-      .main {
-        padding: 2rem 1rem;
+      .hero-mode .chat-input {
+        min-height: 80px;
+        padding: 1.5rem 1.5rem;
+        font-size: 1rem;
+      }
+
+      .hero-mode .chat-actions {
+        padding: 0.75rem 1.5rem 1rem;
+      }
+
+      .hero-mode .chat-submit {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9375rem;
       }
     }
 
@@ -505,65 +733,97 @@
     </div>
   </header>
 
-  <main class="main">
-    <div class="hero">
-      <h1 class="hero-title">Discover Skagit County Data</h1>
-      <p class="hero-subtitle">
-        Ask questions, explore property records, analyze trends, and access civic information with AI-powered assistance.
-      </p>
-    </div>
-
-    <section
-      class="chatbot-section"
-      data-chat-root
-      data-chat-style="portal"
-      data-send-url="{% url 'chat' %}"
-      data-history-url="{% url 'chat-history' %}"
-      data-new-url="{% url 'chat-new' %}"
-      data-conversation-id="{{ conversation_id }}"
-      data-initial-prompt="{{ initial_prompt|default:''|escape }}"
-    >
-      <div class="chatbot-header">
-        <p class="chatbot-title">Ask me anything</p>
-        <button type="button" class="chatbot-reset" data-chat-reset>New conversation</button>
+  <main class="main hero-mode" data-chat-mode="hero">
+    <div class="hero-mode">
+      <div class="hero">
+        <h1 class="hero-title">
+          Discover <span class="hero-gradient-text">Skagit County</span> Data
+        </h1>
+        <p class="hero-subtitle">
+          Ask questions, explore property records, analyze trends, and access civic information with AI-powered assistance.
+        </p>
       </div>
 
-      <div class="chat-window">
-        <div id="messages" class="chat-messages-panel" data-chat-messages data-chat-scroll>
-          {% if messages %}
-            {% for m in messages %}
-              {% include "partials/message.html" with role=m.role content=m.content sources=m.sources %}
-            {% endfor %}
-          {% else %}
-            {% include "partials/empty_state.html" %}
-          {% endif %}
+      <section
+        class="chatbot-section chatbot-section--hero"
+        data-chat-root
+        data-chat-style="portal"
+        data-send-url="{% url 'chat' %}"
+        data-history-url="{% url 'chat-history' %}"
+        data-new-url="{% url 'chat-new' %}"
+        data-conversation-id="{{ conversation_id }}"
+        data-initial-prompt="{{ initial_prompt|default:''|escape }}"
+      >
+        <div class="chatbot-header">
+          <p class="chatbot-title">Ask me anything</p>
+          <button type="button" class="chatbot-reset" data-chat-reset>New conversation</button>
         </div>
 
-        <form id="chat-form" class="chat-input-wrapper" data-chat-form method="post">
-          {% csrf_token %}
-          {% if conversation_id %}
-            <input type="hidden" name="conversation_id" value="{{ conversation_id }}" data-chat-conversation-input>
-          {% else %}
-            <input type="hidden" name="conversation_id" value="" data-chat-conversation-input>
-          {% endif %}
-          <label class="sr-only" for="prompt">Ask a question</label>
-          <textarea
-            id="prompt"
-            name="prompt"
-            rows="1"
-            placeholder="Search property records, ask about tax assessments, or explore county data..."
-            class="chat-input"
-            required
-            oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"
-          ></textarea>
-          <button type="submit" class="chat-submit" aria-label="Send message">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-          </button>
-        </form>
-      </div>
-    </section>
+        <div class="chat-window">
+          <div id="messages" class="chat-messages-panel" data-chat-messages data-chat-scroll>
+            {% if messages %}
+              {% for m in messages %}
+                {% include "partials/message.html" with role=m.role content=m.content sources=m.sources %}
+              {% endfor %}
+            {% endif %}
+          </div>
+
+          <form id="chat-form" class="chat-input-wrapper" data-chat-form method="post">
+            {% csrf_token %}
+            {% if conversation_id %}
+              <input type="hidden" name="conversation_id" value="{{ conversation_id }}" data-chat-conversation-input>
+            {% else %}
+              <input type="hidden" name="conversation_id" value="" data-chat-conversation-input>
+            {% endif %}
+            <div class="chat-input-container">
+              <label class="sr-only" for="prompt">Ask a question</label>
+              <textarea
+                id="prompt"
+                name="prompt"
+                rows="3"
+                placeholder="What would you like to know about Skagit County?"
+                class="chat-input"
+                required
+              ></textarea>
+              <div class="chat-actions">
+                <div class="chat-actions-left">
+                  <button type="button" class="chat-action-btn" aria-label="Attach file" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                  </button>
+                </div>
+                <button type="submit" class="chat-submit" aria-label="Send message">
+                  <span>Send</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div class="suggestion-pills" data-suggestions>
+            <button type="button" class="suggestion-pill" data-chat-suggestion="What's the average home value in Mount Vernon?">
+              <span class="suggestion-pill-icon">🏘️</span>
+              <span class="suggestion-pill-text">What's the average home value in Mount Vernon?</span>
+            </button>
+            <button type="button" class="suggestion-pill" data-chat-suggestion="Show me recent sales near Anacortes">
+              <span class="suggestion-pill-icon">📊</span>
+              <span class="suggestion-pill-text">Show me recent sales near Anacortes</span>
+            </button>
+            <button type="button" class="suggestion-pill" data-chat-suggestion="How are property taxes calculated?">
+              <span class="suggestion-pill-icon">💰</span>
+              <span class="suggestion-pill-text">How are property taxes calculated?</span>
+            </button>
+            <button type="button" class="suggestion-pill" data-chat-suggestion="Compare my property to similar homes">
+              <span class="suggestion-pill-icon">⚖️</span>
+              <span class="suggestion-pill-text">Compare my property to similar homes</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <div class="tools-section">
       <h2 class="section-title">Tools & Reports</h2>
