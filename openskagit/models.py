@@ -342,6 +342,10 @@ class ParcelHistory(models.Model):
     parcel_number = models.CharField(max_length=20, unique=True)
     rows = models.JSONField(default=list)      # list of dicts (history rows)
     scraped_at = models.DateTimeField(auto_now=True)
+    neighborhood_code = models.CharField(
+        max_length=20, blank=True, null=True, db_index=True
+    )
+    roll_year = models.IntegerField(blank=True, null=True, db_index=True)
 
     def __str__(self):
         return self.parcel_number
@@ -402,3 +406,48 @@ class ConversationMessage(models.Model):
 
     def __str__(self):
         return f"{self.role}: {self.content[:50]}"
+
+# openskagit/models.py
+
+from django.db import models
+
+class NeighborhoodTrend(models.Model):
+    """
+    Yearly aggregated value/tax history for each neighborhood (hood_id).
+
+    Derived entirely from ParcelHistory; safe to rebuild.
+    """
+
+    hood_id = models.CharField(max_length=20, db_index=True)
+    value_year = models.IntegerField(db_index=True)
+
+    # Medians (store as whole dollars)
+    median_land_market = models.IntegerField(null=True, blank=True)
+    median_building = models.IntegerField(null=True, blank=True)
+    median_market_total = models.IntegerField(null=True, blank=True)
+    median_tax_amount = models.IntegerField(null=True, blank=True)
+
+    # Year-over-year % changes (e.g. 5.3 for +5.3%)
+    yoy_change_land = models.FloatField(null=True, blank=True)
+    yoy_change_building = models.FloatField(null=True, blank=True)
+    yoy_change_total = models.FloatField(null=True, blank=True)
+    yoy_change_tax = models.FloatField(null=True, blank=True)
+
+    # Neighborhood-wide stability metric (same value for all years in a hood)
+    stability_score = models.FloatField(null=True, blank=True)
+
+    # Simple classification by YoY trend
+    # "boom", "bust", or "steady"
+    boom_bust_flag = models.CharField(max_length=20, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("hood_id", "value_year")
+        indexes = [
+            models.Index(fields=["hood_id", "value_year"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.hood_id} – {self.value_year}"
