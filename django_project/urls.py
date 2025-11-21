@@ -53,6 +53,26 @@ urlpatterns = [
     path("faq/", openskagit_views.faq_view, name="faq"),
     path("hood-trends/", openskagit_views.hood_trend_list, name="hood_trend_list"),
     path("hood-trends/<str:hood_id>/", openskagit_views.hood_trend_detail, name="hood_trend_detail"),
+    path(
+        "neighborhood-trends/",
+        openskagit_views.neighborhood_trends_page,
+        name="neighborhood-trends-page",
+    ),
+    path(
+        "neighborhood-trends/<str:hood_id>/data/",
+        openskagit_views.neighborhood_trend_data,
+        name="neighborhood-trend-data",
+    ),
+    path(
+        "neighborhood-trends/<str:hood_id>/geom/",
+        openskagit_views.neighborhood_trend_geom,
+        name="neighborhood-trend-geom",
+    ),
+    path(
+        "neighborhood-trends/search/",
+        openskagit_views.neighborhood_trend_address_search,
+        name="neighborhood-trend-search",
+    ),
     # Citizen Appeal Helper
 
     path("appeal/new/", openskagit_views.appeal_new, name="appeal-new"),

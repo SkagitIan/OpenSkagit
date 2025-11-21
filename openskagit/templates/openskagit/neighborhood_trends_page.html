@@ -1,0 +1,534 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neighborhood Trends • Appertivo</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root {
+      --ap-purple: #b993d6;
+      --ap-orange: #f08000;
+      --ap-teal: #58b09c;
+      --ap-ink: #49475b;
+      --ap-black: #14080e;
+    }
+    body {
+      background: #f5f5f7;
+      color: #1c1a1a;
+    }
+    .card {
+      background: white;
+      border-radius: 32px;
+      box-shadow: 0 20px 45px rgba(20, 8, 14, 0.08);
+    }
+    select {
+      font: inherit;
+    }
+    .search-results-wrapper {
+      max-height: 260px;
+      overflow-y: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(73, 71, 91, 0.12);
+      background: white;
+      transition: box-shadow 0.2s ease;
+    }
+    .search-results-container--visible {
+      box-shadow: 0 25px 45px rgba(20, 8, 14, 0.1);
+    }
+    .autocomplete-result {
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      display: block;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(73, 71, 91, 0.1);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #1c1a1a;
+    }
+    .autocomplete-result:last-child {
+      border-bottom-width: 0;
+    }
+    .autocomplete-result:hover {
+      background: rgba(88, 176, 156, 0.08);
+    }
+    .autocomplete-result .result-parcel {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #6b6a6a;
+      margin-top: 0.2rem;
+    }
+    .empty-results {
+      min-height: 88px;
+    }
+  </style>
+</head>
+  <body class="min-h-screen">
+    <div class="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-4 py-12">
+      <div class="card rounded-[32px] border border-white/60 bg-gradient-to-br from-white/80 to-white/60 p-8 text-center shadow-lg">
+        <p class="text-sm font-semibold uppercase tracking-[0.3em] text-[var(--ap-teal)]">Neighborhood Trends</p>
+        <h1 class="mt-2 text-3xl font-bold text-[var(--ap-black)]">Neighborhood Trends</h1>
+        <p class="mt-2 text-sm text-neutral-500">Explore median values, tax burdens, and stability for every neighborhood in the county.</p>
+        <div class="mt-6 flex flex-col gap-3">
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              data-hood-panel-trigger="hood"
+              class="mode-tab rounded-full border border-[var(--ap-teal)] bg-[var(--ap-teal)]/10 px-5 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-[var(--ap-teal)] shadow-sm transition"
+            >
+              Select by hood
+            </button>
+            <button
+              type="button"
+              data-hood-panel-trigger="address"
+              class="mode-tab rounded-full border border-transparent bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500 transition hover:border-[var(--ap-teal)] hover:text-[var(--ap-teal)]"
+            >
+              Search by address
+            </button>
+          </div>
+          <div class="flex justify-center">
+            <div class="w-full max-w-2xl space-y-3">
+              <div data-mode-panel="hood" class="flex items-center justify-center">
+                <div class="flex items-center gap-3 rounded-full border border-neutral-200 bg-white/60 px-5 py-2 shadow-sm">
+                  <span class="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Neighborhood</span>
+                  <select id="hood-select" class="rounded-full border border-transparent bg-neutral-100 px-4 py-2 text-sm font-semibold text-[var(--ap-ink)] outline-none transition focus:border-[var(--ap-teal)] focus:bg-white">
+                    <option value="">Select a hood</option>
+                    {% for hood in hoods %}
+                      <option value="{{ hood.hood_id }}">{{ hood.hood_id }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div data-mode-panel="address" class="hidden space-y-2">
+                <div class="rounded-[28px] border border-neutral-200 bg-white/70 p-5 shadow-sm">
+                  <div id="selected-address-display" class="hidden rounded-[20px] border border-[var(--ap-teal)]/30 bg-[var(--ap-teal)]/10 p-4 text-left">
+                    <div class="flex items-start justify-between gap-4">
+                      <div>
+                        <p id="selected-address-text" class="text-sm font-semibold text-[var(--ap-black)]"></p>
+                        <p id="selected-address-parcel" class="text-xs text-neutral-500"></p>
+                      </div>
+                      <button
+                        type="button"
+                        id="selected-address-clear"
+                        class="text-xs font-semibold text-[var(--ap-purple)] underline underline-offset-2"
+                      >
+                        Choose another
+                      </button>
+                    </div>
+                  </div>
+                  <form class="space-y-2" onsubmit="return false;">
+                    <div class="relative">
+                      <input
+                        id="hood-search-input"
+                        name="q"
+                        type="text"
+                        class="w-full rounded-[20px] border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-[var(--ap-ink)] outline-none transition focus:border-[var(--ap-teal)]"
+                        placeholder="123 Main St, Mount Vernon or P12345"
+                        autocomplete="off"
+                        hx-get="{% url 'neighborhood-trend-search' %}"
+                        hx-target="#hood-search-results"
+                        hx-trigger="keyup changed delay:400ms"
+                        hx-indicator="#hood-search-loading"
+                        hx-on::before-request="
+                          const minLen = 3;
+                          if (this.value.trim().length < minLen) {
+                            event.detail.shouldCancel = true;
+                            document.getElementById('hood-search-results').innerHTML = '';
+                            document.getElementById('hood-search-results-wrapper').classList.remove('search-results-container--visible');
+                          }
+                        "
+                        hx-on::after-request="
+                          const wrapper = document.getElementById('hood-search-results-wrapper');
+                          const results = document.getElementById('hood-search-results');
+                          wrapper?.classList.toggle('search-results-container--visible', !!(results?.innerHTML.trim()));
+                        "
+                      />
+                      <button
+                        type="button"
+                        id="hood-search-clear"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-neutral-200 bg-white px-2 py-1 text-xs font-semibold text-neutral-500 transition hover:border-[var(--ap-teal)] hover:text-[var(--ap-teal)]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </form>
+                  <div id="hood-search-loading" class="hidden px-2 text-xs text-neutral-500">
+                    Searching properties...
+                  </div>
+                  <div id="hood-search-results-wrapper" class="search-results-wrapper">
+                    <div id="hood-search-results"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <div class="grid gap-6 lg:grid-cols-[1.1fr_0.7fr]">
+      <section class="card flex flex-col gap-4 p-6">
+        <div class="flex items-center justify-between">
+          <div class="space-y-1">
+            <p id="chart-title" class="text-lg font-semibold text-[var(--ap-ink)]">No neighborhood selected</p>
+            <p class="text-xs text-neutral-500">Choose a hood to load the trends</p>
+          </div>
+          <span id="stability-badge" class="hidden rounded-full border border-[var(--ap-purple)] bg-[var(--ap-purple)]/10 px-3 py-1 text-xs font-semibold text-[var(--ap-purple)] shadow-sm"></span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button data-mode-button="values" class="mode-button rounded-full border border-neutral-200 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-600 transition">Values</button>
+          <button data-mode-button="tax-value" class="mode-button rounded-full border border-neutral-200 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-600 transition">Tax vs Value</button>
+          <button data-mode-button="yoy" class="mode-button rounded-full border border-neutral-200 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-600 transition">YoY %</button>
+          <button data-mode-button="tax-percent" class="mode-button rounded-full border border-neutral-200 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-600 transition">Tax % of Value</button>
+        </div>
+        <div class="relative mt-1 min-h-[320px]">
+          <canvas id="trends-chart" class="h-full w-full"></canvas>
+          <p id="chart-placeholder" class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-neutral-500">Select a neighborhood to load its trend.</p>
+        </div>
+      </section>
+
+      <section class="card flex flex-col gap-4 p-6">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Summary &amp; Map</p>
+        </div>
+        <div id="summary-grid" class="grid grid-cols-2 gap-4 text-sm text-neutral-600 hidden">
+          <div class="space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-3">
+            <p class="text-[var(--ap-ink)] text-xs font-semibold uppercase tracking-[0.2em]">Years of data</p>
+            <p id="summary-years" class="text-base font-semibold text-[var(--ap-black)]"></p>
+            <p class="text-xs text-neutral-500" id="summary-count"></p>
+          </div>
+          <div class="space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-3">
+            <p class="text-[var(--ap-ink)] text-xs font-semibold uppercase tracking-[0.2em]">Avg stability</p>
+            <p id="summary-stability" class="text-base font-semibold text-[var(--ap-black)]"></p>
+            <p class="text-xs text-neutral-500">Higher is steadier.</p>
+          </div>
+        </div>
+        <div class="text-sm text-neutral-500" id="map-placeholder">Map will appear after you select a neighborhood.</div>
+        <div id="map-wrapper" class="hidden">
+          <div id="hood-map" class="h-64 w-full rounded-3xl border border-neutral-100 shadow-inner"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const hoodSelect = document.getElementById("hood-select");
+      const chartTitle = document.getElementById("chart-title");
+      const chartPlaceholder = document.getElementById("chart-placeholder");
+      const summaryGrid = document.getElementById("summary-grid");
+      const summaryYears = document.getElementById("summary-years");
+      const summaryCount = document.getElementById("summary-count");
+      const summaryStability = document.getElementById("summary-stability");
+      const stabilityBadge = document.getElementById("stability-badge");
+      const mapPlaceholder = document.getElementById("map-placeholder");
+      const mapWrapper = document.getElementById("map-wrapper");
+      const modeButtons = document.querySelectorAll("[data-mode-button]");
+      const canvas = document.getElementById("trends-chart");
+      const modePanelTriggers = document.querySelectorAll("[data-hood-panel-trigger]");
+      const panelHood = document.querySelector("[data-mode-panel='hood']");
+      const panelAddress = document.querySelector("[data-mode-panel='address']");
+      const selectedAddressDisplay = document.getElementById("selected-address-display");
+      const selectedAddressText = document.getElementById("selected-address-text");
+      const selectedAddressParcel = document.getElementById("selected-address-parcel");
+      const selectedAddressClear = document.getElementById("selected-address-clear");
+      const hoodSearchInput = document.getElementById("hood-search-input");
+      const hoodSearchResultsWrapper = document.getElementById("hood-search-results-wrapper");
+      const hoodSearchResults = document.getElementById("hood-search-results");
+      const hoodSearchClear = document.getElementById("hood-search-clear");
+
+      const palette = {
+        total: getComputedStyle(document.documentElement).getPropertyValue("--ap-purple").trim(),
+        land: getComputedStyle(document.documentElement).getPropertyValue("--ap-orange").trim(),
+        building: getComputedStyle(document.documentElement).getPropertyValue("--ap-teal").trim(),
+        yoy: getComputedStyle(document.documentElement).getPropertyValue("--ap-ink").trim(),
+        tax: getComputedStyle(document.documentElement).getPropertyValue("--ap-orange").trim(),
+      };
+
+      const chart = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { boxWidth: 12 } },
+            tooltip: { mode: "index", intersect: false },
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true },
+          },
+        },
+      });
+
+      const apiBase = "{% url 'neighborhood-trends-page' %}";
+      let cachedTrend = null;
+      let currentMode = "values";
+      let polygonLayer = null;
+      let map = L.map("hood-map", { zoomControl: false }).setView([47.6, -122.3], 10);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+      map.invalidateSize();
+
+      function setActivePanel(panel) {
+        modePanelTriggers.forEach((button) => {
+          const isActive = button.dataset.hoodPanelTrigger === panel;
+          button.classList.toggle("border-[var(--ap-teal)]", isActive);
+          button.classList.toggle("bg-[var(--ap-teal)]/10", isActive);
+          button.classList.toggle("text-[var(--ap-teal)]", isActive);
+          button.classList.toggle("shadow-sm", isActive);
+          button.classList.toggle("border-transparent", !isActive);
+          button.classList.toggle("bg-white", !isActive);
+          button.classList.toggle("text-neutral-500", !isActive);
+        });
+        if (panelHood) {
+          panelHood.classList.toggle("hidden", panel !== "hood");
+        }
+        if (panelAddress) {
+          panelAddress.classList.toggle("hidden", panel !== "address");
+        }
+      }
+
+      modePanelTriggers.forEach((button) => {
+        button.addEventListener("click", () => {
+          setActivePanel(button.dataset.hoodPanelTrigger);
+        });
+      });
+      setActivePanel("hood");
+
+      hoodSearchResultsWrapper?.addEventListener("click", (event) => {
+        const target = event.target.closest("[data-hood-code]");
+        if (!target) return;
+        const hoodCode = target.dataset.hoodCode;
+        if (!hoodCode) return;
+        const address = target.dataset.address || `Neighborhood ${hoodCode}`;
+        const parcel = target.dataset.parcel || "";
+        if (hoodSelect) {
+          hoodSelect.value = hoodCode;
+          hoodSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        if (selectedAddressText && selectedAddressParcel && selectedAddressDisplay) {
+          selectedAddressText.textContent = address;
+          selectedAddressParcel.textContent = parcel ? `Parcel ${parcel}` : "";
+          selectedAddressDisplay.classList.remove("hidden");
+        }
+        hoodSearchResultsWrapper.classList.remove("search-results-container--visible");
+      });
+
+      selectedAddressClear?.addEventListener("click", () => {
+        if (selectedAddressDisplay) {
+          selectedAddressDisplay.classList.add("hidden");
+        }
+        if (hoodSearchInput) {
+          hoodSearchInput.value = "";
+          hoodSearchInput.focus();
+        }
+        if (hoodSearchResults) {
+          hoodSearchResults.innerHTML = "";
+        }
+        hoodSearchResultsWrapper?.classList.remove("search-results-container--visible");
+      });
+
+      hoodSearchClear?.addEventListener("click", () => {
+        if (hoodSearchInput) {
+          hoodSearchInput.value = "";
+          hoodSearchInput.focus();
+        }
+        if (hoodSearchResults) {
+          hoodSearchResults.innerHTML = "";
+        }
+        hoodSearchResultsWrapper?.classList.remove("search-results-container--visible");
+      });
+
+      function setModeButtonState(selected) {
+        modeButtons.forEach((button) => {
+          const isActive = button.dataset.modeButton === selected;
+          button.classList.toggle("border-[var(--ap-purple)]/60", isActive);
+          button.classList.toggle("bg-[var(--ap-purple)]/10", isActive);
+          button.classList.toggle("text-[var(--ap-purple)]", isActive);
+          button.classList.toggle("shadow-sm", isActive);
+          button.classList.toggle("border-neutral-200", !isActive);
+          button.classList.toggle("text-neutral-600", !isActive);
+          button.classList.toggle("bg-white", !isActive);
+        });
+      }
+
+      function renderChart() {
+        if (!cachedTrend || !cachedTrend.years.length) {
+          chart.data.labels = [];
+          chart.data.datasets = [];
+          chart.update();
+          return;
+        }
+
+        const { years, series } = cachedTrend;
+        chart.data.labels = years.slice();
+        let datasets = [];
+        let scales = { x: { grid: { display: false } } };
+        let chartType = "line";
+
+        if (currentMode === "values") {
+          datasets = [
+            { label: "Total Market", data: series.median_market_total, borderColor: palette.total, backgroundColor: "rgba(185,147,214,0.25)", tension: 0.3, pointRadius: 3 },
+            { label: "Land Market", data: series.median_land_market, borderColor: palette.land, backgroundColor: "rgba(240,128,0,0.25)", tension: 0.3, pointRadius: 3 },
+            { label: "Building", data: series.median_building, borderColor: palette.building, backgroundColor: "rgba(88,176,156,0.25)", tension: 0.3, pointRadius: 3 },
+          ];
+          scales.y = { beginAtZero: true, grid: { color: "rgba(73,71,91,0.1)" } };
+        } else if (currentMode === "tax-value") {
+          chartType = "line";
+          datasets = [
+            { label: "Total Market", data: series.median_market_total, borderColor: palette.total, backgroundColor: "rgba(185,147,214,0.25)", tension: 0.3, pointRadius: 3, yAxisID: "market" },
+            { label: "Tax Amount", data: series.median_tax_amount, borderColor: palette.tax, backgroundColor: "rgba(240,128,0,0.25)", tension: 0.3, pointRadius: 3, yAxisID: "tax" },
+          ];
+          scales.market = {
+            position: "left",
+            beginAtZero: true,
+            grid: { color: "rgba(73,71,91,0.1)" },
+          };
+          scales.tax = {
+            position: "right",
+            beginAtZero: true,
+            grid: { display: false },
+            ticks: { color: palette.tax },
+          };
+        } else if (currentMode === "yoy") {
+          chartType = "bar";
+          datasets = [
+            {
+              label: "YoY % (Total)",
+              data: series.yoy_change_total,
+              backgroundColor: "rgba(73,71,91,0.35)",
+            },
+          ];
+          scales.y = {
+            beginAtZero: true,
+            grid: { color: "rgba(73,71,91,0.1)" },
+          };
+        } else if (currentMode === "tax-percent") {
+          chartType = "line";
+          datasets = [
+            {
+              label: "Tax % of Value",
+              data: series.tax_percent_of_value,
+              borderColor: palette.tax,
+              backgroundColor: "rgba(240,128,0,0.25)",
+              tension: 0.3,
+              pointRadius: 3,
+            },
+          ];
+          scales.y = {
+            beginAtZero: true,
+            grid: { color: "rgba(73,71,91,0.1)" },
+          };
+        }
+
+        chart.config.type = chartType;
+        chart.data.datasets = datasets;
+        chart.options.scales = scales;
+        chart.update();
+      }
+
+      function populateSummary(summary) {
+        if (!summary || !summary.first_year) {
+          summaryGrid.classList.add("hidden");
+          return;
+        }
+        summaryGrid.classList.remove("hidden");
+        summaryYears.textContent = `${summary.first_year} – ${summary.last_year}`;
+        summaryCount.textContent = `${cachedTrend.years.length} years of data`;
+        summaryStability.textContent = summary.avg_stability !== null ? summary.avg_stability.toFixed(1) : "—";
+        if (summary.avg_stability !== null) {
+          stabilityBadge.textContent = `Stability ${summary.avg_stability.toFixed(1)}`;
+          stabilityBadge.classList.remove("hidden");
+        } else {
+          stabilityBadge.classList.add("hidden");
+        }
+      }
+
+      function showMapLayer(geoJson) {
+        if (polygonLayer) {
+          polygonLayer.remove();
+        }
+        if (!geoJson) {
+          mapWrapper.classList.add("hidden");
+          mapPlaceholder.classList.remove("hidden");
+          map.setView([47.6, -122.3], 10);
+          return;
+        }
+        polygonLayer = L.geoJSON(geoJson, {
+          style: { color: palette.total, weight: 2, fillColor: "rgba(185,147,214,0.15)", fillOpacity: 0.5 },
+        }).addTo(map);
+        mapWrapper.classList.remove("hidden");
+        mapPlaceholder.classList.add("hidden");
+        map.fitBounds(polygonLayer.getBounds(), { padding: [16, 16], maxZoom: 13 });
+        setTimeout(() => map.invalidateSize(), 200);
+      }
+
+      function handleModeSwitch(event) {
+        const selected = event.target.dataset.modeButton;
+        if (!selected || selected === currentMode) {
+          return;
+        }
+        currentMode = selected;
+        setModeButtonState(selected);
+        renderChart();
+      }
+
+      modeButtons.forEach((button) => button.addEventListener("click", handleModeSwitch));
+      setModeButtonState(currentMode);
+
+      async function fetchTrend(hoodId) {
+        const response = await fetch(`${apiBase}${encodeURIComponent(hoodId)}/data/`);
+        if (!response.ok) throw new Error("Unable to load trend data");
+        return response.json();
+      }
+
+      async function fetchGeom(hoodId) {
+        const response = await fetch(`${apiBase}${encodeURIComponent(hoodId)}/geom/`);
+        if (!response.ok) throw new Error("Unable to load geometry");
+        return response.json();
+      }
+
+      async function handleSelection() {
+        const hoodId = hoodSelect.value;
+        stabilityBadge.classList.add("hidden");
+        summaryGrid.classList.add("hidden");
+        mapWrapper.classList.add("hidden");
+        mapPlaceholder.classList.remove("hidden");
+        chartTitle.textContent = hoodId || "No neighborhood selected";
+        if (!hoodId) {
+          chartPlaceholder.classList.remove("hidden");
+          cachedTrend = null;
+          renderChart();
+          return;
+        }
+        chartPlaceholder.classList.add("hidden");
+        try {
+          const [trendData, geomData] = await Promise.all([fetchTrend(hoodId), fetchGeom(hoodId)]);
+          cachedTrend = trendData;
+          currentMode = "values";
+          setModeButtonState(currentMode);
+          renderChart();
+          populateSummary(trendData.summary);
+          showMapLayer(geomData.geom);
+        } catch (error) {
+          chartPlaceholder.classList.remove("hidden");
+          mapWrapper.classList.add("hidden");
+          mapPlaceholder.classList.remove("hidden");
+          console.error(error);
+        }
+      }
+
+      hoodSelect.addEventListener("change", handleSelection);
+    });
+  </script>
+</body>
+</html>
