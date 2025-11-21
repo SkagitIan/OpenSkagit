@@ -132,11 +132,11 @@
         </div>
       </section>
 
-      <footer class="border-t border-neutral-200 bg-white/90 backdrop-blur">
+      <footer class="border-t border-neutral-200 bg-gradient-to-t from-white to-white/95 backdrop-blur">
         <div class="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4">
           <form id="chat-form"
                 data-chat-form
-                class="flex items-end gap-3 rounded-3xl border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+                class="flex items-end gap-3 rounded-2xl border-2 border-neutral-200 bg-white px-4 py-3 shadow-lg transition-all focus-within:border-[var(--ap-teal)] focus-within:shadow-xl focus-within:shadow-[var(--ap-teal)]/10">
             {% csrf_token %}
             {% if conversation_id %}
               <input type="hidden" name="conversation_id" value="{{ conversation_id }}" data-chat-conversation-input>
@@ -149,12 +149,12 @@
                         name="prompt"
                         rows="1"
                         placeholder="Ask about parcels, comps, or uploaded PDFs…"
-                        class="w-full resize-none bg-transparent px-3 py-2 text-sm text-[var(--ap-ink)] focus:outline-none focus:ring-0"
+                        class="w-full resize-none bg-transparent px-2 py-2 text-sm text-[var(--ap-ink)] placeholder-neutral-400 focus:outline-none focus:ring-0"
                         oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"
                         required></textarea>
             </div>
             <button type="submit"
-                    class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--ap-orange)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--ap-orange)]/90 focus:outline-none focus:ring-2 focus:ring-[var(--ap-orange)]/40 focus:ring-offset-2">
+                    class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--ap-teal)] to-[var(--ap-teal)]/90 px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg hover:shadow-[var(--ap-teal)]/30 focus:outline-none focus:ring-2 focus:ring-[var(--ap-teal)]/50 focus:ring-offset-2 active:scale-95">
               <span>Send</span>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-4 w-4 fill-none stroke-current stroke-2">
                 <path d="M5 12h14"></path>
@@ -163,11 +163,14 @@
             </button>
           </form>
           <div class="flex flex-col gap-1 px-3 text-xs">
-            <div class="text-neutral-500" data-chat-status>Ready when you are.</div>
-            <div class="text-red-600" data-chat-error></div>
+            <div class="flex items-center gap-2">
+              <div class="h-1.5 w-1.5 rounded-full bg-[var(--ap-teal)] animate-pulse"></div>
+              <span class="text-neutral-600 font-medium" data-chat-status>Ready when you are.</span>
+            </div>
+            <div class="text-red-600 font-medium" data-chat-error></div>
           </div>
-          <p class="px-3 pb-2 text-xs text-neutral-500">
-            Prompts are embedded with SentenceTransformers, matched against assessor records via pgvector, and answered with OpenAI Responses.
+          <p class="px-3 pb-2 text-[11px] text-neutral-500">
+            Powered by <span class="font-semibold text-[var(--ap-teal)]">pgvector</span> semantic search and <span class="font-semibold text-[var(--ap-purple)]">OpenAI Responses</span>
           </p>
         </div>
       </footer>
