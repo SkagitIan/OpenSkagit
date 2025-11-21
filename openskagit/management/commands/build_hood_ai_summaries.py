@@ -83,7 +83,7 @@ class Command(BaseCommand):
 
         # OpenAI responses.create call
         response = client.responses.create(
-            model="gpt-4.1",
+            model="gpt-4o-mini",
             input=prompt,
         )
 
