@@ -192,7 +192,7 @@ def build_response_input(
     context_rows: str,
     history: Iterable[Dict[str, Any]] | None = None,
     system_prompt: str | None = None,
-) -> List[Dict[str, Any]]:
+) -> List[Dict[str, str]]:
     """
     Construct the OpenAI Responses API-compatible conversation payload.
     """
@@ -203,18 +203,18 @@ def build_response_input(
         "If the context is insufficient, explain what other research is needed."
     )
 
-    conversation: List[Dict[str, Any]] = [
-        {"role": "system", "content": [{"type": "text", "text": system_prompt}]}
+    conversation: List[Dict[str, str]] = [
+        {"role": "system", "content": system_prompt}
     ]
 
     for msg in history or []:
         role = msg.get("role")
         content = (msg.get("content") or "").strip()
         if role in {"user", "assistant"} and content:
-            conversation.append({"role": role, "content": [{"type": "text", "text": content}]})
+            conversation.append({"role": role, "content": content})
 
     fused_prompt = f"Context:\n{context_rows or 'No related parcels found.'}\n\nQuestion:\n{prompt}"
-    conversation.append({"role": "user", "content": [{"type": "text", "text": fused_prompt}]})
+    conversation.append({"role": "user", "content": fused_prompt})
     return conversation
 
 
