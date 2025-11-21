@@ -18,11 +18,6 @@
            data-details="{% if sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% endif %}">
           <div class="result-address">{{ parcel.address|default:"Address unavailable" }}</div>
           <div class="result-parcel">Parcel {{ parcel.parcel_number }}</div>
-          {% if sale_price %}
-            <div class="result-sale-info">
-              Last sale ${{ sale_price|floatformat:0|intcomma }}
-            </div>
-          {% endif %}
           <div class="result-cta">
             <span class="cta-button">
               Continue

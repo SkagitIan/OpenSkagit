@@ -88,6 +88,8 @@ ADJUSTMENT_LABELS = [
     ("time", "Time trend"),
 ]
 
+ADJUSTMENT_SUMMARY_MAX_ITEMS = 3
+
 ADJUSTMENT_STORYBOARD_CONFIG = {
     "size": {
         "label": "Size adjustments",
@@ -200,6 +202,48 @@ def _parse_limit(raw_limit: Optional[str]) -> int:
         limit = cma.DEFAULT_COMPARABLE_LIMIT
     limit = max(6, limit)
     return min(limit, cma.MAX_COMPARABLE_LIMIT)
+
+
+def _safe_float_value(value: Any) -> Optional[float]:
+    if value in (None, "", "null"):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ratio_similarity(primary: Optional[float], secondary: Optional[float]) -> Optional[float]:
+    if primary is None or secondary is None:
+        return None
+    if primary <= 0 or secondary <= 0:
+        return None
+    ratio = min(primary, secondary) / max(primary, secondary)
+    return max(0.0, min(1.0, ratio))
+
+
+def _match_text_score(subject_value: Any, comparable_value: Any) -> Optional[float]:
+    if subject_value in (None, "", "null") or comparable_value in (None, "", "null"):
+        return None
+    subject_text = str(subject_value).strip().lower()
+    comparable_text = str(comparable_value).strip().lower()
+    if not subject_text or not comparable_text:
+        return None
+    return 1.0 if subject_text == comparable_text else 0.6
+
+
+def _average_score(values: List[Optional[float]]) -> Optional[float]:
+    cleaned = [value for value in values if value is not None]
+    if not cleaned:
+        return None
+    return sum(cleaned) / len(cleaned)
+
+
+def _percentage_score(value: Optional[float]) -> Optional[int]:
+    if value is None:
+        return None
+    percentage = round(value * 100)
+    return max(0, min(100, percentage))
 
 
 def _merge_request_params(request) -> Dict[str, Any]:
@@ -465,6 +509,30 @@ def _compute_adjustment_summary(
             )
         comp["adjustment_list"] = detail_list
     return raw_payload, None
+
+
+def _build_adjustment_excerpt(detail_list: Optional[List[Dict[str, Any]]]) -> List[str]:
+    """
+    Pick the largest non-zero adjustments and format them for a collapsed summary.
+    """
+    if not detail_list:
+        return []
+    non_zero = [item for item in detail_list if item.get("amount")]
+    if not non_zero:
+        return []
+    sorted_items = sorted(non_zero, key=lambda item: abs(item["amount"]), reverse=True)
+    excerpt: List[str] = []
+    for entry in sorted_items[:ADJUSTMENT_SUMMARY_MAX_ITEMS]:
+        amount = entry.get("amount")
+        if amount is None:
+            continue
+        sign = "+" if amount > 0 else "-"
+        try:
+            formatted = f"{abs(amount):,.0f}"
+        except (TypeError, ValueError):
+            formatted = str(abs(amount))
+        excerpt.append(f"{sign}${formatted}")
+    return excerpt
 
 
 def _load_neighborhood_sales_ratio_history(code: Optional[str], *, limit: int = 10) -> List[Dict[str, Any]]:
@@ -1918,17 +1986,6 @@ def appeal_home(request):
     chat_bootstrap = manager.bootstrap(conversation_id)
     return render(request, "openskagit/appeal_home_v3.html", {"step": 1, "chat_bootstrap": chat_bootstrap})
 
-
-@require_GET
-def appeal_new(request):
-    """API-only, mobile-first appeal homepage (no ORM)."""
-    # Intentionally avoid ORM usage; all data is fetched via XHR from /api endpoints.
-    manager = chat_service.ConversationManager(request)
-    conversation_id = manager.ensure(request.GET.get("cid"))
-    chat_bootstrap = manager.bootstrap(conversation_id)
-    return render(request, "openskagit/appeal_home_v3.html", {"step": 1, "chat_bootstrap": chat_bootstrap})
-
-
 APPEAL_SEARCH_LIMIT = 15
 APPEAL_MIN_QUERY_LENGTH = 3
 
@@ -1941,15 +1998,15 @@ def appeal_parcel_search(request):
     if not query_too_short:
         is_parcel_like = bool(re.match(r"^[Pp]\s*\d+\s*$", query))
         qs = Parcel.objects.filter(property_type="R")
-        latest_sale = (
-            Assessor.objects.filter(parcel_number=OuterRef("parcel_number"))
-            .exclude(sale_price__isnull=True)
-            .order_by("-roll__year", "-sale_date")
-        )
-        qs = qs.annotate(
-            sale_price=Subquery(latest_sale.values("sale_price")[:1]),
-            sale_date=Subquery(latest_sale.values("sale_date")[:1]),
-        )
+        # latest_sale = (
+        #     Assessor.objects.filter(parcel_number=OuterRef("parcel_number"))
+        #     .exclude(sale_price__isnull=True)
+        #     .order_by("-roll__year", "-sale_date")
+        # )
+        # qs = qs.annotate(
+        #     sale_price=Subquery(latest_sale.values("sale_price")[:1]),
+        #     sale_date=Subquery(latest_sale.values("sale_date")[:1]),
+        # )
 
         if is_parcel_like:
             normalized = query.upper().replace(" ", "")
@@ -2103,6 +2160,15 @@ def appeal_result_comparables(request, parcel_number: str):
         neigh_diff = your_change_pct - avg_change_pct
 
     score = summary.get("score") or 0
+    subject_meta = getattr(subject, "metadata", {}) or {}
+    subject_area = _safe_float_value(getattr(subject, "living_area", None))
+    subject_lot = _safe_float_value(
+        getattr(subject, "acres", None)
+        or getattr(subject, "lot_acres", None)
+        or subject_meta.get("lot_acres")
+    )
+    subject_quality = subject_meta.get("quality_score")
+    subject_condition = subject_meta.get("condition_score")
 
     soft_stop = False
     soft_reasons: List[str] = []
@@ -2174,6 +2240,63 @@ def appeal_result_comparables(request, parcel_number: str):
                 price_per_sqft = None
         comp_id = getattr(snapshot, "parcel_number", None) if snapshot else None
         adjustments = adjustment_map.get(str(comp_id)) if comp_id else None
+        comp_meta = getattr(snapshot, "metadata", {}) or {}
+        adjustment_excerpt = _build_adjustment_excerpt(
+            adjustments.get("adjustment_list") if adjustments else None
+        )
+        comp_living_area = _safe_float_value(living_area)
+        comp_lot_value = _safe_float_value(
+            getattr(snapshot, "acres", None)
+            or getattr(snapshot, "lot_acres", None)
+            or comp_meta.get("lot_acres")
+        )
+        comp_score_obj = getattr(c, "score", None)
+        proximity_score = (
+            _safe_float_value(getattr(comp_score_obj, "location_score", None))
+            if comp_score_obj
+            else None
+        )
+        time_score = (
+            _safe_float_value(getattr(comp_score_obj, "time_score", None))
+            if comp_score_obj
+            else None
+        )
+        size_ratio = _ratio_similarity(subject_area, comp_living_area)
+        land_ratio = _ratio_similarity(subject_lot, comp_lot_value)
+        quality_match = _match_text_score(subject_quality, comp_meta.get("quality_score"))
+        condition_match = _match_text_score(subject_condition, comp_meta.get("condition_score"))
+        quality_condition_ratio = _average_score([quality_match, condition_match])
+        available_ratios = [
+            value
+            for value in (
+                proximity_score,
+                time_score,
+                size_ratio,
+                quality_condition_ratio,
+                land_ratio,
+            )
+            if value is not None
+        ]
+        overall_ratio = _average_score(available_ratios)
+        if overall_ratio is None:
+            fallback_total = (
+                _safe_float_value(getattr(comp_score_obj, "total_score", None))
+                if comp_score_obj
+                else None
+            )
+            overall_ratio = fallback_total
+        if overall_ratio is None:
+            overall_ratio = 0.0
+        else:
+            overall_ratio = max(0.0, min(1.0, overall_ratio))
+        similarity = {
+            "overall": _percentage_score(overall_ratio),
+            "time": _percentage_score(time_score),
+            "proximity": _percentage_score(proximity_score),
+            "size": _percentage_score(size_ratio),
+            "quality_condition": _percentage_score(quality_condition_ratio),
+            "land": _percentage_score(land_ratio),
+        }
         view_comps.append(
             {
                 "parcel_number": getattr(snapshot, "parcel_number", None) if snapshot else None,
@@ -2192,6 +2315,8 @@ def appeal_result_comparables(request, parcel_number: str):
                 "adjusted_value": adjustments.get("adjusted_value") if adjustments else None,
                 "total_adjustment": adjustments.get("total_adjustment") if adjustments else None,
                 "adjustments": adjustments.get("adjustment_list") if adjustments else [],
+                "adjustments_excerpt": adjustment_excerpt,
+                "similarity": similarity,
             }
         )
 
@@ -2734,7 +2859,10 @@ def neighborhood_trends_page(request):
     return render(
         request,
         "openskagit/neighborhood_trends_page.html",
-        {"hoods": hoods},
+        {
+            "hoods": hoods,
+            "cesium_token": getattr(settings, "CESIUM_ION_TOKEN", None),
+        },
     )
 
 

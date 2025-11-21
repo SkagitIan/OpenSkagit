@@ -217,11 +217,22 @@
     border-bottom: 1px solid var(--gray-200);
   }
 
+  .comp-card__header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
   .comp-card__header-content {
     display: flex;
     justify-content: space-between;
     gap: var(--space-4);
     align-items: flex-start;
+    flex: 1;
+  }
+
+  .comp-card__header-gauge {
+    width: 100px;
   }
 
   .comp-card__title {
@@ -323,32 +334,141 @@
     color: var(--gray-600);
   }
 
-  .adjustments-line {
+  .adjustments-badges {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-4);
+    gap: var(--space-3);
     color: var(--gray-700);
   }
 
-  .adjustment-entry {
+  .adjustment-badge {
     display: inline-flex;
-    gap: 0.35rem;
     align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-full);
+    border: 1px solid transparent;
+    background: var(--gray-100);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .adjustment-badge__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.4);
+  }
+
+  .adjustment-badge__icon i {
+    font-size: 0.85rem;
+    color: inherit;
+  }
+
+  .adjustment-badge__amount {
+    font-weight: 700;
+  }
+
+  .adjustment-badge--positive {
+    background: var(--success-50);
+    border-color: rgba(16, 185, 129, 0.4);
+  }
+
+  .adjustment-badge--positive {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success-600);
+  }
+
+  .adjustment-badge--positive {
+    color: var(--success-600);
+  }
+
+  .adjustment-badge--negative {
+    background: var(--error-50);
+    border-color: rgba(239, 68, 68, 0.35);
+  }
+
+  .adjustment-badge--negative {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--error-600);
+  }
+
+  .adjustment-badge--negative{
+    color: var(--error-600);
+  }
+
+  .adjustment-entry {
+    font-size: 0.85rem;
+    color: var(--gray-600);
   }
 
   .adjustment-entry--muted {
-    color: var(--gray-500);
     font-weight: 500;
   }
 
-  .adjustment-amount--up {
-    color: var(--success-600);
-    font-weight: 600;
+  .comp-card__adjustments--collapsible {
+    flex-direction: column;
+    gap: var(--space-3);
   }
 
-  .adjustment-amount--down {
-    color: var(--rose-600);
+  .comp-card__adjustments-summary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .comp-card__adjustments-summary-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .adjustments-summary-text {
+    color: var(--gray-700);
+    font-size: 0.85rem;
     font-weight: 600;
+    min-width: 0;
+  }
+
+  .comp-card__adjustments-summary-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.15);
+    transition: transform 0.25s ease;
+  }
+
+  .comp-card__adjustments-summary::-webkit-details-marker,
+  .comp-card__adjustments-summary::marker {
+    display: none;
+  }
+
+  .comp-card__adjustments--collapsible[open]
+    .comp-card__adjustments-summary-indicator {
+    transform: rotate(180deg);
+  }
+
+  .comp-card__adjustments-body {
+    width: 100%;
+    border-top: 1px solid var(--gray-200);
+    padding-top: var(--space-3);
+  }
+
+  .comp-card__adjustments-body .adjustments-badges {
+    margin-top: 0;
   }
 
   .comp-card__adjusted-row {
@@ -390,6 +510,98 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--rose-600);
+  }
+
+  .comp-similarity {
+    position: relative;
+    width: 100%;
+  }
+
+  .comp-similarity__trigger {
+    border: none;
+    background: transparent;
+    padding: 0;
+    display: block;
+    cursor: pointer;
+  }
+
+  .comp-similarity__gauge {
+    --value: 0%;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background-image: conic-gradient(
+      var(--comp-similarity-color, #6c698d) 0 var(--value),
+      var(--gray-200) var(--value) 100%
+    );
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .comp-similarity__gauge::after {
+    content: "";
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
+    z-index: 1;
+  }
+
+  .comp-similarity__gauge-inner {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .comp-similarity__value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .comp-similarity__tooltip {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    left: 0;
+    z-index: 2;
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(39, 39, 42, 0.1);
+    padding: var(--space-3) var(--space-4);
+    box-shadow: var(--shadow-lg);
+    min-width: 220px;
+    display: none;
+  }
+
+  .comp-similarity.is-open .comp-similarity__tooltip {
+    display: block;
+  }
+
+  .comp-similarity__tooltip table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-600);
+  }
+
+  .comp-similarity__tooltip th {
+    text-align: left;
+    padding-right: var(--space-2);
+    font-weight: 600;
+  }
+
+  .comp-similarity__tooltip td {
+    text-align: right;
+    font-weight: 700;
+    color: var(--gray-900);
   }
 
   /* Grid View */
@@ -515,20 +727,7 @@
           <p class="mode-note mode-note--warning">{{ advanced_error }}</p>
         {% endif %}
       </div>
-      {% if has_more %}
-        <button
-          id="comparables-more-button"
-          class="comparables-more-btn"
-          type="button"
-          data-extended-count="{{ extended_limit }}"
-        >
-          <span class="comparables-more-label">Get more comps</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14"></path>
-            <path d="M5 12h14"></path>
-          </svg>
-        </button>
-      {% endif %}
+
     </div>
   </div>
 
@@ -538,8 +737,34 @@
       {% for comp in comparables %}
         <div class="comp-card">
           <div class="comp-card__header">
+            <div class="comp-card__header-gauge">
+              <div class="comp-similarity">
+                <button class="comp-similarity__trigger" type="button" aria-expanded="false">
+                  <div class="comp-similarity__gauge" style="--value: {{ comp.similarity.overall|default_if_none:0 }}%;">
+                    <div class="comp-similarity__gauge-inner">
+                      <span class="comp-similarity__value">
+                        {% if comp.similarity.overall is not None %}
+                          {{ comp.similarity.overall }}%
+                        {% else %}
+                          0%
+                        {% endif %}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              <div class="comp-similarity__tooltip" role="tooltip">
+                <table>
+                  <tr><th>Time</th><td>{% if comp.similarity.time is not None %}{{ comp.similarity.time }}%{% else %}&mdash;{% endif %}</td></tr>
+                  <tr><th>Proximity</th><td>{% if comp.similarity.proximity is not None %}{{ comp.similarity.proximity }}%{% else %}&mdash;{% endif %}</td></tr>
+                  <tr><th>Size</th><td>{% if comp.similarity.size is not None %}{{ comp.similarity.size }}%{% else %}&mdash;{% endif %}</td></tr>
+                  <tr><th>Quality</th><td>{% if comp.similarity.quality_condition is not None %}{{ comp.similarity.quality_condition }}%{% else %}&mdash;{% endif %}</td></tr>
+                  <tr><th>Land</th><td>{% if comp.similarity.land is not None %}{{ comp.similarity.land }}%{% else %}&mdash;{% endif %}</td></tr>
+                </table>
+              </div>
+              </div>
+            </div>
             <div class="comp-card__header-content">
-              <div style="flex: 1;">
+              <div>
                 <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
                 <div class="comp-card__meta">
                   <span class="comp-card__meta-item">
@@ -594,15 +819,38 @@
             <div class="comp-card__adjustments">
               <span class="adjustments-label">Adjustments:</span>
               {% if comp.adjustments %}
-                <div class="adjustments-line">
+                <div class="adjustments-badges">
                   {% for item in comp.adjustments %}
                     {% if item.amount %}
-                      <span class="adjustment-entry">
-                        {{ item.label }}
-                        <span class="{% if item.amount > 0 %}adjustment-amount--up{% else %}adjustment-amount--down{% endif %}">
-                          {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                      {% with item.label|default:""|lower as label_lower %}
+                        <span class="adjustment-badge {% if item.amount > 0 %}adjustment-badge--positive{% else %}adjustment-badge--negative{% endif %}">
+                          {% if 'living' in label_lower %}
+                            <span class="adjustment-badge__icon">
+                              <i class="fa-solid fa-house-chimney-user" aria-hidden="true"></i>
+                            </span>
+                          {% elif 'lot' in label_lower or 'land' in label_lower %}
+                            <span class="adjustment-badge__icon">
+                              <i class="fa-solid fa-map-pin" aria-hidden="true"></i>
+                            </span>
+                          {% elif 'trend' in label_lower or 'time' in label_lower %}
+                            <span class="adjustment-badge__icon">
+                              <i class="fa-solid fa-timeline" aria-hidden="true"></i>
+                            </span>
+                          {% elif 'age' in label_lower or 'year' in label_lower or 'built' in label_lower %}
+                            <span class="adjustment-badge__icon">
+                              <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                            </span>
+                          {% else %}
+                            <span class="adjustment-badge__icon">
+                              <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                            </span>
+                          {% endif %}
+                          <span class="sr-only">{{ item.label }}</span>
+                          <span class="adjustment-badge__amount">
+                            {% if item.amount > 0 %}+{% elif item.amount < 0 %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                          </span>
                         </span>
-                      </span>
+                      {% endwith %}
                     {% endif %}
                   {% endfor %}
                 </div>
@@ -641,10 +889,28 @@
   <div id="grid-view" class="view-container">
     <div class="comp-grid">
       {% for comp in comparables %}
+
         <div class="comp-card">
           <div class="comp-card__header">
+            <div class="comp-card__header-gauge">
+              <div class="comp-similarity">
+                <button class="comp-similarity__trigger" type="button" aria-expanded="false">
+                  <div class="comp-similarity__gauge" style="--value: {{ comp.similarity.overall|default_if_none:0 }}%;">
+                    <div class="comp-similarity__gauge-inner">
+                      <span class="comp-similarity__value">
+                        {% if comp.similarity.overall is not None %}
+                          {{ comp.similarity.overall }}%
+                        {% else %}
+                          0%
+                        {% endif %}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
             <div class="comp-card__header-content">
-              <div style="flex: 1;">
+              <div>
                 <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
               </div>
               <div class="comp-price-block">
@@ -653,7 +919,6 @@
               </div>
             </div>
           </div>
-
 
           <div class="comp-card__meta comp-card__meta--grid">
             <span class="comp-card__meta-item">
@@ -697,27 +962,66 @@
             </div>
           </div>
           {% if advanced_mode %}
-            <div class="comp-card__adjustments">
-              <span class="adjustments-label">Adjustments:</span>
-              {% if comp.adjustments %}
-                <div class="adjustments-line">
-                  {% for item in comp.adjustments %}
-                    {% if item.amount %}
-                      <span class="adjustment-entry">
-                        {{ item.label }}
-                        <span class="{% if item.amount > 0 %}adjustment-amount--up{% else %}adjustment-amount--down{% endif %}">
-                          {% if item.amount > 0 %}+{% else %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
-                        </span>
-                      </span>
-                    {% endif %}
-                  {% endfor %}
+            {% if comp.adjustments %}
+              <details class="comp-card__adjustments comp-card__adjustments--collapsible">
+                <summary class="comp-card__adjustments-summary">
+                  <div class="comp-card__adjustments-summary-row">
+                    <span class="adjustments-label">Adjustments:</span>
+                    <span class="adjustments-summary-text">
+                      {% if comp.adjustments_excerpt %}
+                        {{ comp.adjustments_excerpt|join:" | " }}
+                      {% else %}
+                        No adjustments applied
+                      {% endif %}
+                    </span>
+                  </div>
+                  <span class="comp-card__adjustments-summary-indicator" aria-hidden="true">
+                    <i class="fa-solid fa-chevron-down"></i>
+                  </span>
+                </summary>
+                <div class="comp-card__adjustments-body">
+                  <div class="adjustments-badges">
+                    {% for item in comp.adjustments %}
+                      {% if item.amount %}
+                        {% with item.label|default:""|lower as label_lower %}
+                          <span class="adjustment-badge {% if item.amount > 0 %}adjustment-badge--positive{% else %}adjustment-badge--negative{% endif %}">
+                            {% if 'living' in label_lower %}
+                              <span class="adjustment-badge__icon">
+                                <i class="fa-solid fa-house-chimney-user" aria-hidden="true"></i>
+                              </span>
+                            {% elif 'lot' in label_lower or 'land' in label_lower %}
+                              <span class="adjustment-badge__icon">
+                                <i class="fa-solid fa-map-pin" aria-hidden="true"></i>
+                              </span>
+                            {% elif 'trend' in label_lower or 'time' in label_lower %}
+                              <span class="adjustment-badge__icon">
+                                <i class="fa-solid fa-timeline" aria-hidden="true"></i>
+                              </span>
+                            {% elif 'age' in label_lower or 'year' in label_lower or 'built' in label_lower %}
+                              <span class="adjustment-badge__icon">
+                                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                              </span>
+                            {% else %}
+                              <span class="adjustment-badge__icon">
+                                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                              </span>
+                            {% endif %}
+                            <span class="sr-only">{{ item.label }}</span>
+                            <span class="adjustment-badge__amount">
+                              {% if item.amount > 0 %}+{% elif item.amount < 0 %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                            </span>
+                          </span>
+                        {% endwith %}
+                      {% endif %}
+                    {% endfor %}
+                  </div>
                 </div>
-              {% elif advanced_error %}
-                <span class="adjustment-entry adjustment-entry--muted">{{ advanced_error }}</span>
-              {% else %}
-                <span class="adjustment-entry adjustment-entry--muted">Not available</span>
-              {% endif %}
-            </div>
+              </details>
+            {% elif advanced_error %}
+              <span class="adjustment-entry adjustment-entry--muted">{{ advanced_error }}</span>
+            {% else %}
+              <span class="adjustment-entry adjustment-entry--muted">Not available</span>
+            {% endif %}
             <div class="comp-card__adjusted-row">
               <span class="comp-adjusted__label">Adjusted Value</span>
               <div>
@@ -750,7 +1054,20 @@
     </div>
   </div>
 </div>
-
+      {% if has_more %}
+        <button
+          id="comparables-more-button"
+          class="comparables-more-btn"
+          type="button"
+          data-extended-count="{{ extended_limit }}"
+        >
+          <span class="comparables-more-label">Get more comps</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+        </button>
+      {% endif %}
 <script>
   let comparablesMap = null;
   let markersGroup = null;
@@ -889,6 +1206,52 @@
         easing: 'easeOutQuad'
       });
     }
+
+    const similarityContainers = Array.from(document.querySelectorAll('.comp-similarity'));
+    const similarityTriggers = document.querySelectorAll('.comp-similarity__trigger');
+
+    const closeAllSimilarity = () => {
+      similarityContainers.forEach((container) => {
+        container.classList.remove('is-open');
+        const trigger = container.querySelector('.comp-similarity__trigger');
+        if (trigger) {
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    };
+
+    similarityTriggers.forEach((trigger) => {
+      trigger.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const container = trigger.closest('.comp-similarity');
+        if (!container) {
+          return;
+        }
+        const currentlyOpen = container.classList.contains('is-open');
+        closeAllSimilarity();
+        if (!currentlyOpen) {
+          container.classList.add('is-open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+
+    similarityContainers.forEach((container) => {
+      const tooltip = container.querySelector('.comp-similarity__tooltip');
+      if (tooltip) {
+        tooltip.addEventListener('click', (event) => {
+          event.stopPropagation();
+        });
+      }
+    });
+
+    document.addEventListener('click', () => closeAllSimilarity());
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeAllSimilarity();
+      }
+    });
   });
 </script>
 

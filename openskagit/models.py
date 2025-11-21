@@ -77,6 +77,26 @@ class RegressionResult(models.Model):
         ordering = ["-run_date"]
 
 
+class ComparableCache(models.Model):
+    parcel_number = models.CharField(max_length=20, db_index=True)
+    roll_year = models.IntegerField(db_index=True)
+    radius_meters = models.IntegerField()
+    limit = models.IntegerField()
+    comparables = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_refreshed = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "comparable_cache"
+        unique_together = ("parcel_number", "roll_year", "radius_meters", "limit")
+        indexes = [
+            models.Index(fields=["parcel_number", "roll_year"]),
+        ]
+
+    def __str__(self):
+        return f"{self.parcel_number} [{self.roll_year}] limit={self.limit}"
+
+
 class Parcel(models.Model):
     parcel_number = models.CharField(max_length=20, unique=True, db_index=True)
     address = models.CharField(max_length=255, blank=True, null=True)  # includes city & ZIP

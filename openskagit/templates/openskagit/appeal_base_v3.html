@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="{% static 'openskagit/chat.css' %}" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" />
   <style>
     /* === Design System - Ethereal Grays === */
     :root {
@@ -407,140 +408,14 @@
   <div class="app-container">
     <header class="app-header">
       <div class="app-header__badge">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
+        <i class="fa-solid fa-house-chimney"></i>
         Property Assessment Tool
       </div>
-      <p class="app-header__subtitle">
-        <span class="app-header__subtitle-compact">
-          {% block header_teaser_compact %}Smart guidance on whether your assessment is worth appealing.{% endblock %}
-        </span>
-      </p>
     </header>
-
-    {% if step %}
-    <div class="progress-stepper">
-      <div class="progress-step {% if step == 1 %}progress-step--active{% elif step > 1 %}progress-step--completed{% endif %}">
-        <div class="progress-step__circle">
-          {% if step > 1 %}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          {% else %}
-            1
-          {% endif %}
-        </div>
-        <span class="progress-step__label">Find Property</span>
-      </div>
-
-      <div class="progress-connector {% if step > 1 %}progress-connector--active{% endif %}"></div>
-
-      <div class="progress-step {% if step == 2 %}progress-step--active{% elif step > 2 %}progress-step--completed{% endif %}">
-        <div class="progress-step__circle">
-          {% if step > 2 %}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          {% else %}
-            2
-          {% endif %}
-        </div>
-        <span class="progress-step__label">Review Details</span>
-      </div>
-
-      <div class="progress-connector {% if step > 2 %}progress-connector--active{% endif %}"></div>
-
-      <div class="progress-step {% if step == 3 %}progress-step--active{% elif step > 3 %}progress-step--completed{% endif %}">
-        <div class="progress-step__circle">3</div>
-        <span class="progress-step__label">View Analysis</span>
-      </div>
-    </div>
-    {% endif %}
 
     {% block content %}{% endblock %}
   </div>
 
-  {% if chat_bootstrap %}
-    <div class="chat-widget" data-chat-widget>
-      <button type="button" class="chat-widget__toggle" data-chat-widget-toggle>
-        💬
-      </button>
-      <div class="chat-widget__panel" data-chat-widget-panel>
-        <div class="chat-widget__header">
-          <div>
-            <h3 class="chat-widget__title">Appeal Copilot</h3>
-            <p class="chat-widget__subtitle">Ask questions about valuations, comps, or next steps.</p>
-          </div>
-          <button type="button" class="chat-widget__close" data-chat-widget-close>&times;</button>
-        </div>
-        <div data-chat-root
-             data-chat-style="widget"
-             data-send-url="{% url 'chat' %}"
-             data-new-url="{% url 'chat-new' %}"
-             data-conversation-id="{{ chat_bootstrap.conversation_id }}">
-          <div class="chat-widget__messages"
-               data-chat-messages
-               data-chat-scroll>
-            {% if chat_bootstrap.messages %}
-              {% for m in chat_bootstrap.messages %}
-                <div class="chat-message chat-message--{{ m.role }} chat-message--widget">
-                  <div class="chat-avatar chat-avatar--{{ m.role }}">{{ m.role|slice:":1"|upper }}</div>
-                  <div class="chat-message-body chat-message-body--widget">
-                    <div class="chat-content">{{ m.content|linebreaksbr }}</div>
-                    {% if m.sources %}
-                      <div class="chat-sources">
-                        {% for source in m.sources %}
-                          <span class="chat-source-chip">
-                            <span>#{{ forloop.counter }}</span>
-                            {% if source.parcel_number %}<span>{{ source.parcel_number }}</span>{% endif %}
-                            {% if source.address %}<span class="chat-source-address">{{ source.address }}</span>{% endif %}
-                          </span>
-                        {% endfor %}
-                      </div>
-                    {% endif %}
-                  </div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <p class="chat-placeholder">No questions yet. Ask about comparable sales or assessment changes.</p>
-            {% endif %}
-          </div>
-          <form class="chat-widget__form" data-chat-form>
-            {% csrf_token %}
-            <input type="hidden"
-                   name="conversation_id"
-                   value="{{ chat_bootstrap.conversation_id }}"
-                   data-chat-conversation-input>
-            <textarea name="prompt"
-                      placeholder="How do I contest my assessed value?"
-                      required></textarea>
-            <div class="chat-widget__actions">
-              <div class="chat-widget__status" data-chat-status>Ready when you are.</div>
-              <button type="submit">Send</button>
-            </div>
-            <div class="chat-widget__error" data-chat-error></div>
-          </form>
-          <div class="chat-widget__suggestions">
-            <button type="button" data-chat-suggestion="How do I start a property tax appeal in Skagit County?">
-              Start an appeal
-            </button>
-            <button type="button" data-chat-suggestion="What comps can support parcel P12345?">
-              Find comps
-            </button>
-            <button type="button" data-chat-suggestion="Explain the timeline for appeal hearings.">
-              Appeal timeline
-            </button>
-          </div>
-        </div>
-        <div class="chat-widget__footer">
-          <button type="button" data-chat-reset>Start over</button>
-          <a href="{% url 'chatbot' %}" target="_blank" rel="noopener">Open full chat</a>
-        </div>
-      </div>
-    </div>
-  {% endif %}
 
   {% block extra_js %}{% endblock %}
   <script src="{% static 'openskagit/chat.js' %}" defer></script>
