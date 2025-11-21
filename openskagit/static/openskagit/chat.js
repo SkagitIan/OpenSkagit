@@ -467,6 +467,12 @@
       }
     }
 
+    resizeInput() {
+      if (!this.inputEl) return;
+      this.inputEl.style.height = "auto";
+      this.inputEl.style.height = this.inputEl.scrollHeight + "px";
+    }
+
     scrollToBottom() {
       if (this.scrollWrapper) {
         requestAnimationFrame(() => {
