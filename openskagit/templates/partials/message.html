@@ -1,35 +1,44 @@
 {% load humanize %}
-<div class="msg flex items-start gap-3" data-role="{{ role }}">
+<div class="msg flex items-start gap-3 animate-fade-in" data-role="{{ role }}">
   {% if role == "user" %}
-    <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--ap-orange)]/20 font-semibold text-[var(--ap-orange)]">U</div>
-    <div class="flex-1 rounded-3xl bg-white px-4 py-3 text-sm text-[var(--ap-ink)] shadow-sm chat-content">
+    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-[var(--ap-orange)]/30 bg-gradient-to-br from-[var(--ap-orange)]/20 to-[var(--ap-orange)]/10 font-bold text-[var(--ap-orange)] shadow-sm">U</div>
+    <div class="flex-1 rounded-2xl border border-[var(--ap-orange)]/20 bg-gradient-to-br from-[var(--ap-orange)]/8 to-transparent px-5 py-3.5 text-sm text-[var(--ap-ink)] shadow-md chat-content">
       {{ content|linebreaksbr }}
     </div>
   {% else %}
-    <div class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--ap-teal)]/25 font-semibold text-[var(--ap-teal)]">A</div>
-    <div class="flex-1 rounded-3xl bg-white px-4 py-3 text-sm text-[var(--ap-ink)] shadow-sm">
+    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-[var(--ap-teal)]/30 bg-gradient-to-br from-[var(--ap-teal)]/25 to-[var(--ap-teal)]/15 font-bold text-[var(--ap-teal)] shadow-sm">A</div>
+    <div class="flex-1 rounded-2xl border border-neutral-200 bg-white px-5 py-3.5 text-sm text-[var(--ap-ink)] shadow-md">
       {{ content|safe }}
       {% if sources %}
-        <div class="chat-sources mt-3 border-t border-dashed border-neutral-200 pt-2 text-xs text-neutral-500">
-          <span class="font-semibold text-[var(--ap-ink)]">Sources:</span>
+        <div class="chat-sources mt-4 flex flex-wrap gap-2 border-t border-neutral-200 pt-3">
           {% for s in sources %}
-            <span class="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-1 text-[11px] text-neutral-600">
-              <span>#{{ forloop.counter }}</span>
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--ap-teal)]/20 bg-[var(--ap-teal)]/5 px-3 py-1.5 text-xs font-medium text-[var(--ap-teal)] shadow-sm">
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ap-teal)]/15 text-[10px] font-bold">#{{ forloop.counter }}</span>
               {% if s.parcel_number %}
-                <span>{{ s.parcel_number }}</span>
+                <span class="font-semibold">{{ s.parcel_number }}</span>
               {% endif %}
               {% if s.address %}
-                <span class="truncate max-w-[10rem]">{{ s.address }}</span>
+                <span class="truncate max-w-[10rem] text-neutral-600">{{ s.address }}</span>
               {% endif %}
               {% if s.distance is not None %}
-                <span>dist: {{ s.distance }}</span>
+                <span class="text-neutral-500">{{ s.distance|floatformat:2 }}mi</span>
               {% endif %}
             </span>
           {% empty %}
-            <span>No related parcels returned.</span>
+            <span class="text-xs text-neutral-500">No related parcels returned.</span>
           {% endfor %}
         </div>
       {% endif %}
     </div>
   {% endif %}
 </div>
+
+<style>
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+</style>
