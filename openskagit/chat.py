@@ -4,157 +4,180 @@ import copy
 import json
 import logging
 from typing import Any, Dict, Iterable, Iterator, List, Optional
-from uuid import uuid4
+from uuid import UUID
 
 from django.conf import settings
 from django.utils import timezone
 
 from . import llm
 from .llm import MissingCredentials, MissingDependency, OpenAIError
+from .models import Conversation, ConversationMessage
 
 logger = logging.getLogger(__name__)
 
-CHAT_SESSION_KEY = "rag_conversations"
-CHAT_ACTIVE_KEY = "rag_active_conversation"
 
-
-def _timestamp() -> float:
-    return timezone.now().timestamp()
-
-
-def _create_conversation_record() -> Dict[str, Any]:
-    now_ts = _timestamp()
-    return {
-        "title": "New conversation",
-        "created_ts": now_ts,
-        "updated_ts": now_ts,
-        "messages": [],
-    }
+def _create_conversation(session_key: Optional[str] = None, title: str = "New conversation") -> Conversation:
+    """Create a new conversation in the database."""
+    return Conversation.objects.create(
+        session_key=session_key,
+        title=title
+    )
 
 
 class ConversationManager:
     """
-    Lightweight session-backed conversation store shared across templates and widgets.
+    Database-backed conversation manager that replaces session storage.
     """
 
     def __init__(self, request) -> None:
         self.request = request
+        self.session_key = request.session.session_key or ""
+
+    def _get_active_conversation_id(self) -> Optional[str]:
+        """Get the active conversation ID from session."""
+        return self.request.session.get("active_conversation_id")
+
+    def _set_active_conversation_id(self, conversation_id: str) -> None:
+        """Set the active conversation ID in session."""
+        self.request.session["active_conversation_id"] = conversation_id
+        self.request.session.modified = True
 
     @property
     def active_id(self) -> Optional[str]:
-        cid = self.request.session.get(CHAT_ACTIVE_KEY)
-        store = self._store()
-        if cid and cid in store:
-            return cid
+        """Return the currently active conversation ID if it exists."""
+        cid = self._get_active_conversation_id()
+        if cid:
+            try:
+                UUID(cid)
+                if Conversation.objects.filter(id=cid).exists():
+                    return cid
+            except (ValueError, AttributeError):
+                pass
         return None
-
-    def _store(self) -> Dict[str, Any]:
-        store = self.request.session.get(CHAT_SESSION_KEY)
-        if not isinstance(store, dict):
-            store = {}
-            self.request.session[CHAT_SESSION_KEY] = store
-            self.request.session.modified = True
-        return store
-
-    def _persist(self) -> None:
-        self.request.session.modified = True
 
     def ensure(self, conversation_id: Optional[str] = None) -> str:
         """
         Return an existing conversation id, creating one if needed.
         """
+        if conversation_id:
+            try:
+                UUID(conversation_id)
+                if Conversation.objects.filter(id=conversation_id).exists():
+                    self._set_active_conversation_id(conversation_id)
+                    return conversation_id
+            except (ValueError, AttributeError):
+                pass
 
-        store = self._store()
-        cid = conversation_id
-        if cid and cid in store:
-            self._set_active(cid)
-            return cid
+        active = self.active_id
+        if active:
+            return active
 
-        if cid and cid not in store:
-            cid = None
+        most_recent = (
+            Conversation.objects.filter(session_key=self.session_key)
+            .order_by("-updated_at")
+            .first()
+        )
 
-        if cid is None:
-            active = self.active_id
-            if active:
-                return active
-            if store:
-                cid = max(store.items(), key=lambda item: item[1].get("updated_ts", 0))[0]
-            else:
-                cid = self.new()
-        self._set_active(cid)
+        if most_recent:
+            cid = str(most_recent.id)
+        else:
+            cid = self.new()
+
+        self._set_active_conversation_id(cid)
         return cid
 
     def new(self) -> str:
         """
         Create a new empty conversation and set it active.
         """
+        conversation = _create_conversation(session_key=self.session_key)
+        cid = str(conversation.id)
+        self._set_active_conversation_id(cid)
+        return cid
 
-        store = self._store()
-        conversation_id = uuid4().hex
-        store[conversation_id] = _create_conversation_record()
-        self.request.session[CHAT_SESSION_KEY] = store
-        self._set_active(conversation_id)
-        return conversation_id
+    def _get_conversation(self, conversation_id: str) -> Conversation:
+        """Get or create a conversation by ID."""
+        try:
+            UUID(conversation_id)
+            conversation = Conversation.objects.get(id=conversation_id)
+        except (ValueError, Conversation.DoesNotExist):
+            conversation = _create_conversation(session_key=self.session_key)
+            self._set_active_conversation_id(str(conversation.id))
 
-    def _set_active(self, conversation_id: str) -> None:
-        self.request.session[CHAT_ACTIVE_KEY] = conversation_id
-        self._persist()
-
-    def _get_conversation(self, conversation_id: str) -> Dict[str, Any]:
-        store = self._store()
-        conversation = store.get(conversation_id)
-        if conversation is None:
-            conversation = _create_conversation_record()
-            store[conversation_id] = conversation
-            self.request.session[CHAT_SESSION_KEY] = store
         return conversation
 
     def list_conversations(self) -> List[Dict[str, Any]]:
-        store = self._store()
+        """List all conversations for the current session."""
+        conversations_qs = (
+            Conversation.objects.filter(session_key=self.session_key)
+            .order_by("-updated_at")[:50]
+        )
+
         conversations: List[Dict[str, Any]] = []
-        for cid, data in store.items():
-            title = (data.get("title") or "").strip() or "New conversation"
+        for conv in conversations_qs:
+            title = (conv.title or "").strip() or "New conversation"
             if len(title) > 60:
                 title = f"{title[:57]}…"
             conversations.append(
                 {
-                    "id": cid,
+                    "id": str(conv.id),
                     "title": title,
-                    "updated_ts": data.get("updated_ts") or data.get("created_ts") or 0,
+                    "updated_ts": conv.updated_at.timestamp(),
                 }
             )
-        conversations.sort(key=lambda item: item["updated_ts"], reverse=True)
         return conversations
 
     def get_messages(self, conversation_id: str) -> List[Dict[str, Any]]:
+        """Get all messages for a conversation."""
         conversation = self._get_conversation(conversation_id)
-        messages = conversation.get("messages") or []
-        return [copy.deepcopy(message) for message in messages]
+        messages = conversation.messages.all()
+
+        result = []
+        for msg in messages:
+            result.append({
+                "role": msg.role,
+                "content": msg.content,
+                "sources": msg.sources or [],
+                "model": msg.model,
+            })
+        return result
 
     def model_history(self, conversation_id: str) -> List[Dict[str, str]]:
+        """Get conversation history formatted for OpenAI."""
         conversation = self._get_conversation(conversation_id)
+        messages = conversation.messages.filter(role__in=["user", "assistant"])
+
         history: List[Dict[str, str]] = []
-        for message in conversation.get("messages", []):
-            role = message.get("role")
-            content = (message.get("content") or "").strip()
-            if role in {"user", "assistant"} and content:
-                history.append({"role": role, "content": content})
+        for msg in messages:
+            content = (msg.content or "").strip()
+            if content:
+                history.append({"role": msg.role, "content": content})
         return history
 
-    def _update_title(self, conversation: Dict[str, Any], prompt: str) -> None:
-        current_title = (conversation.get("title") or "").strip()
-        if not current_title or current_title.startswith("New conversation"):
+    def _update_title(self, conversation: Conversation, prompt: str) -> None:
+        """Update conversation title based on the first user message."""
+        if not conversation.messages.exists() or conversation.title == "New conversation":
             trimmed = prompt.strip()[:60]
-            conversation["title"] = f"{trimmed}…" if len(prompt.strip()) > 60 else (trimmed or "New conversation")
+            conversation.title = f"{trimmed}…" if len(prompt.strip()) > 60 else (trimmed or "New conversation")
+            conversation.save(update_fields=["title", "updated_at"])
 
     def append_user_message(self, conversation_id: str, prompt: str) -> Dict[str, Any]:
+        """Append a user message to the conversation."""
         conversation = self._get_conversation(conversation_id)
-        message = {"role": "user", "content": prompt}
-        conversation.setdefault("messages", []).append(message)
-        conversation["updated_ts"] = _timestamp()
+
+        message = ConversationMessage.objects.create(
+            conversation=conversation,
+            role="user",
+            content=prompt
+        )
+
         self._update_title(conversation, prompt)
-        self._persist()
-        return copy.deepcopy(message)
+        conversation.save(update_fields=["updated_at"])
+
+        return {
+            "role": message.role,
+            "content": message.content,
+        }
 
     def append_assistant_message(
         self,
@@ -164,21 +187,28 @@ class ConversationManager:
         sources: Optional[List[Dict[str, Any]]] = None,
         model: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Append an assistant message to the conversation."""
         conversation = self._get_conversation(conversation_id)
-        message = {
-            "role": "assistant",
-            "content": content,
+
+        message = ConversationMessage.objects.create(
+            conversation=conversation,
+            role="assistant",
+            content=content,
+            sources=sources or [],
+            model=model
+        )
+
+        conversation.save(update_fields=["updated_at"])
+
+        return {
+            "role": message.role,
+            "content": message.content,
+            "sources": message.sources,
+            "model": message.model,
         }
-        if sources:
-            message["sources"] = sources
-        if model:
-            message["model"] = model
-        conversation.setdefault("messages", []).append(message)
-        conversation["updated_ts"] = _timestamp()
-        self._persist()
-        return copy.deepcopy(message)
 
     def bootstrap(self, conversation_id: str, *, initial_prompt: str | None = None) -> Dict[str, Any]:
+        """Bootstrap conversation data for templates."""
         return {
             "conversation_id": conversation_id,
             "messages": self.get_messages(conversation_id),
@@ -201,7 +231,7 @@ class StreamingCompletion:
     ) -> None:
         self.prompt = prompt
         self.history = list(history or [])
-        self.model_name = model or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4.1-mini")
+        self.model_name = model or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4o-mini")
         self.sources: List[Dict[str, Any]] = []
         self.full_text: str = ""
 
@@ -241,7 +271,6 @@ class StreamingCompletion:
         """
         Yield streamed text deltas from OpenAI Responses.
         """
-
         yield from self._stream_events()
 
 
@@ -249,13 +278,10 @@ def render_stream_event(payload: Dict[str, Any]) -> bytes:
     """
     Convert dict payloads to newline-delimited JSON bytes for StreamingHttpResponse.
     """
-
     return (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
 
 
 __all__ = [
-    "CHAT_ACTIVE_KEY",
-    "CHAT_SESSION_KEY",
     "ConversationManager",
     "MissingCredentials",
     "MissingDependency",

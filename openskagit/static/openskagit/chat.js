@@ -26,6 +26,7 @@
   class ChatController {
     constructor(root) {
       this.root = root;
+      this.mode = root.dataset.chatStyle || "fullpage";
       this.form = root.querySelector("[data-chat-form]");
       this.messagesEl = root.querySelector("[data-chat-messages]");
       this.inputEl = this.form ? this.form.querySelector("textarea[name='prompt']") : null;
@@ -133,16 +134,15 @@
     appendUserMessage(text) {
       this.clearPlaceholders();
       const container = document.createElement("div");
-      container.className = "msg flex items-start gap-3";
+      container.className = this.getMessageClass("user");
       container.dataset.role = "user";
 
       const avatar = document.createElement("div");
-      avatar.className =
-        "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--ap-orange)]/20 font-semibold text-[var(--ap-orange)]";
+      avatar.className = this.getAvatarClass("user");
       avatar.textContent = "U";
 
       const body = document.createElement("div");
-      body.className = "flex-1 rounded-3xl bg-white px-4 py-3 text-sm text-[var(--ap-ink)] shadow-sm chat-content";
+      body.className = this.getMessageBodyClass();
       body.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
 
       container.appendChild(avatar);
@@ -154,25 +154,23 @@
     createAssistantBubble() {
       this.clearPlaceholders();
       const container = document.createElement("div");
-      container.className = "msg flex items-start gap-3";
+      container.className = this.getMessageClass("assistant");
       container.dataset.role = "assistant";
 
       const avatar = document.createElement("div");
-      avatar.className =
-        "grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--ap-teal)]/25 font-semibold text-[var(--ap-teal)]";
+      avatar.className = this.getAvatarClass("assistant");
       avatar.textContent = "A";
 
       const body = document.createElement("div");
-      body.className = "flex-1 rounded-3xl bg-white px-4 py-3 text-sm text-[var(--ap-ink)] shadow-sm";
+      body.className = this.getMessageBodyClass();
 
       const content = document.createElement("div");
       content.className = "chat-content";
-      content.innerHTML = "<span class='text-neutral-400'>Thinking…</span>";
+      content.innerHTML = "<span class='chat-thinking'>Thinking…</span>";
       body.appendChild(content);
 
       const sources = document.createElement("div");
-      sources.className =
-        "chat-sources mt-3 hidden border-t border-dashed border-neutral-200 pt-2 text-xs text-neutral-500";
+      sources.className = "chat-sources chat-sources--hidden";
       body.appendChild(sources);
 
       container.appendChild(avatar);
@@ -181,6 +179,25 @@
       this.scrollToBottom();
 
       return { element: container, contentEl: content, sourcesEl: sources, buffer: "" };
+    }
+
+    getMessageClass(role) {
+      const baseClasses = "chat-message";
+      if (this.mode === "widget") {
+        return `${baseClasses} chat-message--${role} chat-message--widget`;
+      }
+      return `${baseClasses} chat-message--${role}`;
+    }
+
+    getAvatarClass(role) {
+      return `chat-avatar chat-avatar--${role}`;
+    }
+
+    getMessageBodyClass() {
+      if (this.mode === "widget") {
+        return "chat-message-body chat-message-body--widget";
+      }
+      return "chat-message-body";
     }
 
     updateAssistantContent(assistant, text) {
@@ -193,14 +210,13 @@
       if (!assistant.sourcesEl) return;
       assistant.sourcesEl.innerHTML = "";
       if (!sources || !sources.length) {
-        assistant.sourcesEl.classList.add("hidden");
+        assistant.sourcesEl.classList.add("chat-sources--hidden");
         return;
       }
-      assistant.sourcesEl.classList.remove("hidden");
+      assistant.sourcesEl.classList.remove("chat-sources--hidden");
       sources.forEach((source, index) => {
         const chip = document.createElement("span");
-        chip.className =
-          "inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-1 text-[11px] text-neutral-600";
+        chip.className = "chat-source-chip";
 
         const badge = document.createElement("span");
         badge.textContent = `#${index + 1}`;
@@ -213,7 +229,7 @@
         }
         if (source.address) {
           const addr = document.createElement("span");
-          addr.className = "truncate max-w-[10rem]";
+          addr.className = "chat-source-address";
           addr.textContent = source.address;
           chip.appendChild(addr);
         }
@@ -246,7 +262,7 @@
         this.setConversationId(data.conversation_id);
         this.messagesEl.innerHTML = "";
         const placeholder = document.createElement("p");
-        placeholder.className = "text-sm text-neutral-500";
+        placeholder.className = "chat-placeholder";
         placeholder.setAttribute("data-chat-placeholder", "true");
         placeholder.textContent = "New conversation started. Ask any question below.";
         this.messagesEl.appendChild(placeholder);
@@ -420,11 +436,12 @@
     }
 
     toggle.addEventListener("click", () => {
-      panel.classList.add("is-open");
+      panel.classList.add("chat-widget--open");
     });
+
     if (close) {
       close.addEventListener("click", () => {
-        panel.classList.remove("is-open");
+        panel.classList.remove("chat-widget--open");
       });
     }
   }
