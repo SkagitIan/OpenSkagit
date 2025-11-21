@@ -157,7 +157,7 @@ class Assessor(models.Model):
     has_septic = models.TextField(blank=True, null=True)
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
-    geom = gis_models.PointField(srid=4326, blank=True, null=True)
+    geom = gis_models.MultiPolygonField(srid=3857, blank=True, null=True)
     embedding = VectorField(dimensions=384, blank=True, null=True)
     centroid_geog = gis_models.PointField(geography=True, srid=4326, null=True, blank=True)
     class Meta:

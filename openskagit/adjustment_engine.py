@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from django.db.models import Max
+
 from .models import AdjustmentCoefficient
 
 # Terms we store in the DB but do NOT expose as separate “adjustments”
@@ -261,7 +263,13 @@ def _load_coefficients(
 
     target_run = run_id
     if not target_run:
-        target_run = qs.order_by("-created_at").values_list("run_id", flat=True).first()
+        target_run = (
+            qs.values("run_id")
+            .annotate(latest_created=Max("created_at"))
+            .order_by("-latest_created")
+            .values_list("run_id", flat=True)
+            .first()
+        )
     if not target_run:
         raise AdjustmentEngineError(f"No adjustment coefficients found for market_group={market_group}.")
 

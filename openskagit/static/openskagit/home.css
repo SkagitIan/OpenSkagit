@@ -710,3 +710,44 @@ button {
         align-items: flex-start;
     }
 }
+
+@media (max-width: 600px) {
+    .chat-panel {
+        padding: 1.25rem;
+        min-height: auto;
+    }
+
+    .chat-panel__transcript {
+        max-height: 300px;
+    }
+
+    .chat-panel__composer {
+        grid-template-columns: 1fr;
+    }
+
+    .chat-panel__composer input {
+        font-size: 0.95rem;
+    }
+
+    .chat-panel__composer button {
+        width: 100%;
+        align-self: stretch;
+    }
+
+    .chat-suggestions {
+        gap: 0.5rem;
+    }
+
+    .chat-suggestions__item {
+        width: 100%;
+        text-align: center;
+    }
+
+    .workspace__sidebar {
+        grid-template-columns: 1fr;
+    }
+
+    .workspace {
+        gap: 1.25rem;
+    }
+}

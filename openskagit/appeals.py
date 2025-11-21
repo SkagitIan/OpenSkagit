@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from django.core.cache import cache
 from django.utils import timezone
@@ -158,7 +158,11 @@ def load_subject_with_roll_context(parcel_number: str) -> Tuple[cma.PropertySnap
         .first()
     )
     if assessor_row:
-        metadata["assessed_value"] = assessor_row.assessed_value
+        active_value = cma.current_property_value(assessor_row)
+        if active_value is not None:
+            metadata["assessed_value"] = float(active_value)
+        else:
+            metadata.pop("assessed_value", None)
 
     prior_roll_year = active_roll_year - 1
     prior_assessor = (
@@ -172,28 +176,28 @@ def load_subject_with_roll_context(parcel_number: str) -> Tuple[cma.PropertySnap
     assessor_meta = metadata.setdefault("assessor", {})
     if assessor_row:
         assessor_meta["assessment_year"] = active_roll_year
-        assessor_meta["assessed_value"] = assessor_row.assessed_value
+        active_value = cma.current_property_value(assessor_row)
+        if active_value is not None:
+            assessor_meta["assessed_value"] = float(active_value)
+        else:
+            assessor_meta.pop("assessed_value", None)
     if prior_assessor:
         assessor_meta["prior_assessment_year"] = prior_roll_year
-        assessor_meta["prior_assessed_value"] = prior_assessor.assessed_value
+        prior_value = cma.current_property_value(prior_assessor)
+        if prior_value is not None:
+            assessor_meta["prior_assessed_value"] = float(prior_value)
+        else:
+            assessor_meta.pop("prior_assessed_value", None)
 
     assessed_change_pct: Optional[float] = None
-    if assessor_row and prior_assessor:
-        current_value = assessor_row.assessed_value
-        prior_value = prior_assessor.assessed_value
-        if current_value is not None and prior_value not in (None, 0):
-            try:
-                current_dec = Decimal(str(current_value))
-                prior_dec = Decimal(str(prior_value))
-            except (InvalidOperation, TypeError):
-                current_dec = None
-                prior_dec = None
-            if current_dec is not None and prior_dec not in (None, Decimal("0")):
-                try:
-                    change_pct = (current_dec - prior_dec) / prior_dec * Decimal("100")
-                    assessed_change_pct = float(change_pct)
-                except (InvalidOperation, ZeroDivisionError):
-                    assessed_change_pct = None
+    active_value = cma.current_property_value(assessor_row) if assessor_row else None
+    prior_value = cma.current_property_value(prior_assessor) if prior_assessor else None
+    if active_value is not None and prior_value not in (None, Decimal("0")):
+        try:
+            change_pct = (active_value - prior_value) / prior_value * Decimal("100")
+            assessed_change_pct = float(change_pct)
+        except (InvalidOperation, ZeroDivisionError):
+            assessed_change_pct = None
 
     if assessed_change_pct is not None:
         metadata["assessed_change_pct"] = assessed_change_pct
@@ -264,13 +268,39 @@ def _cached_comparables(subject: cma.PropertySnapshot, radius_meters: float, lim
     return comps
 
 
+def _comparable_key(comp: cma.ComparableResult) -> str:
+    snapshot = getattr(comp, "snapshot", None)
+    if snapshot is not None:
+        parcel_number = getattr(snapshot, "parcel_number", None)
+        if parcel_number:
+            return f"parcel:{parcel_number}"
+
+    sale_date = getattr(comp, "sale_date", None)
+    sale_price = getattr(comp, "sale_price", None)
+
+    date_text = None
+    if sale_date is not None:
+        date_text = sale_date.isoformat() if hasattr(sale_date, "isoformat") else str(sale_date)
+    price_text = str(sale_price) if sale_price is not None else "no-price"
+    return f"sale:{date_text or 'no-date'}:{price_text}"
+
+
 def _comparable_candidates(subject: cma.PropertySnapshot, limit: int) -> Tuple[List[cma.ComparableResult], float]:
-    comps = _cached_comparables(subject, PRIMARY_RADIUS_M, limit)
+    seen: Set[str] = set()
+    results: List[cma.ComparableResult] = []
     radius_used = PRIMARY_RADIUS_M
-    if len(comps) < 4:
-        comps = _cached_comparables(subject, SECONDARY_RADIUS_M, limit)
-        radius_used = SECONDARY_RADIUS_M
-    return comps, radius_used
+    for radius in (PRIMARY_RADIUS_M, SECONDARY_RADIUS_M):
+        radius_used = radius
+        batch = _cached_comparables(subject, radius, limit)
+        for comp in batch:
+            key = _comparable_key(comp)
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append(comp)
+            if len(results) >= limit:
+                return results[:limit], radius_used
+    return results[:limit], radius_used
 
 
 def choose_citizen_comps(
