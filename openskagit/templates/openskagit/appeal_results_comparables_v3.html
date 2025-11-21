@@ -211,6 +211,10 @@
     box-shadow: var(--shadow-lg);
   }
 
+  .comp-card {
+    overflow: visible;
+  }
+
   .comp-card__header {
     padding: var(--space-5);
     background: var(--gray-50);
@@ -557,7 +561,7 @@
 
   .comp-similarity__tooltip {
     position: absolute;
-    bottom: calc(100% + var(--space-2));
+    bottom: calc(100% + var(--space-2)) !important;
     left: 0;
     z-index: 999;
     background: white;
