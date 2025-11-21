@@ -248,10 +248,10 @@ def generate_rag_response(
         )
 
     client = get_openai_client()
-    model_name = model or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4.1-mini")
+    model_name = model or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4o-mini")
 
     response = client.responses.create(
-        model="gpt-5-mini",
+        model=model_name,
         input=build_response_input(prompt, context_rows, history=history),
         temperature=0.2,
     )

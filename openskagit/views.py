@@ -1558,7 +1558,7 @@ def chat(request):
             rag_response = llm.generate_rag_response(prompt, history=history_messages)
             final_text = (rag_response.get("answer") or "").strip() or "I wasn't able to craft a response."
             sources = rag_response.get("sources") or []
-            model_name = rag_response.get("model") or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4.1-mini")
+            model_name = rag_response.get("model") or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4o-mini")
 
             manager.append_assistant_message(
                 conversation_id,
@@ -2590,7 +2590,7 @@ def appeal_fairness_analysis(request, parcel_number: str):
 
     try:
         client = llm.get_openai_client()
-        model_name = getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4.1-mini")
+        model_name = getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4o-mini")
         response = client.responses.create(
             model=model_name,
             input=str(f"System Prompt {system_prompt}, User Prompt: {user_prompt}"),
