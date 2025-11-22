@@ -224,16 +224,27 @@
   .comp-card__header {
     display: flex;
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: var(--space-3);
     overflow: visible;
   }
 
   .comp-card__header-content {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-4);
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: flex-start;
+    gap: var(--space-2) var(--space-4);
     flex: 1;
+    min-width: 0;
+  }
+
+  .comp-card__header-main {
+    min-width: 0;
+  }
+
+  .comp-card__header-price {
+    justify-self: end;
+    align-self: flex-start;
   }
 
   .comp-card__title {
@@ -241,6 +252,24 @@
     font-weight: 600;
     color: var(--gray-900);
     margin-bottom: var(--space-2);
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .comp-card__header-gauge {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+  }
+
+  .comp-card__header-gauge:not(.comp-card__header-similarity--text) {
+    width: 88px;
+  }
+
+  .comp-card__header-gauge.comp-card__header-similarity--text {
+    width: clamp(110px, 24vw, 160px);
+    flex: 0 1 clamp(110px, 24vw, 160px);
+    justify-content: flex-start;
   }
 
   .comp-card__meta {
@@ -512,11 +541,21 @@
     display: flex;
     justify-content: center;
     cursor: pointer;
+    width: 100%;
   }
 
   .comp-similarity__summary::-webkit-details-marker,
   .comp-similarity__summary::marker {
     display: none;
+  }
+
+  .comp-similarity--text .comp-similarity__summary {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: var(--space-1);
+    padding: var(--space-1) 0;
+    line-height: 1.2;
   }
 
   .comp-similarity__gauge {
@@ -557,6 +596,22 @@
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--gray-900);
+  }
+
+  .comp-similarity__text {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    overflow-wrap: anywhere;
+  }
+
+  .comp-similarity__text-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-500);
   }
 
   .comp-similarity__tooltip {
@@ -682,6 +737,21 @@
       grid-template-columns: 1fr;
     }
   }
+
+  @media (max-width: 640px) {
+    .comp-card__header {
+      gap: var(--space-2);
+      padding: var(--space-4);
+    }
+
+    .comp-card__header-content {
+      grid-template-columns: 1fr;
+    }
+
+    .comp-card__header-price {
+      justify-self: flex-start;
+    }
+  }
 </style>
 
 <div class="card comparables-section" id="appeal-comparables-root" data-fetch-url="{{ fetch_url }}" data-active-mode="{{ view_mode }}">
@@ -749,34 +819,37 @@
       {% for comp in comparables %}
         <div class="comp-card">
           <div class="comp-card__header">
-            <div class="comp-card__header-gauge">
-              <details class="comp-similarity">
-                <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
-                  <div class="comp-similarity__gauge" style="--value: {{ comp.similarity.overall|default_if_none:0 }}%;">
-                    <div class="comp-similarity__gauge-inner">
-                      <span class="comp-similarity__value">
-                        {% if comp.similarity.overall is not None %}
-                          {{ comp.similarity.overall }}%
-                        {% else %}
-                          0%
-                        {% endif %}
-                      </span>
-                    </div>
+            {% with comp.similarity.overall|default_if_none:0 as similarity_value %}
+              <div class="comp-card__header-gauge{% if advanced_mode %} comp-card__header-similarity--text{% endif %}">
+                <details class="comp-similarity{% if advanced_mode %} comp-similarity--text{% endif %}">
+                  <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
+                    {% if advanced_mode %}
+                      <div class="comp-similarity__text">
+                        <span class="comp-similarity__text-label">Similarity</span>
+                        <span class="comp-similarity__value">{{ similarity_value }}%</span>
+                      </div>
+                    {% else %}
+                        <div class="comp-similarity__gauge" style="--value: {{ similarity_value }}%;">
+                          <div class="comp-similarity__gauge-inner">
+                            <span class="comp-similarity__value">{{ similarity_value }}%</span>
+                          </div>
+                        </div>
+                    {% endif %}
+                  </summary>
+                  <div class="comp-similarity__tooltip" role="tooltip">
+                    <table>
+                      <tr><th>Time</th><td>{% if comp.similarity.time is not None %}{{ comp.similarity.time }}%{% else %}&mdash;{% endif %}</td></tr>
+                      <tr><th>Proximity</th><td>{% if comp.similarity.proximity is not None %}{{ comp.similarity.proximity }}%{% else %}&mdash;{% endif %}</td></tr>
+                      <tr><th>Size</th><td>{% if comp.similarity.size is not None %}{{ comp.similarity.size }}%{% else %}&mdash;{% endif %}</td></tr>
+                      <tr><th>Quality</th><td>{% if comp.similarity.quality_condition is not None %}{{ comp.similarity.quality_condition }}%{% else %}&mdash;{% endif %}</td></tr>
+                      <tr><th>Land</th><td>{% if comp.similarity.land is not None %}{{ comp.similarity.land }}%{% else %}&mdash;{% endif %}</td></tr>
+                    </table>
                   </div>
-                </summary>
-                <div class="comp-similarity__tooltip" role="tooltip">
-                  <table>
-                    <tr><th>Time</th><td>{% if comp.similarity.time is not None %}{{ comp.similarity.time }}%{% else %}&mdash;{% endif %}</td></tr>
-                    <tr><th>Proximity</th><td>{% if comp.similarity.proximity is not None %}{{ comp.similarity.proximity }}%{% else %}&mdash;{% endif %}</td></tr>
-                    <tr><th>Size</th><td>{% if comp.similarity.size is not None %}{{ comp.similarity.size }}%{% else %}&mdash;{% endif %}</td></tr>
-                    <tr><th>Quality</th><td>{% if comp.similarity.quality_condition is not None %}{{ comp.similarity.quality_condition }}%{% else %}&mdash;{% endif %}</td></tr>
-                    <tr><th>Land</th><td>{% if comp.similarity.land is not None %}{{ comp.similarity.land }}%{% else %}&mdash;{% endif %}</td></tr>
-                  </table>
-                </div>
-              </details>
-            </div>
+                </details>
+              </div>
+            {% endwith %}
             <div class="comp-card__header-content">
-              <div>
+              <div class="comp-card__header-main">
                 <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
                 <div class="comp-card__meta">
                   <span class="comp-card__meta-item">
@@ -797,7 +870,7 @@
                   </span>
                 </div>
               </div>
-              <div class="comp-price-block">
+              <div class="comp-price-block comp-card__header-price">
                 <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
                 <div class="comp-card__price-label">Sale Price</div>
               </div>
@@ -905,10 +978,10 @@
         <div class="comp-card">
           <div class="comp-card__header">
             <div class="comp-card__header-content">
-              <div>
+              <div class="comp-card__header-main">
                 <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
               </div>
-              <div class="comp-price-block">
+              <div class="comp-price-block comp-card__header-price">
                 <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
                 <div class="comp-card__price-label">Sale Price</div>
               </div>

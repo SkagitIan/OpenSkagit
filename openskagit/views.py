@@ -37,6 +37,7 @@ from .models import (
     NeighborhoodMetrics,
     NeighborhoodTrend,
     Parcel,
+    ParcelHistory,
 )
 from .improvement_utils import QUALITY_WEIGHTS
 from .valuation_areas import resolve_market_group
@@ -88,6 +89,18 @@ ADJUSTMENT_LABELS = [
     ("time", "Time trend"),
 ]
 
+ADJUSTMENT_TOOLTIP_METADATA = {
+    "area": {"unit": "sq ft", "decimals": 0},
+    "lot": {"unit": "acres", "decimals": 2},
+    "age": {"unit": "years", "decimals": 1},
+    "quality": {"unit": "pts", "decimals": 1},
+    "condition": {"unit": "pts", "decimals": 1},
+    "garage": {"unit": None, "decimals": 0},
+    "basement": {"unit": None, "decimals": 0},
+    "view": {"unit": None, "decimals": 0},
+    "time": {"unit": "months", "decimals": 1},
+}
+
 ADJUSTMENT_STORYBOARD_CONFIG = {
     "size": {
         "label": "Size adjustments",
@@ -117,6 +130,8 @@ ADJUSTMENT_STORYBOARD_CONFIG = {
 }
 
 ADJUSTMENT_STORYBOARD_ORDER = ["size", "quality", "condition", "time", "location"]
+
+PARCEL_HISTORY_LIMIT = 24
 
 
 def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metadata: object) -> None:
@@ -200,6 +215,53 @@ def _parse_limit(raw_limit: Optional[str]) -> int:
         limit = cma.DEFAULT_COMPARABLE_LIMIT
     limit = max(6, limit)
     return min(limit, cma.MAX_COMPARABLE_LIMIT)
+
+
+def _parse_currency_value(raw: Any) -> Optional[float]:
+    if raw in (None, ""):
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    if text.startswith("(") and text.endswith(")"):
+        text = f"-{text[1:-1]}"
+    text = text.replace("$", "").replace(",", "").replace(" ", "")
+    if not text or text == "-":
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _parcel_value_history(parcel_number: str, limit: int = PARCEL_HISTORY_LIMIT) -> List[Dict[str, Any]]:
+    if not parcel_number:
+        return []
+    record = ParcelHistory.objects.only("rows").filter(parcel_number=parcel_number).first()
+    if not record:
+        return []
+    raw_rows = record.rows or []
+    entries: List[Dict[str, Any]] = []
+    for row in raw_rows:
+        year_text = row.get("VALUE YEAR") or row.get("TAX YEAR")
+        try:
+            year = int(year_text)
+        except (TypeError, ValueError):
+            continue
+        value = None
+        for key in ("MARKET TOTAL", "LAND MARKET", "ASSESSED TOTAL", "LAND ASSESSED"):
+            value = _parse_currency_value(row.get(key))
+            if value is not None:
+                break
+        if value is None:
+            continue
+        entries.append({"year": year, "value": value})
+    if not entries:
+        return []
+    entries.sort(key=lambda item: item["year"])
+    if len(entries) > limit:
+        entries = entries[-limit:]
+    return entries
 
 
 def _safe_float_value(value: Any) -> Optional[float]:
@@ -465,6 +527,122 @@ def _comparable_adjustment_payload(comp: cma.ComparableResult) -> Optional[Dict[
     return base_payload
 
 
+def _format_measure_value(value: Any, decimals: int) -> Optional[str]:
+    if value in (None, "", "null"):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    formatted = f"{numeric:,.{decimals}f}"
+    if decimals == 0:
+        formatted = formatted.split(".")[0]
+    return formatted
+
+
+def _signed_delta_text(delta: float, decimals: int) -> str:
+    formatted = _format_measure_value(abs(delta), decimals)
+    if formatted is None:
+        formatted = f"{abs(delta):,.{decimals}f}"
+        if decimals == 0:
+            formatted = formatted.split(".")[0]
+    if delta > 0:
+        return f"+{formatted}"
+    if delta < 0:
+        return f"-{formatted}"
+    return formatted
+
+
+def _describe_numeric_delta(label: str, key: str, detail: Dict[str, Any]) -> str:
+    config = ADJUSTMENT_TOOLTIP_METADATA.get(key, {})
+    unit = config.get("unit")
+    decimals = config.get("decimals", 0)
+    delta = detail.get("delta")
+    prefix = f"{label} difference"
+    if delta is None:
+        return f"{prefix} unavailable."
+    if delta == 0:
+        sentence = f"{prefix}: No difference detected."
+    else:
+        signed = _signed_delta_text(delta, decimals)
+        direction = "Subject higher" if delta > 0 else "Comparable higher"
+        sentence = (
+            f"{prefix}: {signed}{f' {unit}' if unit else ''} ({direction})."
+        )
+    subject_value = _format_measure_value(detail.get("subject_value"), decimals)
+    comp_value = _format_measure_value(detail.get("comp_value"), decimals)
+    parts = []
+    if subject_value:
+        parts.append(f"Subject: {subject_value}{f' {unit}' if unit else ''}")
+    if comp_value:
+        parts.append(f"Comparable: {comp_value}{f' {unit}' if unit else ''}")
+    if parts:
+        sentence = f"{sentence} {'; '.join(parts)}"
+    return sentence
+
+
+def _describe_feature_delta(label: str, detail: Dict[str, Any]) -> str:
+    subject_flag = detail.get("subject_value")
+    comp_flag = detail.get("comp_value")
+    if subject_flag is None and comp_flag is None:
+        return f"{label} data unavailable."
+    if subject_flag is not None and comp_flag is not None:
+        subject_has = bool(subject_flag)
+        comp_has = bool(comp_flag)
+        if subject_has and not comp_has:
+            return f"{label}: Subject has this feature while the comparable does not."
+        if not subject_has and comp_has:
+            return f"{label}: Comparable has this feature while the subject does not."
+        if subject_has:
+            return f"{label}: Both properties have this feature."
+        return f"{label}: Neither property has this feature."
+    if subject_flag is not None:
+        return f"{label}: Subject {'has' if bool(subject_flag) else 'does not have'} this feature; comparable data missing."
+    return f"{label}: Comparable {'has' if bool(comp_flag) else 'does not have'} this feature; subject data missing."
+
+
+def _describe_time_delta(label: str, detail: Dict[str, Any]) -> str:
+    prefix = f"{label} difference"
+    stats = ADJUSTMENT_TOOLTIP_METADATA.get("time", {})
+    decimals = stats.get("decimals", 1)
+    unit = stats.get("unit", "months")
+    delta = detail.get("delta")
+    if delta is None:
+        return f"{prefix} unavailable."
+    signed = _signed_delta_text(delta, decimals)
+    if delta > 0:
+        direction = "Subject valuation date is later than the comparable sale."
+    elif delta < 0:
+        direction = "Subject valuation date is earlier than the comparable sale."
+    else:
+        direction = "Subject valuation date matches the comparable sale."
+    sentence = f"{prefix}: {signed} {unit} ({direction})"
+    subject_date = detail.get("subject_value")
+    comp_date = detail.get("comp_value")
+    dates = []
+    if subject_date:
+        dates.append(f"Subject: {subject_date}")
+    if comp_date:
+        dates.append(f"Comparable: {comp_date}")
+    if dates:
+        sentence = f"{sentence}. {'; '.join(dates)}"
+    return sentence
+
+
+def _adjustment_delta_description(
+    key: str,
+    label: str,
+    detail: Optional[Dict[str, Any]],
+) -> str:
+    if not detail:
+        return f"{label} difference unavailable."
+    if key in {"garage", "basement", "view"}:
+        return _describe_feature_delta(label, detail)
+    if key == "time":
+        return _describe_time_delta(label, detail)
+    return _describe_numeric_delta(label, key, detail)
+
+
 def _compute_adjustment_summary(
     subject: cma.PropertySnapshot,
     comparables: List[cma.ComparableResult],
@@ -497,12 +675,15 @@ def _compute_adjustment_summary(
     for comp in raw_payload.get("comparables", []):
         adjustments = comp.get("adjustments") or {}
         detail_list = []
+        adjustment_details = comp.get("adjustment_details") or {}
         for key, label in ADJUSTMENT_LABELS:
+            detail = adjustment_details.get(key)
             detail_list.append(
                 {
                     "key": key,
                     "label": label,
                     "amount": adjustments.get(key, 0.0),
+                    "delta_text": _adjustment_delta_description(key, label, detail),
                 }
             )
         comp["adjustment_list"] = detail_list
@@ -2047,6 +2228,8 @@ def appeal_result(request, parcel_number: str):
     conversation_id = manager.ensure(request.GET.get("cid"))
     chat_bootstrap = manager.bootstrap(conversation_id)
 
+    parcel_history_points = _parcel_value_history(parcel_number)
+
     return render(
         request,
         "openskagit/appeal_results_v3.html",
@@ -2057,6 +2240,7 @@ def appeal_result(request, parcel_number: str):
             "neighborhood_geom_geojson": neighborhood_geom_geojson,
             "subject_year_built": subject_year_built,
             "comparables_url": comparables_url,
+            "parcel_history_points": parcel_history_points,
             "step": 2,
             "chat_bootstrap": chat_bootstrap,
         },
