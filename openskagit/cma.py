@@ -17,6 +17,7 @@ from django.contrib.gis.db.models.functions import Distance, Transform
 from .models import Assessor, Sales
 from .improvement_utils import rollup_for_parcel
 from .valuation_areas import resolve_market_group
+from openskagit.models import AdjustmentCoefficient
 
 
 DEFAULT_COMPARABLE_LIMIT = 16
@@ -494,9 +495,24 @@ def _float_value(value: Optional[object]) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+def _compute_physical_score(
+    subject: PropertySnapshot,
+    comparable: PropertySnapshot,
+    weights: Optional[Dict[str, float]] = None,
+) -> float:
+    # Use regression-based weights if provided; otherwise default to legacy scheme.
+    weights = weights or {}
+    w_area      = weights.get("area", 0.25)
+    w_baths     = weights.get("baths", 0.15)
+    w_beds      = weights.get("beds", 0.10)
+    w_lot       = weights.get("lot", 0.15)
+    w_age       = weights.get("age", 0.10)
+    w_garage    = weights.get("garage", 0.05)
+    w_basement  = weights.get("basement", 0.05)
+    w_quality   = weights.get("quality", 0.075)
+    w_condition = weights.get("condition", 0.075)
+    w_view      = weights.get("view", 0.0)  # currently unused until we add view similarity
 
-
-def _compute_physical_score(subject: PropertySnapshot, comparable: PropertySnapshot) -> float:
     subject_meta = _metadata_dict(subject)
     comp_meta = _metadata_dict(comparable)
 
@@ -506,64 +522,86 @@ def _compute_physical_score(subject: PropertySnapshot, comparable: PropertySnaps
         accumulator["score"] += weight * similarity
         accumulator["weight"] += weight
 
-    totals = {"score": 0.0, "weight": 0.0}
+    totals: Dict[str, float] = {"score": 0.0, "weight": 0.0}
 
+    # --- AREA ---
     subj_area = _float_value(subject.living_area)
     comp_area = _float_value(comparable.living_area)
     if subj_area is not None and comp_area is not None and subj_area > 0:
         scale = max(subj_area * 0.2, 300.0)
         similarity = math.exp(-abs(subj_area - comp_area) / scale)
-        accumulate(0.25, similarity, accumulator=totals)
+        accumulate(w_area, similarity, accumulator=totals)
 
+    # --- BATHS ---
     subj_baths = _float_value(subject.bathrooms)
     comp_baths = _float_value(comparable.bathrooms)
     if subj_baths is not None and comp_baths is not None:
         similarity = math.exp(-abs(subj_baths - comp_baths) / 0.75)
-        accumulate(0.15, similarity, accumulator=totals)
+        accumulate(w_baths, similarity, accumulator=totals)
 
+    # --- BEDS ---
     subj_beds = _float_value(subject.bedrooms)
     comp_beds = _float_value(comparable.bedrooms)
     if subj_beds is not None and comp_beds is not None:
         similarity = math.exp(-abs(subj_beds - comp_beds) / 1.0)
-        accumulate(0.1, similarity, accumulator=totals)
+        accumulate(w_beds, similarity, accumulator=totals)
 
+    # --- LOT SIZE (ACRES) ---
     subj_lot = _float_value(subject.acres or subject.lot_acres)
     comp_lot = _float_value(comparable.acres or comparable.lot_acres)
     if subj_lot is not None and comp_lot is not None and subj_lot > 0:
         scale = max(subj_lot * 0.25, 0.1)
         similarity = math.exp(-abs(subj_lot - comp_lot) / scale)
-        accumulate(0.15, similarity, accumulator=totals)
+        accumulate(w_lot, similarity, accumulator=totals)
 
+    # --- AGE ---
     subj_age = _float_value(subject_meta.get("age"))
     comp_age = _float_value(comp_meta.get("age"))
     if subj_age is not None and comp_age is not None:
         similarity = math.exp(-abs(subj_age - comp_age) / 10.0)
-        accumulate(0.1, similarity, accumulator=totals)
+        accumulate(w_age, similarity, accumulator=totals)
 
+    # --- GARAGE ---
     subj_garage = subject_meta.get("has_garage")
     comp_garage = comp_meta.get("has_garage")
     if subj_garage is not None and comp_garage is not None:
-        accumulate(0.05, 1.0 if bool(subj_garage) == bool(comp_garage) else 0.5, accumulator=totals)
+        similarity = 1.0 if bool(subj_garage) == bool(comp_garage) else 0.5
+        accumulate(w_garage, similarity, accumulator=totals)
 
+    # --- BASEMENT ---
     subj_basement = subject_meta.get("has_basement")
     comp_basement = comp_meta.get("has_basement")
     if subj_basement is not None and comp_basement is not None:
-        accumulate(0.05, 1.0 if bool(subj_basement) == bool(comp_basement) else 0.6, accumulator=totals)
+        similarity = 1.0 if bool(subj_basement) == bool(comp_basement) else 0.6
+        accumulate(w_basement, similarity, accumulator=totals)
 
+    # --- QUALITY ---
     subj_quality = subject_meta.get("quality_score")
     comp_quality = comp_meta.get("quality_score")
     if subj_quality is not None and comp_quality is not None:
-        similarity = 1.0 if str(subj_quality).strip().lower() == str(comp_quality).strip().lower() else 0.6
-        accumulate(0.075, similarity, accumulator=totals)
+        similarity = (
+            1.0
+            if str(subj_quality).strip().lower() == str(comp_quality).strip().lower()
+            else 0.6
+        )
+        accumulate(w_quality, similarity, accumulator=totals)
 
+    # --- CONDITION ---
     subj_condition = subject_meta.get("condition_score")
     comp_condition = comp_meta.get("condition_score")
     if subj_condition is not None and comp_condition is not None:
-        similarity = 1.0 if str(subj_condition).strip().lower() == str(comp_condition).strip().lower() else 0.6
-        accumulate(0.075, similarity, accumulator=totals)
+        similarity = (
+            1.0
+            if str(subj_condition).strip().lower() == str(comp_condition).strip().lower()
+            else 0.6
+        )
+        accumulate(w_condition, similarity, accumulator=totals)
+
+    # TODO: when you’re ready, add a view similarity that uses w_view.
 
     if totals["weight"] == 0:
         return 0.0
+
     return max(0.0, min(1.0, totals["score"] / totals["weight"]))
 
 
@@ -644,7 +682,7 @@ def load_subject(
             "finished_basement_sqft": float(assessor.finished_basement) if assessor.finished_basement else None,
             "unfinished_basement_sqft": float(assessor.unfinished_basement) if assessor.unfinished_basement else None,
             "quality_score": getattr(assessor, "quality_score", None),
-            "condition_score": getattr(assessor, "condition_code", None),
+            "condition_score": getattr(assessor, "condition_score", None),
             "has_garage": bool(assessor.garage_sqft),
             "has_basement": bool(
                 (assessor.finished_basement or 0) > 0 or (assessor.unfinished_basement or 0) > 0
@@ -734,6 +772,9 @@ def _base_queryset(
         "city_district",
         "assessed_value",
         "total_market_value",
+        "quality_score",
+        "condition_score",
+        "condition_code",
     )
 
     # Exclude subject parcel
@@ -975,6 +1016,10 @@ def build_comparables(
     # ---------------------------------------
     # 6. Build ComparableResult structures
     # ---------------------------------------
+        # Regression-based physical weights for this subject's market group
+    coeffs = _load_coefficients_for_subject(subject)
+    reg_weights = _regression_based_weights(coeffs) if coeffs else {}
+
     comps: List[ComparableResult] = []
     seen_parcels: set[str] = set()
     for row in raw_rows:
@@ -1004,7 +1049,8 @@ def build_comparables(
         comp_sale_date = _safe_date(row.comp_sale_date)
         location_score = _compute_location_score(subject, snapshot, distance_value_m, search_radius)
         time_score = _compute_time_score(comp_sale_date, valuation_date)
-        physical_score = _compute_physical_score(subject, snapshot)
+        physical_score = _compute_physical_score(subject, snapshot, weights=reg_weights)
+
         score_obj = ComparableScore.from_components(location_score, time_score, physical_score)
 
         comp = ComparableResult(
@@ -1227,3 +1273,87 @@ def filters_from_dict(payload: Dict[str, Any]) -> CmaFilters:
         bathrooms=_parse_int(payload.get("bathrooms")),
         bbox=_parse_bbox(payload.get("bbox")),
     )
+
+def _regression_based_weights(coeffs: dict[str, float]) -> dict[str, float]:
+    """
+    Convert regression coefficients into rough importance weights
+    for CMA physical similarity.
+
+    - Uses abs(beta) for key terms.
+    - Ignores:
+        * const
+        * price-tier dummies (pt_*)
+        * missing_quality (data artifact, not a real attribute)
+        * area_time (tiny + weird to interpret in similarity)
+    - Returns weights that sum to 1 over the keys we care about.
+    """
+    # Pull raw betas (0 default if missing)
+    b_area   = abs(coeffs.get("log_area", 0.0))
+    b_lot    = abs(coeffs.get("log_lot", 0.0))
+    b_age    = abs(coeffs.get("log_age", 0.0))
+    b_q      = abs(coeffs.get("quality_score", 0.0))
+    b_c      = abs(coeffs.get("condition_score", 0.0))
+    b_gar    = abs(coeffs.get("has_garage", 0.0))
+    b_bas    = abs(coeffs.get("has_basement", 0.0))
+    b_view   = abs(coeffs.get("is_view", 0.0))
+
+    raw = {
+        "area": b_area,
+        "lot": b_lot,
+        "age": b_age,
+        "quality": b_q,
+        "condition": b_c,
+        "garage": b_gar,
+        "basement": b_bas,
+        "view": b_view,
+    }
+
+    total = sum(raw.values()) or 1.0
+
+    return {k: v / total for k, v in raw.items()}
+
+def _load_coefficients_for_subject(
+    subject: PropertySnapshot,
+    run_id: Optional[str] = None,
+) -> Dict[str, float]:
+    """
+    Load regression coefficients for the subject's market group (valuation_area).
+
+    Returns a dict like:
+        {
+            "const": -3.21,
+            "log_area": 0.85,
+            "log_lot": 0.12,
+            "log_age": -0.03,
+            "t": 0.01,
+            ...
+        }
+
+    If run_id is None, uses the most recent run_id for that market_group.
+    """
+    metadata = _metadata_dict(subject)
+    market_group = metadata.get("valuation_area")
+
+    if not market_group:
+        return {}
+
+    qs = AdjustmentCoefficient.objects.filter(market_group=market_group)
+
+    if run_id is not None:
+        qs = qs.filter(run_id=run_id)
+    else:
+        # Pick the latest run for this market_group
+        latest = (
+            qs.order_by("-created_at")
+            .values_list("run_id", flat=True)
+            .first()
+        )
+        if not latest:
+            return {}
+        qs = qs.filter(run_id=latest)
+
+    coeffs: Dict[str, float] = {}
+    for row in qs:
+        coeffs[row.term] = row.beta
+
+    return coeffs

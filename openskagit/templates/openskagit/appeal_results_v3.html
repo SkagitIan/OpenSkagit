@@ -78,6 +78,26 @@
     font-weight: 500;
   }
 
+  .property-hero__value-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-4);
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .property-hero__trend {
+    min-width: 140px;
+    height: 70px;
+  }
+
+  .property-hero__trend canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
   /* Neighborhood Comparison Flip */
   .neighborhood-card {
     position: relative;
@@ -115,6 +135,55 @@
     transform: rotateY(180deg);
     min-height: 100%;
     background: white;
+  }
+
+  .neighborhood-card__front-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-8);
+  }
+
+  .neighborhood-card__front-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .neighborhood-card__front-icon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    font-size: 1.25rem;
+  }
+
+  .neighborhood-card__front-text {
+    min-width: 0;
+  }
+
+  .neighborhood-card__front-text h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin: 0;
+    line-height: 1.15;
+  }
+
+  .neighborhood-card__front-text p {
+    font-size: 0.9375rem;
+    color: var(--gray-600);
+    margin: var(--space-1) 0 0;
   }
 
   .neighborhood-flip-button {
@@ -403,11 +472,28 @@
     }
   }
 
+  @media (max-width: 600px) {
+    .neighborhood-card__front-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .neighborhood-card__front-title {
+      width: 100%;
+    }
+
+    .neighborhood-flip-button {
+      align-self: flex-start;
+      margin-top: var(--space-2);
+    }
+  }
+
   @media (max-width: 520px) {
     .gauge-grid {
       grid-template-columns: 1fr;
     }
   }
+
 </style>
 
 <div class="property-hero">
@@ -421,12 +507,17 @@
     </div>
   </div>
 
-  <div class="property-hero__value">
-    {% if subject.metadata.assessed_value %}
-      ${{ subject.metadata.assessed_value|floatformat:0|intcomma }}
-    {% else %}
-      —
-    {% endif %}
+  <div class="property-hero__value-row">
+    <div class="property-hero__value">
+      {% if subject.metadata.assessed_value %}
+        ${{ subject.metadata.assessed_value|floatformat:0|intcomma }}
+      {% else %}
+        —
+      {% endif %}
+    </div>
+    <div class="property-hero__trend" data-history-id="parcel-history-data">
+      <canvas width="160" height="80" aria-hidden="true" focusable="false"></canvas>
+    </div>
   </div>
   <div class="property-hero__label">Total Market Value</div>
 
@@ -461,18 +552,19 @@
     </div>
   </div>
 </div>
+{{ parcel_history_points|json_script:"parcel-history-data" }}
 
 <div class="card neighborhood-card{% if neighborhood_geom_geojson %} neighborhood-card--flippable{% endif %}" id="neighborhood-section-card">
   <div class="neighborhood-card__inner">
     <div class="neighborhood-card__front">
-      <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-8); justify-content: space-between;">
-        <div style="display: flex; align-items: center; gap: var(--space-3);">
-          <div style="width: 2.5rem; height: 2.5rem; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe)); color: white; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
-<i class="fa-solid fa-mountain-city"></i>
+      <div class="neighborhood-card__front-header">
+        <div class="neighborhood-card__front-title">
+          <div class="neighborhood-card__front-icon">
+            <i class="fa-solid fa-mountain-city" aria-hidden="true"></i>
           </div>
-          <div>
-            <h3 style="font-size: 1.5rem; font-weight: 700; color: var(--gray-900); margin: 0;">Neighborhood Comparison</h3>
-            <p style="font-size: 0.9375rem; color: var(--gray-600); margin: var(--space-1) 0 0;">Click any card to learn more about these assessment metrics</p>
+          <div class="neighborhood-card__front-text">
+            <h3>Neighborhood Comparison</h3>
+            <p>Click any card to learn more about these assessment metrics</p>
           </div>
         </div>
         {% if neighborhood_geom_geojson %}
@@ -987,6 +1079,98 @@
     };
   })();
 
+  function drawParcelHistoryCharts() {
+    const containers = document.querySelectorAll('[data-history-id]');
+    if (!containers.length) {
+      return;
+    }
+    containers.forEach((container) => {
+      const historyId = container.dataset.historyId;
+      if (!historyId) {
+        return;
+      }
+      const script = document.getElementById(historyId);
+      if (!script) {
+        return;
+      }
+      let points;
+      try {
+        points = JSON.parse(script.textContent || "[]");
+      } catch (_) {
+        return;
+      }
+      if (!Array.isArray(points) || points.length === 0) {
+        return;
+      }
+      const canvas = container.querySelector('canvas');
+      if (!canvas) {
+        return;
+      }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+      const bounds = canvas.getBoundingClientRect();
+      const width = bounds.width || canvas.width;
+      const height = bounds.height || canvas.height;
+      if (!width || !height) {
+        return;
+      }
+      const ratio = window.devicePixelRatio || 1;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      canvas.width = Math.max(1, Math.round(width * ratio));
+      canvas.height = Math.max(1, Math.round(height * ratio));
+      ctx.scale(ratio, ratio);
+      ctx.clearRect(0, 0, width, height);
+
+      const numericValues = points
+        .map((point) => Number(point && point.value))
+        .filter((value) => !Number.isNaN(value));
+      if (!numericValues.length) {
+        return;
+      }
+      const minValue = Math.min(...numericValues);
+      const maxValue = Math.max(...numericValues);
+      const range = maxValue - minValue || 1;
+      const paddingX = 12;
+      const paddingY = 12;
+      const plotWidth = Math.max(width - paddingX * 2, 0);
+      const plotHeight = Math.max(height - paddingY * 2, 0);
+      const stepCount = Math.max(points.length - 1, 1);
+      let pathStarted = false;
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        const value = Number(point && point.value);
+        if (Number.isNaN(value)) {
+          return;
+        }
+        const normalized = (value - minValue) / range;
+        const x = paddingX + (plotWidth * index) / stepCount;
+        const y = paddingY + plotHeight * (1 - normalized);
+        if (!pathStarted) {
+          ctx.moveTo(x, y);
+          pathStarted = true;
+          return;
+        }
+        ctx.lineTo(x, y);
+      });
+
+      if (!pathStarted) {
+        return;
+      }
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    drawParcelHistoryCharts();
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     // Initialize gauges
     const codValue = {{ neighborhood.cod|default:0 }};
@@ -996,6 +1180,8 @@
     createGauge('cod-gauge', codValue, 0, 30, 5, 15);
     createGauge('prd-gauge', prdValue, 0.80, 1.20, 0.98, 1.03);
     createGauge('sales-ratio-gauge', salesRatioValue, 70, 130, 90, 110);
+
+    drawParcelHistoryCharts();
 
     // Auto-load comparables
     window.appealFetchComparables();

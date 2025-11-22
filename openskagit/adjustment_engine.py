@@ -129,7 +129,7 @@ def compute_adjustments(
 
         comp_features = _extract_features(comp)
 
-        adjustments = _build_adjustments(
+        adjustments, adjustment_details = _build_adjustments(
             subject_features=subject_features,
             comp_features=comp_features,
             coefficients=coefficients,
@@ -151,6 +151,7 @@ def compute_adjustments(
                 "comp_id": str(comp_id),
                 "base_sale_price": _currency(base_price),
                 "adjustments": {key: _currency(value) for key, value in adjustments.items()},
+                "adjustment_details": adjustment_details,
                 "total_adjustment": _currency(total_adjustment),
                 "adjusted_value": _currency(base_price + total_adjustment),
             }
@@ -171,7 +172,7 @@ def _build_adjustments(
     subject_pred_price: float,
     base_sale_price: float,
     valuation_date: date,
-) -> Dict[str, float]:
+) -> Tuple[Dict[str, float], Dict[str, Dict[str, Any]]]:
     """
     Build per-factor adjustments.
 
@@ -182,62 +183,109 @@ def _build_adjustments(
       from comp sale date to the valuation_date using the 't' coefficient.
     """
     adjustments: Dict[str, float] = {key: 0.0 for key in ADJUSTMENT_KEYS}
+    adjustment_details: Dict[str, Dict[str, Any]] = {}
+
+    def _record_detail(
+        key: str,
+        subject_value: Any,
+        comp_value: Any,
+        delta: Optional[float],
+    ) -> None:
+        adjustment_details[key] = {
+            "delta": delta,
+            "subject_value": subject_value,
+            "comp_value": comp_value,
+        }
 
     # AREA
+    area_delta_value = _delta(subject_features.gla, comp_features.gla)
     adjustments["area"] = _multiplicative_adjustment(
         coefficients.get("log_area"),
         _delta(subject_features.log_area, comp_features.log_area),
         subject_pred_price,
     )
+    _record_detail("area", subject_features.gla, comp_features.gla, area_delta_value)
 
     # LOT
+    lot_delta_value = _delta(subject_features.lot_acres, comp_features.lot_acres)
     adjustments["lot"] = _multiplicative_adjustment(
         coefficients.get("log_lot"),
         _delta(subject_features.log_lot, comp_features.log_lot),
         subject_pred_price,
     )
+    _record_detail("lot", subject_features.lot_acres, comp_features.lot_acres, lot_delta_value)
 
     # AGE
+    age_delta_value = _delta(subject_features.age, comp_features.age)
     adjustments["age"] = _multiplicative_adjustment(
         coefficients.get("log_age"),
         _delta(subject_features.log_age, comp_features.log_age),
         subject_pred_price,
     )
+    _record_detail("age", subject_features.age, comp_features.age, age_delta_value)
 
     # QUALITY
+    quality_delta_value = _delta(subject_features.quality_score, comp_features.quality_score)
     adjustments["quality"] = _multiplicative_adjustment(
         coefficients.get("quality_score"),
         _delta(subject_features.quality_score, comp_features.quality_score),
         subject_pred_price,
     )
+    _record_detail(
+        "quality",
+        subject_features.quality_score,
+        comp_features.quality_score,
+        quality_delta_value,
+    )
 
     # CONDITION
+    condition_delta_value = _delta(
+        subject_features.condition_score,
+        comp_features.condition_score,
+    )
     adjustments["condition"] = _multiplicative_adjustment(
         coefficients.get("condition_score"),
         _delta(subject_features.condition_score, comp_features.condition_score),
         subject_pred_price,
     )
+    _record_detail(
+        "condition",
+        subject_features.condition_score,
+        comp_features.condition_score,
+        condition_delta_value,
+    )
 
     # GARAGE
+    garage_delta_value = _delta(subject_features.has_garage, comp_features.has_garage)
     adjustments["garage"] = _multiplicative_adjustment(
         coefficients.get("has_garage"),
         _delta(subject_features.has_garage, comp_features.has_garage),
         subject_pred_price,
     )
+    _record_detail("garage", subject_features.has_garage, comp_features.has_garage, garage_delta_value)
 
     # BASEMENT
+    basement_delta_value = _delta(subject_features.has_basement, comp_features.has_basement)
     adjustments["basement"] = _multiplicative_adjustment(
         coefficients.get("has_basement"),
         _delta(subject_features.has_basement, comp_features.has_basement),
         subject_pred_price,
     )
+    _record_detail(
+        "basement",
+        subject_features.has_basement,
+        comp_features.has_basement,
+        basement_delta_value,
+    )
 
     # VIEW
+    view_delta_value = _delta(subject_features.is_view, comp_features.is_view)
     adjustments["view"] = _multiplicative_adjustment(
         coefficients.get("is_view"),
         _delta(subject_features.is_view, comp_features.is_view),
         subject_pred_price,
     )
+    _record_detail("view", subject_features.is_view, comp_features.is_view, view_delta_value)
 
     # TIME – IAAO-STYLE (use MONTHS on the regression scale)
     months = _months_between(valuation_date, comp_features.sale_date)
@@ -248,9 +296,14 @@ def _build_adjustments(
         beta_area_time=(coefficients.get("area_time") if INCLUDE_AREA_TIME_IN_TREND else None),
         log_area=comp_features.log_area,
     )
+    _record_detail(
+        "time",
+        valuation_date.isoformat(),
+        comp_features.sale_date.isoformat() if comp_features.sale_date else None,
+        months,
+    )
 
-
-    return adjustments
+    return adjustments, adjustment_details
 
 
 def _load_coefficients(
