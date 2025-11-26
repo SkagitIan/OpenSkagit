@@ -14,32 +14,69 @@ from django.contrib.gis.db import models as gis_models
 
 from django.db import models
 
+class AdjustmentRunSummary(models.Model):
+    run_id = models.CharField(max_length=20, unique=True, db_index=True)
+    # This JSON field will hold the list of dictionaries your UI iterates over
+    stats = models.JSONField(default=list, help_text="List of per-market diagnostic rows.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    content = models.JSONField(default=list,help_text="AI Generated Content from Stats")
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class AdjustmentModelSegment(models.Model):
+    """
+    Represents ONE specific regression model (e.g. 'Anacortes - Mid Tier').
+    This holds the metadata the UI needs to display: Price Range, Metrics, and Variables.
+    """
+    run = models.ForeignKey(AdjustmentRunSummary, on_delete=models.CASCADE, related_name="segments")
+    
+    # Identifiers
+    market_group = models.CharField(max_length=100)  # e.g. "ANACORTES"
+    value_tier = models.CharField(max_length=20)     # e.g. "T1_LOW"
+    
+    # The calculated Price Range (The "Breaking Points")
+    price_min = models.FloatField(help_text="Lower bound of sales used in this model")
+    price_max = models.FloatField(help_text="Upper bound of sales used in this model")
+    
+    # The Diagnostic Metrics
+    n_obs = models.IntegerField(help_text="Number of sales in this tier")
+    r2 = models.FloatField(null=True)
+    cod = models.FloatField(null=True, help_text="Coefficient of Dispersion")
+    prd = models.FloatField(null=True, help_text="Price Related Differential")
+    median_ratio = models.FloatField(null=True)
+
+    # The Variables selected by the Stepwise process
+    # Stores a list like: ["log_area", "quality_score", "has_garage"]
+    included_predictors = models.JSONField(default=list)
+
+    class Meta:
+        # Ensures unique constraint per run
+        unique_together = ("run", "market_group", "value_tier")
+        ordering = ["market_group", "value_tier"]
+
+    @property
+    def label(self):
+        return f"{self.market_group}__{self.value_tier}"
+
+
 class AdjustmentCoefficient(models.Model):
     """
-    Stores regression coefficients for a given market group (valuation_area).
-    These coefficients are used to compute subject-specific dollar adjustments
-    for comparable sales.
+    Stores the actual Betas. 
+    Linked to the Run, but logically belongs to a Segment.
     """
-    # Example: "ANACORTES", "BURLINGTON", "MOUNT_VERNON"
+    # We match this to AdjustmentModelSegment.label (e.g., "ANACORTES__T1_LOW")
     market_group = models.CharField(max_length=100, db_index=True)
-    # Example: "log_area", "log_lot", "has_garage"
+    
     term = models.CharField(max_length=200, db_index=True)
-    # Regression coefficient (beta) and standard error
     beta = models.FloatField()
     beta_se = models.FloatField(null=True, blank=True)
-    # Regression run that generated this coefficient
+    
     run_id = models.CharField(max_length=20, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ("market_group", "term", "run_id")
-        indexes = [
-            models.Index(fields=["market_group", "term"]),
-        ]
-
-    def __str__(self):
-        return f"{self.market_group} | {self.term} = {self.beta}"
-
 
 class NeighborhoodMetrics(models.Model):
     neighborhood_code = models.CharField(max_length=20, db_index=True)

@@ -1,0 +1,310 @@
+{# templates/partials/adjustment_summary.html #}
+{% load humanize %}
+
+{% comment %} 
+NOTE: The 'split' filter used below for variables is NOT built into Django. 
+You will need to register a custom template filter in your app's templatetags directory
+to use it, or join the list of variables in your view before passing it to the context.
+If you join the list in the view, remove the 'split' filter logic from the HTML.
+{% endcomment %}
+
+<style>
+  .adjustment-summary-card {
+    background: #ffffff;
+    border-radius: 24px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 18px 35px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .adjustment-summary-card h3 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+  .adjustment-summary-header {
+    padding: 0.8rem 1.25rem 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+  .adjustment-summary-body {
+    padding: 0.25rem 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .adjustment-summary-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 0;
+  }
+  .adjustment-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+    color: #1f2933;
+    table-layout: fixed;
+  }
+  .adjustment-summary-table thead {
+    background: #f8fafc;
+  }
+  .adjustment-summary-table th,
+  .adjustment-summary-table td {
+    padding: 0.65rem 0.8rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .adjustment-summary-table th {
+    color: #475467;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    font-size: 0.78rem;
+  }
+  .value-range-col,
+  .value-range-cell {
+    min-width: 140px;
+  }
+  .adjustment-summary-table tbody tr {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  }
+  .adjustment-summary-flag {
+    font-size: 0.85rem;
+    margin-right: 0.4rem;
+    font-weight: 600;
+  }
+  .adjustment-summary-footer {
+    border-top: 0px solid #e5e7eb;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    color: #475467;
+    font-size: 0.9rem;
+  }
+  /* New styles for the predictors list */
+  .predictor-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #e0f2fe;
+    color: #0284c7;
+    border-radius: 9999px;
+    padding: 0.15rem 0.5rem;
+    margin: 0.1rem 0.25rem 0.1rem 0;
+    font-size: 0.7rem;
+    line-height: 1;
+    white-space: normal;
+  }
+  .predictor-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  @media (max-width: 768px) {
+    .adjustment-summary-table th,
+    .adjustment-summary-table td {
+      padding: 0.45rem 0.55rem;
+    }
+  }
+  .predictor-row {
+    
+  }
+  .predictor-row-cell {
+    padding: 0.35rem 0.8rem 0.8rem;
+  }
+  .predictor-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #444b55;
+    margin-bottom: 0.35rem;
+  }
+  .adjustment-copy-button {
+    border: none;
+    background: #ebe8ed;
+    color: #6c698d;
+    border-radius: 9999px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .adjustment-copy-button:hover {
+    background: #d4d2d5;
+    transform: translateY(-1px);
+  }
+</style>
+<div class="w-full mt-6 adjustment-summary-card">
+    <div class="adjustment-summary-header">
+      <div>
+        <h3 class="text-gray-900">Adjustment Model Summary</h3>
+        {% if run_id %}
+          <p style="margin: 0.35rem 0 0; color: #6b7280; font-size: 0.9rem;">
+            Run ID: <span style="font-family: ui-monospace, SFMono-Regular, menlo, monospace;">{{ run_id }}</span>
+            {% if run_time %}
+              • {{ run_time|date:"F j, Y g:i A" }}
+            {% endif %}
+          </p>
+        {% endif %}
+      </div>
+      <button type="button" class="adjustment-copy-button" aria-live="polite">Copy table</button>
+    </div>
+    <div class="adjustment-summary-body">
+    {% if adjustment_results %}
+        <div class="adjustment-summary-table-wrapper">
+            <table class="adjustment-summary-table">
+                <thead>
+                    <tr>
+                        <th>Market Group</th>
+                        {# New Column: Value Range #}
+                        <th class="value-range-col" style="text-align: left;">Value Range</th> 
+                        <th style="text-align: right;">N</th>
+                        <th style="text-align: right;">R²</th>
+                        <th style="text-align: right;">Adj R²</th>
+                        <th style="text-align: right;">COD</th>
+                        <th style="text-align: right;">PRD</th>
+                        {# NEW: PRB #}
+                        <th style="text-align: right;">PRB</th>
+                        <th style="text-align: right;">Median Ratio</th>
+                        <th>Flags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in adjustment_results %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ row.label }}</td>
+                            
+                            {# Value Range #}
+                            <td class="value-range-cell" style="font-size: 0.85rem;">
+                                {% if row.price_min is not None and row.price_max is not None %}
+                                    ${{ row.price_min|floatformat:0|intcomma }} – ${{ row.price_max|floatformat:0|intcomma }}
+                                {% else %}
+                                    All Values
+                                {% endif %}
+                            </td>
+
+                            <td style="text-align: right;{% if row.n < 400 %} color: #ca8a04; font-weight: 600;{% endif %}">
+                                {{ row.n|intcomma }}
+                            </td>
+                            <td style="text-align: right;">{{ row.r2|floatformat:3 }}</td>
+                            <td style="text-align: right;">{{ row.adj_r2|floatformat:3 }}</td>
+
+                            {# COD #}
+                            <td style="text-align: right;{% if row.COD is not None and row.COD > 15 %} color: #f97316; font-weight: 600;{% endif %}">
+                                {{ row.COD|floatformat:2 }}
+                            </td>
+
+                            {# PRD #}
+                            <td style="text-align: right;">
+                                {% if row.PRD is not None %}
+                                    {{ row.PRD|floatformat:3 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            {# NEW: PRB #}
+                            <td style="
+                                text-align: right;
+                                {% if row.PRB is not None and row.PRB > 0.05 %} color:#dc2626; font-weight:600;{% endif %}
+                                {% if row.PRB is not None and row.PRB < -0.05 %} color:#2563eb; font-weight:600;{% endif %}
+                            ">
+                                {% if row.PRB is not None %}
+                                    {{ row.PRB|floatformat:3 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            {# Median ratio #}
+                            <td style="text-align: right;">{{ row.median_ratio|floatformat:3 }}</td>
+
+                            {# Flags #}
+                            <td>
+                                {% if row.COD is not None and row.COD > 15 %}
+                                    <span class="adjustment-summary-flag" style="color: #f97316;">High COD</span>
+                                {% endif %}
+
+                                {% if row.PRD is not None and row.PRD < 0.98 or row.PRD is not None and row.PRD > 1.03 %}
+                                    <span class="adjustment-summary-flag" style="color: #dc2626;">Out-of-range PRD</span>
+                                {% endif %}
+
+                                {% if row.PRB is not None and row.PRB > 0.05 %}
+                                    <span class="adjustment-summary-flag" style="color: #dc2626;">Regressive PRB</span>
+                                {% elif row.PRB is not None and row.PRB < -0.05 %}
+                                    <span class="adjustment-summary-flag" style="color: #2563eb;">Progressive PRB</span>
+                                {% endif %}
+
+                                {% if row.n < 400 %}
+                                    <span class="adjustment-summary-flag" style="color: #ca8a04;">Small N</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        {% if row.variables %}
+                        <tr class="predictor-row">
+                            <td colspan="10" class="predictor-row-cell">
+                                <div class="predictor-tags">
+                                    <div class="predictor-label">Predictors used</div>
+                                    {% for var in row.variables %}
+                                        <span class="predictor-tag">{{ var }}</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="adjustment-summary-footer">
+            <strong>Interpretation:</strong>
+            COD above ~15 suggests high dispersion. PRD outside about 0.98–1.03 or PRB outside about –0.05 to +0.05
+            may indicate value-related bias between lower- and higher-valued properties.
+        </p>
+    {% else %}
+        <p style="margin: 0; color: #475467;">
+            No adjustment runs have been recorded yet. The next regression run will populate this summary automatically.
+        </p>
+    {% endif %}
+</div>
+
+  </div>
+<script>
+  (function () {
+    if (window.__adjustmentSummaryCopyInitialized) return;
+    window.__adjustmentSummaryCopyInitialized = true;
+
+    document.addEventListener("click", function (event) {
+      const button = event.target.closest(".adjustment-copy-button");
+      if (!button) return;
+
+      const card = button.closest(".adjustment-summary-card");
+      const table = card?.querySelector(".adjustment-summary-table");
+      if (!table) return;
+
+      const rows = Array.from(table.querySelectorAll("tr")).map((row) => {
+        return Array.from(row.querySelectorAll("th, td"))
+          .map((cell) => cell.textContent.trim().replace(/\s+/g, " "))
+          .join("\t");
+      });
+
+      const clipboardText = rows.join("\n");
+      if (!clipboardText) return;
+
+      const originalLabel = button.textContent;
+      navigator.clipboard.writeText(clipboardText).then(() => {
+        button.textContent = "Copied";
+        setTimeout(() => {
+          button.textContent = originalLabel;
+        }, 1500);
+      });
+    });
+  })();
+</script>

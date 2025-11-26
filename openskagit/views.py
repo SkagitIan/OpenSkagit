@@ -2832,20 +2832,35 @@ def methodology_view(request):
     Public-facing page explaining the regression methodology used for property valuations.
     Shows real coefficients and model performance metrics for transparency.
     """
-    from .models import AdjustmentCoefficient
+    from .models import AdjustmentCoefficient, AdjustmentRunSummary
     from django.db.models import Max
 
-    latest_run = AdjustmentCoefficient.objects.aggregate(Max('created_at'))['created_at__max']
+    latest_summary = AdjustmentRunSummary.objects.order_by("-created_at").first()
+    latest_run_id = latest_summary.run_id if latest_summary else None
+    fallback_run_time = (
+        AdjustmentCoefficient.objects.aggregate(Max("created_at"))["created_at__max"]
+        if latest_summary is None
+        else None
+    )
+    latest_run = latest_summary.created_at if latest_summary else fallback_run_time
 
     market_groups = AdjustmentCoefficient.objects.values('market_group').distinct().order_by('market_group')
 
     coefficients_by_group = {}
     for mg in market_groups:
         group_name = mg['market_group']
-        coeffs = AdjustmentCoefficient.objects.filter(
-            market_group=group_name,
-            created_at=latest_run
-        ).order_by('term')
+        if latest_run_id:
+            coeffs = AdjustmentCoefficient.objects.filter(
+                market_group=group_name,
+                run_id=latest_run_id,
+            ).order_by('term')
+        elif latest_run:
+            coeffs = AdjustmentCoefficient.objects.filter(
+                market_group=group_name,
+                created_at=latest_run
+            ).order_by('term')
+        else:
+            coeffs = AdjustmentCoefficient.objects.none()
 
         coefficients_by_group[group_name] = {
             'coefficients': list(coeffs),
@@ -2860,6 +2875,15 @@ def methodology_view(request):
         'MOUNT_VERNON': {'n': 9012, 'r2': 0.935, 'adj_r2': 0.935, 'COD': 4.92, 'PRD': 1.130, 'median_ratio': 1.000},
         'SEDRO_WOOLLEY': {'n': 5215, 'r2': 0.929, 'adj_r2': 0.928, 'COD': 7.12, 'PRD': 1.178, 'median_ratio': 0.995},
     }
+
+    model_stats_list = [
+        {
+            **stats,
+            "market_group": name,
+            "display_name": name.replace("_", " ").title(),
+        }
+        for name, stats in model_stats.items()
+    ]
 
     feature_explanations = [
         {
@@ -2924,12 +2948,79 @@ def methodology_view(request):
         },
     ]
 
+    # Build interactive table rows
+    interactive_rows = []
+
+    for group_name, group_data in coefficients_by_group.items():
+        stats = model_stats.get(group_name, {})
+
+        for coeff in group_data["coefficients"]:
+            interactive_rows.append({
+                "market_group": group_name,
+                "term": coeff.term,
+                "beta": coeff.beta,
+                "beta_se": coeff.beta_se,
+                "display_name": group_data["display_name"],
+                "n": stats.get("n"),
+                "r2": stats.get("r2"),
+                "adj_r2": stats.get("adj_r2"),
+                "COD": stats.get("COD"),
+                "PRD": stats.get("PRD"),
+                "median_ratio": stats.get("median_ratio"),
+            })
+
+    feature_importance_scores: Dict[str, float] = {}
+
+    for stats in (latest_summary.stats if latest_summary else []):
+        for driver in stats.get("value_drivers", []):
+            predictor = driver.get("predictor")
+            score = driver.get("importance") or 0.0
+            if predictor:
+                feature_importance_scores[predictor] = feature_importance_scores.get(predictor, 0.0) + float(score)
+
+    if not feature_importance_scores:
+        for stats in (latest_summary.stats if latest_summary else []):
+            for driver in stats.get("PRB_drivers", []):
+                predictor = driver.get("predictor")
+                score = driver.get("score") or 0.0
+                if predictor:
+                    feature_importance_scores[predictor] = feature_importance_scores.get(predictor, 0.0) + float(score)
+
+    max_score = max(feature_importance_scores.values()) if feature_importance_scores else 0.0
+    def importance_label(norm_value: float) -> str:
+        if norm_value >= 0.75:
+            return "Core driver"
+        if norm_value >= 0.4:
+            return "Strong driver"
+        if norm_value > 0:
+            return "Supporting driver"
+        return "Emerging driver"
+
+    feature_importance: Dict[str, Dict[str, Any]] = {}
+    for predictor, total_score in feature_importance_scores.items():
+        norm = (total_score / max_score) if max_score else 0.0
+        feature_importance[predictor] = {
+            "percent": round(norm * 100, 1),
+            "label": importance_label(norm),
+        }
+
+    for feature in feature_explanations:
+        info = feature_importance.get(feature["term"], {"percent": 0, "label": "Emerging driver"})
+        feature["importance"] = info
+
+    latest_summary_stats = latest_summary.stats if latest_summary else []
     context = {
         'coefficients_by_group': coefficients_by_group,
         'model_stats': model_stats,
         'feature_explanations': feature_explanations,
-        'last_updated': latest_run,
+        'last_updated': latest_summary.created_at if latest_summary else latest_run,
+        'latest_adjustment_run': latest_summary,
+        'adjustment_run_stats': latest_summary_stats,
+        'adjustment_run_stats_json': json.dumps(latest_summary_stats, default=str),
+        'interactive_rows': interactive_rows,
         'total_observations': sum(stats['n'] for stats in model_stats.values()),
+        'model_stats_list': model_stats_list,
+        'feature_importance': feature_importance,
     }
 
     return render(request, 'openskagit/methodology.html', context)

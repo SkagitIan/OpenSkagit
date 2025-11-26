@@ -1,0 +1,5 @@
+{% for run in runs %}
+<div class="adjustment-summary-wrapper fade-in mb-6">
+  {% include "partials/adjustment_summary.html" with adjustment_results=run.stats run_id=run.run_id run_time=run.created_at %}
+</div>
+{% endfor %}

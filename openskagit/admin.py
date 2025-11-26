@@ -267,3 +267,70 @@ class ParcelAdmin(admin.ModelAdmin):
 
     # Optional: how many rows per page in the changelist
     list_per_page = 100
+
+from django.contrib import admin
+from .models import AdjustmentRunSummary, AdjustmentModelSegment
+
+
+class AdjustmentModelSegmentInline(admin.TabularInline):
+    """
+    Show the segments inline on the AdjustmentRunSummary page.
+    Lets you quickly inspect tiers for each run.
+    """
+    model = AdjustmentModelSegment
+    extra = 0  # don't show extra empty rows by default
+    fields = (
+        "market_group",
+        "value_tier",
+        "price_min",
+        "price_max",
+        "n_obs",
+        "r2",
+        "cod",
+        "prd",
+        "median_ratio",
+        "included_predictors",
+    )
+    readonly_fields = ()  # make fields read-only later if runs are immutable
+
+
+@admin.register(AdjustmentRunSummary)
+class AdjustmentRunSummaryAdmin(admin.ModelAdmin):
+    """
+    Top-level view of each regression run.
+    """
+    list_display = ("run_id", "created_at", "segment_count")
+    search_fields = ("run_id",)
+    date_hierarchy = "created_at"
+    ordering = ("-created_at",)
+    inlines = [AdjustmentModelSegmentInline]
+
+    def segment_count(self, obj):
+        """How many model segments were created for this run."""
+        return obj.segments.count()
+
+    segment_count.short_description = "Segments"
+
+
+@admin.register(AdjustmentModelSegment)
+class AdjustmentModelSegmentAdmin(admin.ModelAdmin):
+    """
+    Detail view for individual model segments.
+    Useful if you want to filter or search across runs.
+    """
+    list_display = (
+        "run",
+        "market_group",
+        "value_tier",
+        "price_min",
+        "price_max",
+        "n_obs",
+        "r2",
+        "cod",
+        "prd",
+        "median_ratio",
+    )
+    list_filter = ("market_group", "value_tier")
+    search_fields = ("run__run_id", "market_group", "value_tier")
+    autocomplete_fields = ("run",)
+    ordering = ("market_group", "value_tier")

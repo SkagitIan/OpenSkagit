@@ -240,6 +240,15 @@
 
   .comp-card__header-main {
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .comp-card__similarity-badge {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .comp-card__header-price {
@@ -260,16 +269,7 @@
     flex-shrink: 0;
     display: flex;
     justify-content: center;
-  }
-
-  .comp-card__header-gauge:not(.comp-card__header-similarity--text) {
     width: 88px;
-  }
-
-  .comp-card__header-gauge.comp-card__header-similarity--text {
-    width: clamp(110px, 24vw, 160px);
-    flex: 0 1 clamp(110px, 24vw, 160px);
-    justify-content: flex-start;
   }
 
   .comp-card__meta {
@@ -383,6 +383,56 @@
     font-weight: 600;
   }
 
+  .adjustment-badge--expandable {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid transparent;
+    background: var(--gray-100);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    min-width: 160px;
+    position: relative;
+  }
+
+  .adjustment-badge--expandable .adjustment-badge__summary {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    justify-content: space-between;
+  }
+
+  .adjustment-badge--expandable .adjustment-badge__summary::-webkit-details-marker,
+  .adjustment-badge--expandable .adjustment-badge__summary::marker {
+    display: none;
+  }
+
+  .adjustment-badge__label {
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-600);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .adjustment-badge__amount {
+    font-weight: 700;
+  }
+
   .adjustment-badge__icon {
     display: inline-flex;
     align-items: center;
@@ -398,35 +448,59 @@
     color: inherit;
   }
 
-  .adjustment-badge__amount {
-    font-weight: 700;
+  .adjustment-badge__tooltip {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translate(-50%, -0.45rem);
+    min-width: 220px;
+    padding: var(--space-3) var(--space-3);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(39, 39, 42, 0.1);
+    background: white;
+    color: var(--gray-600);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    box-shadow: var(--shadow-2xl);
+    z-index: 1;
   }
 
-  .adjustment-badge--positive {
-    background: var(--success-50);
-    border-color: rgba(16, 185, 129, 0.4);
+  .adjustment-badge__tooltip p {
+    margin: 0;
+  }
+
+  .adjustment-badge__tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-left: 1px solid rgba(39, 39, 42, 0.1);
+    border-top: 1px solid rgba(39, 39, 42, 0.1);
+    z-index: -1;
+  }
+
+  .adjustment-badge--expandable[open] {
+    box-shadow: var(--shadow-sm);
+  }
+
+  .adjustment-badge--expandable[open] .adjustment-badge__tooltip {
+    display: block;
   }
 
   .adjustment-badge--positive {
     background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.4);
     color: var(--success-600);
-  }
-
-  .adjustment-badge--positive {
-    color: var(--success-600);
-  }
-
-  .adjustment-badge--negative {
-    background: var(--error-50);
-    border-color: rgba(239, 68, 68, 0.35);
   }
 
   .adjustment-badge--negative {
     background: rgba(239, 68, 68, 0.15);
-    color: var(--error-600);
-  }
-
-  .adjustment-badge--negative{
+    border-color: rgba(239, 68, 68, 0.35);
     color: var(--error-600);
   }
 
@@ -489,9 +563,16 @@
   .comp-card__adjusted-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
+    gap: var(--space-4);
     padding: var(--space-4) var(--space-5);
     background: white;
+  }
+
+  .comp-card__adjusted-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .comp-adjusted__label {
@@ -499,6 +580,7 @@
     font-weight: 600;
     color: var(--gray-500);
     letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .comp-adjusted__value {
@@ -507,10 +589,17 @@
     color: var(--gray-900);
   }
 
+  .comp-card__adjusted-delta {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-2);
+    min-height: 1.25rem;
+  }
+
   .comp-adjusted__delta {
     font-size: 0.85rem;
     font-weight: 600;
-    margin-left: var(--space-2);
+    margin-left: 0;
   }
 
   .comp-adjusted__delta--up {
@@ -549,13 +638,19 @@
     display: none;
   }
 
-  .comp-similarity--text .comp-similarity__summary {
-    flex-direction: column;
-    align-items: flex-start;
+  .comp-similarity--badge .comp-similarity__summary {
+    width: auto;
     justify-content: flex-start;
-    gap: var(--space-1);
-    padding: var(--space-1) 0;
-    line-height: 1.2;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(39, 39, 42, 0.1);
+    background: white;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .comp-similarity--badge .comp-similarity__summary:hover {
+    border-color: var(--primary-500);
   }
 
   .comp-similarity__gauge {
@@ -598,11 +693,11 @@
     color: var(--gray-900);
   }
 
-  .comp-similarity__text {
-    width: 100%;
+  .comp-similarity__badge-stack {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+    align-items: flex-start;
     overflow-wrap: anywhere;
   }
 
@@ -820,61 +915,61 @@
         <div class="comp-card">
           <div class="comp-card__header">
             {% with comp.similarity.overall|default_if_none:0 as similarity_value %}
-              <div class="comp-card__header-gauge{% if advanced_mode %} comp-card__header-similarity--text{% endif %}">
-                <details class="comp-similarity{% if advanced_mode %} comp-similarity--text{% endif %}">
-                  <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
-                    {% if advanced_mode %}
-                      <div class="comp-similarity__text">
-                        <span class="comp-similarity__text-label">Similarity</span>
-                        <span class="comp-similarity__value">{{ similarity_value }}%</span>
-                      </div>
-                    {% else %}
-                        <div class="comp-similarity__gauge" style="--value: {{ similarity_value }}%;">
-                          <div class="comp-similarity__gauge-inner">
-                            <span class="comp-similarity__value">{{ similarity_value }}%</span>
-                          </div>
+              {% if not advanced_mode %}
+                <div class="comp-card__header-gauge">
+                  <details class="comp-similarity">
+                    <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
+                      <div class="comp-similarity__gauge" style="--value: {{ similarity_value }}%;">
+                        <div class="comp-similarity__gauge-inner">
+                          <span class="comp-similarity__value">{{ similarity_value }}%</span>
                         </div>
-                    {% endif %}
-                  </summary>
-                  <div class="comp-similarity__tooltip" role="tooltip">
-                    <table>
-                      <tr><th>Time</th><td>{% if comp.similarity.time is not None %}{{ comp.similarity.time }}%{% else %}&mdash;{% endif %}</td></tr>
-                      <tr><th>Proximity</th><td>{% if comp.similarity.proximity is not None %}{{ comp.similarity.proximity }}%{% else %}&mdash;{% endif %}</td></tr>
-                      <tr><th>Size</th><td>{% if comp.similarity.size is not None %}{{ comp.similarity.size }}%{% else %}&mdash;{% endif %}</td></tr>
-                      <tr><th>Quality</th><td>{% if comp.similarity.quality_condition is not None %}{{ comp.similarity.quality_condition }}%{% else %}&mdash;{% endif %}</td></tr>
-                      <tr><th>Land</th><td>{% if comp.similarity.land is not None %}{{ comp.similarity.land }}%{% else %}&mdash;{% endif %}</td></tr>
-                    </table>
+                      </div>
+                    </summary>
+                    {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
+                  </details>
+                </div>
+              {% endif %}
+              <div class="comp-card__header-content">
+                <div class="comp-card__header-main">
+                  <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+                  {% if advanced_mode %}
+                    <div class="comp-card__similarity-badge">
+                      <details class="comp-similarity comp-similarity--badge">
+                        <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
+                          <div class="comp-similarity__badge-stack">
+                            <span class="comp-similarity__value">{{ similarity_value }}%</span>
+                            <span class="comp-similarity__text-label">Similarity</span>
+                          </div>
+                        </summary>
+                        {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
+                      </details>
+                    </div>
+                  {% endif %}
+                  <div class="comp-card__meta">
+                    <span class="comp-card__meta-item">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 21s7-4.5 7-11A7 7 0 0 0 5 10c0 6.5 7 11 7 11z"></path>
+                        <circle cx="12" cy="10" r="2.5"></circle>
+                      </svg>
+                      {{ comp.distance_miles|floatformat:2 }} mi
+                    </span>
+                    <span class="comp-card__meta-item">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                        <line x1="16" y1="3" x2="16" y2="7"></line>
+                        <line x1="8" y1="3" x2="8" y2="7"></line>
+                        <line x1="3" y1="11" x2="21" y2="11"></line>
+                      </svg>
+                      Sold {{ comp.sale_date|date:"M Y" }}
+                    </span>
                   </div>
-                </details>
-              </div>
-            {% endwith %}
-            <div class="comp-card__header-content">
-              <div class="comp-card__header-main">
-                <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
-                <div class="comp-card__meta">
-                  <span class="comp-card__meta-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 21s7-4.5 7-11A7 7 0 0 0 5 10c0 6.5 7 11 7 11z"></path>
-                      <circle cx="12" cy="10" r="2.5"></circle>
-                    </svg>
-                    {{ comp.distance_miles|floatformat:2 }} mi
-                  </span>
-                  <span class="comp-card__meta-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="3" y="5" width="18" height="16" rx="2"></rect>
-                      <line x1="16" y1="3" x2="16" y2="7"></line>
-                      <line x1="8" y1="3" x2="8" y2="7"></line>
-                      <line x1="3" y1="11" x2="21" y2="11"></line>
-                    </svg>
-                    Sold {{ comp.sale_date|date:"M Y" }}
-                  </span>
+                </div>
+                <div class="comp-price-block comp-card__header-price">
+                  <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+                  <div class="comp-card__price-label">Sale Price</div>
                 </div>
               </div>
-              <div class="comp-price-block comp-card__header-price">
-                <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
-                <div class="comp-card__price-label">Sale Price</div>
-              </div>
-            </div>
+            {% endwith %}
           </div>
 
           <div class="comp-stats">
@@ -902,39 +997,45 @@
 
           {% if advanced_mode %}
             <div class="comp-card__adjustments">
-            
               {% if comp.adjustments %}
                 <div class="adjustments-badges">
                   {% for item in comp.adjustments %}
                     {% if item.amount %}
-                      {% with item.label|default:""|lower as label_lower %}
-                        <span class="adjustment-badge {% if item.amount > 0 %}adjustment-badge--positive{% else %}adjustment-badge--negative{% endif %}">
-                          {% if 'living' in label_lower %}
-                            <span class="adjustment-badge__icon">
-                              <i class="fa-solid fa-house-chimney-user" aria-hidden="true"></i>
-                            </span>
-                          {% elif 'lot' in label_lower or 'land' in label_lower %}
-                            <span class="adjustment-badge__icon">
-                              <i class="fa-solid fa-map-pin" aria-hidden="true"></i>
-                            </span>
-                          {% elif 'trend' in label_lower or 'time' in label_lower %}
-                            <span class="adjustment-badge__icon">
-                              <i class="fa-solid fa-timeline" aria-hidden="true"></i>
-                            </span>
-                          {% elif 'age' in label_lower or 'year' in label_lower or 'built' in label_lower %}
-                            <span class="adjustment-badge__icon">
-                              <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-                            </span>
-                          {% else %}
-                            <span class="adjustment-badge__icon">
-                              <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                            </span>
-                          {% endif %}
-                          <span class="sr-only">{{ item.label }}</span>
-                          <span class="adjustment-badge__amount">
-                            {% if item.amount > 0 %}+{% elif item.amount < 0 %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
-                          </span>
-                        </span>
+                      {% with item.label|default:"" as label_text %}
+                        {% with label_text|lower as label_lower %}
+                          <details class="adjustment-badge adjustment-badge--expandable {% if item.amount > 0 %}adjustment-badge--positive{% else %}adjustment-badge--negative{% endif %}">
+                            <summary class="adjustment-badge__summary" aria-label="View adjustment detail for {{ label_text }}">
+                              {% if 'living' in label_lower %}
+                                <span class="adjustment-badge__icon">
+                                  <i class="fa-solid fa-house-chimney-user" aria-hidden="true"></i>
+                                </span>
+                              {% elif 'lot' in label_lower or 'land' in label_lower %}
+                                <span class="adjustment-badge__icon">
+                                  <i class="fa-solid fa-map-pin" aria-hidden="true"></i>
+                                </span>
+                              {% elif 'trend' in label_lower or 'time' in label_lower %}
+                                <span class="adjustment-badge__icon">
+                                  <i class="fa-solid fa-timeline" aria-hidden="true"></i>
+                                </span>
+                              {% elif 'age' in label_lower or 'year' in label_lower or 'built' in label_lower %}
+                                <span class="adjustment-badge__icon">
+                                  <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                                </span>
+                              {% else %}
+                                <span class="adjustment-badge__icon">
+                                  <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                                </span>
+                              {% endif %}
+                              <span class="adjustment-badge__label">{{ label_text }}</span>
+                              <span class="adjustment-badge__amount">
+                                {% if item.amount > 0 %}+{% elif item.amount < 0 %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
+                              </span>
+                            </summary>
+                            <div class="adjustment-badge__tooltip">
+                              <p>{{ item.delta_text|default:"Adjustment detail unavailable." }}</p>
+                            </div>
+                          </details>
+                        {% endwith %}
                       {% endwith %}
                     {% endif %}
                   {% endfor %}
@@ -946,21 +1047,23 @@
               {% endif %}
             </div>
             <div class="comp-card__adjusted-row">
-              <span class="comp-adjusted__label">Adjusted Value</span>
-              <div>
+              <div class="comp-card__adjusted-stack">
                 {% if comp.adjusted_value %}
                   <span class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</span>
-                  {% if comp.total_adjustment %}
-                    {% if comp.total_adjustment > 0 %}
-                      <span class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</span>
-                    {% elif comp.total_adjustment < 0 %}
-                      <span class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</span>
-                    {% endif %}
-                  {% endif %}
                 {% elif advanced_error %}
                   <span class="comp-adjusted__missing">Unavailable</span>
                 {% else %}
                   <span class="comp-adjusted__missing">Not calculated</span>
+                {% endif %}
+                <span class="comp-adjusted__label">Adjusted Value</span>
+              </div>
+              <div class="comp-card__adjusted-delta">
+                {% if comp.total_adjustment %}
+                  {% if comp.total_adjustment > 0 %}
+                    <span class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</span>
+                  {% elif comp.total_adjustment < 0 %}
+                    <span class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</span>
+                  {% endif %}
                 {% endif %}
               </div>
             </div>

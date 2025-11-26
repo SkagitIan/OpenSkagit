@@ -9,7 +9,7 @@ import statsmodels.api as sm
 from django.core.management.base import BaseCommand
 from django.db import connection, transaction
 
-from openskagit.models import AdjustmentCoefficient
+from openskagit.models import AdjustmentCoefficient, AdjustmentRunSummary
 
 
 class Command(BaseCommand):
@@ -121,9 +121,9 @@ class Command(BaseCommand):
 
         # Aggressive trim on price (10–95%) to drop bargain bin + luxury tail
         # Softer trim on area/lot just to kill true outliers.
-        p_lo, p_hi = df["sale_price"].quantile([0.10, 0.95])
-        a_lo, a_hi = df["living_area"].quantile([0.01, 0.99])
-        l_lo, l_hi = df["lot_acres"].quantile([0.01, 0.99])
+        p_lo, p_hi = df["sale_price"].quantile([0.05, 0.95])
+        a_lo, a_hi = df["living_area"].quantile([0.02, 0.98])
+        l_lo, l_hi = df["lot_acres"].quantile([0.02, 0.98])
 
         df = df[
             df["sale_price"].between(p_lo, p_hi)
@@ -132,7 +132,7 @@ class Command(BaseCommand):
         ]
 
         # Hard caps on area
-        df = df[df["living_area"].between(500, 5500)]
+        df = df[df["living_area"].between(450, 6000)]
 
         df["sale_date"] = pd.to_datetime(df["sale_date"], errors="coerce")
         df = df[df["sale_date"].notna()]
@@ -147,19 +147,42 @@ class Command(BaseCommand):
         df["log_area"] = np.log(df["living_area"])
         df["log_lot"] = np.log1p(df["lot_acres"].clip(lower=0))
         df["log_age"] = np.log1p(df["age"].clip(lower=0))
+        df["log_area_sq"] = df["log_area"] ** 2
 
         # Time trend – MUST stay in sync with adjustment engine
         REGRESSION_ANCHOR_DATE = pd.Timestamp("2015-01-01")
         df["t"] = (df["sale_date"] - REGRESSION_ANCHOR_DATE).dt.days / 30.4375
+        df["t_sq"] = df["t"] ** 2
 
         # Interaction: bigger homes might trend differently
         df["area_time"] = df["log_area"] * df["t"]
+        df["area_quality"] = df["log_area"] * df["quality_score"]
+        df["area_condition"] = df["log_area"] * df["condition_score"]
+
 
         # Quality / Condition handling (from Assessor scores)
+        median_q = df["quality_score"].median()
+        median_c = df["condition_score"].median()
+
         df["missing_quality"] = df["quality_score"].isna().astype(int)
         df["missing_condition"] = df["condition_score"].isna().astype(int)
-        df["quality_score"] = df["quality_score"].fillna(0)
-        df["condition_score"] = df["condition_score"].fillna(0)
+
+        df["quality_score"] = df["quality_score"].fillna(median_q)
+        df["condition_score"] = df["condition_score"].fillna(median_c)
+
+                # ------------------------------------------
+        # QUALITY BAND (Low, Mid, High)
+        # ------------------------------------------
+        df["quality_band"] = pd.cut(
+            df["quality_score"],
+            bins=[-1, 2, 3, 10],   # (0-2)=Low, 3=Mid, 4-10=High
+            labels=["LOW", "MID", "HIGH"]
+        )
+        quality_dummies = pd.get_dummies(
+            df["quality_band"], prefix="qb", drop_first=True, dtype=float
+        )
+        df = df.join(quality_dummies)
+
 
         # ------------------------------
         # VIEW FLAG (from SQL view)
@@ -168,67 +191,45 @@ class Command(BaseCommand):
             raise ValueError("Expected 'is_view' column from sale_regression_sfr view")
         df["is_view"] = df["is_view"].fillna(0).astype(int)
 
-        # ------------------------------
-        # PRICE TIER DUMMIES
-        # ------------------------------
-        try:
-            df["price_tier"] = pd.qcut(
-                df["sale_price"], 5, labels=False, duplicates="drop"
-            )
-        except ValueError:
-            # fallback if qcut fails
-            df["price_tier"] = pd.cut(
-                df["sale_price"].rank(method="first"), bins=5, labels=False
-            )
+        # ------------------------------------------------------------
+        #  Correct luxury removal (Skagit-appropriate, IAAO compliant)
+        # ------------------------------------------------------------
 
-        df["price_tier"] = df["price_tier"].astype(float)
-        pt_dummies = pd.get_dummies(
-            df["price_tier"], prefix="pt", drop_first=True, dtype=float
-        )
-        df = df.join(pt_dummies)
+        # Remove only the true extreme luxury sales
+        lux_cut = df["sale_price"].quantile(0.985)
 
-        # ------------------------------
-        # LUXURY REMOVAL (inside trimmed range)
-        # ------------------------------
-        price_95 = df["sale_price"].quantile(0.95)
+        df = df[df["sale_price"] < lux_cut]
 
-        df["luxury_flag"] = (
-            (df["sale_price"] >= price_95)
-            | (df["living_area"] >= 3500)
-            | (df["quality_score"] >= 5)
-            | (df["condition_score"] >= 5)
-            | (
-                (df.get("valuation_subarea") == "WATERFRONT")
-                & (df["sale_price"] >= df["sale_price"].median())
-            )
-        ).astype(int)
+        # Very large houses can distort slope; light trim only
+        df = df[df["living_area"] < 5500]
 
-        df = df[df["luxury_flag"] == 0]
+        # Light waterfront-only removal: only the top 0.5% of WF sales
+        if "valuation_subarea" in df.columns:
+            wf = df["valuation_subarea"] == "WATERFRONT"
+            wf_cut = df.loc[wf, "sale_price"].quantile(0.995)
+            df = df[~(wf & (df["sale_price"] >= wf_cut))]
 
-        if len(df) < 50:
-            self.stdout.write(f"{label}: not enough non-luxury rows, skipping.")
-            return None
 
         # ------------------------------
         # PREDICTORS
         # ------------------------------
         predictors = [
-            "log_area",
+            "log_area", "log_area_sq",
             "log_lot",
             "log_age",
-            "t",
+            "t", "t_sq",
             "area_time",
-            "quality_score",
-            "condition_score",
-            "has_garage",
-            "has_basement",
-            "missing_quality",
-            "missing_condition",
+            "quality_score", "condition_score",
+            "area_quality","area_condition",
+            "has_garage", "has_basement",
+            "missing_quality", "missing_condition",
             "is_view",
         ]
 
+        predictors.extend(quality_dummies.columns.tolist())
+
         # price-tier dummies
-        predictors.extend(pt_dummies.columns.tolist())
+        #predictors.extend(pt_dummies.columns.tolist())
 
         # Optional within-group dummies (e.g. neighborhood_code) – skipped here
         if group_col:
@@ -368,6 +369,10 @@ class Command(BaseCommand):
         # Write coefficients in one transaction
         self.stdout.write(f"\nWriting {len(coef_rows)} coefficients to AdjustmentCoefficient…")
         with transaction.atomic():
+            AdjustmentRunSummary.objects.update_or_create(
+                run_id=run_id,
+                defaults={"stats": adjustment_results},
+            )
             AdjustmentCoefficient.objects.bulk_create(coef_rows, batch_size=1000)
 
         self.stdout.write(self.style.SUCCESS("✅ Adjustment coefficients written successfully."))

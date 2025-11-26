@@ -1,0 +1,134 @@
+<div class="process-steps space-y-8">
+
+  <!-- STEP 1 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">1</div>
+    <div class="step-content">
+      <h4>Market Groups & Value Bands</h4>
+      <p>
+        Skagit County isn’t one housing market — it’s several.  
+        We first split sales into <strong>market groups</strong> such as
+        <strong>Anacortes, Burlington, Concrete, La Conner/Conway, Mount Vernon, Sedro-Woolley</strong>
+        (plus a small “Other” group). Each area is modeled separately so that
+        Anacortes waterfront and Sedro-Woolley ramblers aren’t forced into the same curve.
+      </p>
+      <p class="mt-2">
+        Inside the larger markets, we then split sales into <strong>three value tiers</strong>:
+        <strong>T1 Low</strong>, <strong>T2 Mid</strong>, and <strong>T3 High</strong>.
+        These tiers are based on the actual sale-price distribution in each market
+        (using clustering on log prices), not arbitrary price cutoffs.
+        For example, in Anacortes our current tiers look roughly like:
+      </p>
+      <ul class="mt-2 text-sm opacity-90 list-disc list-inside">
+        <li><strong>T1 Low:</strong> about $235,000 – $425,000</li>
+        <li><strong>T2 Mid:</strong> about $445,000 – $730,000</li>
+        <li><strong>T3 High:</strong> about $780,000 – $1.7M</li>
+      </ul>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: price patterns are different for starter homes vs. high-end properties.  
+        Modeling each <strong>market × value tier</strong> separately reduces bias and keeps the
+        curve fair for both modest homes and upper-tier properties.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">2</div>
+    <div class="step-content">
+      <h4>Data Filtering & Cleaning</h4>
+      <p>
+        We start with <strong>verified, arm’s-length residential sales</strong> from the county.
+        Then, for each market group and value tier, we:
+      </p>
+      <ul class="mt-2 text-sm opacity-90 list-disc list-inside">
+        <li>Trim extreme outliers by dropping the lowest and highest slice of <strong>sale prices</strong> and <strong>living area</strong> within each segment.</li>
+        <li>Restrict living area to a reasonable range for typical homes (e.g. small cabins and mega-mansions are handled outside the core model).</li>
+        <li>Flag and separately treat <strong>luxury-like combinations</strong> (very high price, very large size, top quality/condition, and premium locations).</li>
+        <li>Handle missing quality/condition with <strong>indicator flags</strong> so incomplete records don’t distort the curve.</li>
+      </ul>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: clean, typical-market data gives you <strong>stable coefficients</strong>,
+        <strong>lower COD</strong>, and a model that reflects how the bulk of the market actually behaves —
+        not the extremes.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">3</div>
+    <div class="step-content">
+      <h4>Feature Engineering</h4>
+      <p>
+        Next, we transform raw parcel and sale data into predictors the model can actually understand.
+        Our current specification includes:
+      </p>
+      <ul class="mt-2 text-sm opacity-90 list-disc list-inside">
+        <li><strong>Size & age curves:</strong> log(living area), its square, and log(age) so that each extra square foot or year has <em>diminishing impact</em> instead of a straight line.</li>
+        <li><strong>Lot & land mix:</strong> log(lot size) and <strong>land_share</strong> (land value ÷ total value) to separate site value from building value.</li>
+        <li><strong>Time trends:</strong> a normalized time index <code>t</code> and <code>t²</code> so the model can follow rising and cooling markets.</li>
+        <li><strong>Quality & condition:</strong> numeric scores plus “area-level” quality/condition terms that capture neighborhood-level patterns.</li>
+        <li><strong>Flags:</strong> has_garage, has_basement, view premium, plus “missing_quality” and “missing_condition” so the model knows when data is incomplete.</li>
+        <li><strong>Tier-specific curvature:</strong> for each value band we create its own value and size curvature 
+          (e.g. <code>mv_T1</code>, <code>mv_sq_T1</code>, <code>area_T1</code>, <code>area_sq_T1</code>)
+          and time×value interactions (e.g. <code>t_mv_T1</code>) so low, mid, and high tiers can flex differently over time.</li>
+      </ul>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: this is what lets the model capture <strong>diminishing returns</strong>,
+        <strong>nonlinear pricing</strong>, and the fact that a 300 sq ft bump doesn’t mean the same thing
+        for a 1,200 sq ft home as it does for a 3,500 sq ft home.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">4</div>
+    <div class="step-content">
+      <h4>Regression Modeling & Calibration</h4>
+      <p>
+        For each <strong>market group × value tier</strong> we run a separate regression model:
+      </p>
+      <ul class="mt-2 text-sm opacity-90 list-disc list-inside">
+        <li>The dependent variable is <strong>log(sale price)</strong>.</li>
+        <li>We estimate coefficients with <strong>OLS regression</strong> and robust (HC3) standard errors to handle heteroskedasticity.</li>
+        <li>Predicted log prices are converted back to dollars using an <strong>exponential smearing adjustment</strong> so the model stays unbiased after the log transformation.</li>
+        <li>We use a targeted selection process to keep the “core” predictors in every model and only add extra terms when they provide real explanatory power.</li>
+      </ul>
+      <p class="mt-2">
+        After fitting the model, we run a <strong>value-band calibration</strong>:
+        we look at how ratios behave across value levels and apply smooth, data-driven adjustments so that
+        low-, mid-, and high-value homes all center around a common target ratio.
+      </p>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: the regression captures the main pricing structure, and the calibration step
+        cleans up any remaining systematic tilt between cheaper and more expensive properties.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">5</div>
+    <div class="step-content">
+      <h4>Validation, Fairness & Ongoing Tuning</h4>
+      <p>
+        Every run is evaluated with a full set of assessment diagnostics, tracked over time in our
+        <strong>Adjustment Run History</strong>:
+      </p>
+      <ul class="mt-2 text-sm opacity-90 list-disc list-inside">
+        <li><strong>R²:</strong> how much of the variation in sale prices the model explains. Our major markets typically land in the <strong>0.50–0.75</strong> range at the segment level, which is strong for residential mass appraisal.</li>
+        <li><strong>COD (Coefficient of Dispersion):</strong> measures uniformity around the median ratio. Most market–tier combinations fall in roughly the <strong>5–10%</strong> range, well inside common residential targets.</li>
+        <li><strong>PRD (Price-Related Differential):</strong> checks whether we systematically over-value low-priced homes or under-value high-priced ones. We monitor this by market and tier and flag segments that drift too far from 1.00 for review.</li>
+        <li><strong>PRB (Price-Related Bias):</strong> a regression-based measure of how ratios move with value. We pay close attention to PRB when tuning the tier-specific curvature and time×value interactions.</li>
+      </ul>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: this isn’t a “fire-and-forget” model.  
+        We continuously monitor these statistics, compare them to recognized assessment standards,
+        and rerun the models as new sales arrive so the system stays <strong>fair, current, and explainable</strong>.
+      </p>
+    </div>
+  </div>
+
+</div>

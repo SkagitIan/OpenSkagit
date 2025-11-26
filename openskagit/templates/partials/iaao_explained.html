@@ -1,0 +1,83 @@
+<div class="process-steps space-y-8">
+
+  <!-- STEP 1 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">1</div>
+    <div class="step-content">
+      <h4>Market Grouping</h4>
+      <p>
+        Skagit County isn’t one housing market — it’s several.  
+        Homes in Anacortes behave differently than homes in Sedro-Woolley or Concrete.
+        We segment sales into <strong>market groups</strong> so each area is modeled on its own dynamics.
+      </p>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: location-based modeling produces far more accurate and fair valuations.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">2</div>
+    <div class="step-content">
+      <h4>Data Filtering & Cleaning</h4>
+      <p>
+        We remove non-market sales, outliers, and unusual properties that distort the regression.
+        This includes trimming the top/bottom percentiles for price and home size, and excluding
+        luxury properties that follow different pricing patterns.
+      </p>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: clean data → stable coefficients → low COD.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">3</div>
+    <div class="step-content">
+      <h4>Feature Engineering</h4>
+      <p>
+        We convert raw property data into statistically meaningful predictors. 
+        This includes log-transforming living area, lot size, and age; building time trends; 
+        and creating interaction terms to capture how features behave together.
+      </p>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: lets the model capture diminishing returns and nonlinear relationships.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">4</div>
+    <div class="step-content">
+      <h4>Regression Modeling</h4>
+      <p>
+        We fit a robust OLS regression for each market group and value tier using thousands of sales.
+        This identifies how much each property feature contributes to price. Predictions are 
+        back-transformed using exponential smearing to avoid bias.
+      </p>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: the model “learns” real-world pricing behavior directly from the market.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="process-step flex gap-4">
+    <div class="step-number">5</div>
+    <div class="step-content">
+      <h4>Validation & Fairness Checks</h4>
+      <p>
+        We run industry-standard diagnostics including the Coefficient of Dispersion (COD), 
+        Price-Related Differential (PRD), and median ratio studies.  
+        Models must meet <strong>IAAO compliance ranges</strong> to be accepted.
+      </p>
+      <p class="mt-2 text-sm opacity-80">
+        Why it matters: ensures fairness across price ranges and neighborhoods.
+      </p>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,24 @@
+<div class="comp-similarity__tooltip" role="tooltip">
+  <table>
+    <tr>
+      <th>Time</th>
+      <td>{% if similarity.time is not None %}{{ similarity.time }}%{% else %}&mdash;{% endif %}</td>
+    </tr>
+    <tr>
+      <th>Proximity</th>
+      <td>{% if similarity.proximity is not None %}{{ similarity.proximity }}%{% else %}&mdash;{% endif %}</td>
+    </tr>
+    <tr>
+      <th>Size</th>
+      <td>{% if similarity.size is not None %}{{ similarity.size }}%{% else %}&mdash;{% endif %}</td>
+    </tr>
+    <tr>
+      <th>Quality</th>
+      <td>{% if similarity.quality_condition is not None %}{{ similarity.quality_condition }}%{% else %}&mdash;{% endif %}</td>
+    </tr>
+    <tr>
+      <th>Land</th>
+      <td>{% if similarity.land is not None %}{{ similarity.land }}%{% else %}&mdash;{% endif %}</td>
+    </tr>
+  </table>
+</div>

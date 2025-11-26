@@ -33,6 +33,8 @@ urlpatterns = [
     path("cma/", openskagit_views.cma_dashboard_view, name="cma-dashboard"),
     path("cma/parcel-search/", openskagit_views.cma_parcel_search, name="cma-parcel-search"),
     path("cma/comparison/<str:parcel_number>/", openskagit_views.cma_comparison_grid, name="cma-comparison-grid"),
+    #path("methodology/load-more/", openskagit_views.load_more_adjustment_runs, name="load-more-adjustment-runs"),
+
     path(
         "cma/improvements/<str:parcel_number>/<str:comp_parcel>/",
         openskagit_views.cma_comparable_improvements,
