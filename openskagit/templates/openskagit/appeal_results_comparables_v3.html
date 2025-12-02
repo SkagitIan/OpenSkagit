@@ -1,6 +1,7 @@
 {% load humanize formatting %}
 <style>
   .comparables-section {
+    --comparables-similarity: #6B9080;
     animation: fadeInUp 0.6s var(--transition-base);
     margin-top: var(--space-8);
   }
@@ -245,12 +246,6 @@
     gap: var(--space-2);
   }
 
-  .comp-card__similarity-badge {
-    display: flex;
-    justify-content: flex-start;
-    width: 100%;
-  }
-
   .comp-card__header-price {
     justify-self: end;
     align-self: flex-start;
@@ -265,11 +260,33 @@
     overflow-wrap: break-word;
   }
 
-  .comp-card__header-gauge {
-    flex-shrink: 0;
-    display: flex;
-    justify-content: center;
-    width: 88px;
+  .comp-card__meta-item--sold {
+    gap: var(--space-3);
+  }
+
+  .comp-card__meta-text {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .comp-card__meta-similarity {
+    font-size: 0.75rem;
+    color: var(--comparables-similarity);
+    font-weight: 600;
+  }
+
+  .comp-card__similarity-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--comparables-similarity);
+  }
+
+  .comp-card__similarity-grid {
+    margin-top: 0.35rem;
+    text-align: right;
   }
 
   .comp-card__meta {
@@ -618,7 +635,7 @@
 
   .comp-similarity {
     position: relative;
-    width: 100%;
+    display: inline-flex;
   }
 
   .comp-similarity__summary {
@@ -627,10 +644,15 @@
     border: none;
     background: transparent;
     padding: 0;
-    display: flex;
-    justify-content: center;
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-1);
     cursor: pointer;
-    width: 100%;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--comparables-similarity);
   }
 
   .comp-similarity__summary::-webkit-details-marker,
@@ -638,75 +660,14 @@
     display: none;
   }
 
-  .comp-similarity--badge .comp-similarity__summary {
-    width: auto;
-    justify-content: flex-start;
-    gap: var(--space-2);
-    padding: var(--space-1) var(--space-3);
-    border-radius: var(--radius-xl);
-    border: 1px solid rgba(39, 39, 42, 0.1);
-    background: white;
-    box-shadow: var(--shadow-sm);
+  .comp-similarity--inline .comp-similarity__summary {
+    gap: 0.25rem;
   }
 
-  .comp-similarity--badge .comp-similarity__summary:hover {
-    border-color: var(--primary-500);
-  }
-
-  .comp-similarity__gauge {
-    --value: 0%;
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    background-image: conic-gradient(
-      var(--comp-similarity-color, #6c698d) 0 var(--value),
-      var(--gray-200) var(--value) 100%
-    );
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .comp-similarity__gauge::after {
-    content: "";
-    position: absolute;
-    inset: 14px;
-    border-radius: 50%;
-    background: white;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.03);
-    z-index: 1;
-  }
-
-  .comp-similarity__gauge-inner {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.15rem;
-  }
-
-  .comp-similarity__value {
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: var(--gray-900);
-  }
-
-  .comp-similarity__badge-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    align-items: flex-start;
-    overflow-wrap: anywhere;
-  }
-
-  .comp-similarity__text-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--gray-500);
+  .comp-similarity--grid .comp-similarity__summary {
+    width: 100%;
+    justify-content: flex-end;
+    font-size: 0.75rem;
   }
 
   .comp-similarity__tooltip {
@@ -898,7 +859,7 @@
       <div class="mode-switcher">
         <div class="mode-toggle">
           <button class="mode-btn {% if not advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('standard')">Standard</button>
-          <button class="mode-btn {% if advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('advanced')">Advanced</button>
+          <button class="mode-btn {% if advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('advanced')" disabled>Advanced</button>
         </div>
         {% if advanced_error %}
           <p class="mode-note mode-note--warning">{{ advanced_error }}</p>
@@ -915,36 +876,9 @@
         <div class="comp-card">
           <div class="comp-card__header">
             {% with comp.similarity.overall|default_if_none:0 as similarity_value %}
-              {% if not advanced_mode %}
-                <div class="comp-card__header-gauge">
-                  <details class="comp-similarity">
-                    <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
-                      <div class="comp-similarity__gauge" style="--value: {{ similarity_value }}%;">
-                        <div class="comp-similarity__gauge-inner">
-                          <span class="comp-similarity__value">{{ similarity_value }}%</span>
-                        </div>
-                      </div>
-                    </summary>
-                    {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
-                  </details>
-                </div>
-              {% endif %}
               <div class="comp-card__header-content">
                 <div class="comp-card__header-main">
                   <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
-                  {% if advanced_mode %}
-                    <div class="comp-card__similarity-badge">
-                      <details class="comp-similarity comp-similarity--badge">
-                        <summary class="comp-similarity__summary" aria-label="View similarity breakdown">
-                          <div class="comp-similarity__badge-stack">
-                            <span class="comp-similarity__value">{{ similarity_value }}%</span>
-                            <span class="comp-similarity__text-label">Similarity</span>
-                          </div>
-                        </summary>
-                        {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
-                      </details>
-                    </div>
-                  {% endif %}
                   <div class="comp-card__meta">
                     <span class="comp-card__meta-item">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -953,14 +887,24 @@
                       </svg>
                       {{ comp.distance_miles|floatformat:2 }} mi
                     </span>
-                    <span class="comp-card__meta-item">
+                    <span class="comp-card__meta-item comp-card__meta-item--sold">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="5" width="18" height="16" rx="2"></rect>
                         <line x1="16" y1="3" x2="16" y2="7"></line>
                         <line x1="8" y1="3" x2="8" y2="7"></line>
                         <line x1="3" y1="11" x2="21" y2="11"></line>
                       </svg>
-                      Sold {{ comp.sale_date|date:"M Y" }}
+                      <span class="comp-card__meta-text">
+                        <span>Sold {{ comp.sale_date|date:"M Y" }}</span>
+                        <span class="comp-card__meta-similarity">
+                          <details class="comp-similarity comp-similarity--inline" aria-label="View similarity breakdown">
+                            <summary class="comp-similarity__summary">
+                              <span class="comp-card__similarity-text">Similarity {{ similarity_value }}%</span>
+                            </summary>
+                            {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
+                          </details>
+                        </span>
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -1080,15 +1024,25 @@
 
         <div class="comp-card">
           <div class="comp-card__header">
-            <div class="comp-card__header-content">
-              <div class="comp-card__header-main">
-                <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+            {% with comp.similarity.overall|default_if_none:0 as similarity_value %}
+              <div class="comp-card__header-content">
+                <div class="comp-card__header-main">
+                  <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+                </div>
+                <div class="comp-price-block comp-card__header-price">
+                  <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+                  <div class="comp-card__price-label">Sale Price</div>
+                  <div class="comp-card__similarity-grid">
+                    <details class="comp-similarity comp-similarity--grid" aria-label="View similarity breakdown">
+                      <summary class="comp-similarity__summary">
+                        <span class="comp-card__similarity-text">Similarity {{ similarity_value }}%</span>
+                      </summary>
+                      {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
+                    </details>
+                  </div>
+                </div>
               </div>
-              <div class="comp-price-block comp-card__header-price">
-                <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
-                <div class="comp-card__price-label">Sale Price</div>
-              </div>
-            </div>
+            {% endwith %}
           </div>
           <div class="comp-card__meta comp-card__meta--grid">
             <span class="comp-card__meta-item">

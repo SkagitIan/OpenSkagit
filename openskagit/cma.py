@@ -1084,7 +1084,7 @@ def build_comparables(
         _prefetch_improvements(comps, rollup_cache)
 
     t1 = time.perf_counter()
-    logger.info(
+    logger.debug(
         f"[CMA] build_comparables for {subject.parcel_number} "
         f"returned {len(comps)} comps in {t1 - t0:.3f}s"
     )

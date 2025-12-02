@@ -20,10 +20,6 @@ from openskagit.neighborhood import neighborhood_snapshot_view
 
 urlpatterns = [
     path('', openskagit_views.home, name='home'),
-    path('chatbot/', openskagit_views.chatbot, name='chatbot'),
-    path('history/', openskagit_views.history, name='chat-history'),
-    path('chat/', openskagit_views.chat, name='chat'),
-    path('chat/new', openskagit_views.chat_new, name='chat-new'),
     path('documents/upload/', openskagit_views.documents_upload, name='documents-upload'),
     path('admin/', admin.site.urls),
     path("api/dashboard/", openskagit_views.api_dashboard, name="api-dashboard"),

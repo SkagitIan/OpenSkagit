@@ -415,13 +415,6 @@
       </button>
       <button
         class="category-btn"
-        :class="{ 'active': activeCategory === 'chatbot' }"
-        @click="setCategory('chatbot')"
-      >
-        AI Chatbot
-      </button>
-      <button
-        class="category-btn"
         :class="{ 'active': activeCategory === 'data' }"
         @click="setCategory('data')"
       >
@@ -474,7 +467,6 @@
                     <li>Search property assessments and tax information</li>
                     <li>Analyze property values using our regression-based methodology</li>
                     <li>Generate property tax appeal documentation with comparable properties</li>
-                    <li>Ask questions about county data using our AI chatbot</li>
                     <li>Access neighborhood statistics and market trends</li>
                     <li>Use our API to integrate county data into your applications</li>
                   </ul>
@@ -494,7 +486,6 @@
                   <p>There are several ways to find your property:</p>
                   <ul>
                     <li><strong>Property Tax Appeal Helper:</strong> Visit the <a href="{% url 'appeal-home' %}">appeal tool</a> and enter your address or parcel number</li>
-                    <li><strong>AI Chatbot:</strong> Ask the chatbot on the <a href="{% url 'home' %}">homepage</a> something like "Find my property at 123 Main Street"</li>
                     <li><strong>Direct Search:</strong> If you know your parcel number, you can search directly in any of our tools</li>
                   </ul>
                   <p>The system uses fuzzy matching, so you don't need to enter your address exactly. It will suggest the closest matches.</p>
@@ -512,7 +503,6 @@
               <div class="faq-answer">
                 <div class="faq-answer-content">
                   <p>No, you don't need an account! All of OpenSkagit's tools and data are freely accessible without registration.</p>
-                  <p>Your chat conversations and tool usage are stored in your browser session, so you can continue where you left off during your visit. However, this data is not saved permanently across different devices or browsers.</p>
                 </div>
               </div>
             </div>
@@ -527,7 +517,7 @@
               <div class="faq-answer">
                 <div class="faq-answer-content">
                   <p>Yes, OpenSkagit is completely free for public use. We believe in making government data accessible to all citizens.</p>
-                  <p>All features including the Property Tax Appeal Helper, AI chatbot, neighborhood statistics, and API access are provided at no cost.</p>
+                  <p>All features including the Property Tax Appeal Helper, neighborhood statistics, and API access are provided at no cost.</p>
                 </div>
               </div>
             </div>
@@ -647,88 +637,6 @@
                     <li>Generate PDF documentation (using your browser's print-to-PDF feature)</li>
                   </ul>
                   <p>The report includes all comparable sales, property details, valuation estimates, and fairness analysis metrics you'll need for your appeal.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <template x-if="showCategory('chatbot')">
-          <div class="faq-category">
-            <div class="category-header">
-              <div class="category-icon">🤖</div>
-              <h2 class="category-title">AI Chatbot</h2>
-            </div>
-
-            <div class="faq-item" :class="{ 'open': openItems.includes('cb-1') }" x-show="showQuestion('cb-1')">
-              <div class="faq-question" @click="toggleItem('cb-1')">
-                <h3 class="faq-question-text" x-html="highlight('How does the AI chatbot work?')"></h3>
-                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </div>
-              <div class="faq-answer">
-                <div class="faq-answer-content">
-                  <p>Our AI chatbot uses RAG (Retrieval-Augmented Generation) technology to answer questions about Skagit County data:</p>
-                  <ul>
-                    <li><strong>Step 1:</strong> Your question is analyzed to understand what information you need</li>
-                    <li><strong>Step 2:</strong> Relevant data is retrieved from our PostgreSQL database with vector search</li>
-                    <li><strong>Step 3:</strong> An AI model generates a natural language answer based on the retrieved data</li>
-                    <li><strong>Step 4:</strong> The response includes citations to source data for transparency</li>
-                  </ul>
-                  <p>The chatbot has access to property records, sales data, assessment information, and neighborhood statistics.</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="faq-item" :class="{ 'open': openItems.includes('cb-2') }" x-show="showQuestion('cb-2')">
-              <div class="faq-question" @click="toggleItem('cb-2')">
-                <h3 class="faq-question-text" x-html="highlight('What kind of questions can I ask the chatbot?')"></h3>
-                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </div>
-              <div class="faq-answer">
-                <div class="faq-answer-content">
-                  <p>The chatbot can help with questions about:</p>
-                  <ul>
-                    <li>Finding specific properties by address or parcel number</li>
-                    <li>Property values, assessments, and tax information</li>
-                    <li>Recent home sales in specific neighborhoods</li>
-                    <li>Market trends and statistics</li>
-                    <li>Understanding your property assessment</li>
-                    <li>How to use the various tools on the site</li>
-                    <li>General information about Skagit County</li>
-                  </ul>
-                  <p><strong>Example questions:</strong></p>
-                  <ul>
-                    <li>"Find my property at 123 Main Street"</li>
-                    <li>"What are recent home sales in Anacortes?"</li>
-                    <li>"How is my property value calculated?"</li>
-                    <li>"Show me properties similar to mine"</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="faq-item" :class="{ 'open': openItems.includes('cb-3') }" x-show="showQuestion('cb-3')">
-              <div class="faq-question" @click="toggleItem('cb-3')">
-                <h3 class="faq-question-text" x-html="highlight('Is my conversation with the chatbot private?')"></h3>
-                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </div>
-              <div class="faq-answer">
-                <div class="faq-answer-content">
-                  <p>Yes, your privacy is important to us:</p>
-                  <ul>
-                    <li>Conversations are stored only in your browser session</li>
-                    <li>We don't link conversations to individual user identities</li>
-                    <li>Chat data is used only to improve the service</li>
-                    <li>All property data accessed is already public record</li>
-                    <li>We don't share your queries with third parties</li>
-                  </ul>
-                  <p>Since we don't require accounts, there's no personal information tied to your usage of the chatbot.</p>
                 </div>
               </div>
             </div>
@@ -972,12 +880,12 @@ GET /api/neighborhoods/ANA/stats/</code></pre>
 
   <div class="cta-box">
     <h2>Still Have Questions?</h2>
-    <p>Ask our AI chatbot anything about Skagit County data, property values, or how to use our tools</p>
-    <a href="{% url 'home' %}" class="cta-btn">
+    <p>Explore the Property Helper or FAQ, or contact us directly for clarification.</p>
+    <a href="/appeal/" class="cta-btn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        <path d="M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/>
       </svg>
-      Chat with AI
+      Open Property Helper
     </a>
   </div>
 </div>
@@ -1007,7 +915,7 @@ GET /api/neighborhoods/ANA/stats/</code></pre>
       },
 
       expandAll() {
-        const allIds = ['gs-1', 'gs-2', 'gs-3', 'gs-4', 'ap-1', 'ap-2', 'ap-3', 'ap-4', 'ap-5', 'cb-1', 'cb-2', 'cb-3', 'dt-1', 'dt-2', 'dt-3', 'dt-4', 'tl-1', 'tl-2', 'api-1', 'api-2'];
+        const allIds = ['gs-1', 'gs-2', 'gs-3', 'gs-4', 'ap-1', 'ap-2', 'ap-3', 'ap-4', 'ap-5', 'dt-1', 'dt-2', 'dt-3', 'dt-4', 'tl-1', 'tl-2', 'api-1', 'api-2'];
         this.openItems = allIds.filter(id => this.visibleQuestions.has(id));
       },
 

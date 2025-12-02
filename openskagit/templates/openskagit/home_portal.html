@@ -5,7 +5,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OpenSkagit.com - AI-Enhanced Data Portal</title>
-  <link rel="stylesheet" href="{% static 'openskagit/chat.css' %}" />
   <link rel="stylesheet" href="{% static 'openskagit/portal.css' %}" />
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -22,161 +21,97 @@
     </div>
   </header>
 
-  <main class="main hero-mode" data-chat-mode="hero">
+  <main class="main hero-mode">
     <div>
       <div class="hero">
         <h1 class="hero-title">
-          Discover <span class="hero-gradient-text">Skagit County</span> Data
+          Discover <span class="hero-gradient-text">Skagit County</span> data
         </h1>
-        <p class="hero-subtitle">
-          Ask questions, explore property records, analyze trends, and access civic information with AI-powered assistance.
-        </p>
+      
       </div>
 
-      <section
-        class="chatbot-section chatbot-section--hero"
-        data-chat-root
-        data-chat-style="portal"
-        data-send-url="{% url 'chat' %}"
-        data-history-url="{% url 'chat-history' %}"
-        data-new-url="{% url 'chat-new' %}"
-        data-conversation-id="{{ conversation_id }}"
-        data-initial-prompt="{{ initial_prompt|default:''|escape }}"
-      >
-        <div class="chatbot-header">
-          <p class="chatbot-title">Ask me anything</p>
-          <button type="button" class="chatbot-reset" data-chat-reset>New conversation</button>
-        </div>
+      <section class="tools-section">
+        <h2 class="section-title">Tools & Reports</h2>
+        <div class="tools-grid">
+          <a href="/appeal/" class="tool-card active">
+            <div class="tool-icon">⚖️</div>
+            <h3 class="tool-title">Property Helper</h3>
+            <p class="tool-description">
+              Review your property assessment and compare.
+            </p>
+            <span class="tool-badge available">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Available Now
+            </span>
+          </a>
 
-        <div class="chat-window">
-          <div id="messages" class="chat-messages-panel" data-chat-messages data-chat-scroll>
-            {% if messages %}
-              {% for m in messages %}
-                {% include "partials/message.html" with role=m.role content=m.content sources=m.sources %}
-              {% endfor %}
-            {% endif %}
+          <a href="/faq/" class="tool-card active">
+            <div class="tool-icon">❓</div>
+            <h3 class="tool-title">Frequently Asked Questions</h3>
+            <p class="tool-description">
+              Find answers to common questions about data, tools, methodology, and how to use OpenSkagit.
+            </p>
+            <span class="tool-badge available">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Available Now
+            </span>
+          </a>
+
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">💰</div>
+            <h3 class="tool-title">Budget Insights</h3>
+            <p class="tool-description">
+              Explore Skagit County budget allocations, spending trends, and departmental financial data.
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
           </div>
 
-          <form id="chat-form" class="chat-input-wrapper" data-chat-form method="post">
-            {% csrf_token %}
-            {% if conversation_id %}
-              <input type="hidden" name="conversation_id" value="{{ conversation_id }}" data-chat-conversation-input>
-            {% else %}
-              <input type="hidden" name="conversation_id" value="" data-chat-conversation-input>
-            {% endif %}
-            <div class="chat-input-container">
-              <label class="sr-only" for="prompt">Ask a question</label>
-              <textarea
-                id="prompt"
-                name="prompt"
-                rows="3"
-                placeholder="What would you like to know about Skagit County?"
-                class="chat-input"
-                required
-              ></textarea>
-              <div class="chat-actions">
-                <div class="chat-actions-left">
-                  <button type="button" class="chat-action-btn" aria-label="Attach file" style="display: none;">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                    </svg>
-                  </button>
-                </div>
-                <button type="submit" class="chat-submit" aria-label="Send message">
-                  <span>Send</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </form>
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">📊</div>
+            <h3 class="tool-title">Job Outlook</h3>
+            <p class="tool-description">
+              Analyze local employment trends, industry growth, and economic indicators for Skagit County.
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
+          </div>
 
-                  </div>
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">📈</div>
+            <h3 class="tool-title">Flavor Index</h3>
+            <p class="tool-description">
+              Actual sentiment about local restaurants
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
+          </div>
+
+          <a href="/neighborhood-trends/" class="tool-card active">
+            <div class="tool-icon">🏘️</div>
+            <h3 class="tool-title">Neighborhood Reports</h3>
+            <p class="tool-description">
+              Detailed insights about neighborhoods including demographics, schools, and amenities.
+            </p>
+            <span class="tool-badge available">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Available Now
+            </span>
+          </a>
+
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">📋</div>
+            <h3 class="tool-title">Custom Reports</h3>
+            <p class="tool-description">
+              Generate custom data reports and visualizations based on county records and analytics.
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
+          </div>
+        </div>
       </section>
-    </div>
-
-    <div class="tools-section">
-      <h2 class="section-title">Tools & Reports</h2>
-      <div class="tools-grid">
-        <a href="/appeal/" class="tool-card active">
-          <div class="tool-icon">⚖️</div>
-          <h3 class="tool-title">Property Helper</h3>
-          <p class="tool-description">
-            Review your property assessment and compare.
-          </p>
-          <span class="tool-badge available">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            Available Now
-          </span>
-        </a>
-
-        <a href="/faq/" class="tool-card active">
-          <div class="tool-icon">❓</div>
-          <h3 class="tool-title">Frequently Asked Questions</h3>
-          <p class="tool-description">
-            Find answers to common questions about data, tools, methodology, and how to use OpenSkagit.
-          </p>
-          <span class="tool-badge available">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            Available Now
-          </span>
-        </a>
-
-        <div class="tool-card coming-soon">
-          <div class="tool-icon">💰</div>
-          <h3 class="tool-title">Budget Insights</h3>
-          <p class="tool-description">
-            Explore Skagit County budget allocations, spending trends, and departmental financial data.
-          </p>
-          <span class="tool-badge coming-soon">Coming Soon</span>
-        </div>
-
-        <div class="tool-card coming-soon">
-          <div class="tool-icon">📊</div>
-          <h3 class="tool-title">Job Outlook</h3>
-          <p class="tool-description">
-            Analyze local employment trends, industry growth, and economic indicators for Skagit County.
-          </p>
-          <span class="tool-badge coming-soon">Coming Soon</span>
-        </div>
-
-        <div class="tool-card coming-soon">
-          <div class="tool-icon">📈</div>
-          <h3 class="tool-title">Flavor Index</h3>
-          <p class="tool-description">
-            Actual sentiment about local restaurants
-          </p>
-          <span class="tool-badge coming-soon">Coming Soon</span>
-        </div>
-
-        <a href="/neighborhood-trends/" class="tool-card active">
-          <div class="tool-icon">🏘️</div>
-          <h3 class="tool-title">Neighborhood Reports</h3>
-          <p class="tool-description">
-            Detailed insights about neighborhoods including demographics, schools, and amenities.
-          </p>
-          <span class="tool-badge available">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            Available Now
-          </span>
-        </a>
-
-        <div class="tool-card coming-soon">
-          <div class="tool-icon">📋</div>
-          <h3 class="tool-title">Custom Reports</h3>
-          <p class="tool-description">
-            Generate custom data reports and visualizations based on county records and analytics.
-          </p>
-          <span class="tool-badge coming-soon">Coming Soon</span>
-        </div>
-      </div>
     </div>
   </main>
 
@@ -194,6 +129,5 @@
     </div>
   </footer>
 
-  <script src="{% static 'openskagit/chat.js' %}" defer></script>
 </body>
 </html>

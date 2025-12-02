@@ -8,8 +8,9 @@ import os
 import operator
 import re
 import time
+import numpy as np
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -17,18 +18,19 @@ from django.contrib.humanize.templatetags.humanize import intcomma
 from django.db import connection
 from django.db.models import Avg, Count, Max, Min, OuterRef, Q, Subquery
 from django.db.models.functions import Upper
-from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.utils.formats import date_format
 from django.views.decorators.http import require_GET, require_POST
 
 
 logger = logging.getLogger(__name__)
 
-from . import adjustment_engine, appeals, cma, chat as chat_service, llm
+from . import adjustment_engine, appeals, cma, llm
 from .models import (
     Assessor,
     CmaAnalysis,
@@ -38,9 +40,12 @@ from .models import (
     NeighborhoodTrend,
     Parcel,
     ParcelHistory,
+    Sales,
 )
+from .neighborhood import get_neighborhood_snapshot
 from .improvement_utils import QUALITY_WEIGHTS
 from .valuation_areas import resolve_market_group
+from openskagit.regression_stats import load_regression_run, list_regression_runs
 
 
 CMA_SESSION_KEY = "cma_state"
@@ -129,6 +134,103 @@ ADJUSTMENT_STORYBOARD_CONFIG = {
     },
 }
 
+# Static descriptions of the predictors rendered on the methodology page.
+FEATURE_EXPLANATIONS = [
+    {
+        "term": "log_area",
+        "simple": "Living area",
+        "explanation": (
+            "We take the natural log of finished square footage so the model reads size as a percent change. "
+            "It keeps very large homes from overpowering the fit while still rewarding extra space."
+        ),
+        "example": "Adding 400 sq ft to a 1,600 sq ft home does less than adding the same space to an 800 sq ft cottage.",
+    },
+    {
+        "term": "log_age",
+        "simple": "Effective age",
+        "explanation": (
+            "Older homes often sell at a discount, but the impact tapers as properties age. "
+            "Using the logged age captures that quick drop-off after the first few decades."
+        ),
+        "example": "A house built in 1995 typically sees a much smaller age adjustment than one built in 1925.",
+    },
+    {
+        "term": "quality_score",
+        "simple": "Build quality",
+        "explanation": (
+            "Quality scores summarize materials, finishes, and workmanship. "
+            "Higher scores usually translate to higher values even after controlling for size."
+        ),
+        "example": "Upgrading from builder grade cabinets to custom woodwork increases the quality score and value.",
+    },
+    {
+        "term": "condition_score",
+        "simple": "Condition",
+        "explanation": (
+            "Condition measures upkeep and recent renovations. "
+            "Well-maintained homes sell closer to market benchmarks than deferred-maintenance properties."
+        ),
+        "example": "A roof replacement or systems update boosts the condition score and reduces downward adjustments.",
+    },
+    {
+        "term": "t",
+        "simple": "Time trend",
+        "explanation": (
+            "Monthly time steps keep the regression synced with market movement. "
+            "They also prevent stale sales from skewing a hot market up or down."
+        ),
+        "example": "If the market rises 1% per month, the model applies that appreciation to earlier comparable sales.",
+    },
+    {
+        "term": "land_share",
+        "simple": "Land share",
+        "explanation": (
+            "This feature captures how much of the total value sits in the land component. "
+            "It helps explain valuation bias between view lots and interior lots with similar homes."
+        ),
+        "example": "Waterfront parcels with modest structures have high land shares, so the model keeps them on-ratio.",
+    },
+    {
+        "term": "has_garage",
+        "simple": "Garage amenity",
+        "explanation": (
+            "Simple indicator variables such as garages, basements, or views still matter. "
+            "They make sure basic amenities stay valued even in a model dominated by continuous variables."
+        ),
+        "example": "All else equal, attached two-car garages typically add several percentage points to value.",
+    },
+    {
+        "term": "area_time",
+        "simple": "Size × time interaction",
+        "explanation": (
+            "Interactions let us test if certain home types appreciate differently. "
+            "Here we watch whether larger homes move faster or slower than the market average."
+        ),
+        "example": "During fast run-ups, large new construction may lead appreciation relative to small starter homes.",
+    },
+]
+
+NEIGHBORHOOD_VALID_SALES_START = dt.date(2024, 5, 1)
+NEIGHBORHOOD_VALID_SALES_END = dt.date(2025, 4, 30)
+NEIGHBORHOOD_RESIDENTIAL_CODES = {
+    "110",
+    "111",
+    "112",
+    "113",
+    "120",
+    "130",
+    "140",
+    "180",
+    "181",
+    "182",
+    "190",
+    "910",
+    "911",
+    "912",
+}
+NEIGHBORHOOD_MIN_PRB_SAMPLES = 12
+NEIGHBORHOOD_MIN_PRB_INSIDE_WINDOW = max(6, NEIGHBORHOOD_MIN_PRB_SAMPLES // 2)
+
 ADJUSTMENT_STORYBOARD_ORDER = ["size", "quality", "condition", "time", "location"]
 
 PARCEL_HISTORY_LIMIT = 24
@@ -141,7 +243,7 @@ def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metad
     message = f"[comparables] parcel={parcel_number} step={step} took {elapsed:.3f}s"
     if details:
         message = f"{message} {details}"
-    logger.info(message)
+    logger.debug(message)
 
 
 def _centroid_lat_lon(geom) -> Tuple[Optional[float], Optional[float]]:
@@ -711,6 +813,133 @@ def _load_neighborhood_sales_ratio_history(code: Optional[str], *, limit: int = 
             }
         )
     return sorted(history, key=lambda item: item["year"])
+
+
+def _normalize_hood_code(hood_id: Optional[str]) -> str:
+    if not hood_id:
+        return ""
+    return str(hood_id).strip()
+
+
+def _normalize_parcel_number(parcel: Optional[str]) -> str:
+    if not parcel:
+        return ""
+    return str(parcel).strip()
+
+
+def _collect_neighborhood_ratio_samples(hood_id: Optional[str]) -> List[Tuple[float, float]]:
+    hood_code = _normalize_hood_code(hood_id)
+    if not hood_code:
+        return []
+    normalized_hood = hood_code.upper()
+
+    assessor_rows = list(
+        Assessor.objects.filter(
+            neighborhood_code__iexact=normalized_hood,
+            property_type="R",
+            land_use_code__in=NEIGHBORHOOD_RESIDENTIAL_CODES,
+            assessed_value__gt=0,
+        ).values("parcel_number", "assessed_value")
+    )
+    if not assessor_rows:
+        return []
+
+    parcel_numbers = set()
+    for entry in assessor_rows:
+        raw_parcel = entry.get("parcel_number")
+        if not raw_parcel:
+            continue
+        trimmed = _normalize_parcel_number(raw_parcel)
+        if trimmed:
+            parcel_numbers.add(trimmed)
+        parcel_numbers.add(raw_parcel)
+    parcel_numbers.discard("")
+    if not parcel_numbers:
+        return []
+
+    sale_records = Sales.objects.filter(
+        parcel_number__in=parcel_numbers,
+        sale_type__iexact="VALID SALE",
+        sale_price__gt=0,
+        sale_date__range=(NEIGHBORHOOD_VALID_SALES_START, NEIGHBORHOOD_VALID_SALES_END),
+    ).values_list("parcel_number", "sale_price")
+
+    sales_map: Dict[str, List[float]] = {}
+    for parcel, price in sale_records:
+        cleaned = _normalize_parcel_number(parcel)
+        if not cleaned or not price:
+            continue
+        sales_map.setdefault(cleaned, []).append(float(price))
+
+    samples: List[Tuple[float, float]] = []
+    for entry in assessor_rows:
+        parcel = _normalize_parcel_number(entry.get("parcel_number"))
+        if not parcel:
+            continue
+        assessed_value = entry.get("assessed_value")
+        if assessed_value in (None, 0):
+            continue
+        for sale_price in sales_map.get(parcel, []):
+            if sale_price <= 0:
+                continue
+            ratio = float(assessed_value) / sale_price
+            if 0.25 <= ratio <= 2.5:
+                samples.append((ratio, sale_price))
+    return samples
+
+
+def _estimate_prb_from_samples(samples: List[Tuple[float, float]]) -> Optional[float]:
+    if len(samples) < NEIGHBORHOOD_MIN_PRB_SAMPLES:
+        return None
+    ratios = np.array([pair[0] for pair in samples], dtype=float)
+    sale_prices = np.array([pair[1] for pair in samples], dtype=float)
+    mask = np.isfinite(ratios) & np.isfinite(sale_prices) & (sale_prices > 0)
+    if mask.sum() < NEIGHBORHOOD_MIN_PRB_SAMPLES:
+        return None
+    ratios = ratios[mask]
+    sale_prices = sale_prices[mask]
+
+    median_ratio = np.median(ratios)
+    if median_ratio == 0:
+        return None
+    sale_median = np.median(sale_prices)
+    if sale_median == 0:
+        return None
+
+    val_dev = np.log2(sale_prices / sale_median)
+    y = (ratios / median_ratio) - 1.0
+
+    q_low, q_high = np.percentile(sale_prices, [10, 90])
+    window_mask = (sale_prices >= q_low) & (sale_prices <= q_high)
+    if window_mask.sum() < NEIGHBORHOOD_MIN_PRB_INSIDE_WINDOW:
+        return None
+
+    X = np.vstack((np.ones(window_mask.sum()), val_dev[window_mask])).T
+    y_window = y[window_mask]
+    try:
+        coef, *_ = np.linalg.lstsq(X, y_window, rcond=None)
+    except Exception:
+        return None
+
+    if len(coef) < 2:
+        return None
+    prb_value = float(coef[1])
+    if not np.isfinite(prb_value):
+        return None
+    return round(prb_value, 3)
+
+
+def _load_neighborhood_fairness_data(hood_id: Optional[str]) -> Dict[str, Optional[float]]:
+    fairness = {"cod": None, "prd": None, "sales_ratio": None, "prb": None}
+    snapshot = get_neighborhood_snapshot(hood_id, year=2025)
+    if not snapshot:
+        snapshot = get_neighborhood_snapshot(hood_id)
+    if snapshot:
+        fairness["cod"] = snapshot.get("cod")
+        fairness["prd"] = snapshot.get("prd")
+        fairness["sales_ratio"] = snapshot.get("sales_ratio")
+    fairness["prb"] = _estimate_prb_from_samples(_collect_neighborhood_ratio_samples(hood_id))
+    return fairness
 
 
 def _prepare_adjustment_storyboard(
@@ -1633,139 +1862,12 @@ def parcel_modal(request, parcel_number: str):
     return render(request, "openskagit/partials/parcel_modal.html", context)
 
 
+
 def home(request):
     """
-    Render the OpenSkagit portal homepage with chatbot-first interface.
+    Render the OpenSkagit portal homepage.
     """
-    manager = chat_service.ConversationManager(request)
-    requested_id = request.GET.get("cid")
-    initial_prompt = (request.GET.get("prompt") or "").strip()
-    if initial_prompt:
-        initial_prompt = initial_prompt[:1000]
-        conversation_id = manager.new()
-    else:
-        conversation_id = manager.ensure(requested_id)
-
-    context = manager.bootstrap(conversation_id, initial_prompt=initial_prompt or None)
-    return render(request, "openskagit/home_portal.html", context)
-
-
-@require_GET
-def chatbot(request):
-    """
-    Dedicated chat experience with conversation history and streaming responses.
-    """
-
-    manager = chat_service.ConversationManager(request)
-    requested_id = request.GET.get("cid")
-    initial_prompt = (request.GET.get("prompt") or "").strip()
-    if initial_prompt:
-        initial_prompt = initial_prompt[:1000]
-        conversation_id = manager.new()
-    else:
-        conversation_id = manager.ensure(requested_id)
-
-    context = manager.bootstrap(conversation_id, initial_prompt=initial_prompt)
-    return render(request, "openskagit/home.html", context)
-
-
-@require_GET
-def history(request):
-    """
-    Return the conversation history sidebar HTML.
-    """
-
-    manager = chat_service.ConversationManager(request)
-    conversations = manager.list_conversations()
-    active_id = manager.active_id
-
-    html = render_to_string(
-        "partials/history.html",
-        {
-            "conversations": conversations,
-            "active_id": active_id,
-        },
-        request=request,
-    )
-    return HttpResponse(html)
-
-
-@require_POST
-def chat(request):
-    """
-    Stream chat prompts via OpenAI Responses, emitting newline-delimited JSON chunks.
-    """
-
-    prompt = (request.POST.get("prompt") or "").strip()
-    requested_id = request.POST.get("conversation_id") or None
-
-    if not prompt:
-        return HttpResponseBadRequest("Prompt is required.")
-
-    manager = chat_service.ConversationManager(request)
-    conversation_id = manager.ensure(requested_id)
-    manager.append_user_message(conversation_id, prompt)
-    history_messages = manager.model_history(conversation_id)
-
-    def event_stream():
-        yield chat_service.render_stream_event({"type": "conversation", "conversation_id": conversation_id})
-        try:
-            rag_response = llm.generate_rag_response(prompt, history=history_messages)
-            final_text = (rag_response.get("answer") or "").strip() or "I wasn't able to craft a response."
-            sources = rag_response.get("sources") or []
-            model_name = rag_response.get("model") or getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4o-mini")
-
-            manager.append_assistant_message(
-                conversation_id,
-                final_text,
-                sources=sources,
-                model=model_name,
-            )
-            yield chat_service.render_stream_event(
-                {
-                    "type": "final",
-                    "text": final_text,
-                    "model": model_name,
-                    "sources": sources,
-                }
-            )
-        except (llm.MissingDependency, llm.MissingCredentials) as exc:
-            error_text = str(exc)
-            manager.append_assistant_message(conversation_id, error_text, sources=[])
-            yield chat_service.render_stream_event({"type": "error", "message": error_text})
-        except llm.OpenAIError as exc:
-            error_text = str(exc) or "The model was unable to finish the response."
-            manager.append_assistant_message(conversation_id, error_text, sources=[])
-            yield chat_service.render_stream_event({"type": "error", "message": error_text})
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.exception("Chat request failed: %s", exc)
-            error_text = "Something went wrong while contacting the language model. Please try again in a moment."
-            manager.append_assistant_message(conversation_id, error_text, sources=[])
-            yield chat_service.render_stream_event({"type": "error", "message": error_text})
-
-    response = StreamingHttpResponse(event_stream(), content_type="application/x-ndjson")
-    response["Cache-Control"] = "no-cache"
-    return response
-
-
-@require_POST
-def chat_new(request):
-    """
-    Initialize a new empty conversation.
-    """
-
-    manager = chat_service.ConversationManager(request)
-    conversation_id = manager.new()
-
-    accepts_json = "application/json" in (request.headers.get("Accept") or "")
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-
-    if accepts_json or is_ajax:
-        return JsonResponse({"conversation_id": conversation_id})
-
-    chat_url = f"{reverse('chatbot')}?cid={conversation_id}"
-    return redirect(chat_url)
-
+    return render(request, "openskagit/home_portal.html")
 
 @staff_member_required
 @require_POST
@@ -1951,7 +2053,7 @@ def cma_parcel_search(request):
 
         end = time.perf_counter()
         elapsed = end - start
-        logger.info(f"[DEBUG] Parcel search query='{query}' took {elapsed:.3f}s")
+        logger.debug(f"Parcel search query='{query}' took {elapsed:.3f}s")
 
     return render(
         request,
@@ -2136,10 +2238,7 @@ def appeal_home(request):
     """
     Minimal, citizen-friendly entry with a single address/parcel search box.
     """
-    manager = chat_service.ConversationManager(request)
-    conversation_id = manager.ensure(request.GET.get("cid"))
-    chat_bootstrap = manager.bootstrap(conversation_id)
-    return render(request, "openskagit/appeal_home_v3.html", {"step": 1, "chat_bootstrap": chat_bootstrap})
+    return render(request, "openskagit/appeal_home_v3.html", {"step": 1})
 
 APPEAL_SEARCH_LIMIT = 15
 APPEAL_MIN_QUERY_LENGTH = 3
@@ -2188,10 +2287,6 @@ def appeal_parcel_search(request):
               .order_by("parcel_number")[:APPEAL_SEARCH_LIMIT]
         )
 
-    manager = chat_service.ConversationManager(request)
-    conversation_id = manager.ensure(request.GET.get("cid"))
-    chat_bootstrap = manager.bootstrap(conversation_id)
-
     return render(
         request,
         "openskagit/appeal_parcel_search_results_v3.html",
@@ -2200,7 +2295,6 @@ def appeal_parcel_search(request):
             "results": results,
             "query_too_short": query_too_short,
             "min_search_length": APPEAL_MIN_QUERY_LENGTH,
-            "chat_bootstrap": chat_bootstrap,
         },
     )
 
@@ -2224,10 +2318,6 @@ def appeal_result(request, parcel_number: str):
             neighborhood_geom_geojson = None
 
     comparables_url = request.path + "comparables/"
-    manager = chat_service.ConversationManager(request)
-    conversation_id = manager.ensure(request.GET.get("cid"))
-    chat_bootstrap = manager.bootstrap(conversation_id)
-
     parcel_history_points = _parcel_value_history(parcel_number)
 
     return render(
@@ -2242,7 +2332,6 @@ def appeal_result(request, parcel_number: str):
             "comparables_url": comparables_url,
             "parcel_history_points": parcel_history_points,
             "step": 2,
-            "chat_bootstrap": chat_bootstrap,
         },
     )
 
@@ -2488,10 +2577,6 @@ def appeal_result_comparables(request, parcel_number: str):
     except Exception:
         pass
 
-    manager = chat_service.ConversationManager(request)
-    conversation_id = manager.ensure(request.GET.get("cid"))
-    chat_bootstrap = manager.bootstrap(conversation_id)
-
     return render(
         request,
         "openskagit/appeal_results_comparables_v3.html",
@@ -2513,7 +2598,6 @@ def appeal_result_comparables(request, parcel_number: str):
             "adjustment_labels": ADJUSTMENT_LABELS,
             "radius_meters_used": radius_used,
             "fetch_url": request.path,
-            "chat_bootstrap": chat_bootstrap,
         },
     )
 
@@ -2826,140 +2910,68 @@ def appeal_fairness_analysis(request, parcel_number: str):
     return render(request, "openskagit/appeal_fairness_analysis_v3.html", context)
 
 
+def _parse_iso_datetime(value: Optional[str]) -> Optional[dt.datetime]:
+    if not value:
+        return None
+    parsed = parse_datetime(value)
+    if not parsed:
+        return None
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.utc)
+    return parsed
+
+
 @require_GET
 def methodology_view(request):
     """
     Public-facing page explaining the regression methodology used for property valuations.
     Shows real coefficients and model performance metrics for transparency.
     """
-    from .models import AdjustmentCoefficient, AdjustmentRunSummary
-    from django.db.models import Max
-
-    latest_summary = AdjustmentRunSummary.objects.order_by("-created_at").first()
-    latest_run_id = latest_summary.run_id if latest_summary else None
-    fallback_run_time = (
-        AdjustmentCoefficient.objects.aggregate(Max("created_at"))["created_at__max"]
-        if latest_summary is None
-        else None
+    requested_run_id = request.GET.get("run_id")
+    requested_mode = request.GET.get("mode")
+    payload, _ = load_regression_run(run_id=requested_run_id, mode=requested_mode)
+    stats_list = payload.stats if payload else []
+    metadata = payload.metadata if payload else None
+    last_updated = _parse_iso_datetime(metadata.generated_at if metadata else None)
+    latest_adjustment_run = (
+        {"run_id": metadata.run_id, "created_at": last_updated} if metadata else None
     )
-    latest_run = latest_summary.created_at if latest_summary else fallback_run_time
 
-    market_groups = AdjustmentCoefficient.objects.values('market_group').distinct().order_by('market_group')
-
-    coefficients_by_group = {}
-    for mg in market_groups:
-        group_name = mg['market_group']
-        if latest_run_id:
-            coeffs = AdjustmentCoefficient.objects.filter(
-                market_group=group_name,
-                run_id=latest_run_id,
-            ).order_by('term')
-        elif latest_run:
-            coeffs = AdjustmentCoefficient.objects.filter(
-                market_group=group_name,
-                created_at=latest_run
-            ).order_by('term')
-        else:
-            coeffs = AdjustmentCoefficient.objects.none()
-
-        coefficients_by_group[group_name] = {
-            'coefficients': list(coeffs),
-            'display_name': group_name.replace('_', ' ').title()
+    raw_coefficients = payload.coefficients if payload else []
+    coefficients_raw = [
+        entry.dict() if hasattr(entry, "dict") else entry for entry in raw_coefficients
+    ]
+    coefficients_by_group: Dict[str, Dict[str, Any]] = {}
+    for entry in coefficients_raw:
+        market_group = entry.get("market_group")
+        if not market_group:
+            continue
+        coefficients_by_group[market_group] = {
+            "coefficients": entry.get("coefficients", []),
+            "display_name": entry.get("display_name") or market_group.replace("_", " ").title(),
         }
 
-    model_stats = {
-        'ANACORTES': {'n': 4798, 'r2': 0.928, 'adj_r2': 0.928, 'COD': 6.92, 'PRD': 1.181, 'median_ratio': 0.995},
-        'BURLINGTON': {'n': 2852, 'r2': 0.931, 'adj_r2': 0.930, 'COD': 5.65, 'PRD': 1.151, 'median_ratio': 0.998},
-        'CONCRETE': {'n': 833, 'r2': 0.923, 'adj_r2': 0.921, 'COD': 7.40, 'PRD': 1.216, 'median_ratio': 0.992},
-        'LACONNER_CONWAY': {'n': 698, 'r2': 0.937, 'adj_r2': 0.936, 'COD': 6.78, 'PRD': 1.179, 'median_ratio': 1.000},
-        'MOUNT_VERNON': {'n': 9012, 'r2': 0.935, 'adj_r2': 0.935, 'COD': 4.92, 'PRD': 1.130, 'median_ratio': 1.000},
-        'SEDRO_WOOLLEY': {'n': 5215, 'r2': 0.929, 'adj_r2': 0.928, 'COD': 7.12, 'PRD': 1.178, 'median_ratio': 0.995},
-    }
+    model_stats: Dict[str, Dict[str, Any]] = {}
+    for stat in stats_list:
+        if not isinstance(stat, dict):
+            continue
+        label = stat.get("label") or stat.get("market_group")
+        if not label:
+            continue
+        model_stats[label] = stat
 
-    model_stats_list = [
-        {
-            **stats,
-            "market_group": name,
-            "display_name": name.replace("_", " ").title(),
-        }
-        for name, stats in model_stats.items()
-    ]
+    model_stats_list = stats_list
+    feature_explanations = copy.deepcopy(FEATURE_EXPLANATIONS)
 
-    feature_explanations = [
-        {
-            'term': 'log_area',
-            'simple': 'Living Area (Square Feet)',
-            'explanation': 'Larger homes typically sell for more. We use a logarithmic transformation because each additional square foot has diminishing returns.',
-            'example': 'A 2,000 sq ft home vs 1,500 sq ft might be worth $50,000 more, but going from 3,000 to 3,500 sq ft adds less.'
-        },
-        {
-            'term': 'log_lot',
-            'simple': 'Lot Size (Acres)',
-            'explanation': 'Larger lots generally increase property value, especially in rural areas.',
-            'example': 'A half-acre lot is worth more than a quarter-acre, but the premium decreases as lots get very large.'
-        },
-        {
-            'term': 'log_age',
-            'simple': 'Property Age (Years)',
-            'explanation': 'Newer homes typically command higher prices, though well-maintained older homes can hold value.',
-            'example': 'A 5-year-old home might sell for more than a 25-year-old home of similar size.'
-        },
-        {
-            'term': 't',
-            'simple': 'Time Trend',
-            'explanation': 'Market conditions change over time. This captures whether prices are rising or falling.',
-            'example': 'Properties sold in 2023 might have different values than identical properties sold in 2021.'
-        },
-        {
-            'term': 'quality_score',
-            'simple': 'Construction Quality',
-            'explanation': 'Higher quality materials and finishes increase home value.',
-            'example': 'Granite counters and hardwood floors vs laminate counters and vinyl flooring.'
-        },
-        {
-            'term': 'condition_score',
-            'simple': 'Property Condition',
-            'explanation': 'Well-maintained properties are worth more than those needing repairs.',
-            'example': 'A home with a new roof and fresh paint vs one needing significant updates.'
-        },
-        {
-            'term': 'has_garage',
-            'simple': 'Garage Present',
-            'explanation': 'Properties with garages typically sell for more than those without.',
-            'example': 'An attached 2-car garage adds value for storage and convenience.'
-        },
-        {
-            'term': 'has_basement',
-            'simple': 'Basement Present',
-            'explanation': 'Finished or unfinished basements add usable space and value.',
-            'example': 'Additional storage, living space, or potential for future expansion.'
-        },
-        {
-            'term': 'is_view',
-            'simple': 'View Premium',
-            'explanation': 'Properties with water, mountain, or other desirable views command premium prices.',
-            'example': 'Homes with Puget Sound views or mountain vistas in specific neighborhoods.'
-        },
-        {
-            'term': 'area_time',
-            'simple': 'Size × Time Interaction',
-            'explanation': 'How the market values home size can change over time. Larger homes may appreciate differently than smaller ones.',
-            'example': 'During certain market periods, larger homes may see stronger price growth.'
-        },
-    ]
-
-    # Build interactive table rows
-    interactive_rows = []
-
+    interactive_rows: List[Dict[str, Any]] = []
     for group_name, group_data in coefficients_by_group.items():
         stats = model_stats.get(group_name, {})
-
         for coeff in group_data["coefficients"]:
             interactive_rows.append({
                 "market_group": group_name,
-                "term": coeff.term,
-                "beta": coeff.beta,
-                "beta_se": coeff.beta_se,
+                "term": coeff.get("term"),
+                "beta": coeff.get("beta"),
+                "beta_se": coeff.get("beta_se"),
                 "display_name": group_data["display_name"],
                 "n": stats.get("n"),
                 "r2": stats.get("r2"),
@@ -2969,61 +2981,128 @@ def methodology_view(request):
                 "median_ratio": stats.get("median_ratio"),
             })
 
-    feature_importance_scores: Dict[str, float] = {}
-
-    for stats in (latest_summary.stats if latest_summary else []):
-        for driver in stats.get("value_drivers", []):
+    aggregated_value_drivers: Dict[str, Dict[str, Any]] = {}
+    for stats in stats_list:
+        for driver in stats.get("value_drivers", []) or []:
             predictor = driver.get("predictor")
-            score = driver.get("importance") or 0.0
-            if predictor:
-                feature_importance_scores[predictor] = feature_importance_scores.get(predictor, 0.0) + float(score)
+            if not predictor:
+                continue
+            entry = aggregated_value_drivers.setdefault(
+                predictor,
+                {
+                    "importance": 0.0,
+                    "direction_counts": {"up": 0, "down": 0},
+                    "group_counts": {},
+                    "last_group": None,
+                },
+            )
+            entry["importance"] += float(driver.get("importance") or 0.0)
+            direction = (driver.get("direction") or "").lower()
+            if direction in entry["direction_counts"]:
+                entry["direction_counts"][direction] += 1
+            group = driver.get("group")
+            if group:
+                counts = entry.setdefault("group_counts", {})
+                counts[group] = counts.get(group, 0) + 1
+                entry["last_group"] = group
 
-    if not feature_importance_scores:
-        for stats in (latest_summary.stats if latest_summary else []):
-            for driver in stats.get("PRB_drivers", []):
-                predictor = driver.get("predictor")
-                score = driver.get("score") or 0.0
-                if predictor:
-                    feature_importance_scores[predictor] = feature_importance_scores.get(predictor, 0.0) + float(score)
+    total_driver_importance = sum(entry["importance"] for entry in aggregated_value_drivers.values())
 
-    max_score = max(feature_importance_scores.values()) if feature_importance_scores else 0.0
-    def importance_label(norm_value: float) -> str:
-        if norm_value >= 0.75:
-            return "Core driver"
-        if norm_value >= 0.4:
-            return "Strong driver"
-        if norm_value > 0:
-            return "Supporting driver"
-        return "Emerging driver"
+    def resolve_group_label(data: Optional[Dict[str, Any]]) -> str:
+        if not data:
+            return "General"
+        group_counts = data.get("group_counts") or {}
+        if group_counts:
+            group_key = max(group_counts.items(), key=lambda kv: kv[1])[0]
+        else:
+            group_key = data.get("last_group")
+        if not group_key:
+            return "General"
+        return group_key.replace("_", " ").title()
 
-    feature_importance: Dict[str, Dict[str, Any]] = {}
-    for predictor, total_score in feature_importance_scores.items():
-        norm = (total_score / max_score) if max_score else 0.0
-        feature_importance[predictor] = {
-            "percent": round(norm * 100, 1),
-            "label": importance_label(norm),
-        }
+    def resolve_direction_code(data: Optional[Dict[str, Any]]) -> str:
+        if not data:
+            return "mixed"
+        counts = data.get("direction_counts") or {}
+        lowers_ratio = counts.get("up", 0)
+        raises_ratio = counts.get("down", 0)
+        if lowers_ratio > raises_ratio:
+            return "lower"
+        if raises_ratio > lowers_ratio:
+            return "higher"
+        return "mixed"
 
+    def resolve_importance_percent(data: Optional[Dict[str, Any]]) -> Optional[float]:
+        if not data or total_driver_importance <= 0:
+            return None
+        share = data.get("importance") or 0.0
+        if share <= 0:
+            return None
+        return round((share / total_driver_importance) * 100, 1)
+
+    value_driver_rows: List[Dict[str, Any]] = []
+    seen_predictors: Set[str] = set()
     for feature in feature_explanations:
-        info = feature_importance.get(feature["term"], {"percent": 0, "label": "Emerging driver"})
-        feature["importance"] = info
+        predictor = feature.get("term")
+        stats = aggregated_value_drivers.get(predictor)
+        value_driver_rows.append(
+            {
+                "term": predictor,
+                "label": feature.get("simple") or (predictor or "").replace("_", " ").title(),
+                "description": feature.get("explanation") or "",
+                "group_label": resolve_group_label(stats),
+                "direction": resolve_direction_code(stats),
+                "importance_pct": resolve_importance_percent(stats),
+            }
+        )
+        if predictor:
+            seen_predictors.add(predictor)
 
-    latest_summary_stats = latest_summary.stats if latest_summary else []
+    extra_rows: List[Dict[str, Any]] = []
+    for predictor, stats in aggregated_value_drivers.items():
+        if predictor in seen_predictors:
+            continue
+        extra_rows.append(
+            {
+                "term": predictor,
+                "label": predictor.replace("_", " ").title(),
+                "description": "Predictor surfaced in the latest regression run.",
+                "group_label": resolve_group_label(stats),
+                "direction": resolve_direction_code(stats),
+                "importance_pct": resolve_importance_percent(stats),
+            }
+        )
+
+    extra_rows.sort(key=lambda row: row.get("importance_pct") or 0, reverse=True)
+    value_driver_rows.extend(extra_rows)
+
+    global_metrics = payload.global_metrics if payload else None
+    if global_metrics:
+        total_observations = int(global_metrics.total_observations)
+    else:
+        total_observations = sum(int(stat.get("n") or 0) for stat in stats_list)
+
+    runs_available = [meta.dict() for meta in list_regression_runs(mode=requested_mode)]
+
     context = {
-        'coefficients_by_group': coefficients_by_group,
-        'model_stats': model_stats,
-        'feature_explanations': feature_explanations,
-        'last_updated': latest_summary.created_at if latest_summary else latest_run,
-        'latest_adjustment_run': latest_summary,
-        'adjustment_run_stats': latest_summary_stats,
-        'adjustment_run_stats_json': json.dumps(latest_summary_stats, default=str),
-        'interactive_rows': interactive_rows,
-        'total_observations': sum(stats['n'] for stats in model_stats.values()),
-        'model_stats_list': model_stats_list,
-        'feature_importance': feature_importance,
+        "coefficients_by_group": coefficients_by_group,
+        "model_stats": model_stats,
+        "feature_explanations": feature_explanations,
+        "value_driver_rows": value_driver_rows,
+        "last_updated": last_updated,
+        "latest_adjustment_run": latest_adjustment_run,
+        "adjustment_run_stats": stats_list,
+        "adjustment_run_stats_json": json.dumps(stats_list, default=str),
+        "interactive_rows": interactive_rows,
+        "total_observations": total_observations,
+        "model_stats_list": model_stats_list,
+        "chart_data": stats_list[0].get("chart_data", []) if stats_list else [],
+        "runs_available": runs_available,
+        "selected_run_id": metadata.run_id if metadata else None,
+        "current_run_mode": metadata.mode if metadata else None,
     }
 
-    return render(request, 'openskagit/methodology.html', context)
+    return render(request, "openskagit/methodology.html", context)
 
 
 @require_GET
@@ -3116,6 +3195,7 @@ def neighborhood_trend_data(request, hood_id):
     """
     Chart-specific JSON payload with yearly trend arrays.
     """
+    fairness_data = _load_neighborhood_fairness_data(hood_id)
     rows = list(
         NeighborhoodTrend.objects.filter(hood_id=hood_id).order_by("value_year")
     )
@@ -3130,12 +3210,17 @@ def neighborhood_trend_data(request, hood_id):
             "tax_percent_of_value": [],
         }
         return JsonResponse(
-            {
-                "hood_id": hood_id,
-                "years": [],
-                "series": empty_series,
-                "summary": {"first_year": None, "last_year": None, "avg_stability": None},
-            }
+        {
+            "hood_id": hood_id,
+            "years": [],
+            "series": empty_series,
+            "summary": {
+                "first_year": None,
+                "last_year": None,
+                "avg_stability": None,
+                "fairness": fairness_data,
+            },
+        }
         )
 
     series = {
@@ -3175,6 +3260,7 @@ def neighborhood_trend_data(request, hood_id):
         "first_year": rows[0].value_year,
         "last_year": rows[-1].value_year,
         "avg_stability": avg_stability,
+        "fairness": fairness_data,
     }
 
     return JsonResponse(

@@ -65,11 +65,6 @@
     .empty-results {
       min-height: 88px;
     }
-    .cesium-placeholder,
-    .cesium-error-state {
-      border-radius: 28px;
-      text-align: center;
-    }
   </style>
 </head>
   <body class="min-h-screen">
@@ -197,9 +192,9 @@
 
       <section class="card flex flex-col gap-4 p-6">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Summary &amp; Map</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Summary</p>
         </div>
-        <div id="summary-grid" class="grid grid-cols-2 gap-4 text-sm text-neutral-600 hidden">
+        <div id="summary-grid" class="grid grid-cols-2 gap-4 text-sm text-neutral-600 hidden md:grid-cols-3">
           <div class="space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-3">
             <p class="text-[var(--ap-ink)] text-xs font-semibold uppercase tracking-[0.2em]">Years of data</p>
             <p id="summary-years" class="text-base font-semibold text-[var(--ap-black)]"></p>
@@ -210,10 +205,26 @@
             <p id="summary-stability" class="text-base font-semibold text-[var(--ap-black)]"></p>
             <p class="text-xs text-neutral-500">Higher is steadier.</p>
           </div>
-        </div>
-        <div class="text-sm text-neutral-500" id="map-placeholder">Map will appear after you select a neighborhood.</div>
-        <div id="map-wrapper" class="hidden">
-          <div id="hood-map" class="h-64 w-full rounded-3xl border border-neutral-100 shadow-inner"></div>
+          <div class="space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-3">
+            <p class="text-[var(--ap-ink)] text-xs font-semibold uppercase tracking-[0.2em]">Sales ratio</p>
+            <p id="summary-sales-ratio" class="text-base font-semibold text-[var(--ap-black)]"></p>
+            <p class="text-xs text-neutral-500">IAAO band: 90–110%</p>
+          </div>
+          <div class="space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-3">
+            <p class="text-[var(--ap-ink)] text-xs font-semibold uppercase tracking-[0.2em]">COD</p>
+            <p id="summary-cod" class="text-base font-semibold text-[var(--ap-black)]"></p>
+            <p class="text-xs text-neutral-500">Lower is better; ~10 is strong.</p>
+          </div>
+          <div class="space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-3">
+            <p class="text-[var(--ap-ink)] text-xs font-semibold uppercase tracking-[0.2em]">PRD</p>
+            <p id="summary-prd" class="text-base font-semibold text-[var(--ap-black)]"></p>
+            <p class="text-xs text-neutral-500">Balanced target: 0.98–1.03.</p>
+          </div>
+          <div class="space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-3">
+            <p class="text-[var(--ap-ink)] text-xs font-semibold uppercase tracking-[0.2em]">PRB</p>
+            <p id="summary-prb" class="text-base font-semibold text-[var(--ap-black)]"></p>
+            <p class="text-xs text-neutral-500">Values near 0 mean no value bias.</p>
+          </div>
         </div>
       </section>
     </div>
@@ -221,23 +232,18 @@
     <section class="card flex flex-col gap-4 p-6">
       <div class="flex items-start justify-between gap-4">
         <div class="space-y-1">
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">3D Neighborhood View</p>
-          <p class="text-lg font-semibold text-[var(--ap-ink)]">Explore this neighborhood on a 3D globe.</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">Neighborhood Map</p>
+          <p class="text-lg font-semibold text-[var(--ap-ink)]">See the selected hood in 2D.</p>
         </div>
-        <span id="cesium-powered-badge" class="rounded-full border border-[var(--ap-purple)] bg-[var(--ap-purple)]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-[var(--ap-purple)] shadow-sm">
-          Powered by Cesium 3D
-        </span>
       </div>
       <div class="relative mt-4 h-[420px] min-h-[300px] overflow-hidden rounded-[28px] border border-neutral-200 bg-neutral-100/60 shadow-inner">
-        <div id="cesium-placeholder" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-[28px] text-center text-sm text-neutral-600">
-          <span class="text-2xl">🌍</span>
-          <p id="cesium-placeholder-message" class="max-w-sm px-6">Select a neighborhood to load the 3D view.</p>
+        <div id="map-placeholder" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-[28px] text-center text-sm text-neutral-600">
+          <span class="text-2xl">🗺️</span>
+          <p class="max-w-sm px-6">Select a neighborhood to view its map.</p>
         </div>
-        <div id="cesium-error" class="hidden absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-[28px] bg-white/80 px-6 text-center text-sm text-neutral-600">
-          <p id="cesium-error-message" class="font-semibold text-neutral-700">3D view isn’t supported on this device/browser.</p>
-          <p class="text-xs text-neutral-500">Try a different browser or device.</p>
+        <div id="map-wrapper" class="hidden absolute inset-3 rounded-[24px] bg-white shadow-inner">
+          <div id="hood-map" class="h-full w-full rounded-[24px] border border-neutral-100"></div>
         </div>
-        <div id="cesium-container" class="hidden absolute inset-0"></div>
       </div>
     </section>
   </div>
@@ -254,6 +260,10 @@
       const summaryYears = document.getElementById("summary-years");
       const summaryCount = document.getElementById("summary-count");
       const summaryStability = document.getElementById("summary-stability");
+      const summarySalesRatio = document.getElementById("summary-sales-ratio");
+      const summaryCod = document.getElementById("summary-cod");
+      const summaryPrd = document.getElementById("summary-prd");
+      const summaryPrb = document.getElementById("summary-prb");
       const stabilityBadge = document.getElementById("stability-badge");
       const mapPlaceholder = document.getElementById("map-placeholder");
       const mapWrapper = document.getElementById("map-wrapper");
@@ -270,23 +280,6 @@
       const hoodSearchResultsWrapper = document.getElementById("hood-search-results-wrapper");
       const hoodSearchResults = document.getElementById("hood-search-results");
       const hoodSearchClear = document.getElementById("hood-search-clear");
-      const cesiumToken = "{{ cesium_token|default:''|escapejs }}";
-      const cesiumPlaceholder = document.getElementById("cesium-placeholder");
-      const cesiumPlaceholderMessage = document.getElementById("cesium-placeholder-message");
-      const cesiumError = document.getElementById("cesium-error");
-      const cesiumErrorMessage = document.getElementById("cesium-error-message");
-      const cesiumContainer = document.getElementById("cesium-container");
-      let cesiumViewer = null;
-      let cesiumDataSource = null;
-      let cesiumLoaderPromise = null;
-      let hasWebglSupport = null;
-      const localCesiumBase = "{% static 'cesium/Build/Cesium' %}";
-      const cesiumAssetProviders = [
-        localCesiumBase,
-        "https://cesium.com/downloads/cesiumjs/releases/1.109/Build/Cesium",
-        "https://cdn.jsdelivr.net/npm/cesium@1.109.0/Build/Cesium",
-        "https://unpkg.com/cesium@1.109.0/Build/Cesium",
-      ].filter(Boolean);
 
       const palette = {
         total: getComputedStyle(document.documentElement).getPropertyValue("--ap-purple").trim(),
@@ -481,9 +474,30 @@
         chart.update();
       }
 
+      function formatNumeric(value, decimals) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num.toFixed(decimals) : "—";
+      }
+
+      function formatPercent(value, decimals = 1) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) {
+          return "—";
+        }
+        return `${num.toFixed(decimals)}%`;
+      }
+
+      function populateFairness(fairness = {}) {
+        summarySalesRatio.textContent = formatPercent(fairness.sales_ratio);
+        summaryCod.textContent = formatNumeric(fairness.cod, 1);
+        summaryPrd.textContent = formatNumeric(fairness.prd, 3);
+        summaryPrb.textContent = formatNumeric(fairness.prb, 3);
+      }
+
       function populateSummary(summary) {
         if (!summary || !summary.first_year) {
           summaryGrid.classList.add("hidden");
+          populateFairness();
           return;
         }
         summaryGrid.classList.remove("hidden");
@@ -496,6 +510,7 @@
         } else {
           stabilityBadge.classList.add("hidden");
         }
+        populateFairness(summary.fairness || {});
       }
 
       function showMapLayer(geoJson) {
@@ -515,220 +530,6 @@
         mapPlaceholder.classList.add("hidden");
         map.fitBounds(polygonLayer.getBounds(), { padding: [16, 16], maxZoom: 13 });
         setTimeout(() => map.invalidateSize(), 200);
-      }
-
-      function supportsWebGL() {
-        if (hasWebglSupport !== null) {
-          return hasWebglSupport;
-        }
-        try {
-          const canvas = document.createElement("canvas");
-          hasWebglSupport =
-            !!window.WebGLRenderingContext &&
-            (!!canvas.getContext("webgl") || !!canvas.getContext("experimental-webgl"));
-        } catch (error) {
-          hasWebglSupport = false;
-          console.error("WebGL detection failed", error);
-        }
-        return hasWebglSupport;
-      }
-
-      function setCesiumPlaceholderText(text) {
-        if (cesiumPlaceholderMessage) {
-          cesiumPlaceholderMessage.textContent = text;
-        }
-      }
-
-      function showCesiumPlaceholder(text = "Select a neighborhood to load the 3D view.") {
-        setCesiumPlaceholderText(text);
-        cesiumPlaceholder?.classList.remove("hidden");
-        cesiumError?.classList.add("hidden");
-        cesiumContainer?.classList.add("hidden");
-      }
-
-      function showCesiumCanvas() {
-        cesiumPlaceholder?.classList.add("hidden");
-        cesiumError?.classList.add("hidden");
-        cesiumContainer?.classList.remove("hidden");
-      }
-
-      function showCesiumError(message) {
-        if (cesiumErrorMessage) {
-          cesiumErrorMessage.textContent = message;
-        }
-        cesiumPlaceholder?.classList.add("hidden");
-        cesiumError?.classList.remove("hidden");
-        cesiumContainer?.classList.add("hidden");
-      }
-
-      function appendCesiumAssets(baseUrl) {
-        window.CESIUM_BASE_URL = baseUrl;
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = `${baseUrl}/Cesium.css`;
-        link.crossOrigin = "anonymous";
-        const cssPromise = new Promise((resolve, reject) => {
-          link.onload = () => resolve();
-          link.onerror = () =>
-            reject(new Error(`Failed to load Cesium CSS from ${link.href}`));
-        });
-        document.head.appendChild(link);
-
-        const script = document.createElement("script");
-        script.src = `${baseUrl}/Cesium.js`;
-        script.crossOrigin = "anonymous";
-        script.async = true;
-        const scriptPromise = new Promise((resolve, reject) => {
-          script.onload = () => resolve();
-          script.onerror = () =>
-            reject(new Error(`Failed to load Cesium JS from ${script.src}`));
-        });
-        document.body.appendChild(script);
-
-        return { link, script, cssPromise, scriptPromise };
-      }
-
-      async function loadCesiumAssets() {
-        let lastError = null;
-        for (const baseUrl of cesiumAssetProviders) {
-          const { link, script, cssPromise, scriptPromise } =
-            appendCesiumAssets(baseUrl);
-          try {
-            await Promise.all([cssPromise, scriptPromise]);
-            return baseUrl;
-          } catch (error) {
-            lastError = error;
-            link.remove();
-            script.remove();
-          }
-        }
-        throw lastError || new Error("Unable to load Cesium assets");
-      }
-
-      function ensureCesiumViewer() {
-        if (cesiumViewer) {
-          return Promise.resolve(cesiumViewer);
-        }
-        if (!supportsWebGL()) {
-          return Promise.reject(new Error("WebGL is not supported"));
-        }
-        if (cesiumLoaderPromise) {
-          return cesiumLoaderPromise;
-        }
-        cesiumLoaderPromise = loadCesiumAssets()
-          .then(() => {
-            if (!cesiumToken) {
-              throw new Error("Cesium token missing");
-            }
-            Cesium.Ion.defaultAccessToken = cesiumToken;
-            const viewer = new Cesium.Viewer("cesium-container", {
-              timeline: false,
-              animation: false,
-              baseLayerPicker: false,
-              geocoder: false,
-              homeButton: false,
-              vrButton: false,
-              sceneModePicker: false,
-              infoBox: false,
-              selectionIndicator: false,
-              fullscreenButton: false,
-              terrainProvider: Cesium.createWorldTerrain(),
-              navigationHelpButton: false,
-              automaticallyTrackDataSourceClocks: false,
-            });
-            viewer.scene.globe.depthTestAgainstTerrain = true;
-            viewer.scene.globe.enableLighting = true;
-            viewer.scene.screenSpaceCameraController.enableTilt = true;
-            window.addEventListener("resize", () => {
-              viewer?.resize();
-            });
-            cesiumViewer = viewer;
-            return viewer;
-          })
-          .catch((error) => {
-            cesiumLoaderPromise = null;
-            throw error;
-          });
-        return cesiumLoaderPromise;
-      }
-
-      async function loadCesiumGeoJson(viewer, geoJson) {
-        if (!viewer || !geoJson) {
-          return null;
-        }
-        if (cesiumDataSource) {
-          viewer.dataSources.remove(cesiumDataSource, true);
-          cesiumDataSource = null;
-        }
-        const dataSource = await Cesium.GeoJsonDataSource.load(geoJson, {
-          clampToGround: true,
-          stroke: Cesium.Color.fromCssColorString("rgba(94,58,255,0.95)"),
-          fill: Cesium.Color.fromCssColorString("rgba(94,58,255,0.4)"),
-          strokeWidth: 3,
-          extrudedHeight: 130,
-        });
-        cesiumDataSource = dataSource;
-        viewer.dataSources.add(dataSource);
-        return dataSource;
-      }
-
-      function focusCesiumCamera(viewer, dataSource, centroid) {
-        if (!viewer || !dataSource) {
-          return;
-        }
-        const heading = Cesium.Math.toRadians(25);
-        const pitch = Cesium.Math.toRadians(-52);
-        const range = 4200;
-        if (centroid && centroid.lat != null && centroid.lng != null) {
-          const destination = Cesium.Cartesian3.fromDegrees(centroid.lng, centroid.lat, range);
-          viewer.camera.flyTo({
-            destination,
-            orientation: { heading, pitch, roll: 0 },
-            duration: 2.9,
-          });
-        } else {
-          viewer.flyTo(dataSource, {
-            duration: 2.9,
-            offset: new Cesium.HeadingPitchRange(heading, pitch, range),
-          });
-        }
-      }
-
-      async function updateCesiumView(geomData) {
-        if (!cesiumToken) {
-          showCesiumError("Cesium credentials missing – 3D view disabled.");
-          return;
-        }
-        if (!geomData || !geomData.geom) {
-          showCesiumPlaceholder("Geometry unavailable for this neighborhood.");
-          if (cesiumViewer && cesiumDataSource) {
-            cesiumViewer.dataSources.remove(cesiumDataSource, true);
-            cesiumDataSource = null;
-          }
-          return;
-        }
-        if (!supportsWebGL()) {
-          showCesiumError("3D view isn’t supported on this device/browser.");
-          return;
-        }
-        try {
-          showCesiumPlaceholder("Loading the 3D view…");
-          const viewer = await ensureCesiumViewer();
-          const dataSource = await loadCesiumGeoJson(viewer, geomData.geom);
-          focusCesiumCamera(viewer, dataSource, geomData.centroid);
-          showCesiumCanvas();
-        } catch (error) {
-          console.error("Cesium error:", error);
-          showCesiumError("Unable to load the 3D view right now.");
-        }
-      }
-
-      if (!cesiumToken) {
-        showCesiumError("Cesium credentials missing – 3D view disabled.");
-      } else if (!supportsWebGL()) {
-        showCesiumError("3D view isn’t supported on this device/browser.");
-      } else {
-        showCesiumPlaceholder("Select a neighborhood to load the 3D view.");
       }
 
       function handleModeSwitch(event) {
@@ -767,11 +568,6 @@
           chartPlaceholder.classList.remove("hidden");
           cachedTrend = null;
           renderChart();
-          if (cesiumViewer && cesiumDataSource) {
-            cesiumViewer.dataSources.remove(cesiumDataSource, true);
-            cesiumDataSource = null;
-          }
-          showCesiumPlaceholder();
           return;
         }
         chartPlaceholder.classList.add("hidden");
@@ -783,40 +579,16 @@
           renderChart();
           populateSummary(trendData.summary);
           showMapLayer(geomData.geom);
-          updateCesiumView(geomData);
         } catch (error) {
           chartPlaceholder.classList.remove("hidden");
           mapWrapper.classList.add("hidden");
           mapPlaceholder.classList.remove("hidden");
-          if (cesiumViewer && cesiumDataSource) {
-            cesiumViewer.dataSources.remove(cesiumDataSource, true);
-            cesiumDataSource = null;
-          }
-          showCesiumPlaceholder("Unable to load the 3D view right now.");
           console.error(error);
         }
       }
 
       hoodSelect.addEventListener("change", handleSelection);
     });
-
-    const CESIUM_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyZTMwNDI2My00NDAwLTRkYTQtYTk1ZC0xOWFjZDhmYzlkNGEiLCJpZCI6MzYxOTgyLCJpYXQiOjE3NjM3NDcwNTh9.zMAe-mPgEjtSeVkQlJqveMfKrMapSMW1Lb-PtlYgW4A"; // replace with the env value
-
-async function validateCesiumToken() {
-  const response = await fetch("https://api.cesium.com/v1/ion/assets", {
-    headers: {
-      Authorization: `Bearer ${CESIUM_TOKEN}`,
-      Accept: "application/json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`Token validation failed: ${response.status} ${response.statusText}`);
-  }
-  const payload = await response.json();
-  console.log("Cesium token is valid; available assets:", payload);
-}
-
-validateCesiumToken().catch((err) => console.error(err));
 
   </script>
 </body>

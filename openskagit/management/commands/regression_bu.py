@@ -1,7 +1,5 @@
-
 import datetime
 import json
-import math
 import os
 from typing import Any, List
 
@@ -19,12 +17,6 @@ from dotenv import load_dotenv
 # App imports - adjust if your app name is different
 from openskagit.models import AdjustmentCoefficient, AdjustmentRunSummary
 from openskagit.ai.methodology_schemas import ModelMethodologyPage
-from openskagit.regression_stats import (
-    RegressionGlobalMetrics,
-    RegressionRunMetadata,
-    RegressionRunPayload,
-    write_regression_run_payload,
-)
 
 load_dotenv()
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -63,12 +55,12 @@ TIER_INTERACTION_VARS = [
 CORE_PREDICTORS = [
     "log_area",
     "log_age",
-    "land_time",
+    #"land_time",
     "t",
     "t_sq",
     #"log_total_mv",
     #"log_total_mv_sq",
-    "area_time",        
+    #"area_time",        
     "quality_score",
     "condition_score",
 ]
@@ -93,14 +85,8 @@ CANDIDATE_PREDICTORS = [
     # New additions
     "log_far",
     "log_eff_age",
-    "bedrooms",
-    "bathrooms"
     "baths_per_bed",
     "log_lot_sq",
-    "view_aspect_west",
-    "view_elev",
-    "view_level",
-
 ]
 
 # --- GROUP 4: TIERING PREDICTORS (Used for Clustering only) ---
@@ -123,21 +109,6 @@ DRIVER_GROUPS = {
     "Location & extras": {"is_view", "has_garage", "has_basement"},
 }
 
-DATASET_LOOKUP = {
-    "sfr": "sale_regression_sfr",
-    "condo": "sale_regression_condo",
-    "mobile_home": "sale_regression_mobile_home",
-}
-DEFAULT_DATASET = DATASET_LOOKUP["sfr"]
-
-
-def safe_finite(value: Any, default=None):
-    try:
-        candidate = float(value)
-    except (TypeError, ValueError):
-        return default
-    return candidate if math.isfinite(candidate) else default
-
 class Command(BaseCommand):
     help = "Two-Pass Regression: Tiering by Predicted Value, then Stepwise Selection."
 
@@ -147,7 +118,6 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument("--undo", action="store_true")
         parser.add_argument("--countywide", action="store_true")
-        parser.add_argument("--mode", type=str, default="sfr")
 
     # -------------------------------------------------------------------
     # UTILITY METHODS
@@ -273,15 +243,6 @@ class Command(BaseCommand):
         df["slope_pct"] = df["slope"].fillna(0)
         df["dist_major_road"] = df["dist_major_road"].fillna(0)
         df["log_major_road"] = np.log1p(df["dist_major_road"])
-        # >>> VIEW TEST FEATURES <<<
-        df["view_aspect_west"] = df["aspect"].apply(lambda a: 1 if 225 <= a <= 315 else 0)
-        df["view_elev"] = df["is_view"] * df["log_elev"]
-        df["view_level"] = (
-            (df["is_view"] == 1).astype(int) +
-            (df["aspect"].between(225, 315)).astype(int)
-        )
-
-
 
         # 6. INTERACTIONS (Calculate ALL here; select via config later)
         df["land_time"] = df["land_share"] * df["t"]
@@ -458,25 +419,6 @@ class Command(BaseCommand):
         except:
             prb = np.nan
 
-        residual_values = model.resid.to_numpy()
-        residual_sum_sq = float(np.sum(residual_values ** 2))
-        rmse_value = None
-        if residual_values.size > 0:
-            rmse_value = safe_finite(math.sqrt(residual_sum_sq / residual_values.size))
-
-        time_trend = None
-        trend_mask = ratio_use.notna() & df["t"].notna()
-        if trend_mask.sum() > 3:
-            try:
-                trend_model = sm.OLS(ratio_use[trend_mask], sm.add_constant(df.loc[trend_mask, "t"])).fit()
-                time_trend = {
-                    "slope": safe_finite(trend_model.params.get("t")),
-                    "p_value": safe_finite(trend_model.pvalues.get("t")),
-                    "r2": safe_finite(trend_model.rsquared),
-                }
-            except Exception:
-                time_trend = None
-
         # 7. Summary Package
         # --- FIX FOR JSON SERIALIZATION ERROR ---
         
@@ -514,10 +456,6 @@ class Command(BaseCommand):
             "value_drivers": value_drivers,
             "chart_data": clean_chart_data.to_dict(orient="records") # Use the clean data
         }
-        if rmse_value is not None:
-            summary["rmse"] = rmse_value
-        summary["residual_sum_sq"] = residual_sum_sq
-        summary["time_trend"] = time_trend
 
         diagnostics = diagnostics_for_segment(df, model, final_predictors, summary, mandatory=mandatory)
 
@@ -603,13 +541,9 @@ class Command(BaseCommand):
         if options["undo"]: self.handle_undo(options.get("run_id")); return
 
         self.stdout.write(self.style.SUCCESS(f"Starting Run: {run_id}"))
-        run_mode = (options.get("mode") or "sfr").lower()
-        dataset = DATASET_LOOKUP.get(run_mode, DEFAULT_DATASET)
-        if run_mode not in DATASET_LOOKUP:
-            self.stdout.write(self.style.WARNING(f"Unrecognized mode '{run_mode}', defaulting to SFR data."))
-
+        
         # Load & Prep
-        df = pd.read_sql_query(f"SELECT * FROM {dataset}", connection)
+        df = pd.read_sql_query("SELECT * FROM sale_regression_sfr", connection)
         df = self.ensure_age_column(df).dropna(subset=["sale_price", "living_area", "age"])
         df = df[(df["sale_price"] > 10000) & (df["sale_date"].notna())].copy()
         df["sale_date"] = pd.to_datetime(df["sale_date"])
@@ -618,12 +552,9 @@ class Command(BaseCommand):
         mg_col = options["market_group_col"]
         run_stats = []
         coef_rows = []
-        coefficients_output = {}
         run_diag = {
             "run_id": run_id,
-            "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "mode": run_mode,
-            "dataset": dataset,
+            "generated_at": datetime.datetime.utcnow().isoformat(),
             "market_group_col": mg_col,
             "segments": []
         }
@@ -664,97 +595,26 @@ class Command(BaseCommand):
                 self.stdout.write(f"   [{tier_label}] COD={stats['COD']:.1f} PRD={stats['PRD']:.3f} | +Vars: {len(added)}")
 
                 for term, beta in model.params.items():
-                    beta_value = safe_finite(beta)
-                    beta_value = beta_value if beta_value is not None else 0.0
-                    beta_se_value = safe_finite(model.bse.get(term, 0))
-                    beta_se_value = beta_se_value if beta_se_value is not None else 0.0
                     coef_rows.append(AdjustmentCoefficient(
-                        market_group=label_str, term=term, beta=beta_value,
-                        beta_se=beta_se_value, run_id=run_id
+                        market_group=label_str, term=term, beta=float(beta),
+                        beta_se=float(model.bse.get(term, 0)), run_id=run_id
                     ))
-                    coefficients_output.setdefault(label_str, []).append({
-                        "term": term,
-                        "beta": beta_value,
-                        "beta_se": beta_se_value,
-                    })
 
         # Save
         if not options["dry_run"] and run_stats:
             with transaction.atomic():
                 AdjustmentRunSummary.objects.create(run_id=run_id, stats=run_stats)
                 AdjustmentCoefficient.objects.bulk_create(coef_rows)
-
-            total_observations = int(sum(int(stat.get("n", 0)) for stat in run_stats))
-            total_segments = len(run_stats)
-            market_groups = sorted({stat.get("market_group") for stat in run_stats if stat.get("market_group")})
-
-            def weighted_metric(key: str) -> float | None:
-                if total_observations == 0:
-                    return None
-                numerator = 0.0
-                for stat in run_stats:
-                    n = int(stat.get("n", 0)) if stat.get("n") is not None else 0
-                    value = safe_finite(stat.get(key), default=0.0) or 0.0
-                    numerator += value * n
-                return numerator / total_observations
-
-            cod_avg = weighted_metric("COD")
-            prd_avg = weighted_metric("PRD")
-            prb_avg = weighted_metric("PRB")
-            residual_sum_sq = sum(safe_finite(stat.get("residual_sum_sq"), default=0.0) or 0.0 for stat in run_stats)
-            rmse_global = None
-            if total_observations:
-                rmse_global = safe_finite(math.sqrt(residual_sum_sq / total_observations))
-
-            global_metrics_data = {
-                "total_observations": total_observations,
-                "segments": total_segments,
-                "market_groups": market_groups,
-                "cod": round(cod_avg, 3) if cod_avg is not None else None,
-                "prd": round(prd_avg, 3) if prd_avg is not None else None,
-                "prb": round(prb_avg, 3) if prb_avg is not None else None,
-                "rmse": float(round(rmse_global, 4)) if rmse_global is not None else None,
-            }
-
-            coeff_group_entries = []
-            for mg in sorted(coefficients_output):
-                entries = coefficients_output.get(mg) or []
-                if not entries:
-                    continue
-                coeff_group_entries.append({
-                    "market_group": mg,
-                    "display_name": mg.replace("_", " ").title(),
-                    "coefficients": entries,
-                })
-
-            metadata = RegressionRunMetadata(
-                run_id=run_id,
-                generated_at=run_diag["generated_at"],
-                mode=run_mode,
-                dataset=dataset,
-                market_group_col=mg_col,
-            )
-
-            payload = RegressionRunPayload(
-                metadata=metadata,
-                stats=run_stats,
-                segments=run_diag["segments"],
-                coefficients=coeff_group_entries,
-                global_metrics=RegressionGlobalMetrics(**global_metrics_data),
-            )
-            write_regression_run_payload(payload)
-
+            
             run_diag["segment_count"] = len(run_diag["segments"])
             run_diag["totals"] = {
-                "observations": total_observations,
-                "tiers": sorted({seg.get("value_tier") for seg in run_diag["segments"] if seg.get("value_tier")}),
+                "observations": int(sum(seg["performance"]["n"] for seg in run_diag["segments"])),
+                "tiers": sorted({seg["value_tier"] for seg in run_diag["segments"]}),
             }
-            run_diag["global_metrics"] = global_metrics_data
-            run_diag["coefficients"] = coeff_group_entries
-
+            
             with open(os.path.join(settings.BASE_DIR, f"diagnostics_{run_id}.json"), "w") as f:
                 json.dump(run_diag, f, indent=2)
-
+                
             self.stdout.write(self.style.SUCCESS("✅ Run Complete."))
 
 # -------------------------------------------------------------------
@@ -827,33 +687,7 @@ def diagnostics_for_segment(df, model, predictors, stats, mandatory=None):
         for i, c in enumerate(model.model.exog_names) if c != "const"
     }
 
-    flags = []
-    if perf["n"] < 50:
-        flags.append("Limited sample size")
-    if perf["COD"] and perf["COD"] > 15:
-        flags.append("COD above IAAO target")
-    if perf["PRD"] and not (0.98 <= perf["PRD"] <= 1.03):
-        flags.append("PRD outside target")
-    if perf["PRB"] is not None and abs(perf["PRB"]) > 0.05:
-        flags.append("PRB drift")
-    median_ratio = perf.get("median_ratio")
-    if median_ratio is not None and (median_ratio < 0.9 or median_ratio > 1.1):
-        flags.append("Median ratio off target")
-
-    outliers = []
-    if "residual" in df.columns:
-        residuals = df["residual"].dropna()
-        if not residuals.empty:
-            biggest = residuals.abs().nlargest(3)
-            for idx in biggest.index:
-                row = df.loc[idx]
-                outliers.append({
-                    "sale_price": float(row.get("sale_price", np.nan)),
-                    "residual": float(row.get("residual", np.nan)),
-                    "ratio": float(row.get("ratio_final", row.get("ratio", np.nan))),
-                })
-
-    diagnostics_payload = {
+    return {
         "segment": stats.get("label"),
         "market_group": stats.get("market_group"),
         "value_tier": stats.get("value_tier"),
@@ -875,11 +709,3 @@ def diagnostics_for_segment(df, model, predictors, stats, mandatory=None):
             "prb": stats.get("PRB_calibration"),
         }
     }
-    diagnostics_payload.update(
-        flags=flags,
-        outliers=outliers,
-        time_trend=stats.get("time_trend"),
-        errors=stats.get("errors") or [],
-    )
-
-    return diagnostics_payload

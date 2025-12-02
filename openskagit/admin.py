@@ -47,11 +47,6 @@ class ImprovementsAdmin(admin.ModelAdmin):
     list_display = ("parcel_number","improvement_detail_type_code")
     search_fields = ("parcel_number",)
 
-@admin.register(Assessor)
-class AssessorAdmin(LeafletGeoAdmin):
-    list_display = ("parcel_number", "assessed_value")
-    search_fields = ("parcel_number", "address", "city_district")
-
 @admin.register(Sales)
 class SalesAdmin(admin.ModelAdmin):
     list_display = ("parcel_number", "sale_price", "sale_date", "sale_type")
@@ -334,3 +329,34 @@ class AdjustmentModelSegmentAdmin(admin.ModelAdmin):
     search_fields = ("run__run_id", "market_group", "value_tier")
     autocomplete_fields = ("run",)
     ordering = ("market_group", "value_tier")
+
+from django.contrib import admin
+from .models import Assessor
+
+
+@admin.register(Assessor)
+class AssessorAdmin(admin.ModelAdmin):
+    list_display = (
+        "parcel_number",
+        "address",
+        "neighborhood_code",
+        "land_use_code",
+        "total_market_value",
+        "acres",
+        "sale_price",
+        "year_built",
+    )
+
+    search_fields = (
+        "parcel_number",
+        "address",
+        "neighborhood_code",
+        "land_use_code",
+    )
+
+    list_filter = (
+        "neighborhood_code",
+        "land_use_code",
+        "property_type",
+        "in_flood_zone",
+    )
