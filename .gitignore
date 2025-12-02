@@ -13,6 +13,9 @@ __pycache__/
 *.sh
 *.txt
 *.sqlite3
+*.osm.pbf
+*.pbf
+
 
 # Django project data
 django_project/data/*
