@@ -23,6 +23,7 @@ urlpatterns = [
     path('documents/upload/', openskagit_views.documents_upload, name='documents-upload'),
     path('admin/', admin.site.urls),
     path("api/dashboard/", openskagit_views.api_dashboard, name="api-dashboard"),
+    path("api/live-activity/", openskagit_views.live_activity_feed, name="live-activity-feed"),
     path("api/docs/", openskagit_views.api_docs, name="api-docs"),
     path("api/sales/top25/", openskagit_views.top_sales_widget, name="top-sales-partial"),
     path("api/sales/top25/<str:parcel_number>/", openskagit_views.parcel_modal, name="parcel-modal-partial"),
@@ -88,4 +89,10 @@ urlpatterns = [
         openskagit_views.appeal_fairness_analysis,
         name="appeal-result-fairness",
     ),
+    # Experiments
+    path("experiments/", openskagit_views.experiment_list, name="experiment_list"),
+    path("experiments/new/", openskagit_views.experiment_create, name="experiment_create"),
+    path("experiments/<uuid:experiment_id>/", openskagit_views.experiment_detail, name="experiment_detail"),
+    path("experiments/<uuid:experiment_id>/status/", openskagit_views.experiment_status_json, name="experiment_status"),
+    path("experiments/compare/", openskagit_views.experiment_compare, name="experiment_compare"),
 ]

@@ -15,7 +15,10 @@
            href="{% url 'appeal-result' parcel.parcel_number %}"
            data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
            data-parcel="{{ parcel.parcel_number|escape }}"
-           data-details="{% if sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% endif %}">
+           data-details="{% if sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% endif %}"
+           data-neighborhood="{{ parcel.neighborhood_code|default:''|escape }}"
+           data-prevent-redirect="{% if source == 'home_portal' or source == 'portal' %}true{% else %}false{% endif %}"
+           onclick="window.appealSearchSelect(event)">
           <div class="result-address">{{ parcel.address|default:"Address unavailable" }}</div>
           <div class="result-parcel">Parcel {{ parcel.parcel_number }}</div>
           <div class="result-cta">

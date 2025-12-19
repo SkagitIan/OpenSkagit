@@ -1,0 +1,186 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenSkagit.com - AI-Enhanced Data Portal</title>
+  <link rel="stylesheet" href="{% static 'openskagit/portal.css' %}" />
+  <link rel="stylesheet" href="{% static 'openskagit/parcel-search.css' %}" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script src="https://unpkg.com/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <a href="/" class="logo">
+        <div class="logo-mark">OS</div>
+        <span class="logo-text">OpenSkagit.com</span>
+      </a>
+      <span class="header-subtitle">AI-Enhanced Data Portal for Skagit County</span>
+    </div>
+  </header>
+
+  <main class="main hero-mode">
+    <div>
+      <div class="hero">
+        <h1 class="hero-title">
+          Discover <span class="hero-gradient-text">Skagit County</span> data
+        </h1>
+      
+      </div>
+
+    
+
+      <section class="tools-section">
+        <h2 class="section-title">Tools & Reports</h2>
+        <div class="tools-grid">
+          <a href="/appeal/" class="tool-card active">
+            <div class="tool-icon">⚖️</div>
+            <h3 class="tool-title">Property Helper</h3>
+            <p class="tool-description">
+              Review your property assessment and compare.
+            </p>
+            <span class="tool-badge available">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Available Now
+            </span>
+          </a>
+
+          <a href="/faq/" class="tool-card active">
+            <div class="tool-icon">❓</div>
+            <h3 class="tool-title">Frequently Asked Questions</h3>
+            <p class="tool-description">
+              Find answers to common questions about data, tools, methodology, and how to use OpenSkagit.
+            </p>
+            <span class="tool-badge available">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Available Now
+            </span>
+          </a>
+
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">💰</div>
+            <h3 class="tool-title">Budget Insights</h3>
+            <p class="tool-description">
+              Explore Skagit County budget allocations, spending trends, and departmental financial data.
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
+          </div>
+
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">📊</div>
+            <h3 class="tool-title">Job Outlook</h3>
+            <p class="tool-description">
+              Analyze local employment trends, industry growth, and economic indicators for Skagit County.
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
+          </div>
+
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">📈</div>
+            <h3 class="tool-title">Flavor Index</h3>
+            <p class="tool-description">
+              Actual sentiment about local restaurants
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
+          </div>
+
+          <a href="/neighborhood-trends/" class="tool-card active">
+            <div class="tool-icon">🏘️</div>
+            <h3 class="tool-title">Neighborhood Reports</h3>
+            <p class="tool-description">
+              Detailed insights about neighborhoods including demographics, schools, and amenities.
+            </p>
+            <span class="tool-badge available">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Available Now
+            </span>
+          </a>
+
+          <div class="tool-card coming-soon">
+            <div class="tool-icon">📋</div>
+            <h3 class="tool-title">Custom Reports</h3>
+            <p class="tool-description">
+              Generate custom data reports and visualizations based on county records and analytics.
+            </p>
+            <span class="tool-badge coming-soon">Coming Soon</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const panel = document.getElementById("home-parcel-tools-panel");
+      const parcelNumberEl = document.getElementById("home-parcel-tools-parcel-number");
+      const appealLink = document.getElementById("home-parcel-tools-appeal");
+      const neighborhoodLink = document.getElementById("home-parcel-tools-neighborhood");
+
+      function hidePanel() {
+        if (panel) {
+          panel.classList.add("hidden");
+        }
+        if (parcelNumberEl) {
+          parcelNumberEl.textContent = "—";
+        }
+        if (neighborhoodLink) {
+          neighborhoodLink.classList.add("hidden");
+          neighborhoodLink.setAttribute("aria-disabled", "true");
+          neighborhoodLink.removeAttribute("href");
+        }
+      }
+
+      function updatePanel(detail) {
+        if (!detail || !detail.parcel || !panel || !parcelNumberEl || !appealLink) {
+          return;
+        }
+
+        parcelNumberEl.textContent = detail.parcel;
+        appealLink.href = `/appeal/results/${detail.parcel}`;
+        if (neighborhoodLink) {
+          if (detail.neighborhood) {
+            neighborhoodLink.href = `https://openskagit.com/neighborhood-trends/${detail.neighborhood}`;
+            neighborhoodLink.classList.remove("hidden");
+            neighborhoodLink.removeAttribute("aria-disabled");
+          } else {
+            neighborhoodLink.classList.add("hidden");
+            neighborhoodLink.setAttribute("aria-disabled", "true");
+            neighborhoodLink.removeAttribute("href");
+          }
+        }
+        panel.classList.remove("hidden");
+      }
+
+      document.addEventListener("parcel-search-selected", (event) => {
+        updatePanel(event.detail);
+      });
+
+      document.addEventListener("parcel-search-reset", hidePanel);
+    })();
+  </script>
+
+  <footer class="footer">
+    <div class="footer-content">
+      <p class="footer-text">
+        <strong>NOT AFFILIATED WITH SKAGIT COUNTY GOVERNMENT</strong> <BR/> Data sourced from Skagit County public data sources,
+        Information is updated regularly but may not reflect real-time changes.
+      </p>
+      <div class="footer-links">
+        <a href="/api/docs/" class="footer-link">API Documentation</a>
+        <a href="#" class="footer-link">About OpenSkagit</a>
+        <a href="#" class="footer-link">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

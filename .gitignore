@@ -15,12 +15,24 @@ __pycache__/
 *.sqlite3
 *.osm.pbf
 *.pbf
+*.gdb
+*.gdbtable
+*.gdbtablx
+*.gdbindexes
 
+
+!static/openskagit/data/live_activity.json
 
 # Django project data
 django_project/data/*
+django_project/reference_data/source_files/*
 logs/
+django_project/openskagit/migrations/*
 analysis.ipynb
 regression.ipynb
 
 .env
+
+# Large local GIS archives
+reference_data/source_files/geopackages/
+*.zip

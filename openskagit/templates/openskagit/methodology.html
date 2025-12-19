@@ -3,590 +3,109 @@
 
 {% block extra_css %}
   <link rel="stylesheet" href="{% static 'openskagit/portal.css' %}" />
-  <script>
-    window.tailwind = window.tailwind || {};
-    window.tailwind.config = {
-      corePlugins: { preflight: false },
-    };
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <style>
-    .methodology-hero {
-      background: linear-gradient(135deg, #6B9080 0%, #7FA693 100%) !important;
-      color: #fff !important;
-      border: none !important;
-      padding: 2.75rem 2.5rem;
-      border-radius: 1.5rem;
-      overflow: hidden;
-      position: relative;
-      box-shadow: 0 25px 35px rgba(25, 44, 33, 0.2);
-    }
-
-    .methodology-hero::after {
-      content: "";
-      position: absolute;
-      inset: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 1.25rem;
-      pointer-events: none;
-    }
-
-    .hero-top-line {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: 0.85rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      opacity: 0.85;
-      font-weight: 600;
-    }
-
-    .hero-top-line span:last-child {
-      font-size: 0.9rem;
-      letter-spacing: 0.15em;
-    }
-
-    .methodology-hero h1 {
-      font-size: clamp(2rem, 4vw, 3rem);
-      margin: 1rem 0 1rem;
-      line-height: 1.2;
-      font-weight: 800;
-    }
-
-    .methodology-hero p {
-      max-width: 760px;
-      font-size: 1.05rem;
-      line-height: 1.7;
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .hero-note {
-      font-size: 0.95rem;
-      color: rgba(255, 255, 255, 0.75);
-      margin-top: 0.5rem;
-    }
-
-    .hero-metrics {
-      margin-top: 1.75rem;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 1rem;
-    }
-
-    .hero-metric {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 1rem;
-      padding: 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-    }
-
-    .hero-metric-label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.2em;
-      opacity: 0.85;
-    }
-
-    .hero-metric-value {
-      font-size: 1.8rem;
-      font-weight: 700;
-      margin: 0.35rem 0;
-    }
-
-    .hero-metric-note {
-      font-size: 0.85rem;
-      color: rgba(255, 255, 255, 0.85);
-    }
-
-    .section-eyebrow {
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      font-size: 0.75rem;
-      color: #4a5f52;
-      font-weight: 600;
-    }
-
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .section-head h2 {
-      margin: 0.15rem 0;
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: #1f3327;
-    }
-
-    .section-subtitle {
-      color: var(--gray-600);
-      max-width: 60ch;
-      margin: 0;
-    }
-
-    .pipeline-section {
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-
-    .pipeline-hero {
-      background: linear-gradient(145deg, #f7fbf6 0%, #eef4ee 100%);
-      border: 1px solid #dbe8df;
-      border-radius: 1.5rem;
-      padding: 1.75rem;
-      box-shadow: var(--shadow-md);
-    }
-
-    .pipeline-hero p {
-      color: var(--gray-700);
-      max-width: 70ch;
-    }
-
-    .pipeline-footnote {
-      font-size: 0.85rem;
-      color: var(--gray-600);
-      margin-top: 0.8rem;
-    }
-
-    .pipeline-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1rem;
-    }
-
-    .pipeline-step {
-      border: 1px solid #e0ede5;
-      border-radius: 1rem;
-      padding: 0.9rem 1.1rem;
-      background: #fff;
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 0.9rem;
-      box-shadow: inset 0 0 0 1px rgba(107, 144, 128, 0.08);
-      align-items: flex-start;
-    }
-
-    .pipeline-step-icon {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 1rem;
-      background: #e6f1ea;
-      color: #1f3327;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-      position: relative;
-      box-shadow: 0 6px 18px rgba(107, 144, 128, 0.25);
-    }
-
-    .pipeline-step-order {
-      position: absolute;
-      top: -0.45rem;
-      right: -0.45rem;
-      width: 1.5rem;
-      height: 1.5rem;
-      border-radius: 999px;
-      background: #1f3327;
-      color: #fff;
-      font-size: 0.85rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 10px rgba(31, 51, 39, 0.45);
-    }
-
-    .pipeline-step h3 {
-      margin: 0;
-      font-size: 1.1rem;
-      color: #1f3327;
-    }
-
-    .pipeline-step p {
-      margin: 0.4rem 0 0;
-      color: var(--gray-600);
-      line-height: 1.6;
-    }
-
-    .model-health-grid {
-      margin-top: 1.25rem;
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    }
-
-    .model-health-card {
-      border-radius: 1rem;
-      border: 1px solid #e0e6dd;
-      padding: 1.25rem;
-      background: #fff;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .model-health-card h3 {
-      margin: 0;
-      font-size: 1.2rem;
-      color: #274d34;
-    }
-
-    .model-sample {
-      margin: 0.3rem 0 0.65rem;
-      color: var(--gray-600);
-      font-weight: 600;
-    }
-
-    .model-health-metrics {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.85rem;
-      font-size: 0.95rem;
-    }
-
-    .model-health-metrics span {
-      color: #2c4132;
-    }
-
-    .chart-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      margin: 1rem 0.75rem 1.5rem;
-      padding: 0.75rem 0;
-    }
-
-    .chart-controls .chart-btn {
-      min-width: 150px;
-    }
-
-    .chart-description {
-      background: #f9fbf8;
-      border: 1px solid #dbe7dd;
-      border-radius: 1rem;
-      padding: 1rem 1.25rem;
-      margin: 0 0.75rem 1.5rem;
-    }
-
-    .chart-description-title {
-      margin: 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #1f3327;
-    }
-
-    .chart-description-body,
-    .chart-description-ideal {
-      margin: 0.4rem 0 0;
-      font-size: 0.92rem;
-      color: var(--gray-700);
-    }
-
-    .chart-description-ideal {
-      color: #4a5f52;
-      font-weight: 500;
-    }
-
-    .table-card {
-      margin-top: 2rem;
-      padding: 1.75rem 1.5rem;
-      width: 100%;
-    }
-
-    .table-shell {
-      margin-top: 1rem;
-      border: 1px solid #dbe7dd;
-      border-radius: 1.1rem;
-      overflow: hidden;
-      background: #fff;
-      box-shadow: 0 20px 45px rgba(23, 44, 33, 0.06);
-    }
-
-    .table-legend {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      padding: 0.85rem 1.1rem;
-      background: linear-gradient(120deg, #eff6f1 0%, #e4eee6 100%);
-      border-bottom: 1px solid #dbe7dd;
-    }
-
-    .legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-weight: 700;
-      color: #1f3327;
-    }
-
-    .legend-dot {
-      width: 0.75rem;
-      height: 0.75rem;
-      border-radius: 999px;
-      background: #166534;
-      box-shadow: 0 0 0 6px rgba(22, 101, 52, 0.08);
-    }
-
-    .legend-dot--watch {
-      background: #b45309;
-      box-shadow: 0 0 0 6px rgba(180, 83, 9, 0.08);
-    }
-
-    .legend-note {
-      color: var(--gray-600);
-      font-size: 0.9rem;
-    }
-
-    .table-wrapper {
-      width: 100%;
-      overflow-x: auto;
-    }
-
-    .diagnostic-table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 920px;
-    }
-
-    .diagnostic-table thead th {
-      background: #f7faf6;
-      color: #1f3327;
-      font-size: 0.8rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      padding: 0.85rem 1rem;
-      text-align: left;
-      border-bottom: 1px solid #dbe7dd;
-      white-space: nowrap;
-    }
-
-    .diagnostic-table tbody td {
-      padding: 0.95rem 1rem;
-      border-bottom: 1px solid #eef3ed;
-      color: #2e4433;
-      font-size: 0.98rem;
-    }
-
-    .diagnostic-table tbody tr:hover {
-      background: #f8fbf8;
-      transition: background 150ms ease;
-    }
-
-    .segment-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      padding: 0.35rem 0.65rem;
-      background: #eef5f1;
-      border-radius: 999px;
-      color: #1f3327;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .segment-subtext {
-      display: block;
-      margin-top: 0.2rem;
-      color: var(--gray-600);
-      font-size: 0.9rem;
-    }
-
-    .stat-metric {
-      font-variant-numeric: tabular-nums;
-      font-weight: 600;
-    }
-
-    .iaao-pass {
-      color: #166534;
-    }
-
-    .iaao-watch {
-      color: #b45309;
-    }
-
-    .iaao-muted {
-      color: var(--gray-500);
-    }
-
-    .range-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      padding: 0.5rem 0.75rem;
-      background: #f1f7f2;
-      border-radius: 0.75rem;
-      font-weight: 700;
-      color: #1f3327;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .range-pill span {
-      color: var(--gray-600);
-      font-weight: 500;
-      font-size: 0.9rem;
-    }
-
-    .table-empty {
-      padding: 1.2rem;
-      color: var(--gray-600);
-      font-size: 0.95rem;
-    }
-
-    .table-footer {
-      margin-top: 1rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      font-size: 0.9rem;
-      color: var(--gray-600);
-      justify-content: space-between;
-    }
-
-    .table-footer span {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    @media (max-width: 768px) {
-      .methodology-hero {
-        padding: 2.25rem 1.5rem;
-      }
-
-      .hero-top-line {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="{% static 'openskagit/methodology.css' %}" />
 {% endblock %}
 
 {% block page_title %}Valuation Methodology — OpenSkagit{% endblock %}
 
 {% block content %}
-  <section class="card methodology-hero">
-    <div class="hero-top-line">
-      <span>OpenSkagit.com</span>
-      <span>AI-Enhanced Data Portal for Skagit County</span>
+<section class="stats-hero">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">{{ total_observations|intcomma }}</div>
+      <div class="stat-label">Sales Analyzed</div>
     </div>
-    <h1>Trustworthy valuations start with transparent data.</h1>
-    <p>
-      Every number on this page is drawn from the most recent regression run, reflecting {{ adjustment_run_stats|length }}
-      market tiers and {{ total_observations|intcomma }} verified residential sales. The interactive diagnostics below let
-      you explore how each community scores on COD, PRD, R², and the median ratio.
-    </p>
-    <p class="hero-note">
-      {% if last_updated %}
-        Updated {{ last_updated|date:"F j, Y g:i A" }} with the latest verified sales.
-      {% else %}
-        Awaiting the first adjustment run.
-      {% endif %}
-    </p>
-    <div class="hero-metrics">
-      <article class="hero-metric">
-        <div class="hero-metric-label">Sales analyzed</div>
-        <div class="hero-metric-value">{{ total_observations|intcomma }}</div>
-        <div class="hero-metric-note">Residential transactions in the current window</div>
-      </article>
-      <article class="hero-metric">
-        <div class="hero-metric-label">Active segments</div>
-        <div class="hero-metric-value">{{ adjustment_run_stats|length }}</div>
-        <div class="hero-metric-note">Tiered regressions in this run</div>
-      </article>
-      <article class="hero-metric">
-        <div class="hero-metric-label">Latest refresh</div>
-        <div class="hero-metric-value">
-          {% if last_updated %}
-            {{ last_updated|date:"M j, Y" }}
-          {% else %}
-            TBD
-          {% endif %}
-        </div>
-        <div class="hero-metric-note">Timestamp stamped on this run</div>
-      </article>
+    <div class="stat-card">
+      <div class="stat-value">{{ adjustment_run_stats|length }}</div>
+      <div class="stat-label">Active Segments</div>
     </div>
-  </section>
+    <div class="stat-card">
+      <div class="stat-value">
+        {% if last_updated %}{{ last_updated|date:"M j, Y" }}{% else %}TBD{% endif %}
+      </div>
+      <div class="stat-label">Latest Refresh</div>
+    </div>
+  </div>
+  <div class="stats-timestamp">
+    {% if last_updated %}
+      <i class="fa-regular fa-clock"></i> Updated {{ last_updated|date:"F j, Y g:i A" }}
+    {% endif %}
+  </div>
+</section>
 
-  <section class="card pipeline-section">
-    <div class="pipeline-hero">
-      <p class="section-eyebrow">Trusted data pipeline</p>
-      <h2>We trace county data from download to delivery.</h2>
-      <p>
-        Integrity and privacy drive every decision. We pull from public Skagit County sources, keep raw files in a
-        locked PostgresGIS environment, and log the transformations so anyone can follow what changed. Only aggregated,
-        purpose-built outputs leave the secure workspace.
-      </p>
+<section class="pipeline-visual">
+  <h2>How We Build Your Data</h2>
+
+  <div class="pipeline-timeline">
+    <div class="timeline-line"></div>
+
+    <div class="pipeline-node" data-step="1">
+      <div class="node-circle">
+        <i class="fa-solid fa-cloud-arrow-down"></i>
+      </div>
+      <div class="node-content">
+        <h3>Collect</h3>
+        <p>County records & GIS data</p>
+      </div>
     </div>
-    <div class="pipeline-grid">
-      <article class="pipeline-step">
-        <div class="pipeline-step-icon">
-          <span class="pipeline-step-order">1</span>
-          <i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
-        </div>
-        <div>
-          <h3>Collect county records</h3>
-          <p>We download parcel characteristics, sales registers, and spatial layers straight from the Skagit County assessor and GIS websites. In the same pass we ingest public restaurant reviews and permitting data to grow the Skagit Flavor Index.</p>
-        </div>
-      </article>
-      <article class="pipeline-step">
-        <div class="pipeline-step-icon">
-          <span class="pipeline-step-order">2</span>
-          <i class="fa-solid fa-broom" aria-hidden="true"></i>
-        </div>
-        <div>
-          <h3>Clean, reconcile, and log</h3>
-          <p>Automations in our management commands normalize formats, handle missing values, reconcile duplicate parcels, and flag outliers. Each task records counts and warnings so it is clear what stayed, what was trimmed, and why.</p>
-        </div>
-      </article>
-      <article class="pipeline-step">
-        <div class="pipeline-step-icon">
-          <span class="pipeline-step-order">3</span>
-          <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
-        </div>
-        <div>
-          <h3>Geo tag every parcel</h3>
-          <p>Every property receives terrain features—elevation, slope, aspect—as well as distances to rivers, ferries, schools, utilities, and more. Those tags make neighborhood comparisons and site planning more grounded.</p>
-        </div>
-      </article>
-      <article class="pipeline-step">
-        <div class="pipeline-step-icon">
-          <span class="pipeline-step-order">4</span>
-          <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
-        </div>
-        <div>
-          <h3>Build the economic layer</h3>
-          <p>Clean parcels feed into a PostgresGIS layer joined with census demographics plus city, state, and federal budget data. That view keeps local economic pressure, capital projects, and revenue context next to each parcel.</p>
-        </div>
-      </article>
-      <article class="pipeline-step">
-        <div class="pipeline-step-icon">
-          <span class="pipeline-step-order">5</span>
-          <i class="fa-solid fa-toolbox" aria-hidden="true"></i>
-        </div>
-        <div>
-          <h3>Create tools and reports</h3>
-          <p>The structured data powers Property Helper, Neighborhood Reports, the Flavor Index, Job Outlook, and custom reports for you—always scoped to the questions at hand.</p>
-        </div>
-      </article>
-      <article class="pipeline-step">
-        <div class="pipeline-step-icon">
-          <span class="pipeline-step-order">6</span>
-          <i class="fa-solid fa-robot" aria-hidden="true"></i>
-        </div>
-        <div>
-          <h3>Use AI carefully</h3>
-          <p>AI assists with coding, research, data cleaning, parcel narratives, and automated LLM tooling, but humans verify every narrative because models can be wrong. When in doubt, we slow down and double-check.</p>
-        </div>
-      </article>
+
+    <div class="pipeline-node" data-step="2">
+      <div class="node-circle">
+        <i class="fa-solid fa-broom"></i>
+      </div>
+      <div class="node-content">
+        <h3>Clean</h3>
+        <p>Normalize & reconcile</p>
+      </div>
     </div>
-  </section>
-  <section class="card table-card">
+
+    <div class="pipeline-node" data-step="3">
+      <div class="node-circle">
+        <i class="fa-solid fa-location-crosshairs"></i>
+      </div>
+      <div class="node-content">
+        <h3>Geo Tag</h3>
+        <p>Terrain & distance</p>
+      </div>
+    </div>
+
+    <div class="pipeline-node" data-step="4">
+      <div class="node-circle">
+        <i class="fa-solid fa-layer-group"></i>
+      </div>
+      <div class="node-content">
+        <h3>Enrich</h3>
+        <p>Census & economic</p>
+      </div>
+    </div>
+
+    <div class="pipeline-node" data-step="5">
+      <div class="node-circle">
+        <i class="fa-solid fa-toolbox"></i>
+      </div>
+      <div class="node-content">
+        <h3>Build Tools</h3>
+        <p>Reports & analysis</p>
+      </div>
+    </div>
+
+    <div class="pipeline-node" data-step="6">
+      <div class="node-circle">
+        <i class="fa-solid fa-robot"></i>
+      </div>
+      <div class="node-content">
+        <h3>AI Assist</h3>
+        <p>Verified insights</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-detail" id="pipelineDetail">
+    <div class="detail-content"></div>
+  </div>
+</section>
+
+<section class="card table-card">
     <div class="section-head">
       <div>
         <p class="section-eyebrow">Diagnostics snapshot</p>
@@ -635,9 +154,6 @@
       </div>
     </div>
 
-    <script id="methodology-run-stats-data" type="application/json">
-      {{ adjustment_run_stats_json|safe }}
-    </script>
     <div class="table-footer">
       {% if latest_adjustment_run %}
         <span>Run {{ latest_adjustment_run.run_id }}</span>
@@ -648,89 +164,85 @@
       {% endif %}
     </div>
   </section>
-  <section class="card feature-section"><div class="bg-white shadow rounded-xl p-6 space-y-6">
 
-    <!-- Header -->
-    <h2 class="text-2xl font-bold text-gray-800">
-        Regression Diagnostics
-    </h2>
+<section class="card feature-section">
+  <div class="bg-white shadow rounded-xl p-6 space-y-6">
+    <h2 class="text-2xl font-bold text-gray-800">Regression Diagnostics</h2>
 
-    <!-- Button Bar -->
     <div class="chart-controls flex flex-wrap gap-4">
-        <button data-chart="ratio_dist"
-                data-title="Ratio Distribution"
-                data-body="Histogram of sale-to-value ratios so you can confirm the center, spread, and skew of the model."
-                data-support="A balanced model has a narrow bell curve, meaning extreme under- or over-valuations are rare."
-                data-ideal="Ideal: ratios stack between 0.95 and 1.05 with the median pinned near 1.00."
-                class="chart-btn px-5 py-2.5 rounded-lg bg-[#7FA693] text-white text-sm font-medium shadow-sm">
-            Ratio Distribution
-        </button>
+      <button
+        data-chart="ratio_dist"
+        data-title="Ratio Distribution"
+        data-body="Histogram of sale-to-value ratios so you can confirm the center, spread, and skew of the model."
+        data-support="A balanced model has a narrow bell curve, meaning extreme under- or over-valuations are rare."
+        data-ideal="Ideal: ratios stack between 0.95 and 1.05 with the median pinned near 1.00."
+        class="chart-btn px-5 py-2.5 rounded-lg bg-[#7FA693] text-white text-sm font-medium shadow-sm"
+      >
+        Ratio Distribution
+      </button>
 
-        <button data-chart="ratio_vs_value"
-                data-title="Ratio vs Value"
-                data-body="Each dot compares a sale ratio to its predicted value to surface price-related bias (PRB)."
-                data-support="Use this view to confirm calibration keeps luxury homes and entry-level homes aligned to the target ratio."
-                data-ideal="Ideal: a horizontal cloud centered on 1.00 with no upward or downward slope."
-                class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium">
-            Ratio vs Value
-        </button>
+      <button
+        data-chart="ratio_vs_value"
+        data-title="Ratio vs Value"
+        data-body="Each dot compares a sale ratio to its predicted value to surface price-related bias (PRB)."
+        data-support="Use this view to confirm calibration keeps luxury homes and entry-level homes aligned to the target ratio."
+        data-ideal="Ideal: a horizontal cloud centered on 1.00 with no upward or downward slope."
+        class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+      >
+        Ratio vs Value
+      </button>
 
-        <button data-chart="residuals"
-                data-title="Residuals"
-                data-body="Residuals show the dollar difference between the actual sale price and the predicted price."
-                data-support="Large outliers hint at parcels that need closer review or features missing from the regression."
-                data-ideal="Ideal: residuals scatter randomly around zero with symmetric spread."
-                class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium">
-            Residuals
-        </button>
+      <button
+        data-chart="residuals"
+        data-title="Residuals"
+        data-body="Residuals show the dollar difference between the actual sale price and the predicted price."
+        data-support="Large outliers hint at parcels that need closer review or features missing from the regression."
+        data-ideal="Ideal: residuals scatter randomly around zero with symmetric spread."
+        class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+      >
+        Residuals
+      </button>
 
-        <button data-chart="area_bias"
-                data-title="Area Bias"
-                data-body="Ratios plotted against log living area reveal whether small, mid, or large homes lean off-ratio."
-                data-support="Reviewing this tab confirms size calibrations keep cottages and custom homes on the same footing."
-                data-ideal="Ideal: ratios sit near 1.00 across the entire area range with no tilt."
-                class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium">
-            Area Bias
-        </button>
+      <button
+        data-chart="area_bias"
+        data-title="Area Bias"
+        data-body="Ratios plotted against log living area reveal whether small, mid, or large homes lean off-ratio."
+        data-support="Reviewing this tab confirms size calibrations keep cottages and custom homes on the same footing."
+        data-ideal="Ideal: ratios sit near 1.00 across the entire area range with no tilt."
+        class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+      >
+        Area Bias
+      </button>
 
-        <button data-chart="time_trend"
-                data-title="Time Trend"
-                data-body="Ratios compared against the time index verify that the time-adjustment keeps up with market movement."
-                data-support="Look for drift up or down to know when the appreciation factor needs to be refreshed."
-                data-ideal="Ideal: ratios stay centered on 1.00 throughout the study period."
-                class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium">
-            Time Trend
-        </button>
+      <button
+        data-chart="time_trend"
+        data-title="Time Trend"
+        data-body="Ratios compared against the time index verify that the time-adjustment keeps up with market movement."
+        data-support="Look for drift up or down to know when the appreciation factor needs to be refreshed."
+        data-ideal="Ideal: ratios stay centered on 1.00 throughout the study period."
+        class="chart-btn px-5 py-2.5 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+      >
+        Time Trend
+      </button>
     </div>
 
     <div class="chart-description">
-        <h3 id="chartDescriptionTitle" class="chart-description-title">Ratio Distribution</h3>
-        <p id="chartDescriptionBody" class="chart-description-body">
-          Histogram of sale-to-value ratios so you can confirm the center, spread, and skew of the model.
-        </p>
-        <p id="chartDescriptionSupport" class="chart-description-body">
-          A balanced model has a narrow bell curve, meaning extreme under- or over-valuations are rare.
-        </p>
-        <p id="chartDescriptionIdeal" class="chart-description-ideal">
-          Ideal: ratios stack between 0.95 and 1.05 with the median pinned near 1.00.
-        </p>
+      <h3 id="chartDescriptionTitle" class="chart-description-title">Ratio Distribution</h3>
+      <p id="chartDescriptionBody" class="chart-description-body">
+        Histogram of sale-to-value ratios so you can confirm the center, spread, and skew of the model.
+      </p>
+      <p id="chartDescriptionSupport" class="chart-description-body">
+        A balanced model has a narrow bell curve, meaning extreme under- or over-valuations are rare.
+      </p>
+      <p id="chartDescriptionIdeal" class="chart-description-ideal">
+        Ideal: ratios stack between 0.95 and 1.05 with the median pinned near 1.00.
+      </p>
     </div>
 
-    <!-- Chart Container -->
     <div>
-        <canvas id="raChart" class="w-full h-96"></canvas>
+      <canvas id="raChart" class="w-full h-96"></canvas>
     </div>
-
-</div>
-
-<!-- Pass chart data to JS -->
-<script>
-    window.chartData = {{ chart_data|safe }};
-</script>
-
-<!-- Load your JS -->
-<script src="{% static 'openskagit/js/ra_charts.js' %}"></script>
-
+  </div>
 </section>
 
   <section class="card feature-section">
@@ -816,166 +328,236 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const dataElement = document.getElementById("methodology-run-stats-data");
-  const tableBody = document.getElementById("adjustment-stats-body");
-  const emptyRow = document.getElementById("adjustment-stats-empty");
-
-  if (!dataElement || !tableBody) {
-    return;
-  }
-
-  let diagnostics = [];
-  try {
-    diagnostics = dataElement.textContent ? JSON.parse(dataElement.textContent) : [];
-  } catch (error) {
-    diagnostics = [];
-    console.error("Failed to parse adjustment run stats JSON.", error);
-  }
-
-  if (!Array.isArray(diagnostics) || diagnostics.length === 0) {
-    return;
-  }
-
-  if (emptyRow) {
-    emptyRow.remove();
-  }
-
-  const integerFormatter = new Intl.NumberFormat("en-US");
-  const currencyFormatter = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-
-  const marketPrefixes = {
-    MOUNT_VERNON: "MV",
-    SEDRO_WOOLLEY: "SW",
-    BURLINGTON: "BURL",
-    ANACORTES: "ANA",
-    CONCRETE: "CON",
-    LACONNER_CONWAY: "LACO",
-    COUNTYWIDE: "CTY",
+  window.tailwind = window.tailwind || {};
+  window.tailwind.config = {
+    corePlugins: { preflight: false },
   };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
-  const tierLabels = {
-    T1_LOW: "LOW",
-    T2_MID: "MID",
-    T3_HIGH: "HIGH",
-    T4_LUX: "LUX",
-    T5_ULTRA: "ULTRA",
-    ALL: "ALL",
-  };
+<script id="methodology-run-stats-data" type="application/json">
+  {{ adjustment_run_stats_json|safe }}
+</script>
 
-  const titleize = (value) => {
-    if (!value) return "—";
-    return value
-      .toString()
-      .replace(/_/g, " ")
-      .toLowerCase()
-      .split(" ")
-      .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ""))
-      .join(" ");
-  };
+<script>
+  window.chartData = {{ chart_data|safe }};
+</script>
+<script src="{% static 'openskagit/js/ra_charts.js' %}"></script>
 
-  const normalizeTier = (tier) => {
-    if (!tier) return "NA";
-    const cleaned = tierLabels[tier] || tier.replace(/^T\d+_/, "").replace(/_/g, "-");
-    return cleaned.toUpperCase();
-  };
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const detailElement = document.getElementById("pipelineDetail");
+    const detailContent = detailElement ? detailElement.querySelector(".detail-content") : null;
+    const pipelineNodes = Array.from(document.querySelectorAll(".pipeline-node"));
 
-  const descriptorForRow = (row) => {
-    const marketKey = row?.market_group || "";
-    const market = marketPrefixes[marketKey] || marketKey.slice(0, 4).toUpperCase() || "SEG";
-    const tier = normalizeTier(row?.value_tier);
-    return `${market}-${tier}`;
-  };
+    const pipelineDetails = {
+      '1': `
+      We ingest authoritative public records from Skagit County and related agencies, including assessor parcels, sales records, GIS layers, zoning, flood data, and planning overlays. 
+      Sources are pulled directly from county databases, ArcGIS REST services, and published datasets, preserving original attributes and geometry.
+      All raw data is stored intact to ensure traceability back to the source.
+        `,
+      '2': `
+      Incoming datasets are standardized, reconciled, and validated through repeatable pipelines. 
+      Parcel identifiers are aligned across systems, geometry is reprojected and indexed, and schema mismatches are resolved.
+      We log row counts, coverage gaps, conflicts, and anomalies so data quality issues are visible—not hidden.
+        `,
+      '3': `
+      Every parcel is spatially enriched using PostGIS and derived geometry.
+      We calculate terrain characteristics (elevation, slope, aspect), distances to features like shorelines, rivers, roads, utilities, and jurisdictional boundaries, and apply spatial joins for flood zones, zoning, and environmental constraints.
+      These metrics are computed—not guessed—and can be recomputed as better data becomes available.
+        `,
+      '4': `
+      Parcel-level data is contextualized with demographic, economic, and regulatory information.
+      This includes census statistics, neighborhood aggregates, planning designations, water and environmental constraints, and historical trends.
+      The goal is to move beyond raw parcels into explainable, comparable context across neighborhoods and time.
+        `,
+      '5': `
+      This foundation powers analytical tools such as parcel insights, neighborhood profiles, valuation diagnostics, planning and buildability analysis, and fairness metrics.
+      Because the data model is parcel-centric and normalized, tools can evolve without reworking the underlying data.
+      What you see is built directly on the same data professionals use.
+        `,
+      '6': `
+      AI is used to assist with summarization, pattern detection, and narrative generation—but never as an unverified source of truth.
+      All AI outputs are grounded in the underlying data and designed to be explainable.
+      Automation supports analysis; it does not replace accountability or judgment.
+        `,
+    };
 
-  const formatInteger = (value) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return "—";
-    return integerFormatter.format(numeric);
-  };
+    if (detailElement && detailContent && pipelineNodes.length) {
+      pipelineNodes.forEach((node) => {
+        node.addEventListener("click", () => {
+          const step = node.dataset.step;
+          detailContent.textContent = (pipelineDetails[step] || "").trim();
+          detailElement.classList.add("active");
 
-  const formatDecimal = (value, precision = 2) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return "—";
-    return numeric.toFixed(precision);
-  };
-
-  const formatMetric = (metric, value) => {
-    if (value === null || value === undefined) {
-      return "—";
+          if (window.innerWidth <= 768) {
+            setTimeout(() => {
+              detailElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }, 100);
+          }
+        });
+      });
     }
-    if (metric === "COD") {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? `${numeric.toFixed(2)}%` : "—";
-    }
-    if (metric === "median_ratio") {
-      return formatDecimal(value, 3);
-    }
-    const precision = metric === "PRB" ? 3 : 3;
-    return formatDecimal(value, precision);
-  };
 
-  const withinIAAO = {
-    COD: (v) => Number.isFinite(v) && v <= 15,
-    PRD: (v) => Number.isFinite(v) && v >= 0.98 && v <= 1.03,
-    PRB: (v) => Number.isFinite(v) && v >= -0.05 && v <= 0.05,
-    median_ratio: (v) => Number.isFinite(v) && v >= 0.9 && v <= 1.1,
-  };
+    const dataElement = document.getElementById("methodology-run-stats-data");
+    const tableBody = document.getElementById("adjustment-stats-body");
+    const emptyRow = document.getElementById("adjustment-stats-empty");
 
-  const classForMetric = (metric, value) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric) || !withinIAAO[metric]) {
-      return "iaao-muted";
+    if (!dataElement || !tableBody) {
+      return;
     }
-    return withinIAAO[metric](numeric) ? "iaao-pass" : "iaao-watch";
-  };
 
-  const formatRange = (min, max) => {
-    const low = Number(min);
-    const high = Number(max);
-    if (!Number.isFinite(low) || !Number.isFinite(high)) {
-      return "—";
+    let diagnostics = [];
+    try {
+      diagnostics = dataElement.textContent ? JSON.parse(dataElement.textContent) : [];
+    } catch (error) {
+      diagnostics = [];
+      console.error("Failed to parse adjustment run stats JSON.", error);
     }
-    return `${currencyFormatter.format(low)} – ${currencyFormatter.format(high)}`;
-  };
 
-  const sortedDiagnostics = diagnostics
-    .slice()
-    .sort((a, b) => {
-      const marketCompare = String(a.market_group || "").localeCompare(String(b.market_group || ""));
-      if (marketCompare !== 0) return marketCompare;
-      return String(a.value_tier || "").localeCompare(String(b.value_tier || ""));
+    if (!Array.isArray(diagnostics) || diagnostics.length === 0) {
+      return;
+    }
+
+    if (emptyRow) {
+      emptyRow.remove();
+    }
+
+    const integerFormatter = new Intl.NumberFormat("en-US");
+    const currencyFormatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
     });
 
-  sortedDiagnostics.forEach((row) => {
-    const descriptor = descriptorForRow(row);
-    const tierPretty = titleize(row?.value_tier);
-    const marketPretty = titleize(row?.market_group);
+    const marketPrefixes = {
+      MOUNT_VERNON: "MV",
+      SEDRO_WOOLLEY: "SW",
+      BURLINGTON: "BURL",
+      ANACORTES: "ANA",
+      CONCRETE: "CON",
+      LACONNER_CONWAY: "LACO",
+      COUNTYWIDE: "CTY",
+    };
 
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-        <div class="segment-tag">${descriptor}</div>
-        <span class="segment-subtext">${marketPretty} · ${tierPretty}</span>
-      </td>
-      <td class="stat-metric">${formatInteger(row?.n)}</td>
-      <td class="stat-metric">
-        <div>${formatDecimal(row?.r2, 3)}</div>
-        <span class="segment-subtext">Adj ${formatDecimal(row?.adj_r2, 3)}</span>
-      </td>
-      <td class="stat-metric ${classForMetric("COD", row?.COD)}">${formatMetric("COD", row?.COD)}</td>
-      <td class="stat-metric ${classForMetric("PRD", row?.PRD)}">${formatMetric("PRD", row?.PRD)}</td>
-      <td class="stat-metric ${classForMetric("PRB", row?.PRB)}">${formatMetric("PRB", row?.PRB)}</td>
-      <td class="stat-metric ${classForMetric("median_ratio", row?.median_ratio)}">${formatMetric("median_ratio", row?.median_ratio)}</td>
-      <td>
-        <span class="range-pill"><span>Range</span>${formatRange(row?.price_min, row?.price_max)}</span>
-      </td>
-    `;
-    tableBody.appendChild(tr);
+    const tierLabels = {
+      T1_LOW: "LOW",
+      T2_MID: "MID",
+      T3_HIGH: "HIGH",
+      T4_LUX: "LUX",
+      T5_ULTRA: "ULTRA",
+      ALL: "ALL",
+    };
+
+    const titleize = (value) => {
+      if (!value) return "—";
+      return value
+        .toString()
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .split(" ")
+        .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ""))
+        .join(" ");
+    };
+
+    const normalizeTier = (tier) => {
+      if (!tier) return "NA";
+      const cleaned = tierLabels[tier] || tier.replace(/^T\d+_/, "").replace(/_/g, "-");
+      return cleaned.toUpperCase();
+    };
+
+    const descriptorForRow = (row) => {
+      const marketKey = row?.market_group || "";
+      const market = marketPrefixes[marketKey] || marketKey.slice(0, 4).toUpperCase() || "SEG";
+      const tier = normalizeTier(row?.value_tier);
+      return `${market}-${tier}`;
+    };
+
+    const formatInteger = (value) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "—";
+      return integerFormatter.format(numeric);
+    };
+
+    const formatDecimal = (value, precision = 2) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "—";
+      return numeric.toFixed(precision);
+    };
+
+    const formatMetric = (metric, value) => {
+      if (value === null || value === undefined) {
+        return "—";
+      }
+      if (metric === "COD") {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? `${numeric.toFixed(2)}%` : "—";
+      }
+      if (metric === "median_ratio") {
+        return formatDecimal(value, 3);
+      }
+      const precision = metric === "PRB" ? 3 : 3;
+      return formatDecimal(value, precision);
+    };
+
+    const withinIAAO = {
+      COD: (v) => Number.isFinite(v) && v <= 15,
+      PRD: (v) => Number.isFinite(v) && v >= 0.98 && v <= 1.03,
+      PRB: (v) => Number.isFinite(v) && v >= -0.05 && v <= 0.05,
+      median_ratio: (v) => Number.isFinite(v) && v >= 0.9 && v <= 1.1,
+    };
+
+    const classForMetric = (metric, value) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || !withinIAAO[metric]) {
+        return "iaao-muted";
+      }
+      return withinIAAO[metric](numeric) ? "iaao-pass" : "iaao-watch";
+    };
+
+    const formatRange = (min, max) => {
+      const low = Number(min);
+      const high = Number(max);
+      if (!Number.isFinite(low) || !Number.isFinite(high)) {
+        return "—";
+      }
+      return `${currencyFormatter.format(low)} – ${currencyFormatter.format(high)}`;
+    };
+
+    const sortedDiagnostics = diagnostics
+      .slice()
+      .sort((a, b) => {
+        const marketCompare = String(a.market_group || "").localeCompare(String(b.market_group || ""));
+        if (marketCompare !== 0) return marketCompare;
+        return String(a.value_tier || "").localeCompare(String(b.value_tier || ""));
+      });
+
+    sortedDiagnostics.forEach((row) => {
+      const descriptor = descriptorForRow(row);
+      const tierPretty = titleize(row?.value_tier);
+      const marketPretty = titleize(row?.market_group);
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          <div class="segment-tag">${descriptor}</div>
+          <span class="segment-subtext">${marketPretty} · ${tierPretty}</span>
+        </td>
+        <td class="stat-metric">${formatInteger(row?.n)}</td>
+        <td class="stat-metric">
+          <div>${formatDecimal(row?.r2, 3)}</div>
+          <span class="segment-subtext">Adj ${formatDecimal(row?.adj_r2, 3)}</span>
+        </td>
+        <td class="stat-metric ${classForMetric("COD", row?.COD)}">${formatMetric("COD", row?.COD)}</td>
+        <td class="stat-metric ${classForMetric("PRD", row?.PRD)}">${formatMetric("PRD", row?.PRD)}</td>
+        <td class="stat-metric ${classForMetric("PRB", row?.PRB)}">${formatMetric("PRB", row?.PRB)}</td>
+        <td class="stat-metric ${classForMetric("median_ratio", row?.median_ratio)}">${formatMetric("median_ratio", row?.median_ratio)}</td>
+        <td>
+          <span class="range-pill"><span>Range</span>${formatRange(row?.price_min, row?.price_max)}</span>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
   });
-});
 </script>
 {% endblock %}

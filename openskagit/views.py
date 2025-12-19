@@ -7,13 +7,17 @@ import math
 import os
 import operator
 import re
-import time
+import statistics
+import subprocess
+import sys
 import numpy as np
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Set, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.contrib.humanize.templatetags.humanize import intcomma
 from django.db import connection
 from django.db.models import Avg, Count, Max, Min, OuterRef, Q, Subquery
@@ -30,11 +34,12 @@ from django.views.decorators.http import require_GET, require_POST
 
 logger = logging.getLogger(__name__)
 
-from . import adjustment_engine, appeals, cma, llm
+from . import activity_feed, adjustment_engine, appeals, cma, llm
 from .models import (
     Assessor,
     CmaAnalysis,
     CmaComparableSelection,
+    ExperimentRun,
     NeighborhoodGeom,
     NeighborhoodMetrics,
     NeighborhoodTrend,
@@ -45,7 +50,20 @@ from .models import (
 from .neighborhood import get_neighborhood_snapshot
 from .improvement_utils import QUALITY_WEIGHTS
 from .valuation_areas import resolve_market_group
-from openskagit.regression_stats import load_regression_run, list_regression_runs
+from openskagit.regression_stats import STATS_DIR, load_regression_run, list_regression_runs
+
+# Import predictor/interaction configs from the regression command.
+try:
+    from openskagit.management.commands import regression_masterparcel as regression_cmd
+
+    PREDICTOR_PROFILES = regression_cmd.PREDICTOR_PROFILES
+    INTERACTION_BUNDLES = regression_cmd.INTERACTION_BUNDLES
+    REGRESSION_MODES = regression_cmd.REGRESSION_MODES
+except Exception:
+    # Safe fallback if import has side effects or fails.
+    PREDICTOR_PROFILES = {"baseline": {}}
+    INTERACTION_BUNDLES = {"standard": []}
+    REGRESSION_MODES = {"sfr": "Single-family residential"}
 
 
 CMA_SESSION_KEY = "cma_state"
@@ -234,16 +252,6 @@ NEIGHBORHOOD_MIN_PRB_INSIDE_WINDOW = max(6, NEIGHBORHOOD_MIN_PRB_SAMPLES // 2)
 ADJUSTMENT_STORYBOARD_ORDER = ["size", "quality", "condition", "time", "location"]
 
 PARCEL_HISTORY_LIMIT = 24
-
-
-def _log_comparables_step(parcel_number: str, step: str, elapsed: float, **metadata: object) -> None:
-    details = " ".join(
-        f"{key}={value}" for key, value in metadata.items() if value is not None
-    )
-    message = f"[comparables] parcel={parcel_number} step={step} took {elapsed:.3f}s"
-    if details:
-        message = f"{message} {details}"
-    logger.debug(message)
 
 
 def _centroid_lat_lon(geom) -> Tuple[Optional[float], Optional[float]]:
@@ -1862,12 +1870,142 @@ def parcel_modal(request, parcel_number: str):
     return render(request, "openskagit/partials/parcel_modal.html", context)
 
 
+def _get_latest_regression_stats_json() -> Tuple[Optional[Dict[str, Any]], Optional[Path]]:
+    """
+    Load the most recent regression stats payload from disk.
+    """
+    if not STATS_DIR.exists():
+        return None, None
+
+    files = sorted(
+        (path for path in STATS_DIR.glob("*.json") if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+    for path in files:
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Unable to load regression stats %s: %s", path.name, exc)
+            continue
+        return data, path
+
+    return None, None
+
+
+def _median_sale_price_from_stats(stats: Sequence[Dict[str, Any]]) -> Optional[float]:
+    sale_prices: List[float] = []
+    for segment in stats:
+        chart = segment.get("chart_data") or []
+        for point in chart:
+            price = point.get("sale_price")
+            if price is None:
+                continue
+            try:
+                sale_prices.append(float(price))
+            except (TypeError, ValueError):
+                continue
+    if not sale_prices:
+        return None
+    return statistics.median(sale_prices)
+
+
+def _format_currency_compact(value: Optional[float]) -> str:
+    if value is None:
+        return "—"
+    thresholds = ((1_000_000, "M"), (1_000, "K"))
+    for threshold, suffix in thresholds:
+        if value >= threshold:
+            scaled = value / threshold
+            short_value = f"{scaled:.1f}".rstrip("0").rstrip(".")
+            return f"${short_value}{suffix}"
+    return _format_currency(value)
+
+
+def _build_data_quality_score(global_metrics: Dict[str, Any]) -> str:
+    components: List[float] = []
+
+    cod_val = global_metrics.get("cod")
+    if cod_val is not None:
+        try:
+            cod_float = float(cod_val)
+        except (TypeError, ValueError):
+            pass
+        else:
+            normalized = cod_float / 100.0 if cod_float > 1 else cod_float
+            components.append(max(0.0, min(1.0, 1.0 - normalized)))
+
+    prd_val = global_metrics.get("prd")
+    if prd_val is not None:
+        try:
+            prd_float = float(prd_val)
+        except (TypeError, ValueError):
+            pass
+        else:
+            components.append(max(0.0, min(1.0, 1.0 - abs(prd_float - 1.0))))
+
+    prb_val = global_metrics.get("prb")
+    if prb_val is not None:
+        try:
+            prb_float = float(prb_val)
+        except (TypeError, ValueError):
+            pass
+        else:
+            components.append(max(0.0, min(1.0, 1.0 - abs(prb_float))))
+
+    if not components:
+        return "—"
+
+    score = sum(components) / len(components)
+    percentage = max(0.0, min(100.0, score * 100))
+    return f"{percentage:.1f}%"
+
 
 def home(request):
     """
     Render the OpenSkagit portal homepage.
     """
-    return render(request, "openskagit/home_portal.html")
+    stats_data, _ = _get_latest_regression_stats_json()
+    stats_list = stats_data.get("stats", []) if isinstance(stats_data, dict) else []
+    global_metrics = stats_data.get("global_metrics", {}) if isinstance(stats_data, dict) else {}
+
+    median_value = _median_sale_price_from_stats(
+        stats_list if isinstance(stats_list, list) else []
+    )
+    median_value_display = _format_currency_compact(median_value)
+    hood_groups = global_metrics.get("market_groups") or []
+    hood_count = len(set(hood_groups)) if isinstance(hood_groups, list) else 0
+
+    data_quality_score = _build_data_quality_score(global_metrics if isinstance(global_metrics, dict) else {})
+
+    total_parcels = Assessor.objects.filter(roll__year=2025).count()
+
+    context = {
+        "total_parcels": total_parcels,
+        "median_value_display": median_value_display,
+        "hood_count": hood_count,
+        "data_quality_score": data_quality_score,
+    }
+    return render(request, "openskagit/home_portal.html", context)
+
+
+@require_GET
+def live_activity_feed(request):
+    """
+    Serve the recent live activity feed as JSON for the homepage widget.
+    """
+    limit_param = request.GET.get("limit")
+    limit: Optional[int] = None
+    if limit_param:
+        try:
+            limit = max(1, min(int(limit_param), activity_feed.LIVE_ACTIVITY_LIMIT))
+        except (TypeError, ValueError):
+            limit = None
+
+    entries = activity_feed.get_recent_activity(limit=limit)
+    return JsonResponse(entries, safe=False)
+
 
 @staff_member_required
 @require_POST
@@ -2032,6 +2170,14 @@ def cma_dashboard_view(request, parcel_number: Optional[str] = None):
     if parcel_number:
         detail_context = _build_cma_context(request, parcel_number)
         context.update(detail_context)
+        if not request.headers.get("HX-Request"):
+            subject = detail_context.get("subject")
+            if subject:
+                activity_feed.log_activity(
+                    "comparison",
+                    "Finding Comparisons for",
+                    subject.address or parcel_number,
+                )
     template_name = "openskagit/cma/dashboard.html"
     if request.headers.get("HX-Request"):
         template_name = "openskagit/cma/partials/dashboard_content.html"
@@ -2043,17 +2189,11 @@ def cma_parcel_search(request):
     query = (request.GET.get("q") or "").strip()
     results = []
     if query:
-        start = time.perf_counter()
-
         results = list(
             Assessor.objects.filter(
                 Q(parcel_number__istartswith=query) | Q(address__icontains=query)
             )[:15]
         )
-
-        end = time.perf_counter()
-        elapsed = end - start
-        logger.debug(f"Parcel search query='{query}' took {elapsed:.3f}s")
 
     return render(
         request,
@@ -2248,6 +2388,7 @@ def appeal_parcel_search(request):
     query = (request.GET.get("q") or "").strip()
     query_too_short = len(query) < APPEAL_MIN_QUERY_LENGTH
     results = []
+    source = (request.GET.get("source") or "appeal").strip()
 
     if not query_too_short:
         is_parcel_like = bool(re.match(r"^[Pp]\s*\d+\s*$", query))
@@ -2295,6 +2436,7 @@ def appeal_parcel_search(request):
             "results": results,
             "query_too_short": query_too_short,
             "min_search_length": APPEAL_MIN_QUERY_LENGTH,
+            "source": source,
         },
     )
 
@@ -2338,62 +2480,33 @@ def appeal_result(request, parcel_number: str):
 
 @require_GET
 def appeal_result_comparables(request, parcel_number: str):
-    request_start = time.perf_counter()
-    subject_start = time.perf_counter()
     raw_view_mode = (request.GET.get("view_mode") or "").strip().lower()
     advanced_mode = raw_view_mode in {"advanced", "adv", "true", "1", "yes", "on"}
     view_mode = "advanced" if advanced_mode else "standard"
     try:
         subject, _ = appeals.load_subject_with_roll_context(parcel_number)
     except ValueError as exc:
-        subject_elapsed = time.perf_counter() - subject_start
-        _log_comparables_step(
-            parcel_number,
-            "load_subject",
-            subject_elapsed,
-            error=str(exc),
-        )
         return HttpResponseBadRequest(str(exc))
-    subject_elapsed = time.perf_counter() - subject_start
-    _log_comparables_step(parcel_number, "load_subject", subject_elapsed)
-
+    activity_feed.log_activity(
+        "comparison",
+        "Finding Comparisons for",
+        subject.address or parcel_number,
+    )
     requested_count = int(request.GET.get("count", appeals.INITIAL_COMPARABLE_LIMIT))
     display_limit = (
         appeals.EXTENDED_COMPARABLE_LIMIT
         if requested_count >= appeals.EXTENDED_COMPARABLE_LIMIT
         else appeals.INITIAL_COMPARABLE_LIMIT
     )
-    comps_start = time.perf_counter()
     comps, radius_used = appeals._comparable_candidates(subject, display_limit)
-    comps_elapsed = time.perf_counter() - comps_start
-    _log_comparables_step(
-        parcel_number,
-        "fetch_candidates",
-        comps_elapsed,
-        comp_count=len(comps),
-        radius=radius_used,
-        requested=requested_count,
-        limit=display_limit,
-    )
 
-    summary_start = time.perf_counter()
     summary = appeals.citizen_assessment_summary(
         subject,
         comparables=comps,
         radius_meters=radius_used,
         limit=display_limit,
     )
-    summary_elapsed = time.perf_counter() - summary_start
     summary_comps = summary.get("comparables") or []
-    _log_comparables_step(
-        parcel_number,
-        "summarize",
-        summary_elapsed,
-        summary_count=len(summary_comps),
-        score=summary.get("score"),
-        radius=radius_used,
-        limit=display_limit,
-    )
 
     over_pct = summary.get("over_assessment_pct")
     comp_count = summary.get("comp_count") or 0
@@ -2434,16 +2547,6 @@ def appeal_result_comparables(request, parcel_number: str):
 
     has_more = len(comps) == display_limit and display_limit < appeals.EXTENDED_COMPARABLE_LIMIT
     load_more_url = f"{request.path}?count={appeals.EXTENDED_COMPARABLE_LIMIT}"
-
-    total_elapsed = time.perf_counter() - request_start
-    _log_comparables_step(
-        parcel_number,
-        "request",
-        total_elapsed,
-        comp_count=len(summary_comps),
-        score=score,
-        limit=display_limit,
-    )
 
     # Flatten comparable results for v3 templates (which expect simple dicts)
     view_comps = []
@@ -2489,6 +2592,9 @@ def appeal_result_comparables(request, parcel_number: str):
         adjustments = adjustment_map.get(str(comp_id)) if comp_id else None
         comp_meta = getattr(snapshot, "metadata", {}) or {}
         comp_living_area = _safe_float_value(living_area)
+        comp_calc_sqft = _safe_float_value(comp_meta.get("calculated_square_footage"))
+        if comp_calc_sqft is None:
+            comp_calc_sqft = comp_living_area
         comp_lot_value = _safe_float_value(
             getattr(snapshot, "acres", None)
             or getattr(snapshot, "lot_acres", None)
@@ -2552,6 +2658,7 @@ def appeal_result_comparables(request, parcel_number: str):
                 "bedrooms": bedrooms,
                 "bathrooms": bathrooms,
                 "living_area": living_area,
+                "calculated_square_footage": comp_calc_sqft,
                 "year_built": year_built,
                 "price_per_sqft": price_per_sqft,
                 "latitude": lat,
@@ -2921,6 +3028,200 @@ def _parse_iso_datetime(value: Optional[str]) -> Optional[dt.datetime]:
     return parsed
 
 
+def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    diagnostics = diagnostics or {}
+    segments = diagnostics.get("segments") or []
+    stats_list = diagnostics.get("stats") or []
+    if not stats_list and segments:
+        for seg in segments:
+            perf = seg.get("performance") or {}
+            band = seg.get("tier_price_band") or {}
+            stats_list.append(
+                {
+                    "label": seg.get("segment") or f"{seg.get('market_group', '')}__{seg.get('value_tier', '')}",
+                    "market_group": seg.get("market_group"),
+                    "value_tier": seg.get("value_tier"),
+                    "n": perf.get("n"),
+                    "r2": perf.get("r2"),
+                    "adj_r2": perf.get("adj_r2"),
+                    "COD": perf.get("COD"),
+                    "PRD": perf.get("PRD"),
+                    "PRB": perf.get("PRB"),
+                    "median_ratio": perf.get("median_ratio"),
+                    "price_min": band.get("min"),
+                    "price_max": band.get("max"),
+                    "value_drivers": (seg.get("drivers") or {}).get("value_drivers") or [],
+                    "value_driver_groups": (seg.get("drivers") or {}).get("driver_groups") or [],
+                    "calib_bands": (seg.get("calibration") or {}).get("bands") or [],
+                    "chart_data": seg.get("chart_data") or [],
+                }
+            )
+
+    raw_coefficients = diagnostics.get("coefficients") or []
+    coefficients_raw = [
+        entry if isinstance(entry, dict) else getattr(entry, "dict", lambda: {})()
+        for entry in raw_coefficients
+    ]
+    coefficients_by_group: Dict[str, Dict[str, Any]] = {}
+    for entry in coefficients_raw:
+        market_group = entry.get("market_group")
+        if not market_group:
+            continue
+        coefficients_by_group[market_group] = {
+            "coefficients": entry.get("coefficients", []),
+            "display_name": entry.get("display_name") or market_group.replace("_", " ").title(),
+        }
+
+    model_stats: Dict[str, Dict[str, Any]] = {}
+    for stat in stats_list:
+        if not isinstance(stat, dict):
+            continue
+        label = stat.get("label") or stat.get("market_group")
+        if not label:
+            continue
+        model_stats[label] = stat
+
+    interactive_rows: List[Dict[str, Any]] = []
+    for group_name, group_data in coefficients_by_group.items():
+        stats = model_stats.get(group_name, {})
+        for coeff in group_data.get("coefficients", []):
+            interactive_rows.append(
+                {
+                    "market_group": group_name,
+                    "term": coeff.get("term"),
+                    "beta": coeff.get("beta"),
+                    "beta_se": coeff.get("beta_se"),
+                    "display_name": group_data.get("display_name"),
+                    "n": stats.get("n"),
+                    "r2": stats.get("r2"),
+                    "adj_r2": stats.get("adj_r2"),
+                    "COD": stats.get("COD"),
+                    "PRD": stats.get("PRD"),
+                    "median_ratio": stats.get("median_ratio"),
+                }
+            )
+
+    aggregated_value_drivers: Dict[str, Dict[str, Any]] = {}
+    for stats in stats_list:
+        for driver in stats.get("value_drivers", []) or []:
+            predictor = driver.get("predictor")
+            if not predictor:
+                continue
+            entry = aggregated_value_drivers.setdefault(
+                predictor,
+                {
+                    "importance": 0.0,
+                    "direction_counts": {"up": 0, "down": 0},
+                    "group_counts": {},
+                    "last_group": None,
+                },
+            )
+            entry["importance"] += float(driver.get("importance") or 0.0)
+            direction = (driver.get("direction") or "").lower()
+            if direction in entry["direction_counts"]:
+                entry["direction_counts"][direction] += 1
+            group = driver.get("group")
+            if group:
+                counts = entry.setdefault("group_counts", {})
+                counts[group] = counts.get(group, 0) + 1
+                entry["last_group"] = group
+
+    total_driver_importance = sum(entry["importance"] for entry in aggregated_value_drivers.values()) or 1.0
+
+    def resolve_group_label(data: Optional[Dict[str, Any]]) -> str:
+        if not data:
+            return "General"
+        group_counts = data.get("group_counts") or {}
+        if group_counts:
+            group_key = max(group_counts.items(), key=lambda kv: kv[1])[0]
+        else:
+            group_key = data.get("last_group")
+        if not group_key:
+            return "General"
+        return group_key.replace("_", " ").title()
+
+    def resolve_direction_code(data: Optional[Dict[str, Any]]) -> str:
+        if not data:
+            return "mixed"
+        counts = data.get("direction_counts") or {}
+        lowers_ratio = counts.get("up", 0)
+        raises_ratio = counts.get("down", 0)
+        if lowers_ratio > raises_ratio:
+            return "lower"
+        if raises_ratio > lowers_ratio:
+            return "higher"
+        return "mixed"
+
+    def resolve_importance_percent(data: Optional[Dict[str, Any]]) -> Optional[float]:
+        if not data or total_driver_importance <= 0:
+            return None
+        share = data.get("importance") or 0.0
+        if share <= 0:
+            return None
+        return round((share / total_driver_importance) * 100, 1)
+
+    value_driver_rows: List[Dict[str, Any]] = []
+    seen_predictors: Set[str] = set()
+    for feature in copy.deepcopy(FEATURE_EXPLANATIONS):
+        predictor = feature.get("term")
+        stats = aggregated_value_drivers.get(predictor)
+        value_driver_rows.append(
+            {
+                "term": predictor,
+                "label": feature.get("simple") or (predictor or "").replace("_", " ").title(),
+                "description": feature.get("explanation") or "",
+                "group_label": resolve_group_label(stats),
+                "direction": resolve_direction_code(stats),
+                "importance_pct": resolve_importance_percent(stats),
+            }
+        )
+        if predictor:
+            seen_predictors.add(predictor)
+
+    extra_rows: List[Dict[str, Any]] = []
+    for predictor, stats in aggregated_value_drivers.items():
+        if predictor in seen_predictors:
+            continue
+        extra_rows.append(
+            {
+                "term": predictor,
+                "label": predictor.replace("_", " ").title(),
+                "description": "Predictor surfaced in this run.",
+                "group_label": resolve_group_label(stats),
+                "direction": resolve_direction_code(stats),
+                "importance_pct": resolve_importance_percent(stats),
+            }
+        )
+
+    extra_rows.sort(key=lambda row: row.get("importance_pct") or 0, reverse=True)
+    value_driver_rows.extend(extra_rows)
+
+    total_observations = 0
+    if diagnostics.get("global_metrics"):
+        total_observations = diagnostics["global_metrics"].get("total_observations") or 0
+    if not total_observations:
+        total_observations = sum(int(stat.get("n") or 0) for stat in stats_list)
+
+    generated_at = diagnostics.get("generated_at") or diagnostics.get("generated")
+    last_updated = _parse_iso_datetime(generated_at)
+    adjustment_run_stats_json = json.dumps(stats_list, default=str)
+    chart_data = stats_list[0].get("chart_data", []) if stats_list else []
+
+    return {
+        "adjustment_run_stats": stats_list,
+        "adjustment_run_stats_json": adjustment_run_stats_json,
+        "coefficients_by_group": coefficients_by_group,
+        "model_stats": model_stats,
+        "feature_explanations": copy.deepcopy(FEATURE_EXPLANATIONS),
+        "value_driver_rows": value_driver_rows,
+        "last_updated": last_updated,
+        "latest_adjustment_run": {"run_id": diagnostics.get("run_id"), "created_at": last_updated} if diagnostics else None,
+        "total_observations": total_observations,
+        "model_stats_list": stats_list,
+        "chart_data": chart_data,
+    }
+
+
 @require_GET
 def methodology_view(request):
     """
@@ -3195,6 +3496,11 @@ def neighborhood_trend_data(request, hood_id):
     """
     Chart-specific JSON payload with yearly trend arrays.
     """
+    activity_feed.log_activity(
+        "neighborhood",
+        "Creating Neighborhood Analysis for",
+        hood_id,
+    )
     fairness_data = _load_neighborhood_fairness_data(hood_id)
     rows = list(
         NeighborhoodTrend.objects.filter(hood_id=hood_id).order_by("value_year")
@@ -3348,5 +3654,219 @@ def neighborhood_trend_address_search(request):
             "query_too_short": query_too_short,
             "results": results,
             "min_search_length": NEIGHBORHOOD_TRENDS_MIN_QUERY_LENGTH,
+        },
+    )
+
+
+# -------------------------------------------------------------------
+# EXPERIMENT UI
+# -------------------------------------------------------------------
+
+def _parse_tags(raw: str) -> List[str]:
+    if not raw:
+        return []
+    return [t.strip() for t in raw.split(",") if t.strip()]
+
+
+def _load_diagnostics(path: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+@staff_member_required
+def experiment_list(request):
+    status_filter = request.GET.get("status")
+    starred_filter = request.GET.get("starred")
+    search = request.GET.get("search")
+
+    qs = ExperimentRun.objects.all()
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if starred_filter == "true":
+        qs = qs.filter(starred=True)
+    if search:
+        qs = qs.filter(name__icontains=search)
+
+    experiments = qs.order_by("-created_at")[:200]
+    status_counts = {
+        "all": ExperimentRun.objects.count(),
+        "completed": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_COMPLETED).count(),
+        "running": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_RUNNING).count(),
+        "failed": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_FAILED).count(),
+        "pending": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_PENDING).count(),
+    }
+    return render(
+        request,
+        "openskagit/experiments/list.html",
+        {
+            "experiments": experiments,
+            "status_filter": status_filter,
+            "starred_filter": starred_filter,
+            "search": search,
+            "status_counts": status_counts,
+            "compare_candidates": ExperimentRun.objects.order_by("-created_at")[:50],
+        },
+    )
+
+
+@staff_member_required
+def experiment_create(request):
+    predictor_profiles = list(PREDICTOR_PROFILES.keys())
+    interaction_bundles = list(INTERACTION_BUNDLES.keys())
+    regression_modes = REGRESSION_MODES
+
+    if request.method == "POST":
+        name = request.POST.get("name") or "Untitled Experiment"
+        mode = request.POST.get("mode") or "sfr"
+        predictor_profile = request.POST.get("predictor_profile") or "baseline"
+        interaction_bundle = request.POST.get("interaction_bundle") or "standard"
+        countywide = request.POST.get("countywide") == "on"
+        no_interactions = request.POST.get("no_interactions") == "on"
+        market_group_col = request.POST.get("market_group_col") or "valuation_area"
+        notes = request.POST.get("notes") or ""
+        tags = _parse_tags(request.POST.get("tags", ""))
+
+        experiment = ExperimentRun.objects.create(
+            name=name,
+            mode=mode,
+            predictor_profile=predictor_profile,
+            interaction_bundle=interaction_bundle,
+            countywide=countywide,
+            market_group_col=market_group_col,
+            notes=notes,
+            tags=tags,
+            full_config={
+                "mode": mode,
+                "predictor_profile": predictor_profile,
+                "interaction_bundle": interaction_bundle,
+                "no_interactions": no_interactions,
+                "countywide": countywide,
+                "market_group_col": market_group_col,
+                "tags": tags,
+            },
+        )
+
+        manage_py = Path(settings.BASE_DIR) / "manage.py"
+        cmd = [
+            sys.executable,
+            str(manage_py),
+            "regression_masterparcel",
+            "--experiment",
+            "--experiment-id",
+            str(experiment.id),
+            "--mode",
+            mode,
+            "--predictor-set",
+            predictor_profile,
+            "--interactions",
+            interaction_bundle,
+            "--market-group-col",
+            market_group_col,
+        ]
+        if no_interactions:
+            cmd.append("--no-interactions")
+        if countywide:
+            cmd.append("--countywide")
+
+        try:
+            subprocess.Popen(
+                cmd,
+                cwd=str(settings.BASE_DIR),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            messages.success(request, f"Experiment '{name}' launched.")
+        except OSError as exc:
+            messages.error(request, f"Failed to launch experiment: {exc}")
+            experiment.status = ExperimentRun.STATUS_FAILED
+            experiment.error_message = str(exc)
+            experiment.save(update_fields=["status", "error_message"])
+
+        return redirect(experiment.get_absolute_url())
+
+    return render(
+        request,
+        "openskagit/experiments/create.html",
+        {
+            "predictor_profiles": predictor_profiles,
+            "interaction_bundles": interaction_bundles,
+            "regression_modes": regression_modes,
+        },
+    )
+
+
+@staff_member_required
+def experiment_detail(request, experiment_id):
+    experiment = get_object_or_404(ExperimentRun, id=experiment_id)
+    diagnostics = _load_diagnostics(experiment.diagnostics_path)
+    segments = diagnostics.get("segments", []) if diagnostics else []
+    stats = diagnostics.get("stats", []) if diagnostics else []
+    coefficients = diagnostics.get("coefficients", []) if diagnostics else []
+
+    methodology_context = _build_methodology_context_from_diagnostics(diagnostics) if diagnostics else {}
+
+    return render(
+        request,
+        "openskagit/experiments/detail.html",
+        {
+            "experiment": experiment,
+            "diagnostics": diagnostics,
+            "segments": segments,
+            "stats": stats,
+            "coefficients": coefficients,
+            **methodology_context,
+        },
+    )
+
+
+@staff_member_required
+def experiment_status_json(request, experiment_id):
+    experiment = get_object_or_404(ExperimentRun, id=experiment_id)
+    progress = None
+    if experiment.status == ExperimentRun.STATUS_RUNNING:
+        progress = 0.1  # placeholder for future estimate
+    elif experiment.status == ExperimentRun.STATUS_COMPLETED:
+        progress = 1.0
+    return JsonResponse(
+        {
+            "status": experiment.status,
+            "started_at": experiment.started_at.isoformat() if experiment.started_at else None,
+            "completed_at": experiment.completed_at.isoformat() if experiment.completed_at else None,
+            "error_message": experiment.error_message,
+            "run_id": experiment.run_id,
+            "progress": progress,
+        }
+    )
+
+
+@staff_member_required
+def experiment_compare(request):
+    exp1_id = request.GET.get("exp1")
+    exp2_id = request.GET.get("exp2")
+    exp1 = exp2 = None
+    diag1 = diag2 = None
+
+    if exp1_id:
+        exp1 = ExperimentRun.objects.filter(id=exp1_id).first()
+        diag1 = _load_diagnostics(exp1.diagnostics_path) if exp1 else None
+    if exp2_id:
+        exp2 = ExperimentRun.objects.filter(id=exp2_id).first()
+        diag2 = _load_diagnostics(exp2.diagnostics_path) if exp2 else None
+
+    return render(
+        request,
+        "openskagit/experiments/compare.html",
+        {
+            "exp1": exp1,
+            "exp2": exp2,
+            "diag1": diag1,
+            "diag2": diag2,
+            "all_experiments": ExperimentRun.objects.order_by("-created_at")[:50],
         },
     )

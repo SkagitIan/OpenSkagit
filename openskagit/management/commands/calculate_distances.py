@@ -5,14 +5,11 @@ from openskagit.models import Assessor, AssessmentRoll
 
 
 class Command(BaseCommand):
-    help = "Compute OSM-based distance metrics using high-performance LATERAL KNN joins."
+    help = "Compute OSM-based distance metrics using LATERAL joins on classic OSM tables."
 
     def handle(self, *args, **options):
         assessor_table = Assessor._meta.db_table
         roll_table = AssessmentRoll._meta.db_table
-
-        self.stdout.write(self.style.SUCCESS(f"Using assessor table: {assessor_table}"))
-        self.stdout.write(self.style.SUCCESS(f"Using roll table: {roll_table}"))
 
         sql = f"""
         DROP TABLE IF EXISTS assessor_distances;
@@ -27,8 +24,7 @@ class Command(BaseCommand):
             dist_park FLOAT,
             dist_supermarket FLOAT,
             dist_hospital FLOAT,
-            dist_fire_station FLOAT,
-            dist_trailhead FLOAT
+            dist_fire_station FLOAT
         );
 
         INSERT INTO assessor_distances (
@@ -41,27 +37,48 @@ class Command(BaseCommand):
             dist_park,
             dist_supermarket,
             dist_hospital,
-            dist_fire_station,
-            dist_trailhead
+            dist_fire_station
         )
         SELECT
             a.parcel_number,
 
+            -- Major Roads
             r_major.dist,
-            r_minor.dist,
-            fw.dist,
-            city.dist,
-            sch.dist,
-            park.dist,
-            smkt.dist,
-            hosp.dist,
-            fire.dist,
-            trail.dist
 
-        FROM {assessor_table} a
+            -- Minor Roads
+            r_minor.dist,
+
+            -- Floodway
+            fw.dist,
+
+            -- City Center
+            city.dist,
+
+            -- School
+            sch.dist,
+
+            -- Park
+            park.dist,
+
+            -- Supermarket
+            smkt.dist,
+
+            -- Hospital
+            hosp.dist,
+
+            -- Fire station
+            fire.dist
+
+        FROM (
+            SELECT DISTINCT ON (parcel_number) *
+            FROM {assessor_table}
+            WHERE roll_id IN (SELECT id FROM {roll_table} WHERE year = 2025)
+            ORDER BY parcel_number
+        ) a
+
 
         ----------------------------------------------------------
-        -- LATERAL JOINS – using geom_2926 (FAST)
+        -- LATERAL JOINS — Classic OSM Tables
         ----------------------------------------------------------
 
         LEFT JOIN LATERAL (
@@ -104,11 +121,11 @@ class Command(BaseCommand):
         ) sch ON TRUE
 
         LEFT JOIN LATERAL (
-            SELECT ST_Distance(a.geom_2926, pg.geom_2926) AS dist
-            FROM osm.planet_osm_polygon pg
-            WHERE pg.leisure = 'park'
-               OR pg.landuse = 'recreation_ground'
-            ORDER BY a.geom_2926 <-> pg.geom_2926
+            SELECT ST_Distance(a.geom_2926, p.geom_2926) AS dist
+            FROM osm.planet_osm_polygon p
+            WHERE p.leisure = 'park'
+               OR p.landuse = 'recreation_ground'
+            ORDER BY a.geom_2926 <-> p.geom_2926
             LIMIT 1
         ) park ON TRUE
 
@@ -136,16 +153,11 @@ class Command(BaseCommand):
             LIMIT 1
         ) fire ON TRUE
 
-        LEFT JOIN LATERAL (
-            SELECT ST_Distance(a.geom_2926, p.geom_2926) AS dist
-            FROM osm.planet_osm_point p
-            WHERE p.tourism = 'trailhead'
-            ORDER BY a.geom_2926 <-> p.geom_2926
-            LIMIT 1
-        ) trail ON TRUE
-
         WHERE a.roll_id IN (SELECT id FROM {roll_table} WHERE year = 2025);
 
+        ----------------------------------------------------------
+        -- UPDATE ASSESSOR
+        ----------------------------------------------------------
         UPDATE {assessor_table} a
         SET
             dist_major_road   = d.dist_major_road,
@@ -156,8 +168,7 @@ class Command(BaseCommand):
             dist_park         = d.dist_park,
             dist_supermarket  = d.dist_supermarket,
             dist_hospital     = d.dist_hospital,
-            dist_fire_station = d.dist_fire_station,
-            dist_trailhead    = d.dist_trailhead
+            dist_fire_station = d.dist_fire_station
         FROM assessor_distances d
         WHERE a.parcel_number = d.parcel_number
           AND a.roll_id IN (SELECT id FROM {roll_table} WHERE year = 2025);
@@ -166,4 +177,4 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             self.stdout.write(self.style.WARNING("Starting distance calculations..."))
             cursor.execute(sql)
-            self.stdout.write(self.style.SUCCESS("Distances computed using high-performance LATERAL joins."))
+            self.stdout.write(self.style.SUCCESS("Distances computed successfully."))

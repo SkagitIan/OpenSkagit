@@ -1,0 +1,75 @@
+{% extends "openskagit/appeal_base_v3.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-semibold mb-4">Launch New Experiment</h1>
+
+  <form method="post" class="space-y-4 bg-white border rounded px-4 py-4">
+    {% csrf_token %}
+    <div>
+      <label class="block text-sm font-semibold mb-1">Name</label>
+      <input type="text" name="name" class="w-full border px-3 py-2 rounded" required>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold mb-1">Mode</label>
+        <select name="mode" class="w-full border px-3 py-2 rounded">
+          {% for key, desc in regression_modes.items %}
+          <option value="{{ key }}">{{ desc }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1">Market group column</label>
+        <input type="text" name="market_group_col" value="valuation_area" class="w-full border px-3 py-2 rounded">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold mb-1">Predictor profile</label>
+        <select name="predictor_profile" class="w-full border px-3 py-2 rounded">
+          {% for profile in predictor_profiles %}
+          <option value="{{ profile }}">{{ profile }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1">Interaction bundle</label>
+        <select name="interaction_bundle" class="w-full border px-3 py-2 rounded">
+          {% for bundle in interaction_bundles %}
+          <option value="{{ bundle }}">{{ bundle }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="countywide">
+        <span>Run countywide (ignore market groups)</span>
+      </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" name="no_interactions">
+        <span>Disable custom interactions</span>
+      </label>
+    </div>
+
+    <div>
+      <label class="block text-sm font-semibold mb-1">Tags (comma-separated)</label>
+      <input type="text" name="tags" class="w-full border px-3 py-2 rounded" placeholder="e.g., elevation, location, test">
+    </div>
+
+    <div>
+      <label class="block text-sm font-semibold mb-1">Notes</label>
+      <textarea name="notes" rows="3" class="w-full border px-3 py-2 rounded"></textarea>
+    </div>
+
+    <div class="flex justify-end gap-3 pt-2">
+      <a href="{% url 'experiment_list' %}" class="px-4 py-2 border rounded">Cancel</a>
+      <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Launch</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

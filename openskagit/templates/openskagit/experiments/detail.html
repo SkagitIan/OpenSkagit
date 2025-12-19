@@ -1,0 +1,147 @@
+{% extends "openskagit/appeal_base_v3.html" %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+  <section class="card methodology-hero" style="background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);">
+    <div class="hero-top-line">
+      <div class="experiment-badge inline-flex items-center gap-2 uppercase tracking-[0.18em] text-xs bg-white/10 px-3 py-1 rounded-full text-white font-semibold">
+        <i class="fa-solid fa-flask"></i> Experiment
+      </div>
+      <div class="text-white text-sm">
+        Status: <span class="font-semibold">{{ experiment.get_status_display }}</span>
+        {% if experiment.status == "running" %} · polling...{% endif %}
+      </div>
+    </div>
+    <h1 class="text-3xl font-bold text-white">{{ experiment.name }}</h1>
+    <p class="text-white/90">
+      {{ experiment.predictor_profile }} profile · {{ experiment.interaction_bundle }} interactions · {{ experiment.mode }} mode
+    </p>
+    <div class="hero-metrics">
+      <article class="hero-metric">
+        <div class="hero-metric-label text-white/80">COD</div>
+        <div class="hero-metric-value text-white">{{ experiment.global_cod|default:"—" }}</div>
+        <div class="hero-metric-note text-white/70">IAAO target ≤ 15</div>
+      </article>
+      <article class="hero-metric">
+        <div class="hero-metric-label text-white/80">R²</div>
+        <div class="hero-metric-value text-white">{{ experiment.global_r2|default:"—" }}</div>
+        <div class="hero-metric-note text-white/70">Fit quality</div>
+      </article>
+      <article class="hero-metric">
+        <div class="hero-metric-label text-white/80">Observations</div>
+        <div class="hero-metric-value text-white">{{ experiment.total_observations|default:"—" }}</div>
+        <div class="hero-metric-note text-white/70">Sales analyzed</div>
+      </article>
+      <article class="hero-metric">
+        <div class="hero-metric-label text-white/80">Segments</div>
+        <div class="hero-metric-value text-white">{{ experiment.segment_count|default:"—" }}</div>
+        <div class="hero-metric-note text-white/70">Tiered regressions</div>
+      </article>
+    </div>
+  </section>
+
+  {% if experiment.error_message %}
+    <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">Error: {{ experiment.error_message }}</div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="border rounded px-3 py-3 bg-white">
+      <div class="text-xs text-gray-500 uppercase tracking-[0.18em]">Run</div>
+      <div class="text-sm text-gray-700">Run ID: {{ experiment.run_id|default:"—" }}</div>
+      <div class="text-sm text-gray-700">Diagnostics: {{ experiment.diagnostics_path|default:"—" }}</div>
+      <div class="text-sm text-gray-700">Started: {% if experiment.started_at %}{{ experiment.started_at|date:"M j, Y g:i a" }}{% else %}—{% endif %}</div>
+      <div class="text-sm text-gray-700">Completed: {% if experiment.completed_at %}{{ experiment.completed_at|date:"M j, Y g:i a" }}{% else %}—{% endif %}</div>
+    </div>
+    <div class="border rounded px-3 py-3 bg-white">
+      <div class="text-xs text-gray-500 uppercase tracking-[0.18em]">Notes</div>
+      <div class="text-sm text-gray-800 whitespace-pre-line">{{ experiment.notes|default:"No notes." }}</div>
+      {% if experiment.tags %}
+      <div class="mt-2 flex flex-wrap gap-2">
+        {% for tag in experiment.tags %}
+        <span class="px-2 py-1 text-xs rounded bg-emerald-50 text-emerald-800 border border-emerald-100">{{ tag }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if experiment.status == "running" %}
+    <div class="bg-white border rounded px-4 py-3">
+      <div class="text-sm text-gray-700">Run in progress…</div>
+      <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+        <div id="exp-progress-bar" class="bg-emerald-600 h-2 rounded-full" style="width: 20%;"></div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if experiment.status == "completed" and diagnostics %}
+    {% include "openskagit/partials/methodology_steps.html" %}
+
+    <section class="card table-card">
+      <div class="section-head">
+        <div>
+          <p class="section-eyebrow">Diagnostics snapshot</p>
+          <h2>Experiment run statistics</h2>
+        </div>
+        <p class="section-subtitle">
+          Reusing the methodology diagnostics to review this experiment.
+        </p>
+      </div>
+
+      <div class="table-shell bg-white border border-[#dbe7dd] rounded-2xl shadow-xl overflow-hidden">
+        <div class="table-wrapper overflow-x-auto">
+          <table class="diagnostic-table text-sm w-full" aria-live="polite">
+            <thead>
+              <tr>
+                <th scope="col">Segment</th>
+                <th scope="col">Sales</th>
+                <th scope="col">R²</th>
+                <th scope="col">COD</th>
+                <th scope="col">PRD</th>
+                <th scope="col">PRB</th>
+                <th scope="col">Median</th>
+              </tr>
+            </thead>
+            <tbody id="adjustment-stats-body">
+              <tr id="adjustment-stats-empty">
+                <td colspan="7" class="table-empty">Adjustment run data is still being prepared.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <script id="methodology-run-stats-data" type="application/json">
+        {{ adjustment_run_stats_json|safe }}
+      </script>
+      <div class="table-footer">
+        {% if latest_adjustment_run %}
+          <span>Run {{ latest_adjustment_run.run_id }}</span>
+          <span>{{ adjustment_run_stats|length }} rows</span>
+        {% else %}
+          <span>Adjustment run data is still being prepared.</span>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+</div>
+
+{% if experiment.status == "running" %}
+<script>
+  setInterval(() => {
+    fetch("{% url 'experiment_status' experiment_id=experiment.id %}")
+      .then(r => r.json())
+      .then(data => {
+        const bar = document.getElementById("exp-progress-bar");
+        if (bar && data.progress !== null && data.progress !== undefined) {
+          const pct = Math.max(5, Math.min(100, Math.round(data.progress * 100)));
+          bar.style.width = pct + "%";
+        }
+        if (data.status === "completed" || data.status === "failed") {
+          window.location.reload();
+        }
+      });
+  }, 5000);
+</script>
+{% endif %}
+{% endblock %}

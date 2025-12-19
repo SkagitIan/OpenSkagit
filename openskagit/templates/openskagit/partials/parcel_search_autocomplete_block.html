@@ -1,0 +1,161 @@
+<div id="appeal-selection-display" class="hidden"></div>
+
+<form class="form-group" onsubmit="return false;">
+  <div class="input-wrapper">
+    <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.35-4.35"></path>
+    </svg>
+    <input
+      id="appeal-search"
+      name="q"
+      type="text"
+      class="input"
+      placeholder="e.g., 101 Main St or P12345"
+      autocomplete="off"
+      hx-get="{% url 'appeal-parcel-search' %}"
+      hx-target="#appeal-results"
+      hx-trigger="keyup changed delay:400ms"
+      hx-indicator="#search-loading"
+      hx-vals='{"source":"{{ search_source|default:"appeal" }}"}'
+      hx-on::before-request="
+        const minLen = 3;
+        if(this.value.trim().length < minLen) {
+          event.detail.shouldCancel = true;
+          document.getElementById('appeal-results').innerHTML = '';
+          document.getElementById('search-results-wrapper').classList.remove('search-results-container--visible');
+        }
+      "
+      hx-on::after-request="
+        const wrapper = document.getElementById('search-results-wrapper');
+        const results = document.getElementById('appeal-results');
+        if(results.innerHTML.trim()) {
+          wrapper.classList.add('search-results-container--visible');
+        }
+      "
+    />
+    <button type="button" class="input-clear" onclick="
+      const input = document.getElementById('appeal-search');
+      const results = document.getElementById('appeal-results');
+      const wrapper = document.getElementById('search-results-wrapper');
+      input.value = '';
+      results.innerHTML = '';
+      wrapper.classList.remove('search-results-container--visible');
+      input.focus();
+    " aria-label="Clear search">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+</form>
+
+<div id="search-loading" class="hidden loading-indicator">
+  <div class="spinner"></div>
+  Searching properties...
+</div>
+
+<div id="search-results-wrapper" class="search-results-container">
+  <div id="appeal-results"></div>
+</div>
+
+<script>
+  (function () {
+    const inputId = "appeal-search";
+    const resultsId = "appeal-results";
+    const wrapperId = "search-results-wrapper";
+    const selectionId = "appeal-selection-display";
+
+    function resolveButton(event) {
+      if (!event) {
+        return null;
+      }
+      if (event.detail && event.detail.elt) {
+        return event.detail.elt;
+      }
+      if (event.currentTarget) {
+        return event.currentTarget;
+      }
+      return event.target?.closest(".autocomplete-result") || null;
+    }
+
+    function dispatchSelection(detail) {
+      document.dispatchEvent(
+        new CustomEvent("parcel-search-selected", {
+          detail,
+        })
+      );
+    }
+
+    window.appealSearchSelect = function (event) {
+      const button = resolveButton(event);
+      if (!button) {
+        return;
+      }
+
+      const preventRedirect = button.dataset.preventRedirect === "true";
+      if (preventRedirect && event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+
+      const input = document.getElementById(inputId);
+      const display = document.getElementById(selectionId);
+      const results = document.getElementById(resultsId);
+      const wrapper = document.getElementById(wrapperId);
+
+      if (!input || !display || !results || !wrapper) {
+        return;
+      }
+
+      const address = button.dataset.address || "";
+      const parcel = button.dataset.parcel || "";
+      const details = button.dataset.details || "";
+      const neighborhood = button.dataset.neighborhood || "";
+
+      input.classList.add("hidden");
+      display.innerHTML = `
+        <div class="selected-property">
+          <div class="selected-property__icon">✓</div>
+          <div class="selected-property__content">
+            <div class="selected-property__title">Selected Property</div>
+            <div class="selected-property__address">${address}</div>
+            <div class="selected-property__details">Parcel ${parcel}${details ? " • " + details : ""}</div>
+          </div>
+          <button class="selected-property__change" type="button" onclick="window.appealSearchReset()">
+            Change
+          </button>
+        </div>
+      `;
+      display.classList.remove("hidden");
+      results.innerHTML = "";
+      wrapper.classList.remove("search-results-container--visible");
+      input.blur();
+      dispatchSelection({ parcel, address, details, neighborhood });
+    };
+
+    window.appealSearchReset = function () {
+      const input = document.getElementById(inputId);
+      const display = document.getElementById(selectionId);
+      const results = document.getElementById(resultsId);
+      const wrapper = document.getElementById(wrapperId);
+
+      if (!input || !display || !results || !wrapper) {
+        return;
+      }
+
+      display.classList.add("hidden");
+      display.textContent = "";
+      input.classList.remove("hidden");
+      input.value = "";
+      results.innerHTML = "";
+      wrapper.classList.remove("search-results-container--visible");
+      document.dispatchEvent(new CustomEvent("parcel-search-reset"));
+      window.setTimeout(() => input.focus(), 0);
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById(inputId)?.focus();
+    });
+  })();
+</script>

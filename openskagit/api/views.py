@@ -103,17 +103,17 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
     """
     Construct WHERE clauses and parameter list for parcel search endpoints.
     """
-    clauses: List[str] = ["UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'"]
+    clauses: List[str] = ["UPPER(TRIM(COALESCE(mp.proptype, ''))) = 'R'"]
     args: List[Any] = []
 
     address = params.get("address")
     if address:
-        clauses.append("a.address ILIKE %s")
+        clauses.append("mp.situs_address ILIKE %s")
         args.append(f"%{address}%")
 
     parcel_number = params.get("parcel_number")
     if parcel_number:
-        clauses.append("a.parcel_number = %s")
+        clauses.append("mp.parcel_number = %s")
         args.append(parcel_number)
 
     min_value = params.get("min_value")
@@ -122,7 +122,7 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
             parsed = float(min_value)
         except (TypeError, ValueError):
             raise ValidationError({"min_value": "Must be a number."})
-        clauses.append("a.assessed_value >= %s")
+        clauses.append("mp.assessed_value >= %s")
         args.append(parsed)
 
     max_value = params.get("max_value")
@@ -131,12 +131,12 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
             parsed = float(max_value)
         except (TypeError, ValueError):
             raise ValidationError({"max_value": "Must be a number."})
-        clauses.append("a.assessed_value <= %s")
+        clauses.append("mp.assessed_value <= %s")
         args.append(parsed)
 
     district = params.get("district")
     if district:
-        clauses.append("a.city_district = %s")
+        clauses.append("mp.city_district = %s")
         args.append(district)
 
     min_year = params.get("min_year")
@@ -145,7 +145,7 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
             parsed = int(min_year)
         except (TypeError, ValueError):
             raise ValidationError({"min_year": "Must be an integer year."})
-        clauses.append("a.year_built >= %s")
+        clauses.append("mp.year_built >= %s")
         args.append(parsed)
 
     max_year = params.get("max_year")
@@ -154,7 +154,7 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
             parsed = int(max_year)
         except (TypeError, ValueError):
             raise ValidationError({"max_year": "Must be an integer year."})
-        clauses.append("a.year_built <= %s")
+        clauses.append("mp.year_built <= %s")
         args.append(parsed)
 
     min_acres = params.get("min_acres")
@@ -163,7 +163,7 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
             parsed = float(min_acres)
         except (TypeError, ValueError):
             raise ValidationError({"min_acres": "Must be a number."})
-        clauses.append("a.acres >= %s")
+        clauses.append("mp.acres >= %s")
         args.append(parsed)
 
     max_acres = params.get("max_acres")
@@ -172,7 +172,7 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
             parsed = float(max_acres)
         except (TypeError, ValueError):
             raise ValidationError({"max_acres": "Must be a number."})
-        clauses.append("a.acres <= %s")
+        clauses.append("mp.acres <= %s")
         args.append(parsed)
 
     min_sale_price = params.get("min_sale_price")
@@ -204,26 +204,35 @@ def _coalesce_list(value: Optional[Iterable[Any]]) -> List[Any]:
 
 PARCEL_DETAIL_SQL = """
     SELECT
-        a.parcel_number,
-        a.address,
-        a.assessed_value,
-        a.total_market_value,
-        a.taxable_value,
-        a.bedrooms,
-        a.bathrooms,
-        a.living_area,
-        a.year_built,
-        a.eff_year_built,
-        a.acres,
-        a.city_district,
-        a.school_district,
-        a.fire_district,
-        a.latitude,
-        a.longitude,
+        mp.parcel_number,
+        mp.situs_address AS address,
+        mp.assessed_value,
+        mp.total_market_value,
+        mp.taxable_value,
+        mp.number_of_bedrooms AS bedrooms,
+        mp.total_baths AS bathrooms,
+        mp.final_living_area AS living_area,
+        mp.year_built,
+        mp.eff_year_built,
+        mp.acres,
+        mp.city_district,
+        mp.school_district,
+        mp.fire_district,
+        COALESCE(
+            pg.latitude,
+            ST_Y(pg.centroid_geog),
+            ST_Y(ST_Transform(ST_Centroid(pg.geom), 4326))
+        ) AS latitude,
+        COALESCE(
+            pg.longitude,
+            ST_X(pg.centroid_geog),
+            ST_X(ST_Transform(ST_Centroid(pg.geom), 4326))
+        ) AS longitude,
         COALESCE(land.land_segments, '[]'::json) AS land_segments,
         COALESCE(improvements.improvements, '[]'::json) AS improvements,
         COALESCE(sales.sales_array, '[]'::json) AS sales
-    FROM assessor a
+    FROM master_parcel mp
+    LEFT JOIN parcel_geometry pg ON pg.parcel_id = mp.parcel_number
     LEFT JOIN LATERAL (
         SELECT json_agg(
             json_strip_nulls(
@@ -233,8 +242,7 @@ PARCEL_DETAIL_SQL = """
                     'size_acres', lf.size_acres,
                     'size_square_feet', lf.size_square_feet,
                     'market_value', lf.market_value,
-                    'market_unit_price', lf.market_unit_price,
-                    'land_segment_comment', lf.land_segment_comment
+                    'market_unit_price', lf.market_unit_price
                 )
             )
             ORDER BY lf.property_value_year DESC NULLS LAST,
@@ -243,18 +251,18 @@ PARCEL_DETAIL_SQL = """
         ) AS land_segments
         FROM (
             SELECT *
-            FROM (
-                SELECT l.*,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY l.land_segment_id,
-                                        l.property_value_year,
-                                        l.land_type
+                FROM (
+                    SELECT l.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY l.land_segment_id,
+                                            l.property_value_year,
+                                            l.land_type
                            ORDER BY l.property_value_year DESC NULLS LAST,
                                     l.market_value DESC NULLS LAST,
                                     l.land_segment_id
                        ) AS rn
                 FROM land l
-                WHERE l.parcel_number = a.parcel_number
+                WHERE l.parcel_number = mp.parcel_number
             ) ranked_land
             WHERE rn = 1
         ) lf
@@ -288,7 +296,7 @@ PARCEL_DETAIL_SQL = """
                                i.actual_year_built DESC NULLS LAST
                        ) AS rn
                 FROM improvements i
-                WHERE i.parcel_number = a.parcel_number
+                WHERE i.parcel_number = mp.parcel_number
             ) ranked_improvements
             WHERE rn = 1
         ) improvement_filtered
@@ -315,16 +323,16 @@ PARCEL_DETAIL_SQL = """
                            PARTITION BY s.sale_price,
                                         s.sale_date,
                                         s.recording_number
-                           ORDER BY s.sale_id DESC NULLS LAST
+                                ORDER BY s.sale_id DESC NULLS LAST
                        ) AS rn
                 FROM sales s
-                WHERE s.parcel_number = a.parcel_number
+                WHERE s.parcel_number = mp.parcel_number
             ) ranked_sales
             WHERE rn = 1
         ) sales_filtered
     ) sales ON TRUE
-    WHERE a.parcel_number = %s
-      AND UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'
+    WHERE mp.parcel_number = %s
+      AND UPPER(TRIM(COALESCE(mp.proptype, ''))) = 'R'
 """
 
 
@@ -410,11 +418,11 @@ class SalesListView(APIView):
     SORT_FIELDS = {
         "recent": ("s.sale_date", "DESC"),
         "sale_price": ("s.sale_price", "DESC"),
-        "neighborhood": ("a.neighborhood_code", "ASC"),
-        "assessed_value": ("a.assessed_value", "DESC"),
-        "market_value": ("a.total_market_value", "DESC"),
-        "acres": ("a.acres", "DESC"),
-        "year_built": ("a.year_built", "DESC"),
+        "neighborhood": ("mp.hood_code", "ASC"),
+        "assessed_value": ("mp.assessed_value", "DESC"),
+        "market_value": ("mp.total_market_value", "DESC"),
+        "acres": ("mp.acres", "DESC"),
+        "year_built": ("mp.year_built", "DESC"),
     }
 
     def get(self, request) -> Response:
@@ -438,18 +446,18 @@ class SalesListView(APIView):
 
         clauses = [
             "LOWER(TRIM(s.sale_type)) = 'valid sale'",
-            "UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'",
+            "UPPER(TRIM(COALESCE(mp.proptype, ''))) = 'R'",
         ]
         args: List[Any] = []
 
         neighborhood = params.get("neighborhood")
         if neighborhood:
-            clauses.append("a.neighborhood_code = %s")
+            clauses.append("mp.hood_code = %s")
             args.append(neighborhood)
 
         city = params.get("city")
         if city:
-            clauses.append("a.city_district = %s")
+            clauses.append("mp.city_district = %s")
             args.append(city)
 
         parcel_number = params.get("parcel_number")
@@ -487,13 +495,13 @@ class SalesListView(APIView):
 
         land_use = params.get("land_use_code")
         if land_use:
-            clauses.append("a.land_use_code = %s")
+            clauses.append("mp.land_use_code = %s")
             args.append(land_use)
 
         # Optional property_type will only further restrict results.
         property_type = params.get("property_type")
         if property_type:
-            clauses.append("UPPER(TRIM(COALESCE(a.property_type, ''))) = UPPER(TRIM(%s))")
+            clauses.append("UPPER(TRIM(COALESCE(mp.proptype, ''))) = UPPER(TRIM(%s))")
             args.append(property_type)
 
         min_acres = params.get("min_acres")
@@ -502,7 +510,7 @@ class SalesListView(APIView):
                 parsed = float(min_acres)
             except (TypeError, ValueError):
                 raise ValidationError({"min_acres": "Must be numeric."})
-            clauses.append("a.acres >= %s")
+            clauses.append("mp.acres >= %s")
             args.append(parsed)
 
         max_acres = params.get("max_acres")
@@ -511,7 +519,7 @@ class SalesListView(APIView):
                 parsed = float(max_acres)
             except (TypeError, ValueError):
                 raise ValidationError({"max_acres": "Must be numeric."})
-            clauses.append("a.acres <= %s")
+            clauses.append("mp.acres <= %s")
             args.append(parsed)
 
         where_clause = ""
@@ -521,7 +529,7 @@ class SalesListView(APIView):
         count_sql = f"""
             SELECT COUNT(*)
             FROM sales s
-            JOIN assessor a ON a.parcel_number = s.parcel_number
+            JOIN master_parcel mp ON mp.parcel_number = s.parcel_number
             {where_clause}
         """
 
@@ -540,26 +548,26 @@ class SalesListView(APIView):
                 s.deed_date,
                 s.revaluation_area,
                 s.excise_number,
-                a.address,
-                a.neighborhood_code,
-                a.land_use_code,
-                a.property_type,
-                a.city_district,
-                a.school_district,
-                a.fire_district,
-                a.assessed_value,
-                a.total_market_value,
-                a.taxable_value,
-                a.acres,
-                a.year_built,
-                a.eff_year_built,
-                a.bedrooms,
-                a.bathrooms,
-                a.living_area,
+                mp.situs_address AS address,
+                mp.hood_code AS neighborhood_code,
+                mp.land_use_code,
+                mp.proptype AS property_type,
+                mp.city_district,
+                mp.school_district,
+                mp.fire_district,
+                mp.assessed_value,
+                mp.total_market_value,
+                mp.taxable_value,
+                mp.acres,
+                mp.year_built,
+                mp.eff_year_built,
+                mp.number_of_bedrooms AS bedrooms,
+                mp.total_baths AS bathrooms,
+                COALESCE(mp.final_living_area, mp.total_living_area, mp.living_area) AS living_area,
                 COALESCE(land.land_segments, '[]'::json) AS land_segments,
                 COALESCE(improvements.improvements, '[]'::json) AS improvements
             FROM sales s
-            JOIN assessor a ON a.parcel_number = s.parcel_number
+            JOIN master_parcel mp ON mp.parcel_number = s.parcel_number
             LEFT JOIN LATERAL (
                 SELECT json_agg(
                     json_strip_nulls(
@@ -568,9 +576,7 @@ class SalesListView(APIView):
                             'land_type', lf.land_type,
                             'size_acres', lf.size_acres,
                             'size_square_feet', lf.size_square_feet,
-                            'market_value', lf.market_value,
-                            'market_unit_price', lf.market_unit_price,
-                            'land_segment_comment', lf.land_segment_comment
+                            'market_value', lf.market_value
                         )
                     )
                     ORDER BY lf.property_value_year DESC NULLS LAST,
@@ -622,12 +628,12 @@ class SalesListView(APIView):
                                    ORDER BY
                                        i.effective_year_built DESC NULLS LAST,
                                        i.actual_year_built DESC NULLS LAST
-                               ) AS rn
-                        FROM improvements i
-                        WHERE i.parcel_number = s.parcel_number
-                    ) ranked_improvements
-                    WHERE rn = 1
-                ) improvement_filtered
+                        ) AS rn
+                FROM improvements i
+                WHERE i.parcel_number = s.parcel_number
+            ) ranked_improvements
+            WHERE rn = 1
+        ) improvement_filtered
             ) improvements ON TRUE
             {where_clause}
             ORDER BY {base_column} {order_direction} NULLS LAST, s.sale_id DESC NULLS LAST
@@ -713,12 +719,12 @@ class ParcelSearchView(APIView):
     permission_classes = [AllowAny]
 
     BASE_SEARCH_SQL = """
-        FROM assessor a
+        FROM master_parcel mp
         LEFT JOIN LATERAL (
             SELECT s.sale_price,
                    s.sale_date
             FROM sales s
-            WHERE s.parcel_number = a.parcel_number
+            WHERE s.parcel_number = mp.parcel_number
             ORDER BY s.sale_date DESC NULLS LAST
             LIMIT 1
         ) latest_sale ON TRUE
@@ -737,18 +743,18 @@ class ParcelSearchView(APIView):
         count_sql = f"SELECT COUNT(*) {self.BASE_SEARCH_SQL} {where_clause}"
         data_sql = f"""
             SELECT
-                a.parcel_number,
-                a.address,
-                a.assessed_value,
-                a.total_market_value,
-                a.acres,
-                a.city_district,
-                a.year_built,
+                mp.parcel_number,
+                mp.situs_address AS address,
+                mp.assessed_value,
+                mp.total_market_value,
+                mp.acres,
+                mp.city_district,
+                mp.year_built,
                 latest_sale.sale_price AS last_sale_price,
                 latest_sale.sale_date AS last_sale_date
             {self.BASE_SEARCH_SQL}
             {where_clause}
-            ORDER BY a.assessed_value DESC NULLS LAST, a.parcel_number
+            ORDER BY mp.assessed_value DESC NULLS LAST, mp.parcel_number
             OFFSET %s LIMIT %s
         """
 
@@ -774,17 +780,17 @@ class ParcelSummaryView(APIView):
     permission_classes = [AllowAny]
 
     GROUP_BY_FIELDS = {
-        "city_district": "a.city_district",
-        "school_district": "a.school_district",
-        "fire_district": "a.fire_district",
-        "neighborhood_code": "a.neighborhood_code",
-        "levy_code": "a.levy_code",
+        "city_district": "mp.city_district",
+        "school_district": "mp.school_district",
+        "fire_district": "mp.fire_district",
+        "neighborhood_code": "mp.hood_code",
+        "levy_code": "mp.levy_code",
     }
 
     METRICS = {
-        "avg_assessed_value": ("AVG(a.assessed_value)", "average_assessed_value"),
-        "avg_market_value": ("AVG(a.total_market_value)", "average_market_value"),
-        "total_assessed_value": ("SUM(a.assessed_value)", "total_assessed_value"),
+        "avg_assessed_value": ("AVG(mp.assessed_value)", "average_assessed_value"),
+        "avg_market_value": ("AVG(mp.total_market_value)", "average_market_value"),
+        "total_assessed_value": ("SUM(mp.assessed_value)", "total_assessed_value"),
         "parcel_count": ("COUNT(*)", "parcel_count"),
     }
 
@@ -811,12 +817,12 @@ class ParcelSummaryView(APIView):
                 {group_expr} AS group_value,
                 {metric_expr} AS metric_value,
                 COUNT(*) AS parcel_count
-            FROM assessor a
+            FROM master_parcel mp
             LEFT JOIN LATERAL (
                 SELECT s.sale_price,
                        s.sale_date
                 FROM sales s
-                WHERE s.parcel_number = a.parcel_number
+                WHERE s.parcel_number = mp.parcel_number
                 ORDER BY s.sale_date DESC NULLS LAST
                 LIMIT 1
             ) latest_sale ON TRUE
@@ -889,27 +895,28 @@ class SemanticSearchView(APIView):
 
         sql = """
             SELECT
-                a.parcel_number,
-                a.address,
-                a.assessed_value,
-                a.total_market_value,
-                a.acres,
-                a.city_district,
+                mp.parcel_number,
+                mp.situs_address AS address,
+                mp.assessed_value,
+                mp.total_market_value,
+                mp.acres,
+                mp.city_district,
                 latest_sale.sale_price AS last_sale_price,
                 latest_sale.sale_date AS last_sale_date,
-                a.embedding <-> %s::vector AS distance
-            FROM assessor a
+                pg.embedding <-> %s::vector AS distance
+            FROM master_parcel mp
+            LEFT JOIN parcel_geometry pg ON pg.parcel_id = mp.parcel_number
             LEFT JOIN LATERAL (
                 SELECT s.sale_price,
                        s.sale_date
                 FROM sales s
-                WHERE s.parcel_number = a.parcel_number
+                WHERE s.parcel_number = mp.parcel_number
                 ORDER BY s.sale_date DESC NULLS LAST
                 LIMIT 1
             ) latest_sale ON TRUE
-            WHERE a.embedding IS NOT NULL
-              AND UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'
-            ORDER BY a.embedding <-> %s::vector
+            WHERE pg.embedding IS NOT NULL
+              AND UPPER(TRIM(COALESCE(mp.proptype, ''))) = 'R'
+            ORDER BY pg.embedding <-> %s::vector
             LIMIT %s
         """
 
@@ -934,26 +941,26 @@ class SemanticSearchView(APIView):
     def _fallback_semantic_results(self, limit: int) -> List[Dict[str, Any]]:
         sql = """
             SELECT
-                a.parcel_number,
-                a.address,
-                a.assessed_value,
-                a.total_market_value,
-                a.acres,
-                a.city_district,
+                mp.parcel_number,
+                mp.situs_address AS address,
+                mp.assessed_value,
+                mp.total_market_value,
+                mp.acres,
+                mp.city_district,
                 latest_sale.sale_price AS last_sale_price,
                 latest_sale.sale_date AS last_sale_date
-            FROM assessor a
+            FROM master_parcel mp
             LEFT JOIN LATERAL (
                 SELECT s.sale_price,
                        s.sale_date
                 FROM sales s
-                WHERE s.parcel_number = a.parcel_number
+                WHERE s.parcel_number = mp.parcel_number
                 ORDER BY s.sale_date DESC NULLS LAST
                 LIMIT 1
             ) latest_sale ON TRUE
-            WHERE a.address IS NOT NULL
-              AND UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'
-            ORDER BY a.total_market_value DESC NULLS LAST
+            WHERE mp.situs_address IS NOT NULL
+              AND UPPER(TRIM(COALESCE(mp.proptype, ''))) = 'R'
+            ORDER BY mp.total_market_value DESC NULLS LAST
             LIMIT %s
         """
 
@@ -984,7 +991,7 @@ class NearbyParcelsView(APIView):
         clauses: List[str] = []
         args: List[Any] = [lon, lat, lon, lat, radius]
         point_geog = "ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography"
-        geom_geog = "ST_Transform(a.geom, 4326)::geography"
+        geom_geog = "ST_Transform(pg.geom, 4326)::geography"
 
         min_value = request.query_params.get("min_value")
         if min_value:
@@ -992,7 +999,7 @@ class NearbyParcelsView(APIView):
                 parsed = float(min_value)
             except (TypeError, ValueError):
                 raise ValidationError({"min_value": "Must be a number."})
-            clauses.append("a.assessed_value >= %s")
+            clauses.append("mp.assessed_value >= %s")
             args.append(parsed)
 
         max_value = request.query_params.get("max_value")
@@ -1001,7 +1008,7 @@ class NearbyParcelsView(APIView):
                 parsed = float(max_value)
             except (TypeError, ValueError):
                 raise ValidationError({"max_value": "Must be a number."})
-            clauses.append("a.assessed_value <= %s")
+            clauses.append("mp.assessed_value <= %s")
             args.append(parsed)
 
         min_acres = request.query_params.get("min_acres")
@@ -1010,7 +1017,7 @@ class NearbyParcelsView(APIView):
                 parsed = float(min_acres)
             except (TypeError, ValueError):
                 raise ValidationError({"min_acres": "Must be a number."})
-            clauses.append("a.acres >= %s")
+            clauses.append("mp.acres >= %s")
             args.append(parsed)
 
         max_acres = request.query_params.get("max_acres")
@@ -1019,7 +1026,7 @@ class NearbyParcelsView(APIView):
                 parsed = float(max_acres)
             except (TypeError, ValueError):
                 raise ValidationError({"max_acres": "Must be a number."})
-            clauses.append("a.acres <= %s")
+            clauses.append("mp.acres <= %s")
             args.append(parsed)
 
         where_additional = ""
@@ -1028,17 +1035,18 @@ class NearbyParcelsView(APIView):
 
         sql = f"""
             SELECT
-                a.parcel_number,
-                a.address,
-                a.assessed_value,
-                a.total_market_value,
-                a.acres,
-                a.city_district,
+                mp.parcel_number,
+                mp.situs_address AS address,
+                mp.assessed_value,
+                mp.total_market_value,
+                mp.acres,
+                mp.city_district,
                 ST_Distance({geom_geog}, {point_geog}) AS distance_meters
-            FROM assessor a
-            WHERE a.geom IS NOT NULL
+            FROM master_parcel mp
+            JOIN parcel_geometry pg ON pg.parcel_id = mp.parcel_number
+            WHERE pg.geom IS NOT NULL
               AND ST_DWithin({geom_geog}, {point_geog}, %s)
-              AND UPPER(TRIM(COALESCE(a.property_type, ''))) = 'R'
+              AND UPPER(TRIM(COALESCE(mp.proptype, ''))) = 'R'
               {where_additional}
             ORDER BY distance_meters ASC
             LIMIT %s

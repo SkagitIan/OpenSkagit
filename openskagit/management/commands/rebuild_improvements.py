@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from openskagit.improvements_etl import run_improvements_etl
+from openskagit.improvements_etl import TARGETABLE_FIELDS, run_improvements_etl
 
 
 class Command(BaseCommand):
@@ -29,6 +29,15 @@ class Command(BaseCommand):
             default=500,
             help="Bulk update batch size for assessor rows.",
         )
+        parser.add_argument(
+            "--field",
+            action="append",
+            metavar="FIELD",
+            help=(
+                "Limit the rebuild to the named assessor field(s) "
+                f"(repeat to request multiple; supported: {', '.join(sorted(TARGETABLE_FIELDS))})."
+            ),
+        )
 
     def handle(self, *args, **options):
         roll_year = options["roll"]
@@ -36,12 +45,20 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
         batch_size = options["batch_size"]
 
+        raw_field_args = options.get("field") or []
+        requested_fields = []
+        for entry in raw_field_args:
+            requested_fields.extend(
+                part.strip() for part in entry.split(",") if part and part.strip()
+            )
+
         try:
             result = run_improvements_etl(
                 roll_year=roll_year,
                 parcel=parcel,
                 dry_run=dry_run,
                 batch_size=batch_size,
+                fields=requested_fields or None,
                 stdout=self.stdout,
             )
         except ValueError as exc:

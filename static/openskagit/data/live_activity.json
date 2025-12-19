@@ -1,0 +1,37 @@
+[
+  {
+    "type": "comparison",
+    "label": "Finding Comparisons for",
+    "value": "324 Cascade Ave, Sedro-Woolley",
+    "time": "Just now",
+    "timestamp": "2025-12-06T11:59:00Z"
+  },
+  {
+    "type": "neighborhood",
+    "label": "Creating Neighborhood Analysis for",
+    "value": "Bayview Ridge",
+    "time": "3 minutes ago",
+    "timestamp": "2025-12-06T11:56:00Z"
+  },
+  {
+    "type": "appeal",
+    "label": "Assessment appeal initiated for",
+    "value": "1809 LaVenture St",
+    "time": "7 minutes ago",
+    "timestamp": "2025-12-06T11:52:00Z"
+  },
+  {
+    "type": "comparison",
+    "label": "Finding Comparisons for",
+    "value": "105 4th St, Mount Vernon",
+    "time": "12 minutes ago",
+    "timestamp": "2025-12-06T11:47:00Z"
+  },
+  {
+    "type": "neighborhood",
+    "label": "Updating Neighborhood Analysis for",
+    "value": "Anacortes Waterfront",
+    "time": "20 minutes ago",
+    "timestamp": "2025-12-06T11:39:00Z"
+  }
+]

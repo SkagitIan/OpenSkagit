@@ -66,6 +66,8 @@ INSTALLED_APPS = [
     "leaflet",
     'django.contrib.humanize',
     'agent',
+    'reference_data',
+    'gastronet',
 ]
 
 LEAFLET_CONFIG = {

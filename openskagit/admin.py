@@ -1,12 +1,10 @@
 from django.contrib import admin
-from django.contrib import admin
 from .models import Assessor, Improvements, Land, Sales, AssessmentRoll, AdjustmentCoefficient,NeighborhoodGeom, NeighborhoodProfile
 from leaflet.admin import LeafletGeoAdmin
-
-# openskagit/admin.py
-
-from django.contrib import admin
 from .models import ParcelHistory
+
+from .models import RegressionAdjustment, RegressionResult, ParcelWaterfacts
+
 
 
 @admin.register(ParcelHistory)
@@ -34,6 +32,16 @@ class ParcelHistoryAdmin(admin.ModelAdmin):
         return len(obj.rows)
     row_count.short_description = "Row Count"
 
+    
+from django.contrib import admin
+from .models import MasterParcel
+
+@admin.register(MasterParcel)
+class MasterParcelAdmin(admin.ModelAdmin):
+    list_display = ("parcel_number", "situs_address", "total_market_value", "final_living_area", "final_year_built")
+    search_fields = ("parcel_number", "situs_address", "hood_code", "land_use_code")
+    list_filter = ("proptype", "hasseptic", "land_use_code", "hood_code")
+
 
 @admin.register(AdjustmentCoefficient)
 class AdjustmentCoefficientAdmin(admin.ModelAdmin):
@@ -44,8 +52,8 @@ class AdjustmentCoefficientAdmin(admin.ModelAdmin):
 
 @admin.register(Improvements)
 class ImprovementsAdmin(admin.ModelAdmin):
-    list_display = ("parcel_number","improvement_detail_type_code")
-    search_fields = ("parcel_number",)
+    list_display = ("parcel_number","improvement_detail_type_code","roll__year","improvement_id")
+    search_fields = ("parcel_number","segment_id")
 
 @admin.register(Sales)
 class SalesAdmin(admin.ModelAdmin):
@@ -55,7 +63,7 @@ class SalesAdmin(admin.ModelAdmin):
 
 admin.site.register(Land)
 admin.site.register(AssessmentRoll)
-
+admin.site.register(ParcelWaterfacts)
 from django.contrib import admin
 from openskagit.models import NeighborhoodMetrics
 
@@ -94,9 +102,6 @@ class NeighborhoodMetricsAdmin(admin.ModelAdmin):
     def prd_display(self, obj):
         return f"{obj.prd:.3f}" if obj.prd is not None else "—"
 
-
-from django.contrib import admin
-from .models import RegressionAdjustment, RegressionResult
 
 
 @admin.register(RegressionAdjustment)
@@ -360,3 +365,4 @@ class AssessorAdmin(admin.ModelAdmin):
         "property_type",
         "in_flood_zone",
     )
+

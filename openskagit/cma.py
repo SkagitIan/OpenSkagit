@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import GEOSGeometry, Polygon
 from django.contrib.gis.measure import D
-from django.db.models import F, OuterRef, Subquery, Window
+from django.db.models import F, OuterRef, Q, Subquery, Window
 from django.db.models.functions import RowNumber
 from django.utils import timezone
 from django.contrib.gis.db.models.functions import Distance, Transform
@@ -183,6 +183,11 @@ class PropertySnapshot:
             "unfinished_basement_sqft": float(row.unfinished_basement) if getattr(row, "unfinished_basement", None) else None,
         }
 
+        calculated_sqft = _to_decimal(getattr(row, "calculated_square_footage", None))
+        metadata["calculated_square_footage"] = (
+            float(calculated_sqft) if calculated_sqft is not None else None
+        )
+
         age_value: Optional[int] = None
         effective_year = int(row.eff_year_built) if row.eff_year_built else None
         if effective_year:
@@ -204,7 +209,7 @@ class PropertySnapshot:
             sale_price=_to_decimal(getattr(row, "comp_sale_price", None)),
             sale_date=_safe_date(getattr(row, "comp_sale_date", None)),
             property_type=row.property_type,
-            living_area=_to_decimal(row.living_area),
+            living_area=_preferred_living_area(row),
             lot_acres=_to_decimal(row.acres),
             bedrooms=_to_decimal(row.bedrooms),
             bathrooms=_to_decimal(row.bathrooms),
@@ -375,6 +380,17 @@ def _to_decimal(value: Optional[object]) -> Optional[Decimal]:
         return Decimal(str(value))
     except (ValueError, TypeError):
         return None
+
+
+def _preferred_living_area(record: Optional[object]) -> Optional[Decimal]:
+    if record is None:
+        return None
+    for attr in ("calculated_square_footage", "living_area"):
+        if hasattr(record, attr):
+            area_value = _to_decimal(getattr(record, attr))
+            if area_value is not None:
+                return area_value
+    return None
 
 
 def current_property_value(record: Optional[object]) -> Optional[Decimal]:
@@ -650,6 +666,7 @@ def load_subject(
     subject_market_group = resolve_market_group(assessor.neighborhood_code) or assessor.city_district
 
     market_value = current_property_value(assessor)
+    calculated_sqft = _to_decimal(assessor.calculated_square_footage)
 
     snapshot = PropertySnapshot(
         parcel_number=assessor.parcel_number,
@@ -657,7 +674,7 @@ def load_subject(
         sale_price=_to_decimal(sale_row.sale_price if sale_row else assessor.sale_price),
         sale_date=_safe_date(sale_row.sale_date if sale_row else assessor.sale_date),
         property_type=assessor.property_type,
-        living_area=_to_decimal(assessor.living_area),
+        living_area=_preferred_living_area(assessor),
         lot_acres=_to_decimal(assessor.acres),
         bedrooms=_to_decimal(assessor.bedrooms),
         bathrooms=_to_decimal(assessor.bathrooms),
@@ -671,19 +688,20 @@ def load_subject(
             "neighborhood_code": assessor.neighborhood_code,
             "land_use_code": assessor.land_use_code,
             "city_district": assessor.city_district,
-            "valuation_area": subject_market_group,
-            "assessment_roll_year": subject_roll_year,
-            "roll_year": subject_roll_year,
-            "roll_id": subject_roll_id,
-            "assessor_building_style": assessor.building_style,
-            "assessed_value": float(market_value) if market_value is not None else None,
-            "total_market_value": float(assessor.total_market_value) if assessor.total_market_value is not None else None,
-            "county_assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
-            "finished_basement_sqft": float(assessor.finished_basement) if assessor.finished_basement else None,
-            "unfinished_basement_sqft": float(assessor.unfinished_basement) if assessor.unfinished_basement else None,
-            "quality_score": getattr(assessor, "quality_score", None),
-            "condition_score": getattr(assessor, "condition_score", None),
-            "has_garage": bool(assessor.garage_sqft),
+        "valuation_area": subject_market_group,
+        "assessment_roll_year": subject_roll_year,
+        "roll_year": subject_roll_year,
+        "roll_id": subject_roll_id,
+        "assessor_building_style": assessor.building_style,
+        "assessed_value": float(market_value) if market_value is not None else None,
+        "total_market_value": float(assessor.total_market_value) if assessor.total_market_value is not None else None,
+        "county_assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
+        "finished_basement_sqft": float(assessor.finished_basement) if assessor.finished_basement else None,
+        "unfinished_basement_sqft": float(assessor.unfinished_basement) if assessor.unfinished_basement else None,
+        "quality_score": getattr(assessor, "quality_score", None),
+        "condition_score": getattr(assessor, "condition_score", None),
+        "calculated_square_footage": float(calculated_sqft) if calculated_sqft is not None else None,
+        "has_garage": bool(assessor.garage_sqft),
             "has_basement": bool(
                 (assessor.finished_basement or 0) > 0 or (assessor.unfinished_basement or 0) > 0
             ),
@@ -756,6 +774,7 @@ def _base_queryset(
     qs = qs.only(
         "parcel_number",
         "address",
+        "calculated_square_footage",
         "living_area",
         "bedrooms",
         "bathrooms",
@@ -853,10 +872,6 @@ def build_comparables(
     - improved ComparableResult construction
     """
 
-    import time
-
-    t0 = time.perf_counter()
-
     geom = _normalize_subject_geom(subject)
     valuation_date = _subject_valuation_date(subject)
     subject_metadata = _metadata_dict(subject)
@@ -892,11 +907,15 @@ def build_comparables(
         .select_related("roll")
     )
 
-    qs = qs.filter(
-        bedrooms__isnull=False,
-        bathrooms__isnull=False,
-        living_area__isnull=False,
-        year_built__isnull=False,
+    qs = (
+        qs.filter(
+            bedrooms__isnull=False,
+            bathrooms__isnull=False,
+            year_built__isnull=False,
+        )
+        .filter(
+            Q(calculated_square_footage__isnull=False) | Q(living_area__isnull=False)
+        )
     )
 
     if subject_land_use:
@@ -1083,12 +1102,6 @@ def build_comparables(
     if load_improvements:
         _prefetch_improvements(comps, rollup_cache)
 
-    t1 = time.perf_counter()
-    logger.debug(
-        f"[CMA] build_comparables for {subject.parcel_number} "
-        f"returned {len(comps)} comps in {t1 - t0:.3f}s"
-    )
-
     return ComputationResult(subject, comps, filters, sort_field, sort_direction)
 
 def _prefetch_improvements(comps, rollup_cache):
@@ -1149,7 +1162,7 @@ def _compute_difference_flags(subject: PropertySnapshot, candidate: Assessor) ->
     """
     flags: Dict[str, bool] = {}
     field_pairs = {
-        "living_area": ("living_area", "living_area"),
+        "living_area": ("living_area", None),
         "bedrooms": ("bedrooms", "bedrooms"),
         "bathrooms": ("bathrooms", "bathrooms"),
         "garage_sqft": ("garage_sqft", "garage_sqft"),
@@ -1157,8 +1170,12 @@ def _compute_difference_flags(subject: PropertySnapshot, candidate: Assessor) ->
         "year_built": ("year_built", "year_built"),
     }
     for key, (subject_attr, candidate_attr) in field_pairs.items():
-        subj_val = _to_decimal(getattr(subject, subject_attr, None))
-        comp_val = _to_decimal(getattr(candidate, candidate_attr, None))
+        if key == "living_area":
+            subj_val = _to_decimal(getattr(subject, subject_attr, None))
+            comp_val = _preferred_living_area(candidate)
+        else:
+            subj_val = _to_decimal(getattr(subject, subject_attr, None))
+            comp_val = _to_decimal(getattr(candidate, candidate_attr, None))
         threshold = DIFFERENCE_ALERTS.get(key, Decimal("0"))
         if subj_val is None or comp_val is None:
             flags[key] = False

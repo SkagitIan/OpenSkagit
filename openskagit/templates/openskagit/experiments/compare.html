@@ -1,0 +1,46 @@
+{% extends "openskagit/appeal_base_v3.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-semibold mb-4">Compare Experiments</h1>
+
+  <form method="get" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div>
+      <label class="block text-sm font-semibold mb-1">Experiment A</label>
+      <select name="exp1" class="w-full border px-3 py-2 rounded">
+        <option value="">Select…</option>
+        {% for exp in all_experiments %}
+        <option value="{{ exp.id }}" {% if exp1 and exp1.id == exp.id %}selected{% endif %}>{{ exp.name }} ({{ exp.status }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-semibold mb-1">Experiment B</label>
+      <select name="exp2" class="w-full border px-3 py-2 rounded">
+        <option value="">Select…</option>
+        {% for exp in all_experiments %}
+        <option value="{{ exp.id }}" {% if exp2 and exp2.id == exp.id %}selected{% endif %}>{{ exp.name }} ({{ exp.status }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="md:col-span-2 flex justify-end">
+      <button type="submit" class="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Compare</button>
+    </div>
+  </form>
+
+  {% if exp1 and exp2 %}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="border rounded px-3 py-3">
+      <h2 class="font-semibold mb-2">{{ exp1.name }}</h2>
+      <div class="text-sm text-gray-600">COD: {{ exp1.global_cod|default:"—" }}, R²: {{ exp1.global_r2|default:"—" }}</div>
+      <div class="text-sm text-gray-600">Diagnostics: {{ exp1.diagnostics_path|default:"—" }}</div>
+    </div>
+    <div class="border rounded px-3 py-3">
+      <h2 class="font-semibold mb-2">{{ exp2.name }}</h2>
+      <div class="text-sm text-gray-600">COD: {{ exp2.global_cod|default:"—" }}, R²: {{ exp2.global_r2|default:"—" }}</div>
+      <div class="text-sm text-gray-600">Diagnostics: {{ exp2.diagnostics_path|default:"—" }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -926,7 +926,9 @@
               <div class="comp-stat__label">Baths</div>
             </div>
             <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.living_area|default:"—"|floatformat:0|intcomma }}</div>
+              {% with sqft_value=comp.calculated_square_footage|default:comp.living_area %}
+                <div class="comp-stat__value">{{ sqft_value|default:"—"|floatformat:0|intcomma }}</div>
+              {% endwith %}
               <div class="comp-stat__label">Sq Ft</div>
             </div>
             <div class="comp-stat">
@@ -1073,7 +1075,9 @@
               <div class="comp-stat__label">Baths</div>
             </div>
             <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.living_area|default:"—"|floatformat:0|intcomma }}</div>
+              {% with sqft_value=comp.calculated_square_footage|default:comp.living_area %}
+                <div class="comp-stat__value">{{ sqft_value|default:"—"|floatformat:0|intcomma }}</div>
+              {% endwith %}
               <div class="comp-stat__label">Sq Ft</div>
             </div>
             <div class="comp-stat">
@@ -1268,7 +1272,9 @@
             distance: "{{ comp.distance_miles|floatformat:2 }}",
             beds: "{{ comp.bedrooms|default:"—"|floatformat:"-1" }}",
             baths: "{{ comp.bathrooms|quarter_baths|default:"—" }}",
-            sqft: "{{ comp.living_area|default:"—"|floatformat:0|intcomma }}",
+            {% with sqft_value=comp.calculated_square_footage|default:comp.living_area %}
+              sqft: "{{ sqft_value|default:"—"|floatformat:0|intcomma }}",
+            {% endwith %}
             adjusted_value: {{ comp.adjusted_value|default:"null" }},
             total_adjustment: {{ comp.total_adjustment|default:"null" }}
           },
@@ -1416,6 +1422,26 @@
     font-size: 0.8rem;
     color: var(--gray-600);
   }
+
+  .fairness-trigger-note p {
+    margin: 0;
+  }
+
+  .fairness-trigger-hold-note {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+  }
+
+  .fairness-btn-locked {
+    opacity: 0.7;
+    transition: opacity 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .fairness-btn-ready {
+    opacity: 1;
+    box-shadow: 0 0 0 3px rgba(41, 121, 255, 0.25);
+  }
 </style>
 
 <div class="fairness-trigger-card">
@@ -1441,7 +1467,8 @@
         </svg>
       </button>
       <div class="fairness-trigger-note">
-        Uses anonymous neighborhood statistics and a model tuned to IAAO fairness concepts. No legal advice.
+        <p>Uses anonymous neighborhood statistics and a model tuned to IAAO fairness concepts. No legal advice.</p>
+        <p class="fairness-trigger-hold-note">Hold the button down for three seconds so you really mean it before running the analysis.</p>
       </div>
     </div>
   </div>
@@ -1457,29 +1484,76 @@
       return;
     }
 
-    function setLoading(isLoading) {
-      if (isLoading) {
-        button.disabled = true;
-        button.innerHTML = '<div class="fairness-spinner"></div><span>Running analysis…</span>';
-      } else {
-        button.disabled = false;
-        button.innerHTML = '<span>Run Fairness Analysis</span>' +
-          '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-          '<polyline points="9 11 12 14 22 4"></polyline>' +
-          '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' +
-          '</svg>';
+    const iconMarkup =
+      '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<polyline points="9 11 12 14 22 4"></polyline>' +
+      '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' +
+      '</svg>';
+    const defaultButtonHtml = `<span>Run Fairness Analysis</span>${iconMarkup}`;
+    const readyButtonHtml = `<span>Release to run Fairness Analysis</span>${iconMarkup}`;
+    const spinnerHtml = '<div class="fairness-spinner"></div><span>Running analysis…</span>';
+
+    const LONG_PRESS_DURATION = 3000;
+    let holdTimer = null;
+    let holdReady = false;
+
+    function cancelHoldTimer() {
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
       }
     }
 
-    button.addEventListener('click', () => {
-      const url = button.dataset.url;
-      if (!url || button.disabled) {
+    function enterReadyState() {
+      holdReady = true;
+      button.innerHTML = readyButtonHtml;
+      button.classList.remove('fairness-btn-locked');
+      button.classList.add('fairness-btn-ready');
+    }
+
+    function setLoading(isLoading) {
+      cancelHoldTimer();
+      holdReady = false;
+
+      button.disabled = isLoading;
+      button.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+      button.innerHTML = isLoading ? spinnerHtml : defaultButtonHtml;
+      button.classList.remove('fairness-btn-ready');
+      button.classList.add('fairness-btn-locked');
+    }
+
+    button.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) {
         return;
       }
+      if (holdReady || button.disabled) {
+        return;
+      }
+
+      cancelHoldTimer();
+      holdTimer = window.setTimeout(() => {
+        enterReadyState();
+        holdTimer = null;
+      }, LONG_PRESS_DURATION);
+    });
+
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((eventName) => {
+      button.addEventListener(eventName, () => {
+        if (!holdReady) {
+          cancelHoldTimer();
+        }
+      });
+    });
+
+    button.addEventListener('click', () => {
+      if (!holdReady || button.disabled) {
+        return;
+      }
+
       setLoading(true);
       resultContainer.innerHTML = '';
 
-      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then((response) => {
           if (!response.ok) {
             throw new Error('Unable to run fairness analysis');
@@ -1490,12 +1564,14 @@
           resultContainer.innerHTML = html;
         })
         .catch(() => {
-        resultContainer.innerHTML = '<div class="fairness-error">Unable to run the fairness analysis right now. Please try again in a few minutes.</div>';
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+          resultContainer.innerHTML = '<div class="fairness-error">Unable to run the fairness analysis right now. Please try again in a few minutes.</div>';
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     });
+
+    setLoading(false);
   })();
 </script>
 <script>
