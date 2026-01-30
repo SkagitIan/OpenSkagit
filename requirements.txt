@@ -1,0 +1,36 @@
+# Core Django stack
+asgiref==3.8.1
+Django==5.2.7
+djangorestframework==3.16.1
+django-anymail==14.0
+django-extensions==4.1
+django-leaflet==0.32.0
+python-dotenv==1.2.1
+netifaces==0.12.0
+
+# Postgres and vector support
+psycopg==3.2.10
+psycopg2-binary==2.9.11
+pgvector==0.4.1
+
+# Deployment / worker tooling
+gunicorn==20.1.0
+celery==5.6.2
+
+# HTTP / network clients
+requests==2.32.5
+httpx==0.28.1
+
+# AI + agent stack
+openai==2.14.0
+openai-agents==0.4.2
+google-genai==1.60.0
+outscraper==5.9.2
+replicate==1.0.7
+sentence-transformers==5.1.2
+
+# Supporting utilities
+numpy==2.2.6
+pydantic==2.12.3
+playwright==1.57.0
+stripe==14.3.0
