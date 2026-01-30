@@ -6,7 +6,7 @@ django-anymail==14.0
 django-extensions==4.1
 django-leaflet==0.32.0
 python-dotenv==1.2.1
-netifaces==0.12.0
+netifaces==0.11.0
 
 # Postgres and vector support
 psycopg==3.2.10
