@@ -1,0 +1,2052 @@
+{% extends "openskagit/parcel_portal_base.html" %}
+{% load static %}
+
+{% block page_title %}Taxes · Parcel History & Fairness{% endblock %}
+
+{% block hero %}
+<div class="space-y-4 text-center">
+  <p class="text-xs font-semibold uppercase tracking-[0.4em] text-sage-500">Taxes</p>
+  <h1 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">Your parcel, over time</h1>
+  <p class="text-sm text-slate-500">Two pillars: your parcel over time, and neighborhood fairness.</p>
+  <p class="text-sm font-semibold text-slate-700">“Property tax dollars are pooled across overlapping districts; parcel-level spending attribution isn’t auditable.”</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto w-full space-y-8">
+  <style>
+    :root {
+      --osg-lime: #7DB61C;
+      --osg-sky: #0071BC;
+      --osg-gold: #FDB913;
+      --osg-teal: #00828A;
+      --osg-charcoal: #2E3D49;
+      --osg-white: #FFFFFF;
+    }
+    .tax-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .tax-card {
+      position: relative;
+      border-radius: 1.5rem;
+      border: 1px solid var(--gray-100);
+      box-shadow: var(--shadow-xl);
+      overflow: hidden;
+      min-height: 320px;
+      background: var(--osg-white);
+      perspective: 1200px;
+    }
+    .tax-card__inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 240ms ease;
+    }
+    .tax-card[data-flipped="true"] .tax-card__inner {
+      transform: rotateY(180deg);
+    }
+    .tax-card__face {
+      position: absolute;
+      inset: 0;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 0.75rem;
+      backface-visibility: hidden;
+    }
+    .tax-card__face--front {
+      z-index: 2;
+    }
+    .tax-card__face--back {
+      background: rgba(255, 255, 255, 0.96);
+      transform: rotateY(180deg);
+      z-index: 1;
+      overflow-y: auto;
+    }
+    .tax-card__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .tax-card__title {
+      font-size: 0.9rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(46, 61, 73, 0.7);
+      font-weight: 600;
+    }
+    .tax-card__value {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--osg-charcoal);
+    }
+    .tax-card__secondary {
+      font-size: 0.85rem;
+      color: rgba(46, 61, 73, 0.7);
+    }
+    .tax-card__visual {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 80px;
+    }
+    .vertical-equity {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .vertical-equity__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .vertical-equity-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .vertical-equity-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: rgba(46, 61, 73, 0.85);
+    }
+    .vertical-equity-label {
+      flex: 0 0 110px;
+      font-size: 0.7rem;
+      color: rgba(15, 23, 42, 0.75);
+    }
+    .vertical-equity-bar-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .vertical-equity-value {
+      font-size: 0.65rem;
+      color: rgba(46, 61, 73, 0.7);
+      min-width: 44px;
+      text-align: right;
+    }
+    .vertical-equity-bar-wrapper {
+      flex: 1;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(46, 61, 73, 0.1);
+      overflow: hidden;
+    }
+    .vertical-equity-bar {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #0071BC, #00C6FF);
+      min-width: 4px;
+    }
+    .tax-card__flip-button {
+      border: none;
+      background: rgba(46, 61, 73, 0.08);
+      color: var(--osg-charcoal);
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms ease, transform 120ms ease;
+    }
+    .tax-card__flip-button:hover {
+      background: rgba(46, 61, 73, 0.18);
+      transform: translateY(-1px);
+    }
+    .tax-card__back-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      flex: 1;
+    }
+    .tax-card__back-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .tax-card__label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3em;
+      color: #94a3b8;
+    }
+    .tax-card__list {
+      list-style: disc;
+      padding-left: 1.25rem;
+      margin: 0;
+      font-size: 0.85rem;
+      color: rgba(46, 61, 73, 0.8);
+    }
+    .tax-card__list li:not(:last-child) {
+      margin-bottom: 0.25rem;
+    }
+    .tax-card--latest-tax .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(125, 182, 28, 0.22), rgba(46, 61, 73, 0.04));
+      color: var(--osg-charcoal);
+    }
+    .tax-card--total-market-value .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(0, 113, 188, 0.16), rgba(46, 61, 73, 0.06));
+      color: var(--osg-charcoal);
+    }
+    .tax-card--trend .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(253, 185, 19, 0.24), rgba(46, 61, 73, 0.04));
+      color: var(--osg-charcoal);
+    }
+    .tax-card--effective-tax-rate .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(0, 130, 138, 0.18), rgba(46, 61, 73, 0.05));
+      color: var(--osg-charcoal);
+    }
+    .tax-card--county-etr .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(0, 113, 188, 0.14), rgba(0, 198, 255, 0.08));
+      color: var(--osg-charcoal);
+    }
+    .tax-card--vertical-equity .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(125, 182, 28, 0.18), rgba(0, 130, 138, 0.08));
+      color: var(--osg-charcoal);
+    }
+    .tax-card--vertical-equity .tax-card__visual {
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+    .tax-card--fairness .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(46, 61, 73, 0.18), rgba(46, 61, 73, 0.04));
+      color: var(--osg-charcoal);
+    }
+    .tax-card--map .tax-card__face--front {
+      background: linear-gradient(135deg, rgba(0, 113, 188, 0.12), rgba(125, 182, 28, 0.12));
+      color: var(--osg-charcoal);
+    }
+    .tax-map {
+      width: 100%;
+      height: 240px;
+    }
+    .tax-card--fairness-container {
+      min-height: 380px;
+      height: 380px;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      overflow: hidden;
+    }
+    .tax-card--fairness-container .tax-card__inner {
+      height: 100%;
+    }
+    .tax-card--fairness-container > .tax-card__inner > .tax-card__face {
+      height: 100%;
+      padding: 0;
+    }
+    .tax-card--fairness-container > .tax-card__inner > .tax-card__face--front {
+      background: transparent;
+    }
+    .tax-card--fairness-container > .tax-card__inner > .tax-card__face--back {
+      background: transparent;
+      transform: none;
+      opacity: 0;
+      pointer-events: none;
+      display: block;
+      transition: opacity 160ms ease;
+    }
+    .tax-card--fairness-container > .tax-card__inner > .tax-card__face--front {
+      opacity: 1;
+      pointer-events: auto;
+      transition: opacity 160ms ease;
+    }
+    .tax-card--fairness-container[data-flipped="true"] > .tax-card__inner > .tax-card__face--front {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .tax-card--fairness-container[data-flipped="true"] > .tax-card__inner > .tax-card__face--back {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .tax-card__flip-button--floating {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      z-index: 6;
+    }
+    #tax-fairness {
+      position: relative;
+    }
+    .tax-fairness-toggle {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      z-index: 10;
+    }
+    .fairness-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-top: 0.5rem;
+      padding: 0.25rem 0.25rem 0.5rem;
+    }
+    .tax-card--fairness-metric {
+      min-height: 250px;
+      height: 250px;
+      border: none;
+      box-shadow: none;
+      background: transparent;
+      overflow: visible;
+    }
+    .tax-card--fairness-metric .tax-card__face {
+      padding: 1.25rem;
+      justify-content: flex-start;
+    }
+    .fairness-metric {
+      position: relative;
+      overflow: hidden;
+      border-radius: 1.25rem;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      background: linear-gradient(140deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.92));
+      box-shadow: var(--shadow-lg);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      min-height: 200px;
+    }
+    .fairness-metric::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, var(--metric-glow, rgba(148, 163, 184, 0.18)), transparent 55%);
+      pointer-events: none;
+    }
+    .fairness-metric::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 6px;
+      background: var(--metric-accent, #94a3b8);
+      pointer-events: none;
+    }
+    .fairness-metric > * {
+      position: relative;
+      z-index: 1;
+    }
+    .fairness-metric--cod {
+      --metric-accent: #0071BC;
+      --metric-glow: rgba(0, 113, 188, 0.18);
+    }
+    .fairness-metric--prd {
+      --metric-accent: #00828A;
+      --metric-glow: rgba(0, 130, 138, 0.18);
+    }
+    .fairness-metric--etr {
+      --metric-accent: #7DB61C;
+      --metric-glow: rgba(125, 182, 28, 0.18);
+    }
+    .fairness-metric__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .fairness-metric__header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .fairness-metric__label {
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+    .fairness-metric__context {
+      font-size: 0.7rem;
+      color: rgba(46, 61, 73, 0.6);
+      font-weight: 600;
+      margin-top: 0.15rem;
+    }
+    .fairness-metric__status {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: rgba(148, 163, 184, 0.2);
+      color: #475569;
+      white-space: nowrap;
+    }
+    .fairness-metric__status--ok {
+      background: rgba(125, 182, 28, 0.18);
+      border-color: rgba(125, 182, 28, 0.45);
+      color: #3b5a12;
+    }
+    .fairness-metric__status--watch {
+      background: rgba(253, 185, 19, 0.22);
+      border-color: rgba(253, 185, 19, 0.5);
+      color: #7a5200;
+    }
+    .fairness-metric__status--alert {
+      background: rgba(249, 115, 22, 0.2);
+      border-color: rgba(249, 115, 22, 0.55);
+      color: #9a3412;
+    }
+    .fairness-metric__status--info {
+      background: rgba(0, 113, 188, 0.18);
+      border-color: rgba(0, 113, 188, 0.45);
+      color: #0f3f6f;
+    }
+    .fairness-metric__status--neutral {
+      background: rgba(148, 163, 184, 0.2);
+      border-color: rgba(148, 163, 184, 0.45);
+      color: #475569;
+    }
+    .fairness-metric__value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--osg-charcoal);
+    }
+    .fairness-metric__target {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: rgba(46, 61, 73, 0.6);
+    }
+    .fairness-metric__helper {
+      font-size: 0.85rem;
+      color: rgba(46, 61, 73, 0.7);
+    }
+    .fairness-metric__visual {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 70px;
+    }
+    .fairness-metric__footer {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .tax-card__face--back.fairness-metric {
+      overflow-y: auto;
+    }
+    .tax-card__face--map {
+      padding: 0;
+    }
+    .tax-map-wrapper {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .tax-map-wrapper .tax-map {
+      height: 100%;
+      min-height: 380px;
+      border-radius: 0;
+    }
+    .tax-card--fairness-container .tax-map-wrapper .tax-map {
+      min-height: 100%;
+    }
+    #tax-neighborhood-map .leaflet-control-attribution {
+      display: none;
+    }
+    .tax-loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.65);
+      border-radius: 1.5rem;
+      z-index: 6;
+    }
+    .tax-loading-spinner {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 4px solid rgba(125, 182, 28, 0.2);
+      border-top-color: #7DB61C;
+      animation: tax-spin 0.9s linear infinite;
+    }
+    @keyframes tax-spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+  <section class="w-full rounded-3xl border border-sage-100 bg-white/90 p-8 shadow-lg shadow-sage-100/60">
+    <div class="flex flex-wrap items-start gap-4">
+      <div class="rounded-2xl bg-sage-100 p-4 text-sage-700">
+        <i class="fa-solid fa-map-location-dot text-2xl" aria-hidden="true"></i>
+      </div>
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-sage-500">Parcel search</p>
+        <h2 class="text-2xl font-semibold text-slate-900">Find your property</h2>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      {% include "openskagit/partials/tax_parcel_search_autocomplete_block.html" %}
+    </div>
+  </section>
+
+  <section id="tax-ai-summary" class="relative hidden w-full rounded-3xl border border-slate-100 bg-white/90 p-8 shadow-lg shadow-slate-100/60">
+    <div id="tax-ai-summary-loading" class="hidden items-center gap-2 text-sm text-slate-500">
+      <div class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></div>
+      Loading parcel summary...
+    </div>
+    <div id="tax-ai-summary-text" class="text-sm leading-relaxed text-slate-700">Awaiting parcel selection.</div>
+    <div id="tax-ai-summary-overlay" class="tax-loading-overlay hidden">
+      <div class="flex flex-col items-center gap-3 text-center">
+        <div class="tax-loading-spinner" aria-hidden="true"></div>
+        <p class="text-sm font-semibold text-slate-600">Generating parcel summary…</p>
+        <p class="text-xs text-slate-500">This can take up to a minute on first load.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tax-over-time" class="relative hidden w-full rounded-3xl border border-slate-100 bg-white/90 p-8 shadow-lg shadow-slate-100/60">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Pillar 1</p>
+        <h3 class="text-2xl font-semibold text-slate-900">Your parcel over time</h3>
+        <p class="text-sm text-slate-500">Tax paid, trend, and rate vs value.</p>
+      </div>
+      <div id="tax-story-loading" class="hidden items-center gap-2 text-sm text-slate-500">
+        <div class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></div>
+        Loading parcel history…
+      </div>
+    </div>
+
+    <div class="mt-6 tax-card-grid">
+      <article class="tax-card tax-card--latest-tax" data-card-id="latest-tax" data-flipped="false">
+        <div class="tax-card__inner">
+          <div class="tax-card__face tax-card__face--front" role="region" aria-labelledby="tax-card-front-label-latest-tax">
+            <div class="tax-card__header">
+              <p class="tax-card__title" id="tax-card-front-label-latest-tax">Tax paid (latest)</p>
+              <button type="button" class="tax-card__flip-button" data-tax-flip="latest-tax" aria-controls="tax-card-back-latest-tax">Flip</button>
+            </div>
+            <p class="tax-card__value" id="tax-story-latest-tax">—</p>
+            <p class="tax-card__secondary" id="tax-story-latest-helper">Awaiting parcel history.</p>
+            <div class="tax-card__visual" id="tax-story-latest-visual"></div>
+          </div>
+          <div class="tax-card__face tax-card__face--back" id="tax-card-back-latest-tax" role="region" aria-labelledby="tax-card-back-label-latest-tax">
+            <div class="tax-card__back-content">
+              <div class="tax-card__back-section">
+                <p class="tax-card__label" id="tax-card-back-label-latest-tax">What</p>
+                <p class="text-sm text-slate-600">
+                  Your most recent property tax bill (latest tax year). This is the real cash out the door,
+                  independent of assessed value swings. Useful for budgeting and for spotting sudden jumps caused
+                  by levy changes, new construction, or a value reset.
+                </p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">How it's calculated</p>
+                <p class="text-sm text-slate-600">Latest annual tax amount from the parcel's tax statement.</p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">Example</p>
+                <p class="text-sm text-slate-600" id="tax-back-latest-example">Example: —</p>
+              </div>
+            </div>
+            <button type="button" class="tax-card__flip-button" data-tax-flip="latest-tax" aria-controls="tax-card-front-label-latest-tax">Back</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="tax-card tax-card--total-market-value" data-card-id="total-market-value" data-flipped="false">
+        <div class="tax-card__inner">
+          <div class="tax-card__face tax-card__face--front" role="region" aria-labelledby="tax-card-front-label-total-market-value">
+            <div class="tax-card__header">
+              <p class="tax-card__title" id="tax-card-front-label-total-market-value">Total market value</p>
+              <button type="button" class="tax-card__flip-button" data-tax-flip="total-market-value" aria-controls="tax-card-back-total-market-value">Flip</button>
+            </div>
+            <p class="tax-card__value" id="tax-story-market-value">—</p>
+            <p class="tax-card__secondary">Certified roll value from the latest statement.</p>
+            <div class="tax-card__visual" id="tax-story-market-value-visual"></div>
+          </div>
+          <div class="tax-card__face tax-card__face--back" id="tax-card-back-total-market-value" role="region" aria-labelledby="tax-card-back-label-total-market-value">
+            <div class="tax-card__back-content">
+              <div class="tax-card__back-section">
+                <p class="tax-card__label" id="tax-card-back-label-total-market-value">What</p>
+                <p class="text-sm text-slate-600">
+                  The parcel's certified market value from the latest assessment roll (the number most taxes are
+                  ultimately based on). It's your baseline for comparing against neighbors and for understanding
+                  why your tax bill moved. Big value moves without obvious property changes are worth a second look.
+                </p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">How it's calculated</p>
+                <p class="text-sm text-slate-600">Latest certified roll value (assessor) for the parcel.</p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">Example</p>
+                <p class="text-sm text-slate-600" id="tax-back-market-value-example">Example: —</p>
+              </div>
+            </div>
+            <button type="button" class="tax-card__flip-button" data-tax-flip="total-market-value" aria-controls="tax-card-front-label-total-market-value">Back</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="tax-card tax-card--trend" data-card-id="tax-trend" data-flipped="false">
+        <div class="tax-card__inner">
+          <div class="tax-card__face tax-card__face--front" role="region" aria-labelledby="tax-card-front-label-tax-trend">
+            <div class="tax-card__header">
+              <p class="tax-card__title" id="tax-card-front-label-tax-trend">Tax vs inflation</p>
+              <button type="button" class="tax-card__flip-button" data-tax-flip="tax-trend" aria-controls="tax-card-back-tax-trend">Flip</button>
+            </div>
+            <p class="tax-card__value" id="tax-story-inflation-delta">—</p>
+            <p class="tax-card__secondary" id="tax-story-inflation-helper">Tax CAGR vs CPI baseline.</p>
+            <div class="tax-card__visual" id="tax-story-inflation-visual"></div>
+          </div>
+          <div class="tax-card__face tax-card__face--back" id="tax-card-back-tax-trend" role="region" aria-labelledby="tax-card-back-label-tax-trend">
+            <div class="tax-card__back-content">
+              <div class="tax-card__back-section">
+                <p class="tax-card__label" id="tax-card-back-label-tax-trend">What</p>
+                <p class="text-sm text-slate-600">
+                  Shows how fast your taxes have grown over time compared to inflation (CPI). If your tax growth rate
+                  beats CPI, your tax burden is rising faster than the cost of living. This is the cleanest "is this
+                  getting harder to afford?" signal.
+                </p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">How it's calculated</p>
+                <p class="text-sm text-slate-600">Tax CAGR over the selected period vs CPI CAGR over the same period.</p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">Example</p>
+                <p class="text-sm text-slate-600" id="tax-back-inflation-example">Example: —</p>
+              </div>
+            </div>
+            <button type="button" class="tax-card__flip-button" data-tax-flip="tax-trend" aria-controls="tax-card-front-label-tax-trend">Back</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="tax-card tax-card--effective-tax-rate" data-card-id="effective-tax-rate" data-flipped="false">
+        <div class="tax-card__inner">
+          <div class="tax-card__face tax-card__face--front" role="region" aria-labelledby="tax-card-front-label-effective-tax-rate">
+            <div class="tax-card__header">
+              <p class="tax-card__title" id="tax-card-front-label-effective-tax-rate">Effective tax rate (ETR)</p>
+              <button type="button" class="tax-card__flip-button" data-tax-flip="effective-tax-rate" aria-controls="tax-card-back-effective-tax-rate">Flip</button>
+            </div>
+            <p class="tax-card__value" id="tax-story-etr">—</p>
+            <p class="tax-card__secondary">Taxes as a share of market value.</p>
+            <p class="text-xs text-slate-500" id="tax-etr-delta">Vs county median: —</p>
+            <div class="tax-card__visual" id="tax-story-etr-visual"></div>
+          </div>
+          <div class="tax-card__face tax-card__face--back" id="tax-card-back-effective-tax-rate" role="region" aria-labelledby="tax-card-back-label-effective-tax-rate">
+            <div class="tax-card__back-content">
+              <div class="tax-card__back-section">
+                <p class="tax-card__label" id="tax-card-back-label-effective-tax-rate">What</p>
+                <p class="text-sm text-slate-600">
+                  Your tax bill as a percent of market value - think "tax yield" on your property. ETR lets you
+                  compare across very different home prices and quickly see whether your parcel is taxed heavier or
+                  lighter than typical.
+                </p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">How it's calculated</p>
+                <p class="text-sm text-slate-600">ETR = annual taxes / market value (shown as a %).</p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">Example</p>
+                <p class="text-sm text-slate-600" id="tax-back-etr-example">Example: —</p>
+              </div>
+            </div>
+            <button type="button" class="tax-card__flip-button" data-tax-flip="effective-tax-rate" aria-controls="tax-card-front-label-effective-tax-rate">Back</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="tax-card tax-card--county-etr" data-card-id="county-etr" data-flipped="false">
+        <div class="tax-card__inner">
+          <div class="tax-card__face tax-card__face--front" role="region" aria-labelledby="tax-card-front-label-county-etr">
+            <div class="tax-card__header">
+              <p class="tax-card__title" id="tax-card-front-label-county-etr">County median ETR</p>
+              <button type="button" class="tax-card__flip-button" data-tax-flip="county-etr" aria-controls="tax-card-back-county-etr">Flip</button>
+            </div>
+            <p class="tax-card__value" id="tax-county-etr-value">—</p>
+            <p class="tax-card__secondary" id="tax-county-etr-helper">Skagit median effective tax rate.</p>
+            <div class="tax-card__visual" id="tax-county-etr-visual"></div>
+          </div>
+          <div class="tax-card__face tax-card__face--back" id="tax-card-back-county-etr" role="region" aria-labelledby="tax-card-back-label-county-etr">
+            <div class="tax-card__back-content">
+              <div class="tax-card__back-section">
+                <p class="tax-card__label" id="tax-card-back-label-county-etr">What</p>
+                <p class="text-sm text-slate-600">
+                  The countywide midpoint ETR for the current tax year (half of parcels are above, half below). This is
+                  the benchmark for "normal" and makes your ETR meaningful in context. A small difference matters when
+                  it persists year after year.
+                </p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">How it's calculated</p>
+                <p class="text-sm text-slate-600">Median of annual taxes / market value across all parcels for the year.</p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">Example</p>
+                <p class="text-sm text-slate-600" id="tax-back-county-etr-example">Example: —</p>
+              </div>
+            </div>
+            <button type="button" class="tax-card__flip-button" data-tax-flip="county-etr" aria-controls="tax-card-front-label-county-etr">Back</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="tax-card tax-card--vertical-equity" data-card-id="vertical-equity" data-flipped="false">
+        <div class="tax-card__inner">
+          <div class="tax-card__face tax-card__face--front" role="region" aria-labelledby="tax-card-front-label-vertical-equity">
+            <div class="tax-card__header">
+              <p class="tax-card__title" id="tax-card-front-label-vertical-equity">Vertical equity</p>
+              <button type="button" class="tax-card__flip-button" data-tax-flip="vertical-equity" aria-controls="tax-card-back-vertical-equity">Flip</button>
+            </div>
+            <p class="tax-card__value" id="tax-vertical-equity-score">—</p>
+            <p class="tax-card__secondary" id="tax-vertical-equity-helper">ETR by home value bracket.</p>
+            <div class="tax-card__visual">
+              <div class="vertical-equity" id="tax-vertical-equity">
+                <div class="vertical-equity__header">
+                  <span class="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">Value brackets</span>
+                  <span class="text-xs text-slate-500" id="tax-etr-median-label">County median: —</span>
+                </div>
+                <div class="vertical-equity-chart" id="tax-vertical-equity-chart"></div>
+              </div>
+            </div>
+          </div>
+          <div class="tax-card__face tax-card__face--back" id="tax-card-back-vertical-equity" role="region" aria-labelledby="tax-card-back-label-vertical-equity">
+            <div class="tax-card__back-content">
+              <div class="tax-card__back-section">
+                <p class="tax-card__label" id="tax-card-back-label-vertical-equity">What</p>
+                <p class="text-sm text-slate-600">
+                  Checks whether tax burden is fair across value levels (lower-value vs higher-value properties).
+                  "Regressive" means lower-value homes pay a higher effective rate than higher-value homes;
+                  "progressive" is the opposite. This is a fairness lens on the system, not just your parcel.
+                </p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">How it's calculated</p>
+                <p class="text-sm text-slate-600">
+                  Compare ETR by value bracket; the pattern across brackets determines progressive vs proportional vs
+                  regressive.
+                </p>
+              </div>
+              <div class="tax-card__back-section">
+                <p class="tax-card__label">Example</p>
+                <p class="text-sm text-slate-600" id="tax-back-vertical-equity-example">Example: —</p>
+              </div>
+            </div>
+            <button type="button" class="tax-card__flip-button" data-tax-flip="vertical-equity" aria-controls="tax-card-front-label-vertical-equity">Back</button>
+          </div>
+        </div>
+      </article>
+    </div>
+    <div id="tax-story-overlay" class="tax-loading-overlay hidden">
+      <div class="tax-loading-spinner" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <section id="tax-fairness" class="hidden w-full rounded-3xl border border-slate-100 bg-white/90 p-8 shadow-lg shadow-slate-100/60">
+    <button type="button" class="tax-card__flip-button tax-fairness-toggle" data-tax-flip="fairness-container" id="tax-fairness-map-toggle" aria-controls="tax-card-back-fairness-container">
+      Map
+    </button>
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Pillar 2</p>
+        <h3 class="text-2xl font-semibold text-slate-900">Neighborhood fairness</h3>
+      </div>
+      <div id="tax-fairness-loading" class="hidden items-center gap-2 text-sm text-slate-500">
+        <div class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></div>
+        Loading neighborhood fairness…
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <article class="tax-card tax-card--fairness tax-card--fairness-container" data-card-id="fairness-container" data-flipped="false">
+        <div class="tax-card__face tax-card__face--front" role="region" aria-labelledby="tax-card-front-label-fairness-container">
+          <div class="fairness-grid">
+            <article class="tax-card tax-card--fairness-metric" data-card-id="fairness-cod" data-flipped="false">
+              <div class="tax-card__inner">
+                <div class="tax-card__face tax-card__face--front fairness-metric fairness-metric--cod" role="region" aria-labelledby="tax-card-front-label-fairness-cod">
+                  <div class="fairness-metric__header">
+                    <div>
+                      <p class="fairness-metric__label" id="tax-card-front-label-fairness-cod">COD</p>
+                      <p class="fairness-metric__context">Uniformity</p>
+                    </div>
+                    <div class="fairness-metric__header-actions">
+                      <button type="button" class="tax-card__flip-button" data-tax-flip="fairness-cod" aria-controls="tax-card-back-fairness-cod">Flip</button>
+                    </div>
+                  </div>
+                  <p class="fairness-metric__value" id="tax-cod-value">—</p>
+                  <p class="fairness-metric__target">IAAO target: &lt;= 15</p>
+                  <p class="fairness-metric__helper" id="tax-cod-helper">Awaiting parcel selection.</p>
+                  <div class="fairness-metric__visual" id="tax-cod-visual"></div>
+                  <div class="fairness-metric__footer">
+                    <span class="fairness-metric__status fairness-metric__status--neutral" id="tax-cod-status">—</span>
+                  </div>
+                </div>
+                <div class="tax-card__face tax-card__face--back fairness-metric fairness-metric--cod" id="tax-card-back-fairness-cod" role="region" aria-labelledby="tax-card-back-label-fairness-cod">
+                  <div class="tax-card__back-content">
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label" id="tax-card-back-label-fairness-cod">What</p>
+                      <p class="text-sm text-slate-600">COD (Coefficient of Dispersion) shows how tightly clustered assessments are within a neighborhood. Lower values mean more uniformity.</p>
+                    </div>
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label">Why it matters</p>
+                      <p class="text-sm text-slate-600">High dispersion can signal uneven assessments that may warrant review.</p>
+                    </div>
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label">Example</p>
+                      <p class="text-sm text-slate-600" id="tax-cod-example">Example: —</p>
+                    </div>
+                  </div>
+                  <button type="button" class="tax-card__flip-button" data-tax-flip="fairness-cod" aria-controls="tax-card-front-label-fairness-cod">Back</button>
+                </div>
+              </div>
+            </article>
+            <article class="tax-card tax-card--fairness-metric" data-card-id="fairness-prd" data-flipped="false">
+              <div class="tax-card__inner">
+                <div class="tax-card__face tax-card__face--front fairness-metric fairness-metric--prd" role="region" aria-labelledby="tax-card-front-label-fairness-prd">
+                  <div class="fairness-metric__header">
+                    <div>
+                      <p class="fairness-metric__label" id="tax-card-front-label-fairness-prd">PRD</p>
+                      <p class="fairness-metric__context">Price-related bias</p>
+                    </div>
+                    <div class="fairness-metric__header-actions">
+                      <button type="button" class="tax-card__flip-button" data-tax-flip="fairness-prd" aria-controls="tax-card-back-fairness-prd">Flip</button>
+                    </div>
+                  </div>
+                  <p class="fairness-metric__value" id="tax-prd-value">—</p>
+                  <p class="fairness-metric__target">Balanced range: 0.98-1.03</p>
+                  <p class="fairness-metric__helper" id="tax-prd-helper">Awaiting parcel selection.</p>
+                  <div class="fairness-metric__visual" id="tax-prd-visual"></div>
+                  <div class="fairness-metric__footer">
+                    <span class="fairness-metric__status fairness-metric__status--neutral" id="tax-prd-status">—</span>
+                  </div>
+                </div>
+                <div class="tax-card__face tax-card__face--back fairness-metric fairness-metric--prd" id="tax-card-back-fairness-prd" role="region" aria-labelledby="tax-card-back-label-fairness-prd">
+                  <div class="tax-card__back-content">
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label" id="tax-card-back-label-fairness-prd">What</p>
+                      <p class="text-sm text-slate-600">PRD (Price-Related Differential) checks whether higher- and lower-value homes are treated consistently.</p>
+                    </div>
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label">Why it matters</p>
+                      <p class="text-sm text-slate-600">Values above the target can signal regressivity; below can signal progressivity.</p>
+                    </div>
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label">Example</p>
+                      <p class="text-sm text-slate-600" id="tax-prd-example">Example: —</p>
+                    </div>
+                  </div>
+                  <button type="button" class="tax-card__flip-button" data-tax-flip="fairness-prd" aria-controls="tax-card-front-label-fairness-prd">Back</button>
+                </div>
+              </div>
+            </article>
+            <article class="tax-card tax-card--fairness-metric" data-card-id="fairness-etr" data-flipped="false">
+              <div class="tax-card__inner">
+                <div class="tax-card__face tax-card__face--front fairness-metric fairness-metric--etr" role="region" aria-labelledby="tax-card-front-label-fairness-etr">
+                  <div class="fairness-metric__header">
+                    <div>
+                      <p class="fairness-metric__label" id="tax-card-front-label-fairness-etr">ETR percentile</p>
+                      <p class="fairness-metric__context">Your rank in neighborhood</p>
+                    </div>
+                    <div class="fairness-metric__header-actions">
+                      <button type="button" class="tax-card__flip-button" data-tax-flip="fairness-etr" aria-controls="tax-card-back-fairness-etr">Flip</button>
+                    </div>
+                  </div>
+                  <p class="fairness-metric__value" id="tax-etr-percentile">—</p>
+                  <p class="fairness-metric__target">Higher = higher tax rate</p>
+                  <p class="fairness-metric__helper" id="tax-etr-percentile-helper">Awaiting parcel selection.</p>
+                  <div class="fairness-metric__visual" id="tax-etr-percentile-visual"></div>
+                  <div class="fairness-metric__footer">
+                    <span class="fairness-metric__status fairness-metric__status--neutral" id="tax-etr-percentile-status">—</span>
+                  </div>
+                </div>
+                <div class="tax-card__face tax-card__face--back fairness-metric fairness-metric--etr" id="tax-card-back-fairness-etr" role="region" aria-labelledby="tax-card-back-label-fairness-etr">
+                  <div class="tax-card__back-content">
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label" id="tax-card-back-label-fairness-etr">What</p>
+                      <p class="text-sm text-slate-600">ETR percentile ranks your effective tax rate against neighbors. 50% is the median.</p>
+                    </div>
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label">Why it matters</p>
+                      <p class="text-sm text-slate-600">It shows where your parcel lands relative to nearby properties.</p>
+                    </div>
+                    <div class="tax-card__back-section">
+                      <p class="tax-card__label">Example</p>
+                      <p class="text-sm text-slate-600" id="tax-etr-percentile-example">Example: —</p>
+                    </div>
+                  </div>
+                  <button type="button" class="tax-card__flip-button" data-tax-flip="fairness-etr" aria-controls="tax-card-front-label-fairness-etr">Back</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+        <div class="tax-card__face tax-card__face--back tax-card__face--map" id="tax-card-back-fairness-container" role="region" aria-labelledby="tax-card-back-label-fairness-container">
+          <div class="tax-map-wrapper">
+            <div id="tax-neighborhood-map" class="tax-map"></div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section id="tax-history" class="w-full rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-lg shadow-slate-100/60">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">History</p>
+        <h3 class="text-lg font-semibold text-slate-900">Recently viewed parcels</h3>
+        <p class="text-sm text-slate-500">Quickly jump back to parcels you just explored.</p>
+      </div>
+      <button id="tax-history-clear" class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 hover:text-slate-700">
+        Clear history
+      </button>
+    </div>
+    <div id="tax-history-list" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm text-slate-600">
+      <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
+        No recent parcels yet.
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  (function () {
+    const summarySection = document.getElementById("tax-ai-summary");
+    const summaryLoading = document.getElementById("tax-ai-summary-loading");
+    const summaryText = document.getElementById("tax-ai-summary-text");
+    const summaryOverlay = document.getElementById("tax-ai-summary-overlay");
+    const storySection = document.getElementById("tax-over-time");
+    const fairnessSection = document.getElementById("tax-fairness");
+    const storyLoading = document.getElementById("tax-story-loading");
+    const fairnessLoading = document.getElementById("tax-fairness-loading");
+    const storyOverlay = document.getElementById("tax-story-overlay");
+
+    const taxLatestValue = document.getElementById("tax-story-latest-tax");
+    const taxLatestHelper = document.getElementById("tax-story-latest-helper");
+    const taxLatestExample = document.getElementById("tax-back-latest-example");
+    const taxLatestVisual = document.getElementById("tax-story-latest-visual");
+
+    const taxMarketValue = document.getElementById("tax-story-market-value");
+    const taxMarketVisual = document.getElementById("tax-story-market-value-visual");
+    const taxMarketExample = document.getElementById("tax-back-market-value-example");
+
+    const taxInflationDelta = document.getElementById("tax-story-inflation-delta");
+    const taxInflationHelper = document.getElementById("tax-story-inflation-helper");
+    const taxInflationVisual = document.getElementById("tax-story-inflation-visual");
+    const taxInflationExample = document.getElementById("tax-back-inflation-example");
+
+    const taxEtrValue = document.getElementById("tax-story-etr");
+    const taxEtrVisual = document.getElementById("tax-story-etr-visual");
+    const taxEtrExample = document.getElementById("tax-back-etr-example");
+    const taxEtrDelta = document.getElementById("tax-etr-delta");
+    const taxEtrMedianLabel = document.getElementById("tax-etr-median-label");
+    const taxVerticalEquityChart = document.getElementById("tax-vertical-equity-chart");
+    const taxVerticalEquityExample = document.getElementById("tax-back-vertical-equity-example");
+    const taxCountyEtrValue = document.getElementById("tax-county-etr-value");
+    const taxCountyEtrHelper = document.getElementById("tax-county-etr-helper");
+    const taxCountyEtrVisual = document.getElementById("tax-county-etr-visual");
+    const taxCountyEtrExample = document.getElementById("tax-back-county-etr-example");
+    const taxVerticalEquityScore = document.getElementById("tax-vertical-equity-score");
+    const taxVerticalEquityHelper = document.getElementById("tax-vertical-equity-helper");
+
+    const taxCodValue = document.getElementById("tax-cod-value");
+    const taxCodHelper = document.getElementById("tax-cod-helper");
+    const taxCodVisual = document.getElementById("tax-cod-visual");
+    const taxCodStatus = document.getElementById("tax-cod-status");
+    const taxCodExample = document.getElementById("tax-cod-example");
+
+    const taxPrdValue = document.getElementById("tax-prd-value");
+    const taxPrdHelper = document.getElementById("tax-prd-helper");
+    const taxPrdVisual = document.getElementById("tax-prd-visual");
+    const taxPrdStatus = document.getElementById("tax-prd-status");
+    const taxPrdExample = document.getElementById("tax-prd-example");
+
+    const taxEtrPercentile = document.getElementById("tax-etr-percentile");
+    const taxEtrPercentileHelper = document.getElementById("tax-etr-percentile-helper");
+    const taxEtrPercentileVisual = document.getElementById("tax-etr-percentile-visual");
+    const taxEtrPercentileStatus = document.getElementById("tax-etr-percentile-status");
+    const taxEtrPercentileExample = document.getElementById("tax-etr-percentile-example");
+    const taxFairnessToggle = document.getElementById("tax-fairness-map-toggle");
+
+    let latestEtrValue = null;
+    let countyEtrController = null;
+    let summaryController = null;
+    let summaryPollTimer = null;
+    let summaryPollAttempts = 0;
+    let summaryPollParcel = "";
+    const historyList = document.getElementById("tax-history-list");
+    const historyClear = document.getElementById("tax-history-clear");
+
+    let currentNeighborhood = "";
+    let neighborhoodMap = null;
+    let neighborhoodLayer = null;
+    const historyKey = "tax-parcel-history";
+    const historyLimit = 6;
+    const mapDebug = new URLSearchParams(window.location.search).has("debug_fairness_map");
+
+    function logMapDebug(...args) {
+      if (mapDebug) {
+        console.info("[tax fairness map]", ...args);
+      }
+    }
+
+    function formatCurrency(value) {
+      if (value === null || value === undefined || isNaN(value)) {
+        return "—";
+      }
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0,
+      }).format(value);
+    }
+
+    function formatPercent(value, digits = 2) {
+      if (value === null || value === undefined || isNaN(value)) {
+        return "—";
+      }
+      return `${(value * 100).toFixed(digits)}%`;
+    }
+
+    function setMetricStatus(el, label, tone) {
+      if (!el) return;
+      const toneClass = tone ? `fairness-metric__status--${tone}` : "fairness-metric__status--neutral";
+      el.textContent = label || "—";
+      el.classList.remove(
+        "fairness-metric__status--ok",
+        "fairness-metric__status--watch",
+        "fairness-metric__status--alert",
+        "fairness-metric__status--info",
+        "fairness-metric__status--neutral"
+      );
+      el.classList.add(toneClass);
+    }
+
+    function setVisualPlaceholder(el, text) {
+      if (!el) return;
+      el.innerHTML = `<p class=\"text-xs text-slate-500\">${text}</p>`;
+    }
+
+    function createSvg(width, height) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", "100%");
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      return svg;
+    }
+
+    function drawSparkline(container, points = [], color = "#2E3D49") {
+      if (!container) return;
+      const valid = (points || []).filter((point) => typeof point.value === "number");
+      if (valid.length < 2) {
+        setVisualPlaceholder(container, "Trend unavailable");
+        return;
+      }
+      const width = 180;
+      const height = 80;
+      const svg = createSvg(width, height);
+      const values = valid.map((point) => point.value);
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min || 1;
+      const step = (width - 12) / (valid.length - 1 || 1);
+      const coords = valid.map((point, idx) => ({
+        x: 6 + idx * step,
+        y: height - 12 - ((point.value - min) / range) * (height - 24),
+      }));
+      const areaPath = [
+        `M ${coords[0].x} ${height - 12}`,
+        `L ${coords[0].x} ${coords[0].y}`,
+        ...coords.slice(1).map((point) => `L ${point.x} ${point.y}`),
+        `L ${coords[coords.length - 1].x} ${height - 12}`,
+        "Z",
+      ].join(" ");
+      const area = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      area.setAttribute("d", areaPath);
+      area.setAttribute("fill", color);
+      area.setAttribute("fill-opacity", "0.18");
+      svg.appendChild(area);
+      const linePath = coords.map((point) => `${point.x},${point.y}`).join(" ");
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      line.setAttribute("points", linePath);
+      line.setAttribute("fill", "none");
+      line.setAttribute("stroke", color);
+      line.setAttribute("stroke-width", "2");
+      line.setAttribute("stroke-linecap", "round");
+      svg.appendChild(line);
+      container.innerHTML = "";
+      container.appendChild(svg);
+    }
+
+    function drawBars(container, values = [], color = "#7DB61C") {
+      if (!container) return;
+      if (!values.length) {
+        setVisualPlaceholder(container, "No history yet");
+        return;
+      }
+      const width = 180;
+      const height = 80;
+      const svg = createSvg(width, height);
+      const max = Math.max(...values);
+      const padding = 12;
+      const gap = 6;
+      const barWidth = Math.max((width - padding * 2 - gap * (values.length - 1)) / values.length, 6);
+      values.forEach((value, idx) => {
+        const x = padding + idx * (barWidth + gap);
+        const pct = max ? value / max : 0;
+        const barHeight = pct * (height - padding * 2);
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", x);
+        rect.setAttribute("y", height - padding - barHeight);
+        rect.setAttribute("width", barWidth);
+        rect.setAttribute("height", Math.max(barHeight, 2));
+        rect.setAttribute("fill", color);
+        svg.appendChild(rect);
+      });
+      container.innerHTML = "";
+      container.appendChild(svg);
+    }
+
+    function drawComparisonBars(container, taxCagr, cpiCagr) {
+      if (!container) return;
+      const width = 200;
+      const height = 70;
+      const svg = createSvg(width, height);
+      const tax = typeof taxCagr === "number" ? Math.abs(taxCagr) : 0;
+      const cpi = typeof cpiCagr === "number" ? Math.abs(cpiCagr) : 0;
+      const maxValue = Math.max(tax, cpi, 0.01);
+      const barX = 60;
+      const barWidth = width - barX - 16;
+      const rows = [
+        { label: "Tax", value: taxCagr, color: "#0071BC" },
+        { label: "CPI", value: cpiCagr, color: "#FDB913" },
+      ];
+      rows.forEach((row, idx) => {
+        const y = 14 + idx * 24;
+        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", 8);
+        label.setAttribute("y", y + 10);
+        label.setAttribute("font-size", "10");
+        label.setAttribute("fill", "#2E3D49");
+        label.textContent = row.label;
+        svg.appendChild(label);
+        const length = typeof row.value === "number" ? Math.max((Math.abs(row.value) / maxValue) * barWidth, 1) : 0;
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", barX);
+        rect.setAttribute("y", y);
+        rect.setAttribute("width", length);
+        rect.setAttribute("height", 12);
+        rect.setAttribute("fill", row.color);
+        svg.appendChild(rect);
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", barX + barWidth + 4);
+        text.setAttribute("y", y + 10);
+        text.setAttribute("font-size", "10");
+        text.setAttribute("fill", "rgba(46, 61, 73, 0.8)");
+        text.textContent = typeof row.value === "number" ? formatPercent(row.value, 1) : "—";
+        svg.appendChild(text);
+      });
+      container.innerHTML = "";
+      container.appendChild(svg);
+    }
+
+    function drawPercentileBar(container, percentile) {
+      if (!container) return;
+      const width = 200;
+      const height = 56;
+      const svg = createSvg(width, height);
+      const trackY = height / 2 - 6;
+      const trackHeight = 12;
+      const track = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      track.setAttribute("x", 12);
+      track.setAttribute("y", trackY);
+      track.setAttribute("width", width - 24);
+      track.setAttribute("height", trackHeight);
+      track.setAttribute("rx", "6");
+      track.setAttribute("fill", "rgba(46, 61, 73, 0.15)");
+      svg.appendChild(track);
+      const pct = typeof percentile === "number" ? Math.max(0, Math.min(100, percentile)) : null;
+      if (pct !== null) {
+        const dotX = 12 + ((width - 24) * (pct / 100));
+        const fill = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        fill.setAttribute("x", 12);
+        fill.setAttribute("y", trackY);
+        fill.setAttribute("width", dotX - 12);
+        fill.setAttribute("height", trackHeight);
+        fill.setAttribute("rx", "6");
+        fill.setAttribute("fill", "#0071BC");
+        svg.appendChild(fill);
+        const marker = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        marker.setAttribute("x1", dotX);
+        marker.setAttribute("x2", dotX);
+        marker.setAttribute("y1", trackY - 6);
+        marker.setAttribute("y2", trackY + trackHeight + 6);
+        marker.setAttribute("stroke", "#FDB913");
+        marker.setAttribute("stroke-width", "2");
+        svg.appendChild(marker);
+      }
+      container.innerHTML = "";
+      container.appendChild(svg);
+    }
+
+    function drawRangeBar(container, value, min, max, color, markerValue = null) {
+      if (!container) return;
+      const width = 200;
+      const height = 56;
+      const svg = createSvg(width, height);
+      const trackY = height / 2 - 6;
+      const trackHeight = 12;
+      const track = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      track.setAttribute("x", 12);
+      track.setAttribute("y", trackY);
+      track.setAttribute("width", width - 24);
+      track.setAttribute("height", trackHeight);
+      track.setAttribute("rx", "6");
+      track.setAttribute("fill", "rgba(46, 61, 73, 0.15)");
+      svg.appendChild(track);
+      if (typeof value === "number") {
+        const clamped = Math.max(min, Math.min(max, value));
+        const pct = (clamped - min) / (max - min || 1);
+        const dotX = 12 + (width - 24) * pct;
+        const fill = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        fill.setAttribute("x", 12);
+        fill.setAttribute("y", trackY);
+        fill.setAttribute("width", dotX - 12);
+        fill.setAttribute("height", trackHeight);
+        fill.setAttribute("rx", "6");
+        fill.setAttribute("fill", color);
+        svg.appendChild(fill);
+        const marker = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        marker.setAttribute("x1", dotX);
+        marker.setAttribute("x2", dotX);
+        marker.setAttribute("y1", trackY - 6);
+        marker.setAttribute("y2", trackY + trackHeight + 6);
+        marker.setAttribute("stroke", "#FDB913");
+        marker.setAttribute("stroke-width", "2");
+        svg.appendChild(marker);
+      }
+      if (typeof markerValue === "number") {
+        const clampedMarker = Math.max(min, Math.min(max, markerValue));
+        const pct = (clampedMarker - min) / (max - min || 1);
+        const markerX = 12 + (width - 24) * pct;
+        const medianLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        medianLine.setAttribute("x1", markerX);
+        medianLine.setAttribute("x2", markerX);
+        medianLine.setAttribute("y1", trackY - 6);
+        medianLine.setAttribute("y2", trackY + trackHeight + 6);
+        medianLine.setAttribute("stroke", "#ED8936");
+        medianLine.setAttribute("stroke-width", "1.5");
+        medianLine.setAttribute("stroke-dasharray", "3,2");
+        svg.appendChild(medianLine);
+        const medianDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        medianDot.setAttribute("cx", markerX);
+        medianDot.setAttribute("cy", trackY + trackHeight / 2);
+        medianDot.setAttribute("r", "3");
+        medianDot.setAttribute("fill", "#ED8936");
+        svg.appendChild(medianDot);
+      }
+      container.innerHTML = "";
+      container.appendChild(svg);
+    }
+
+    function drawVerticalEquityChart(container, brackets = []) {
+      if (!container) return;
+      const entries = (brackets || []).filter((entry) => typeof entry.avg_etr === "number");
+      if (!entries.length) {
+        setVisualPlaceholder(container, "Vertical equity data unavailable");
+        return;
+      }
+      const maxAvg = Math.max(...entries.map((entry) => entry.avg_etr));
+      container.innerHTML = "";
+      entries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "vertical-equity-row";
+        const label = document.createElement("span");
+        label.className = "vertical-equity-label";
+        label.textContent = entry.label;
+        const barZone = document.createElement("div");
+        barZone.className = "vertical-equity-bar-zone";
+        const value = document.createElement("span");
+        value.className = "vertical-equity-value";
+        value.textContent = formatPercent(entry.avg_etr);
+        const wrapper = document.createElement("span");
+        wrapper.className = "vertical-equity-bar-wrapper";
+        const bar = document.createElement("span");
+        bar.className = "vertical-equity-bar";
+        const widthPct = maxAvg > 0 ? (entry.avg_etr / maxAvg) * 100 : 0;
+        bar.style.width = `${Math.min(100, Math.max(4, widthPct))}%`;
+        wrapper.appendChild(bar);
+        barZone.append(value, wrapper);
+        row.append(label, barZone);
+        container.appendChild(row);
+      });
+    }
+
+    async function loadCountyVerticalEquity(year) {
+      if (!taxVerticalEquityChart) return;
+      if (countyEtrController) {
+        countyEtrController.abort();
+        countyEtrController = null;
+      }
+
+      const showUnavailable = () => {
+        setVisualPlaceholder(taxVerticalEquityChart, "Vertical equity data unavailable");
+        if (taxEtrMedianLabel) {
+          taxEtrMedianLabel.textContent = "County median: —";
+        }
+        if (taxEtrDelta) {
+          taxEtrDelta.textContent = "Vs county median: —";
+        }
+        if (taxVerticalEquityExample) {
+          taxVerticalEquityExample.textContent = "Example: —";
+        }
+        if (taxVerticalEquityScore) {
+          taxVerticalEquityScore.textContent = "—";
+        }
+        if (taxVerticalEquityHelper) {
+          taxVerticalEquityHelper.textContent = "ETR by home value bracket.";
+        }
+        if (taxCountyEtrValue) {
+          taxCountyEtrValue.textContent = "—";
+        }
+        if (taxCountyEtrHelper) {
+          taxCountyEtrHelper.textContent = "Skagit median effective tax rate.";
+        }
+        if (taxCountyEtrExample) {
+          taxCountyEtrExample.textContent = "Example: —";
+        }
+        if (taxCountyEtrVisual) {
+          setVisualPlaceholder(taxCountyEtrVisual, "County median unavailable");
+        }
+        drawRangeBar(
+          taxEtrVisual,
+          latestEtrValue ? latestEtrValue * 100 : null,
+          0,
+          3,
+          "#00828A"
+        );
+      };
+
+      if (!year) {
+        showUnavailable();
+        return;
+      }
+
+      setVisualPlaceholder(taxVerticalEquityChart, "Vertical equity data loading…");
+      if (taxEtrMedianLabel) {
+        taxEtrMedianLabel.textContent = "County median: loading…";
+      }
+      if (taxEtrDelta) {
+        taxEtrDelta.textContent = "Vs county median: loading…";
+      }
+      if (taxVerticalEquityExample) {
+        taxVerticalEquityExample.textContent = "Example: loading…";
+      }
+      if (taxVerticalEquityScore) {
+        taxVerticalEquityScore.textContent = "—";
+      }
+      if (taxVerticalEquityHelper) {
+        taxVerticalEquityHelper.textContent = "ETR by home value bracket.";
+      }
+      if (taxCountyEtrValue) {
+        taxCountyEtrValue.textContent = "—";
+      }
+      if (taxCountyEtrHelper) {
+        taxCountyEtrHelper.textContent = "Skagit median effective tax rate.";
+      }
+      if (taxCountyEtrExample) {
+        taxCountyEtrExample.textContent = "Example: loading…";
+      }
+      if (taxCountyEtrVisual) {
+        setVisualPlaceholder(taxCountyEtrVisual, "County median loading…");
+      }
+
+      const controller = new AbortController();
+      countyEtrController = controller;
+
+      try {
+        const response = await fetch(`/api/county_etr/?year=${encodeURIComponent(year)}`, {
+          signal: controller.signal,
+        });
+        if (countyEtrController !== controller) {
+          // A newer request replaced this one.
+          return;
+        }
+        countyEtrController = null;
+        if (!response.ok) {
+          throw new Error("Vertical equity data unavailable.");
+        }
+
+        const payload = await response.json();
+        const median = typeof payload.median === "number" ? payload.median : null;
+        if (taxEtrMedianLabel) {
+          taxEtrMedianLabel.textContent = median != null ? `County median: ${formatPercent(median)}` : "County median: —";
+        }
+        if (taxEtrDelta) {
+          if (median != null && latestEtrValue != null) {
+            const delta = (latestEtrValue - median) * 100;
+            const sign = delta > 0 ? "+" : "";
+            const suffix = Math.abs(delta) < 0.001 ? "Same as county median" : `Vs county median: ${sign}${delta.toFixed(2)}%`;
+            taxEtrDelta.textContent = suffix;
+          } else {
+            taxEtrDelta.textContent = "Vs county median: —";
+          }
+        }
+        if (taxVerticalEquityExample) {
+          const entries = (payload.brackets || []).filter((entry) => typeof entry.avg_etr === "number");
+          if (entries.length >= 2) {
+            const low = entries[0];
+            const high = entries[entries.length - 1];
+            const direction = payload.regressivity_direction || "unknown";
+            const directionLabel = direction === "neutral" ? "proportional" : direction;
+            taxVerticalEquityExample.textContent =
+              `Example: ${low.label} avg ETR ${formatPercent(low.avg_etr)} vs ${high.label} ${formatPercent(high.avg_etr)} -> ${directionLabel}.`;
+          } else if (entries.length === 1) {
+            taxVerticalEquityExample.textContent =
+              `Example: ${entries[0].label} avg ETR ${formatPercent(entries[0].avg_etr)} (insufficient brackets).`;
+          } else {
+            taxVerticalEquityExample.textContent = "Example: —";
+          }
+        }
+        if (taxVerticalEquityScore) {
+          const direction = payload.regressivity_direction || "—";
+          taxVerticalEquityScore.textContent = direction === "—" ? "—" : direction.replace(/^\w/, (c) => c.toUpperCase());
+        }
+        if (taxVerticalEquityHelper) {
+          const count = payload.count ? `${payload.count} parcels` : "Countywide";
+          taxVerticalEquityHelper.textContent = `ETR by value bracket · ${count}`;
+        }
+        drawVerticalEquityChart(taxVerticalEquityChart, payload.brackets || []);
+        if (taxCountyEtrValue) {
+          taxCountyEtrValue.textContent = median != null ? formatPercent(median) : "—";
+        }
+        if (taxCountyEtrHelper) {
+          const count = payload.count ? `${payload.count} parcels` : "Countywide";
+          const yearLabel = payload.year ? `Tax year ${payload.year}` : "Tax year";
+          if (latestEtrValue != null) {
+            taxCountyEtrHelper.textContent = `${yearLabel} · ${count} · Your ETR ${formatPercent(latestEtrValue)}`;
+          } else {
+            taxCountyEtrHelper.textContent = `${yearLabel} · ${count}`;
+          }
+        }
+        if (taxCountyEtrExample) {
+          if (median != null) {
+            const yearLabel = payload.year ? `in ${payload.year}` : "for this year";
+            const countLabel = payload.count ? ` (${payload.count} parcels)` : "";
+            taxCountyEtrExample.textContent = `Example: ${formatPercent(median)} median ETR ${yearLabel}${countLabel}.`;
+          } else {
+            taxCountyEtrExample.textContent = "Example: —";
+          }
+        }
+        if (taxCountyEtrVisual) {
+          drawRangeBar(
+            taxCountyEtrVisual,
+            latestEtrValue ? latestEtrValue * 100 : null,
+            0,
+            3,
+            "#0071BC",
+            median != null ? median * 100 : null
+          );
+        }
+        drawRangeBar(
+          taxEtrVisual,
+          latestEtrValue ? latestEtrValue * 100 : null,
+          0,
+          3,
+          "#00828A",
+          median != null ? median * 100 : null
+        );
+      } catch (err) {
+        if (err.name === "AbortError") {
+          return;
+        }
+        countyEtrController = null;
+        showUnavailable();
+      }
+    }
+
+    function showLoading(section, loadingEl) {
+      section?.classList.remove("hidden");
+      loadingEl?.classList.remove("hidden");
+    }
+
+    function hideLoading(loadingEl) {
+      loadingEl?.classList.add("hidden");
+    }
+
+    async function loadParcelAiSummary(parcelId, isRetry = false) {
+      if (!isRetry || summaryPollParcel !== parcelId) {
+        summaryPollParcel = parcelId;
+        summaryPollAttempts = 0;
+        if (summaryPollTimer) {
+          clearTimeout(summaryPollTimer);
+          summaryPollTimer = null;
+        }
+      }
+      showLoading(summarySection, summaryLoading);
+      summaryOverlay?.classList.remove("hidden");
+      if (summaryText) {
+        summaryText.textContent = "Generating parcel summary...";
+      }
+      if (summaryController) {
+        summaryController.abort();
+      }
+      const controller = new AbortController();
+      summaryController = controller;
+
+      let keepLoading = false;
+      try {
+        const response = await fetch(`/api/parcel_tax_ai_summary/?parcel_id=${encodeURIComponent(parcelId)}`, {
+          signal: controller.signal,
+        });
+        if (summaryController !== controller) {
+          return;
+        }
+        summaryController = null;
+        if (response.status === 202) {
+          summaryPollAttempts += 1;
+          keepLoading = summaryPollAttempts <= 20;
+          if (summaryText) {
+            summaryText.textContent = "Generating parcel summary... This can take up to a minute.";
+          }
+          if (summaryPollAttempts <= 20) {
+            summaryPollTimer = setTimeout(() => loadParcelAiSummary(parcelId, true), 3000);
+          } else if (summaryText) {
+            summaryText.textContent = "Parcel summary is taking longer than expected. Please try again shortly.";
+          }
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("Parcel summary unavailable.");
+        }
+        const data = await response.json();
+        if (summaryText) {
+          if (data.status === "failed") {
+            summaryText.textContent = data.error || "Parcel summary unavailable.";
+          } else if (data.summary_html) {
+            summaryText.innerHTML = data.summary_html;
+          } else {
+            summaryText.textContent = "Parcel summary unavailable.";
+          }
+        }
+      } catch (err) {
+        if (err.name === "AbortError") {
+          return;
+        }
+        summaryController = null;
+        if (summaryText) {
+          summaryText.textContent = err.message || "Parcel summary unavailable.";
+        }
+      } finally {
+        if (!keepLoading) {
+          hideLoading(summaryLoading);
+          summaryOverlay?.classList.add("hidden");
+        }
+      }
+    }
+
+    async function loadParcelStory(parcelId) {
+      showLoading(storySection, storyLoading);
+      storyOverlay?.classList.remove("hidden");
+      try {
+        const response = await fetch(`/api/parcel_tax_story/?parcel_id=${encodeURIComponent(parcelId)}`);
+        if (!response.ok) {
+          throw new Error("Parcel history unavailable.");
+        }
+        const data = await response.json();
+        const annualPoints = data.annual_tax_points || [];
+        const latestAnnual = annualPoints.length ? annualPoints[annualPoints.length - 1] : null;
+        const latestTax = latestAnnual?.annual_tax;
+        const cumulative = data.cumulative_taxes_paid;
+        const totalValue = data.total_market_value;
+        const historyYears = data.history_years;
+        const taxTrend = data.tax_trend_cagr;
+        const inflationAvg = data.inflation_avg;
+        const taxVsInflation = data.tax_vs_inflation;
+        const valueHistory = data.value_history_5y || [];
+        const latestYear = historyYears?.end ?? latestAnnual?.year ?? null;
+        const startYear = historyYears?.start ?? null;
+
+        taxLatestValue.textContent = latestTax != null ? formatCurrency(latestTax) : "—";
+        taxLatestHelper.textContent = cumulative != null ? `Total paid so far: ${formatCurrency(cumulative)}` : "Total paid so far: —";
+        if (taxLatestExample) {
+          const exampleParts = [];
+          if (latestYear && latestTax != null) {
+            exampleParts.push(`Latest (${latestYear}): ${formatCurrency(latestTax)}`);
+          }
+          if (startYear && cumulative != null) {
+            exampleParts.push(`Total paid since ${startYear}: ${formatCurrency(cumulative)}`);
+          }
+          taxLatestExample.textContent = exampleParts.length ? `Example: ${exampleParts.join(". ")}.` : "Example: —";
+        }
+        drawBars(taxLatestVisual, annualPoints.map((row) => row.annual_tax).slice(-6), "#7DB61C");
+
+        taxMarketValue.textContent = totalValue ? formatCurrency(totalValue) : "—";
+        drawSparkline(taxMarketVisual, valueHistory, "#0071BC");
+        if (taxMarketExample) {
+          if (totalValue) {
+            const label = latestYear ? `Latest roll value (${latestYear})` : "Latest roll value";
+            taxMarketExample.textContent = `Example: ${label}: ${formatCurrency(totalValue)}.`;
+          } else {
+            taxMarketExample.textContent = "Example: —";
+          }
+        }
+
+        taxInflationDelta.textContent = typeof taxVsInflation === "number" ? formatPercent(taxVsInflation) : "—";
+        if (historyYears?.start && historyYears?.end) {
+          taxInflationHelper.textContent = `Tax CAGR ${historyYears.start}-${historyYears.end}.`;
+          if (taxInflationExample) {
+            if (typeof taxTrend === "number" && typeof inflationAvg === "number") {
+              const delta = typeof taxVsInflation === "number" ? taxVsInflation : taxTrend - inflationAvg;
+              const deltaText = typeof delta === "number" ? `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(2)}%` : "—";
+              taxInflationExample.textContent =
+                `Example: Taxes grew ${formatPercent(taxTrend)} per year vs CPI ${formatPercent(inflationAvg)} (${historyYears.start}-${historyYears.end}). Difference ${deltaText}.`;
+            } else {
+              taxInflationExample.textContent = `Example: ${historyYears.start}-${historyYears.end} trend needs CPI + tax history.`;
+            }
+          }
+        } else {
+          taxInflationHelper.textContent = "Trend needs at least two years of history.";
+          if (taxInflationExample) {
+            taxInflationExample.textContent = "Example: Needs at least two years of history.";
+          }
+        }
+        drawComparisonBars(taxInflationVisual, taxTrend, inflationAvg);
+
+        let etrValue = null;
+        if (latestTax != null && totalValue) {
+          etrValue = latestTax / totalValue;
+        }
+        latestEtrValue = etrValue;
+        taxEtrValue.textContent = etrValue ? formatPercent(etrValue) : "—";
+        if (taxEtrExample) {
+          if (latestTax != null && totalValue && etrValue != null) {
+            const yearLabel = latestYear ? ` (Tax year ${latestYear})` : "";
+            taxEtrExample.textContent =
+              `Example: ${formatCurrency(latestTax)} / ${formatCurrency(totalValue)} = ${formatPercent(etrValue)}${yearLabel}.`;
+          } else {
+            taxEtrExample.textContent = "Example: —";
+          }
+        }
+        drawRangeBar(taxEtrVisual, etrValue ? etrValue * 100 : null, 0, 3, "#00828A");
+        const countyYear = historyYears?.end ?? latestAnnual?.year ?? null;
+        loadCountyVerticalEquity(countyYear);
+      } catch (err) {
+        taxLatestValue.textContent = "—";
+        taxLatestHelper.textContent = err.message || "Parcel history unavailable.";
+        if (taxLatestExample) {
+          taxLatestExample.textContent = "Example: —";
+        }
+        setVisualPlaceholder(taxLatestVisual, "No history");
+
+        taxMarketValue.textContent = "—";
+        setVisualPlaceholder(taxMarketVisual, "Trend unavailable");
+        if (taxMarketExample) {
+          taxMarketExample.textContent = "Example: —";
+        }
+
+        taxInflationDelta.textContent = "—";
+        taxInflationHelper.textContent = "—";
+        if (taxInflationExample) {
+          taxInflationExample.textContent = "Example: —";
+        }
+        setVisualPlaceholder(taxInflationVisual, "Trend unavailable");
+
+        taxEtrValue.textContent = "—";
+        if (taxEtrExample) {
+          taxEtrExample.textContent = "Example: —";
+        }
+        setVisualPlaceholder(taxEtrVisual, "ETR unavailable");
+        latestEtrValue = null;
+        loadCountyVerticalEquity(null);
+      } finally {
+        hideLoading(storyLoading);
+        storyOverlay?.classList.add("hidden");
+      }
+    }
+
+    async function loadParcelFairness(parcelId) {
+      showLoading(fairnessSection, fairnessLoading);
+      try {
+        const url = `/api/parcel_tax_fairness/?parcel_id=${encodeURIComponent(parcelId)}`;
+        logMapDebug("Loading fairness", { parcelId, url });
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error("Neighborhood fairness unavailable.");
+        }
+        const data = await response.json();
+        const cod = data.cod;
+        const prd = data.prd;
+        const percentile = data.subject_etr_percentile_rank;
+        const hoodCode = (data.hood_code || "").trim();
+        const taxYear = data.tax_year ? `Tax year ${data.tax_year}` : "";
+        const sampleCount = data.sample_count ? `${data.sample_count} peers` : "";
+        logMapDebug("Fairness response", { hoodCode, taxYear, sampleCount });
+
+        if (hoodCode && hoodCode !== currentNeighborhood) {
+          currentNeighborhood = hoodCode;
+        }
+        const fairnessCard = document.querySelector(".tax-card[data-card-id=\"fairness-container\"]");
+        if (fairnessCard && fairnessCard.getAttribute("data-flipped") === "true") {
+          loadNeighborhoodMap(currentNeighborhood);
+        }
+        taxCodValue.textContent = typeof cod === "number" ? `${cod.toFixed(1)}` : "—";
+        taxCodHelper.textContent = [taxYear, sampleCount].filter(Boolean).join(" · ") || "COD from peer ETRs.";
+        if (typeof cod === "number") {
+          if (cod <= 10) {
+            setMetricStatus(taxCodStatus, "Tight spread", "ok");
+          } else if (cod <= 15) {
+            setMetricStatus(taxCodStatus, "Within IAAO", "ok");
+          } else if (cod <= 20) {
+            setMetricStatus(taxCodStatus, "High spread", "watch");
+          } else {
+            setMetricStatus(taxCodStatus, "Very high", "alert");
+          }
+        } else {
+          setMetricStatus(taxCodStatus, "No data", "neutral");
+        }
+        if (taxCodExample) {
+          if (typeof cod === "number") {
+            const codText = cod.toFixed(1);
+            const sampleText = sampleCount ? ` across ${sampleCount}` : "";
+            taxCodExample.textContent = `Example: COD ${codText} means assessments typically vary about ${codText}% from the median ratio${sampleText}.`;
+          } else {
+            taxCodExample.textContent = "Example: —";
+          }
+        }
+        drawRangeBar(taxCodVisual, cod, 0, 30, "#0071BC");
+
+        taxPrdValue.textContent = typeof prd === "number" ? prd.toFixed(2) : "—";
+        taxPrdHelper.textContent = [taxYear, sampleCount].filter(Boolean).join(" · ") || "PRD from peer ETRs.";
+        if (typeof prd === "number") {
+          if (prd >= 0.98 && prd <= 1.03) {
+            setMetricStatus(taxPrdStatus, "Balanced", "ok");
+          } else if (prd > 1.03) {
+            setMetricStatus(taxPrdStatus, "Regressive", "watch");
+          } else {
+            setMetricStatus(taxPrdStatus, "Progressive", "watch");
+          }
+        } else {
+          setMetricStatus(taxPrdStatus, "No data", "neutral");
+        }
+        if (taxPrdExample) {
+          if (typeof prd === "number") {
+            const prdText = prd.toFixed(2);
+            let prdNote = "balanced across value ranges";
+            if (prd > 1.03) {
+              prdNote = "higher-value homes may be under-assessed";
+            } else if (prd < 0.98) {
+              prdNote = "higher-value homes may be over-assessed";
+            }
+            taxPrdExample.textContent = `Example: PRD ${prdText} suggests ${prdNote}.`;
+          } else {
+            taxPrdExample.textContent = "Example: —";
+          }
+        }
+        drawRangeBar(taxPrdVisual, prd, 0.8, 1.2, "#00828A");
+
+        taxEtrPercentile.textContent = typeof percentile === "number" ? `${percentile.toFixed(1)}%` : "—";
+        taxEtrPercentileHelper.textContent = taxYear || "ETR percentile among neighbors.";
+        if (typeof percentile === "number") {
+          if (percentile >= 75) {
+            setMetricStatus(taxEtrPercentileStatus, "Top quartile", "info");
+          } else if (percentile >= 55) {
+            setMetricStatus(taxEtrPercentileStatus, "Above median", "info");
+          } else if (percentile >= 45) {
+            setMetricStatus(taxEtrPercentileStatus, "Near median", "info");
+          } else if (percentile >= 25) {
+            setMetricStatus(taxEtrPercentileStatus, "Below median", "info");
+          } else {
+            setMetricStatus(taxEtrPercentileStatus, "Bottom quartile", "info");
+          }
+        } else {
+          setMetricStatus(taxEtrPercentileStatus, "No data", "neutral");
+        }
+        if (taxEtrPercentileExample) {
+          if (typeof percentile === "number") {
+            const rounded = Math.round(percentile);
+            taxEtrPercentileExample.textContent = `Example: ${percentile.toFixed(1)}% means your ETR is higher than about ${rounded}% of neighbors.`;
+          } else {
+            taxEtrPercentileExample.textContent = "Example: —";
+          }
+        }
+        drawPercentileBar(taxEtrPercentileVisual, percentile);
+      } catch (err) {
+        logMapDebug("Fairness load failed", err);
+        taxCodValue.textContent = "—";
+        taxCodHelper.textContent = err.message || "Neighborhood fairness unavailable.";
+        setMetricStatus(taxCodStatus, "No data", "neutral");
+        if (taxCodExample) {
+          taxCodExample.textContent = "Example: —";
+        }
+        setVisualPlaceholder(taxCodVisual, "Unavailable");
+
+        taxPrdValue.textContent = "—";
+        taxPrdHelper.textContent = "—";
+        setMetricStatus(taxPrdStatus, "No data", "neutral");
+        if (taxPrdExample) {
+          taxPrdExample.textContent = "Example: —";
+        }
+        setVisualPlaceholder(taxPrdVisual, "Unavailable");
+
+        taxEtrPercentile.textContent = "—";
+        taxEtrPercentileHelper.textContent = "—";
+        setMetricStatus(taxEtrPercentileStatus, "No data", "neutral");
+        if (taxEtrPercentileExample) {
+          taxEtrPercentileExample.textContent = "Example: —";
+        }
+        setVisualPlaceholder(taxEtrPercentileVisual, "Unavailable");
+      } finally {
+        hideLoading(fairnessLoading);
+      }
+    }
+
+    async function loadNeighborhoodMap(hoodCode) {
+      if (!hoodCode) {
+        logMapDebug("Skipping load: missing hood code.");
+        return;
+      }
+      try {
+        const url = `/neighborhood-trends/${encodeURIComponent(hoodCode)}/geom/`;
+        logMapDebug("Fetching geometry", { hoodCode, url });
+        const response = await fetch(url);
+        if (!response.ok) {
+          let detail = "";
+          try {
+            detail = await response.text();
+          } catch (err) {
+            detail = "";
+          }
+          console.warn("[tax fairness map] Geometry fetch failed", {
+            hoodCode,
+            status: response.status,
+            statusText: response.statusText,
+            detail: detail ? detail.slice(0, 300) : "",
+          });
+          throw new Error("Neighborhood geometry unavailable.");
+        }
+        const data = await response.json();
+        const geom = data.geom;
+        const mapEl = document.getElementById("tax-neighborhood-map");
+        if (!mapEl) {
+          throw new Error("Map container missing.");
+        }
+        logMapDebug("Map container", mapEl.getBoundingClientRect());
+        if (typeof L === "undefined") {
+          throw new Error("Leaflet not loaded.");
+        }
+
+        if (!neighborhoodMap) {
+          neighborhoodMap = L.map(mapEl, {
+            zoomControl: false,
+            scrollWheelZoom: false,
+            dragging: false,
+            doubleClickZoom: false,
+            boxZoom: false,
+            keyboard: false,
+            tap: false,
+          });
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "",
+          }).addTo(neighborhoodMap);
+          logMapDebug("Leaflet map initialized.");
+        }
+
+        if (neighborhoodLayer) {
+          neighborhoodLayer.remove();
+        }
+
+        if (!geom) {
+          logMapDebug("No geometry in response.", data);
+          return;
+        }
+
+        neighborhoodLayer = L.geoJSON(geom, {
+          style: {
+            color: "#0071BC",
+            weight: 2,
+            fillColor: "#7DB61C",
+            fillOpacity: 0.2,
+          },
+        }).addTo(neighborhoodMap);
+
+        const bounds = neighborhoodLayer.getBounds();
+        if (bounds.isValid()) {
+          neighborhoodMap.fitBounds(bounds, { padding: [18, 18] });
+        }
+        setTimeout(() => neighborhoodMap.invalidateSize(), 150);
+      } catch (err) {
+        console.error("[tax fairness map] Failed to render map", { hoodCode, error: err });
+      }
+    }
+
+    function resetDisplay() {
+      summarySection?.classList.add("hidden");
+      storySection?.classList.add("hidden");
+      fairnessSection?.classList.add("hidden");
+      currentNeighborhood = "";
+      storyOverlay?.classList.add("hidden");
+      if (taxFairnessToggle) {
+        taxFairnessToggle.textContent = "Map";
+      }
+      if (summaryController) {
+        summaryController.abort();
+        summaryController = null;
+      }
+      if (summaryPollTimer) {
+        clearTimeout(summaryPollTimer);
+        summaryPollTimer = null;
+      }
+      summaryPollAttempts = 0;
+      summaryPollParcel = "";
+      summaryOverlay?.classList.add("hidden");
+      hideLoading(summaryLoading);
+      if (summaryText) {
+        summaryText.textContent = "Awaiting parcel selection.";
+      }
+    }
+
+    function loadHistory() {
+      try {
+        const raw = localStorage.getItem(historyKey);
+        return raw ? JSON.parse(raw) : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function saveHistory(items) {
+      localStorage.setItem(historyKey, JSON.stringify(items.slice(0, historyLimit)));
+    }
+
+    function renderHistory() {
+      if (!historyList) return;
+      const items = loadHistory();
+      if (!items.length) {
+        historyList.innerHTML = `
+          <div class="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
+            No recent parcels yet.
+          </div>
+        `;
+        return;
+      }
+      historyList.innerHTML = items
+        .map((item) => {
+          const address = item.address || "Address unavailable";
+          const parcel = item.parcel || "—";
+          const details = item.details || "";
+          return `
+            <button type="button" class="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition hover:border-sage-300 hover:bg-sage-50/60" data-parcel="${parcel}" data-address="${address}" data-details="${details}">
+              <p class="text-sm font-semibold text-slate-900">${address}</p>
+              <p class="text-xs text-slate-500">Parcel ${parcel}${details ? ` • ${details}` : ""}</p>
+              <span class="mt-2 inline-flex text-xs font-semibold text-sage-600">Select</span>
+            </button>
+          `;
+        })
+        .join("");
+    }
+
+    function addHistoryItem(detail) {
+      if (!detail || !detail.parcel) return;
+      const items = loadHistory().filter((item) => item.parcel !== detail.parcel);
+      items.unshift({
+        parcel: detail.parcel,
+        address: detail.address || "",
+        details: detail.details || "",
+        neighborhood: detail.neighborhood || "",
+      });
+      saveHistory(items);
+      renderHistory();
+    }
+
+    function flipCard(cardId) {
+      const card = document.querySelector(`.tax-card[data-card-id=\"${cardId}\"]`);
+      if (!card) return;
+      const flipped = card.getAttribute("data-flipped") === "true";
+      logMapDebug("Flip card", { cardId, flipped, currentNeighborhood });
+      card.setAttribute("data-flipped", flipped ? "false" : "true");
+      if (cardId === "fairness-container" && taxFairnessToggle) {
+        taxFairnessToggle.textContent = flipped ? "Map" : "Cards";
+      }
+      if (cardId === "fairness-container" && !flipped) {
+        if (!currentNeighborhood) {
+          const mapEl = document.getElementById("tax-neighborhood-map");
+          if (mapEl) {
+            mapEl.innerHTML = mapDebug
+              ? "<p class=\"text-sm text-slate-500\">Debug: no neighborhood code yet.</p>"
+              : mapEl.innerHTML;
+          }
+        }
+        loadNeighborhoodMap(currentNeighborhood);
+        setTimeout(() => {
+          if (neighborhoodMap) {
+            neighborhoodMap.invalidateSize();
+          }
+        }, 200);
+      }
+    }
+
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-tax-flip]");
+      if (!button) return;
+      const cardId = button.getAttribute("data-tax-flip");
+      flipCard(cardId);
+    });
+
+    document.addEventListener("tax-parcel-selected", (event) => {
+      const parcelId = event?.detail?.parcel;
+      const neighborhood = event?.detail?.neighborhood || "";
+      if (!parcelId) return;
+      logMapDebug("Parcel selected", { parcelId, neighborhood });
+      currentNeighborhood = neighborhood;
+      summarySection?.classList.remove("hidden");
+      storySection?.classList.remove("hidden");
+      fairnessSection?.classList.remove("hidden");
+      loadParcelAiSummary(parcelId);
+      loadParcelStory(parcelId);
+      loadParcelFairness(parcelId);
+      addHistoryItem(event?.detail || {});
+    });
+
+    document.addEventListener("tax-parcel-reset", () => {
+      resetDisplay();
+    });
+
+    historyList?.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-parcel]");
+      if (!button) return;
+      const parcel = button.dataset.parcel || "";
+      const address = button.dataset.address || "";
+      const details = button.dataset.details || "";
+      if (window.taxApplySelection) {
+        window.taxApplySelection({ parcel, address, details });
+      } else {
+        document.dispatchEvent(new CustomEvent("tax-parcel-selected", { detail: { parcel, address, details } }));
+      }
+    });
+
+    historyClear?.addEventListener("click", () => {
+      localStorage.removeItem(historyKey);
+      renderHistory();
+    });
+
+    renderHistory();
+  })();
+</script>
+{% endblock %}

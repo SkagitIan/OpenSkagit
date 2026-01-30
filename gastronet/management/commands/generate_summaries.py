@@ -47,7 +47,7 @@ class Command(BaseCommand):
         limit = opts["limit"]
 
         qs = (
-            Restaurant.objects.using("gastronet")
+            Restaurant.objects
             #.filter(place_id__isnull=False)
             .filter(models.Q(summary__isnull=True) | models.Q(summary__exact=""))
             [:limit]
@@ -91,7 +91,7 @@ class Command(BaseCommand):
                 # 5. Save
                 r.summary = summary
                 r.embedding = emb
-                r.save(using="gastronet")
+                r.save()
 
                 self.stdout.write(self.style.SUCCESS(f"✓ {r.name} summarized with reviews."))
 

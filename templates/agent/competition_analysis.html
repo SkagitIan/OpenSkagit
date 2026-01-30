@@ -1,0 +1,131 @@
+{% extends "openskagit/base.html" %}
+
+{% block content %}
+<section class="py-12">
+  <div class="mx-auto max-w-5xl space-y-8 px-4 sm:px-6 lg:px-8">
+    <header class="space-y-2">
+      <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Pilot feature</p>
+      <h1 class="text-3xl font-semibold text-slate-900">Competition analysis</h1>
+      <p class="text-base text-slate-600">
+        Search for the restaurant you are building a project around, review the vetted competitors that Google surfaces, and then kick off the deep analysis to get all of the distilled intel in JSON.
+      </p>
+    </header>
+
+    {% if not service_ready %}
+      <div class="rounded border border-amber-300 bg-amber-50/80 p-4 text-amber-900 shadow-sm">
+        <p class="text-sm">
+          The Google Places and Gemini (GENAI_API_KEY) credentials are required for this experience. Add them to <code>.env</code> and restart the app to continue.
+        </p>
+      </div>
+    {% endif %}
+
+    <section class="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-6 shadow-sm">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-lg font-medium text-slate-900">Step 1 · Find your subject</h2>
+        <span class="text-xs text-slate-500">Google Places API</span>
+      </div>
+      <form
+        hx-post="{% url 'competition-analysis-search' %}"
+        hx-target="#search-results"
+        hx-swap="innerHTML"
+        class="space-y-3"
+      >
+        {% csrf_token %}
+        <label class="flex flex-col gap-2">
+          <span class="text-sm font-semibold text-slate-700">Restaurant name or place</span>
+            <div class="flex gap-2">
+              <input
+                class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none"
+                name="query"
+                id="competition-search-input"
+                placeholder="e.g. Marsh House, Seattle"
+                autocomplete="off"
+                required
+                type="search"
+              />
+              <input type="hidden" name="place_id" id="competition-search-place-id">
+              <button
+                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-slate-500"
+                type="submit"
+              >
+              Search
+            </button>
+          </div>
+        </label>
+      </form>
+      <div id="search-results" class="space-y-3 text-sm text-slate-500">
+        <p>Search results appear here after you send the query.</p>
+      </div>
+    </section>
+
+    <section class="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-6 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-medium text-slate-900">Step 2 · Confirm subject & vetted competitors</h2>
+        <span class="text-xs text-slate-500">You can continue once scouting completes</span>
+      </div>
+      <div id="subject-preview" class="space-y-3 text-sm text-slate-500">
+        <p>Select a subject from the search results to see the preview area populate with vetted competitors.</p>
+      </div>
+    </section>
+
+    <section class="space-y-4 rounded-2xl border border-slate-100 bg-white/80 p-6 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-medium text-slate-900">Step 3 · Watch the deep analysis</h2>
+        <span class="text-xs text-slate-500">HTMX polling keeps the UI alive</span>
+      </div>
+      <div id="analysis-progress" class="space-y-3 text-sm text-slate-500">
+        <p>After pressing Continue, this panel polls the job every few seconds and streams the logs plus the final JSON output.</p>
+      </div>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    window.competitionAutocompleteInit = function () {
+      const input = document.getElementById("competition-search-input");
+      const hidden = document.getElementById("competition-search-place-id");
+      if (!input || !hidden) {
+        return;
+      }
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        return;
+      }
+      const autocomplete = new google.maps.places.Autocomplete(input, {
+        types: ["establishment"],
+        componentRestrictions: { country: "us" },
+      });
+      autocomplete.setFields(["place_id", "name", "formatted_address"]);
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place && place.place_id) {
+          hidden.value = place.place_id;
+          if (place.name) {
+            input.value = place.name;
+          }
+          const form = input.closest("form");
+          if (form) {
+            // nudge htmx to submit immediately
+            if (window.htmx) {
+              htmx.trigger(form, "submit");
+            } else if (typeof form.requestSubmit === "function") {
+              form.requestSubmit();
+            }
+          }
+        }
+      });
+      input.addEventListener("input", () => {
+        hidden.value = "";
+      });
+    };
+  </script>
+  {% if google_places_api_key %}
+    <script
+      async
+      defer
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_places_api_key }}&libraries=places&callback=competitionAutocompleteInit"
+    ></script>
+  {% endif %}
+  <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+{% endblock %}

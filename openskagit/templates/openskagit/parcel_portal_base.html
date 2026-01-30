@@ -1,0 +1,157 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "openskagit/head.html" %}
+  {% block head_extra %}{% endblock %}
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabulator/6.3.1/css/tabulator.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    :root {
+      --dusty-grape: #6c698d;
+      --dust-grey: #d4d2d5;
+      --silver: #bfafa6;
+      --dusty-taupe: #aa968a;
+      --dim-grey: #6e6a6f;
+
+      --primary-50: #f5f3f7;
+      --primary-100: #ebe8ed;
+      --primary-200: #d4d2d5;
+      --primary-300: #bfafa6;
+      --primary-400: #aa968a;
+      --primary-500: #6c698d;
+      --primary-600: #5c5a74;
+      --primary-700: #4a4860;
+      --primary-800: #3a384c;
+      --primary-900: #2a2838;
+
+      --accent-50: #f7f5f4;
+      --accent-100: #efeae8;
+      --accent-500: #aa968a;
+      --accent-600: #9a8679;
+
+      --sage-500: #6b9080;
+      --sage-300: #a4c3b2;
+      --sage-200: #cce3de;
+      --sage-50: #f6fff8;
+
+      --gray-50: #fafafa;
+      --gray-100: #f5f5f5;
+      --gray-200: #e5e5e5;
+      --gray-300: #d4d2d5;
+      --gray-400: #a3a3a3;
+      --gray-500: #737373;
+      --gray-600: #6e6a6f;
+      --gray-700: #525252;
+      --gray-800: #404040;
+      --gray-900: #262626;
+
+      --success-50: #ecfdf5;
+      --success-500: #10b981;
+      --success-600: #059669;
+      --success-700: #047857;
+
+      --warning-50: #fffbeb;
+      --warning-500: #f59e0b;
+      --warning-600: #d97706;
+
+      --error-50: #fef2f2;
+      --error-500: #ef4444;
+      --error-600: #dc2626;
+
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+
+      --parcel-grid-color: rgba(107, 144, 128, 0.15);
+    }
+    .parcel-grid-bg {
+      background-image: radial-gradient(circle at 1px 1px, var(--parcel-grid-color) 1px, transparent 0);
+      background-size: 22px 22px;
+    }
+    .how-we-work-card {
+      min-height: 100%;
+      border-radius: 1.5rem;
+      border-width: 1px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
+    }
+  </style>
+</head>
+<body class="bg-sage-50 text-slate-900 antialiased">
+  <a class="skip-link" href="#parcel-main">Skip to main content</a>
+  {% include "openskagit/nav.html" %}
+  <div class="relative isolate overflow-hidden">
+    <div class="pointer-events-none absolute inset-0 parcel-grid-bg opacity-40"></div>
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b from-sage-100/80 via-white to-white"></div>
+
+    <header class="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      <div class="flex flex-col items-center gap-6 text-center">
+        {% with badge_label=portal_badge|default:"OpenSkagit Parcel Partner" %}
+        <div class="inline-flex items-center gap-2 rounded-full border border-sage-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-sage-700 shadow-lg">
+          <span class="text-sage-500"><i class="fa-solid fa-seedling" aria-hidden="true"></i></span>
+          {{ badge_label }}
+        </div>
+        {% endwith %}
+        {% block hero %}
+        <div class="space-y-3">
+          <p class="text-sm uppercase tracking-[0.35em] text-sage-500">Parcel Intelligence</p>
+          <h1 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">Skagit County parcel research</h1>
+  
+        </div>
+        {% endblock %}
+      </div>
+
+      {% if show_stepper != False %}
+      {% block stepper %}
+      {% with current_step=step|default:1 %}
+      <!-- <div class="mt-10 grid gap-4 lg:grid-cols-3">
+        <article class="how-we-work-card border-sage-100 bg-gradient-to-br from-sage-50/90 to-white text-slate-700">
+          <p class="text-xs font-semibold uppercase tracking-wide text-sage-500">Step 1</p>
+          <h3 class="text-xl font-semibold text-slate-900">Locate your parcel</h3>
+          <p class="text-sm">Search by parcel number or street address to begin.</p>
+          <p class="text-xs font-semibold text-sage-600">Status: {% if current_step >= 1 %}In progress{% else %}Upcoming{% endif %}</p>
+        </article>
+        <article class="how-we-work-card border-sky-100 bg-gradient-to-br from-sky-50/90 to-white text-slate-700">
+          <p class="text-xs font-semibold uppercase tracking-wide text-sky-500">Step 2</p>
+          <h3 class="text-xl font-semibold text-slate-900">Review assessment</h3>
+          <p class="text-sm">See county roll values, fairness diagnostics, and neighborhood context.</p>
+          <p class="text-xs font-semibold text-sky-500">Status: {% if current_step >= 2 %}Ready{% else %}Locked{% endif %}</p>
+        </article>
+        <article class="how-we-work-card border-amber-100 bg-gradient-to-br from-amber-50/90 to-white text-slate-700">
+          <p class="text-xs font-semibold uppercase tracking-wide text-amber-500">Step 3</p>
+          <h3 class="text-xl font-semibold text-slate-900">Compare sales</h3>
+          <p class="text-sm">Pull live comparables, switch to the map, and export evidence.</p>
+          <p class="text-xs font-semibold text-amber-500">Status: {% if current_step >= 3 %}Unlocked{% else %}Locked{% endif %}</p>
+        </article>
+      </div> -->
+      {% endwith %}
+      {% endblock %}
+      {% endif %}
+    </header>
+
+    <main id="parcel-main" class="relative mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  {% include "openskagit/footer.html" %}
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tabulator/6.3.1/js/tabulator.min.js" integrity="sha512-+wxLBzME2YkdE+5EYXPLkZX31lrT7xvFeoJEBhDigw1VE3DybMT0SqnX+ANXoy2cuglRez2oJ6TP2RFxYDs2NQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

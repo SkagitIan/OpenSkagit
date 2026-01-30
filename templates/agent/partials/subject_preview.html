@@ -1,0 +1,116 @@
+{% if error %}
+  <div class="rounded-lg border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-900">
+    {{ error }}
+  </div>
+{% endif %}
+
+{% if job %}
+  <article class="space-y-5 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm text-sm text-slate-600">
+    <header class="space-y-1">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Subject ID</p>
+      <div class="flex items-center gap-2">
+        <p class="font-mono text-xs text-slate-500 break-all">{{ job.id }}</p>
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          {{ job.get_status_display }}
+        </span>
+      </div>
+    </header>
+
+    <div class="space-y-2">
+      <p class="text-base font-semibold text-slate-900">
+        {{ job.name|default:"Untitled subject" }}
+      </p>
+      <p class="text-sm text-slate-500">
+        {{ job.address|default:"Address not captured" }}
+      </p>
+    </div>
+
+    {% with subject=subject_payload %}
+      <section class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-slate-700">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-slate-900">Step 1 · Subject data</h3>
+          <span class="text-xs text-slate-500">Google Places + Gemini</span>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-2 rounded-xl border border-slate-100 bg-white/80 p-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Metadata</p>
+            <ul class="space-y-1 text-xs text-slate-600">
+              <li>Name: {{ subject.name|default:job.name|default:"(missing)" }}</li>
+              <li>Address: {{ subject.address|default:job.address|default:"(missing)" }}</li>
+              <li>Type: {{ subject.type|default:"restaurant" }}</li>
+              <li>Query: {{ subject.vibe_query|default:"Not available yet" }}</li>
+            </ul>
+          </div>
+          <div class="space-y-2 rounded-xl border border-slate-100 bg-white/80 p-3">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Grounded intel snippet</p>
+            <p class="text-sm text-slate-700">{{ subject.intel.vibe.summary|default:"No Intel yet" }}</p>
+            {% if subject.intel.signature_items %}
+              <p class="text-xs font-semibold text-slate-500">Signature items:</p>
+              <p class="text-xs text-slate-600">{{ subject.intel.signature_items|join:", " }}</p>
+            {% endif %}
+          </div>
+        </div>
+        <div class="space-y-1">
+          <p class="text-xs uppercase tracking-wide text-slate-500">Full subject payload</p>
+          <pre class="max-h-48 overflow-auto bg-slate-950/80 p-3 text-[0.65rem] text-slate-50">{{ subject_json }}</pre>
+        </div>
+      </section>
+    {% endwith %}
+
+    <section>
+      {% with comps=vetted_competitors %}
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-slate-900">Vetted competitors ({{ comps|length }})</h3>
+          <span class="text-xs text-slate-500">pulled during scouting</span>
+        </div>
+        <div class="mt-2 grid gap-2 sm:grid-cols-2">
+          {% if comps %}
+            {% for comp in comps %}
+              <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-slate-700">
+                <p class="text-sm font-semibold text-slate-900">{{ comp.name|default:"Unnamed" }}</p>
+                <p class="text-xs text-slate-500">{{ comp.address|default:"Address missing" }}</p>
+                <p class="text-xs font-mono text-slate-500 break-all">{{ comp.place_id }}</p>
+              </div>
+            {% endfor %}
+          {% else %}
+            <p class="rounded-lg border border-dashed border-slate-300 bg-slate-50/80 px-3 py-2 text-xs text-slate-500">
+              No vetted competitors were returned while scouting this subject.
+            </p>
+          {% endif %}
+        </div>
+      {% endwith %}
+    </section>
+
+    <section class="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-600">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-900 text-slate-900">Step 2 · Vetted competitor payload</h3>
+        <span class="text-xs text-slate-500">Raw Google Places list</span>
+      </div>
+      <pre class="max-h-48 overflow-auto bg-slate-950/80 p-3 text-[0.65rem] text-slate-50">{{ competitors_json }}</pre>
+    </section>
+
+    <form
+      hx-post="{% url 'competition-analysis-start' %}"
+      hx-target="#analysis-progress"
+      hx-swap="outerHTML"
+      class="space-y-2"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="job_id" value="{{ job.id }}">
+      <button
+        class="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        type="submit"
+        {% if job.status != job.STATUS_READY %}
+          disabled
+        {% endif %}
+      >
+        Continue with the deep analysis
+      </button>
+      {% if job.status != job.STATUS_READY %}
+        <p class="text-xs text-slate-500">
+          Current status: {{ job.get_status_display }}. Wait until the subject scouting completes before continuing.
+        </p>
+      {% endif %}
+    </form>
+  </article>
+{% endif %}

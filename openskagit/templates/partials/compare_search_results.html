@@ -1,0 +1,16 @@
+{% if query %}
+  {% if results %}
+    <div class="bg-white border border-gray-200 rounded-2xl shadow-sm divide-y divide-gray-100">
+      {% for parcel in results %}
+        <button type="button"
+                class="w-full text-left px-4 py-3 hover:bg-sage-50 transition"
+                onclick="(function(){const input=document.getElementById('compare-input'); if(input){input.value='{{ parcel.parcel_number|escapejs }}';} const results=document.getElementById('compare-search-results'); if(results){results.innerHTML='';} const form=document.getElementById('compare-form'); if(form){form.submit();}})();">
+          <div class="font-semibold text-gray-900">{{ parcel.address|default:'Address unavailable' }}</div>
+          <div class="text-xs text-gray-500">Parcel {{ parcel.parcel_number }}{% if parcel.neighborhood_description %} · {{ parcel.neighborhood_description }}{% endif %}</div>
+        </button>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-sm text-gray-500">No matches for “{{ query }}”.</div>
+  {% endif %}
+{% endif %}

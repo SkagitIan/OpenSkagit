@@ -1,190 +1,150 @@
-{% extends "openskagit/appeal_base_v3.html" %}
+{% extends "openskagit/parcel_portal_base.html" %}
 {% load humanize formatting %}
 
-{% block page_title %}Step 2 — Property Review{% endblock %}
+{% block page_title %}Parcel Partner · Step 2{% endblock %}
+
+{% block hero %}
+<div class="space-y-4 text-center">
+  <p class="text-xs font-semibold uppercase tracking-[0.4em] text-sage-500">Step 2 — Parcel {{ parcel_number }}</p>
+  <h1 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">{{ subject.address|default:"Address unavailable" }}</h1>
+  <p class="mx-auto max-w-3xl text-base text-slate-600">Review county roll values alongside OpenSkagit fairness diagnostics and contextual layers that match the same Tailwind-based design language used on Flavor and VoteVector.</p>
+</div>
+{% endblock %}Search for your home for tailored insights
 
 {% block content %}
 <style>
-  /* Property Hero */
   .property-hero {
-    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
-    color: white;
+    background: linear-gradient(135deg, #4f7266, #6b9080, #8fa3d1);
+    color: #fff;
+    border-radius: 2rem;
     padding: var(--space-8);
-    border-radius: var(--radius-2xl);
+    box-shadow: 0 25px 50px rgba(15, 23, 42, 0.25);
     margin-bottom: var(--space-6);
-    box-shadow: 0 20px 40px -10px rgba(108, 105, 141, 0.3);
-    animation: fadeInUp 0.5s var(--transition-base);
   }
-
   .property-hero__header {
     display: flex;
     justify-content: space-between;
+    gap: var(--space-6);
+    flex-wrap: wrap;
     align-items: flex-start;
-    margin-bottom: var(--space-6);
-    gap: var(--space-4);
   }
-
   .property-hero__title {
-    font-size: 1.875rem;
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
     font-weight: 700;
-    margin-bottom: var(--space-2);
+    margin-top: var(--space-2);
     line-height: 1.2;
   }
-
   .property-hero__subtitle {
-    font-size: 1rem;
-    opacity: 0.9;
+    margin-top: var(--space-2);
+    font-size: 0.95rem;
+    opacity: 0.85;
+  }
+  .property-hero__value-wrap {
+    min-width: 260px;
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: var(--space-2);
-  }
-
-  .property-hero__value {
-    font-size: 2.5rem;
-    font-weight: 800;
-    margin-bottom: var(--space-2);
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-
-  .property-hero__label {
-    font-size: 0.9375rem;
-    opacity: 0.9;
-    font-weight: 500;
-  }
-
-  .property-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--space-4);
   }
-
-  .property-stat {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    padding: var(--space-4);
-    border-radius: var(--radius-lg);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .property-stat__value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: var(--space-1);
-  }
-
-  .property-stat__label {
-    font-size: 0.8125rem;
-    opacity: 0.85;
-    font-weight: 500;
-  }
-
-  .property-hero__value-row {
+  .property-hero__value-block {
     display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: var(--space-3);
-    justify-content: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
   }
-
+  .property-hero__value {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    text-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  }
+  .property-hero__label {
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.8);
+  }
   .property-hero__trend {
-    min-width: 140px;
-    height: 70px;
+    width: 150px;
+    height: 96px;
   }
-
   .property-hero__trend canvas {
     width: 100%;
     height: 100%;
     display: block;
   }
-
-  /* Neighborhood Comparison Flip */
-  .neighborhood-card {
-    position: relative;
-    overflow: hidden;
+  .property-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-6);
+  }
+  .property-stat {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: var(--space-4);
+    text-align: center;
+  }
+  .property-stat__value {
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  .property-stat__label {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.8);
   }
 
+  .neighborhood-card {
+    position: relative;
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--gray-100);
+    background: #fff;
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+  }
   .neighborhood-card__inner {
     position: relative;
     width: 100%;
     transform-style: preserve-3d;
     transition: transform 0.6s;
   }
-
+  .neighborhood-card.flipped .neighborhood-card__inner {
+    transform: rotateY(180deg);
+  }
   .neighborhood-card__front,
   .neighborhood-card__back {
     width: 100%;
     backface-visibility: hidden;
     min-height: 100%;
   }
-
-  .neighborhood-card.flipped .neighborhood-card__inner {
-    transform: rotateY(180deg);
-  }
-
   .neighborhood-card__front {
-    position: relative;
-    padding: var(--space-3);
+    padding: var(--space-6);
   }
-
   .neighborhood-card__back {
     position: absolute;
-    top: 0;
-    left: 0;
+    inset: 0;
     padding: var(--space-6);
     transform: rotateY(180deg);
-    min-height: 100%;
-    background: white;
+    background: #fff;
   }
-
+  .neighborhood-back-panel {
+    display: none;
+  }
+  .neighborhood-card[data-mode="map"] .neighborhood-back--map {
+    display: block;
+  }
+  .neighborhood-card[data-mode="trend"] .neighborhood-back--trend {
+    display: block;
+  }
   .neighborhood-card__front-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-4);
     flex-wrap: wrap;
-    margin-bottom: var(--space-8);
+    margin-bottom: var(--space-6);
   }
-
-  .neighborhood-card__front-title {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    flex: 1;
-    min-width: 0;
-  }
-
-  .neighborhood-card__front-icon {
-    flex-shrink: 0;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-md);
-    font-size: 1.25rem;
-  }
-
-  .neighborhood-card__front-text {
-    min-width: 0;
-  }
-
-  .neighborhood-card__front-text h3 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin: 0;
-    line-height: 1.15;
-  }
-
-  .neighborhood-card__front-text p {
-    font-size: 0.9375rem;
-    color: var(--gray-600);
-    margin: var(--space-1) 0 0;
-  }
-
   .neighborhood-flip-button {
     display: inline-flex;
     align-items: center;
@@ -193,623 +153,475 @@
     background: var(--gray-50);
     color: var(--gray-700);
     padding: 0.4rem 0.85rem;
-    border-radius: var(--radius-full);
+    border-radius: 999px;
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    transition: all var(--transition-fast);
   }
-
-  .neighborhood-flip-button svg {
-    width: 16px;
-    height: 16px;
+  .trend-mode-btn {
+    border: 1px solid var(--gray-200);
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    color: var(--gray-600);
+    background: white;
+    transition: all var(--transition-fast);
   }
-
+  .trend-mode-btn--active {
+    border-color: var(--dusty-grape);
+    color: var(--dusty-grape);
+    background: rgba(108, 105, 141, 0.12);
+    box-shadow: var(--shadow-sm);
+  }
+  .trend-summary-card {
+    border-radius: 1rem;
+    border: 1px solid var(--gray-200);
+    background: white;
+    padding: 1rem;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+  }
   .neighborhood-flip-button:hover {
     background: var(--primary-50);
     color: var(--primary-600);
-    transform: translateY(-1px);
   }
-
-  .map-front-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--gray-500);
-    margin-bottom: var(--space-1);
-  }
-
-  .neighborhood-map {
-    width: 100%;
-    height: 280px;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    border: 1px solid var(--gray-100);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.02);
-    margin-top: var(--space-4);
-  }
-
-  .map-instructions {
-    font-size: 0.9375rem;
-    color: var(--gray-600);
-    margin-top: var(--space-2);
-  }
-
-  /* Flippable Gauge Cards */
   .gauge-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: var(--space-3);
-    margin-top: var(--space-8);
+    gap: var(--space-4);
   }
-
   .gauge-card {
-    perspective: 1000px;
+    perspective: 1200px;
+    position: relative;
     height: 400px;
-    position: relative;
   }
-
   .gauge-card__inner {
-    position: relative;
     width: 100%;
     height: 100%;
+    position: relative;
     transform-style: preserve-3d;
     transition: transform 0.6s;
   }
-
   .gauge-card.flipped .gauge-card__inner {
     transform: rotateY(180deg);
   }
-
   .gauge-card__front,
   .gauge-card__back {
     position: absolute;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     backface-visibility: hidden;
-    background: white;
-    border: 2px solid var(--gray-100);
     border-radius: var(--radius-xl);
-    padding: var(--space-6);
+    border: 1px solid var(--gray-100);
+    background: #fff;
     box-shadow: var(--shadow-lg);
+    padding: var(--space-6);
   }
-
   .gauge-card__front {
     display: flex;
     flex-direction: column;
+    gap: var(--space-4);
   }
-
   .gauge-card__back {
     transform: rotateY(180deg);
     overflow-y: auto;
   }
-
   .gauge-card__header {
     display: flex;
-    justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: var(--space-4);
+    justify-content: space-between;
+    gap: var(--space-2);
   }
-
-  .gauge-card__title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-700);
-  }
-
   .flip-indicator {
-    background: var(--primary-50);
     border: none;
     width: 2rem;
     height: 2rem;
     border-radius: var(--radius-full);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    background: var(--primary-50);
     color: var(--primary-600);
     cursor: pointer;
-    transition: all var(--transition-fast);
-    animation: pulseRotate 3s infinite;
+    transition: transform var(--transition-fast), background var(--transition-fast);
   }
-
   .flip-indicator:hover {
     background: var(--primary-100);
-    transform: scale(1.1);
+    transform: scale(1.05);
   }
-
-  @keyframes pulseRotate {
-    0%, 100% { transform: rotate(0deg) scale(1); }
-    50% { transform: rotate(180deg) scale(1.05); }
-  }
-
   .gauge-container {
     position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: var(--space-4) 0;
-    height: 180px;
     flex: 1;
   }
-
   .gauge-value {
     position: absolute;
-    bottom: 10px;
-    font-size: 2.5rem;
-    font-weight: 800;
-    color: var(--primary-600);
+    bottom: 0.5rem;
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--primary-700);
   }
-
-  .gauge-status {
-    text-align: center;
-    margin-top: auto;
-    padding-top: var(--space-3);
-  }
-
   .status-badge {
-    display: inline-block;
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-full);
-    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
     font-weight: 600;
   }
-
   .status-badge--excellent {
     background: var(--success-50);
     color: var(--success-700);
   }
-
   .status-badge--good {
     background: var(--primary-50);
     color: var(--primary-700);
   }
-
   .status-badge--fair {
     background: var(--warning-50);
-    color: var(--warning-700);
+    color: var(--warning-600);
   }
-
-  .gauge-explanation {
-    font-size: 0.9375rem;
-    line-height: 1.6;
-  }
-
-  .explanation-text {
-    margin-bottom: var(--space-4);
-    color: var(--gray-700);
-  }
-
-  .explanation-section {
-    margin-bottom: var(--space-4);
-  }
-
-  .explanation-section h5 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--primary-700);
-    margin-bottom: var(--space-2);
-  }
-
-  .explanation-section p {
-    color: var(--gray-600);
-  }
-
-  .explanation-metrics {
-    display: grid;
-    gap: var(--space-3);
-    margin-top: var(--space-4);
-  }
-
   .metric-item {
-    padding: var(--space-3);
     background: var(--gray-50);
     border-radius: var(--radius-md);
+    padding: var(--space-3);
   }
-
   .metric-label {
     font-weight: 600;
     color: var(--gray-900);
-    margin-bottom: var(--space-1);
   }
-
   .metric-desc {
-    font-size: 0.8125rem;
+    font-size: 0.85rem;
     color: var(--gray-600);
   }
-
-  .continue-section {
-    display: flex;
-    justify-content: center;
-    margin-top: var(--space-10);
-    animation: fadeInUp 0.5s var(--transition-base) 0.5s both;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    padding: var(--space-4) var(--space-6);
-    font-size: 1rem;
-    font-weight: 600;
-    font-family: inherit;
-    border: none;
-    border-radius: var(--radius-xl);
-    cursor: pointer;
-    transition: all var(--transition-base);
-    text-decoration: none;
-  }
-
-  .btn--primary {
-    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
-    color: white;
-    box-shadow: 0 4px 14px 0 rgba(108, 105, 141, 0.39);
-  }
-
-  .btn--primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px 0 rgba(108, 105, 141, 0.5);
-  }
-
-  .btn--large {
-    padding: var(--space-5) var(--space-8);
-    font-size: 1.125rem;
-  }
-
-  @media (max-width: 768px) {
-    .property-hero__header {
-      flex-direction: column;
-    }
-
-    .gauge-grid {
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: var(--space-4);
-    }
-
-    .gauge-card {
-      height: 360px;
-    }
-  }
-
-  @media (max-width: 600px) {
-    .neighborhood-card__front-header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .neighborhood-card__front-title {
-      width: 100%;
-    }
-
-    .neighborhood-flip-button {
-      align-self: flex-start;
-      margin-top: var(--space-2);
-    }
-  }
-
-  @media (max-width: 520px) {
-    .gauge-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
 </style>
 
-<div class="property-hero">
+<section class="property-hero">
   <div class="property-hero__header">
     <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.4em] text-white/80">Parcel {{ subject.parcel_number }}</p>
       <h2 class="property-hero__title">{{ subject.address|default:"Address unavailable" }}</h2>
-      <div class="property-hero__subtitle">
-        <i class="fa-solid fa-house-chimney me-2"></i>
-         {{ subject.parcel_number }}
-      </div>
-    </div>
-  </div>
-
-  <div class="property-hero__value-row">
-    <div class="property-hero__value">
-      {% if subject.metadata.assessed_value %}
-        ${{ subject.metadata.assessed_value|floatformat:0|intcomma }}
-      {% else %}
-        —
+      {% if neighborhood.name %}
+        <p class="property-hero__subtitle">{{ neighborhood.name }} · Code {{ neighborhood.code }}</p>
       {% endif %}
     </div>
-    <div class="property-hero__trend" data-history-id="parcel-history-data">
-      <canvas width="160" height="80" aria-hidden="true" focusable="false"></canvas>
+    <div class="property-hero__value-wrap">
+      <div class="property-hero__value-block">
+        <p class="property-hero__label text-left">Total market value</p>
+        <p class="property-hero__value">
+          {% if subject.metadata.assessed_value %}
+            ${{ subject.metadata.assessed_value|floatformat:0|intcomma }}
+          {% else %}
+            —
+          {% endif %}
+        </p>
+      </div>
+      <div class="property-hero__trend" data-history-id="parcel-history-data">
+        <canvas width="140" height="90" aria-hidden="true"></canvas>
+      </div>
     </div>
   </div>
-  <div class="property-hero__label">Total Market Value</div>
-
-  <div class="property-stats" style="margin-top: var(--space-6);">
+  <div class="property-stats">
     <div class="property-stat">
-      <div class="property-stat__value">{% if subject.bedrooms %}{{ subject.bedrooms|floatformat:"-1" }}{% else %}—{% endif %}</div>
-      <div class="property-stat__label">Bedrooms</div>
+      <p class="property-stat__label">Bedrooms</p>
+      <p class="property-stat__value">{% if subject.bedrooms %}{{ subject.bedrooms|floatformat:"-1" }}{% else %}—{% endif %}</p>
     </div>
     <div class="property-stat">
-      <div class="property-stat__value">{% if subject.bathrooms %}{{ subject.bathrooms|quarter_baths }}{% else %}—{% endif %}</div>
-      <div class="property-stat__label">Bathrooms</div>
+      <p class="property-stat__label">Bathrooms</p>
+      <p class="property-stat__value">{% if subject.bathrooms %}{{ subject.bathrooms|quarter_baths }}{% else %}—{% endif %}</p>
     </div>
     <div class="property-stat">
-      <div class="property-stat__value">
-        {% if subject.living_area %}
-          {{ subject.living_area|floatformat:0|intcomma }}
-        {% else %}
-          —
-        {% endif %}
-      </div>
-      <div class="property-stat__label">Living Area (sq ft)</div>
+      <p class="property-stat__label">Living area</p>
+      <p class="property-stat__value">{% if subject.living_area %}{{ subject.living_area|floatformat:0|intcomma }} sq ft{% else %}—{% endif %}</p>
     </div>
     <div class="property-stat">
-      <div class="property-stat__value">
-        {% if subject.acres %}
-          {{ subject.acres|floatformat:2 }}
-        {% else %}
-          —
-        {% endif %}
-      </div>
-      <div class="property-stat__label">Lot Size (acres)</div>
+      <p class="property-stat__label">Lot size</p>
+      <p class="property-stat__value">{% if subject.acres %}{{ subject.acres|floatformat:2 }} acres{% else %}—{% endif %}</p>
     </div>
   </div>
-</div>
+</section>
 {{ parcel_history_points|json_script:"parcel-history-data" }}
 
-<div class="card neighborhood-card{% if neighborhood_geom_geojson %} neighborhood-card--flippable{% endif %}" id="neighborhood-section-card">
+{% include "planning/partials/planning_dossier_card.html" with planning=planning planning_sections=planning_sections %}
+
+<div class="neighborhood-card" id="neighborhood-section-card" data-mode="map" data-hood-id="{{ neighborhood.code|default:subject.neighborhood_code|default:'' }}">
   <div class="neighborhood-card__inner">
     <div class="neighborhood-card__front">
       <div class="neighborhood-card__front-header">
-        <div class="neighborhood-card__front-title">
-          <div class="neighborhood-card__front-icon">
-            <i class="fa-solid fa-mountain-city" aria-hidden="true"></i>
-          </div>
-          <div class="neighborhood-card__front-text">
-            <h3>Neighborhood Comparison</h3>
-            <p>Click any card to learn more about these assessment metrics</p>
-          </div>
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-sage-500">Neighborhood fairness</p>
+          <h3 class="text-2xl font-semibold text-slate-900">IAAO-aligned quality checks</h3>
+          <p class="text-sm text-slate-600">Click any card for methodology or flip to explore maps and multi-year trends.</p>
         </div>
-        {% if neighborhood_geom_geojson %}
-          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection()" aria-label="Flip to view neighborhood map">
+        <div class="flex w-full max-w-[190px] flex-col gap-2">
+          {% if neighborhood_geom_geojson %}
+          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('map')">
             <span>View map</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <polyline points="23 4 23 10 17 10"></polyline>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
             </svg>
           </button>
-        {% endif %}
+          {% endif %}
+          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('trend')">
+            <span>Trends</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+        </div>
       </div>
-
       <div class="gauge-grid">
-        <!-- COD Card -->
         <div class="gauge-card" id="cod-card">
           <div class="gauge-card__inner">
             <div class="gauge-card__front">
               <div class="gauge-card__header">
-                <h4 class="gauge-card__title">Coefficient of Dispersion (COD)</h4>
-            <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip to see details">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="gauge-container">
-            <canvas id="cod-gauge" width="200" height="120"></canvas>
-            <div class="gauge-value">{{ neighborhood.cod|default:0|floatformat:1 }}</div>
-          </div>
-          <div class="gauge-status">
-            {% if neighborhood.cod < 10 %}
-              <span class="status-badge status-badge--excellent">Excellent Uniformity</span>
-            {% elif neighborhood.cod < 15 %}
-              <span class="status-badge status-badge--good">Good Uniformity</span>
-            {% else %}
-              <span class="status-badge status-badge--fair">Fair Uniformity</span>
-            {% endif %}
-          </div>
-        </div>
-        <div class="gauge-card__back">
-          <div class="gauge-card__header">
-            <h4 class="gauge-card__title">What is COD?</h4>
-            <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip back">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="1 4 1 10 7 10"></polyline>
-                <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="gauge-explanation">
-            <p class="explanation-text">
-              The <strong>Coefficient of Dispersion (COD)</strong> measures how consistent property assessments are across similar properties.
-            </p>
-            <div class="explanation-section">
-              <h5>What it measures:</h5>
-              <p>"Horizontal equity" – the consistency of appraisals for similar properties, regardless of their value.</p>
-            </div>
-            <div class="explanation-section">
-              <h5>Ideal range (IAAO):</h5>
-              <p>Between <strong>5% and 15%</strong> is considered acceptable.</p>
-            </div>
-            <div class="explanation-metrics">
-              <div class="metric-item">
-                <div class="metric-label">Lower COD (Better)</div>
-                <div class="metric-desc">More consistent valuations across similar properties</div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-slate-400">Uniformity</p>
+                  <h4 class="text-lg font-semibold text-slate-900">Coefficient of Dispersion</h4>
+                </div>
+                <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip COD card">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                </button>
               </div>
-              <div class="metric-item">
-                <div class="metric-label">Higher COD (Worse)</div>
-                <div class="metric-desc">Greater variation, less uniform assessments</div>
+              <div class="gauge-container">
+                <canvas id="cod-gauge" width="200" height="120"></canvas>
+                <div class="gauge-value">{{ neighborhood.cod|default:0|floatformat:1 }}</div>
+              </div>
+              <div>
+                {% if neighborhood.cod and neighborhood.cod < 10 %}
+                  <span class="status-badge status-badge--excellent">Excellent uniformity</span>
+                {% elif neighborhood.cod and neighborhood.cod < 15 %}
+                  <span class="status-badge status-badge--good">Good uniformity</span>
+                {% else %}
+                  <span class="status-badge status-badge--fair">Needs review</span>
+                {% endif %}
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PRD Card -->
-    <div class="gauge-card" id="prd-card">
-      <div class="gauge-card__inner">
-        <div class="gauge-card__front">
-          <div class="gauge-card__header">
-            <h4 class="gauge-card__title">Price-Related Differential (PRD)</h4>
-            <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip to see details">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="gauge-container">
-            <canvas id="prd-gauge" width="200" height="120"></canvas>
-            <div class="gauge-value">{{ neighborhood.prd|default:1|floatformat:2 }}</div>
-          </div>
-          <div class="gauge-status">
-            {% if neighborhood.prd and neighborhood.prd >= 0.98 and neighborhood.prd <= 1.03 %}
-              <span class="status-badge status-badge--excellent">Excellent Equity</span>
-            {% elif neighborhood.prd and neighborhood.prd > 1.03 %}
-              <span class="status-badge status-badge--fair">Regressive</span>
-            {% else %}
-              <span class="status-badge status-badge--fair">Progressive</span>
-            {% endif %}
-          </div>
-        </div>
             <div class="gauge-card__back">
               <div class="gauge-card__header">
-                <h4 class="gauge-card__title">What is PRD?</h4>
-                <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip back">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <h4 class="text-lg font-semibold text-slate-900">What is COD?</h4>
+                <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <polyline points="1 4 1 10 7 10"></polyline>
-                <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="gauge-explanation">
-            <p class="explanation-text">
-              The <strong>Price-Related Differential (PRD)</strong> tests for vertical assessment inequity in mass appraisals.
-            </p>
-            <div class="explanation-section">
-              <h5>What it measures:</h5>
-              <p>Whether high-value and low-value properties are assessed at the same ratio to market value.</p>
-            </div>
-            <div class="explanation-section">
-              <h5>How it works:</h5>
-              <p>PRD = Mean sales ratio ÷ Weighted mean sales ratio</p>
-            </div>
-            <div class="explanation-metrics">
-              <div class="metric-item">
-                <div class="metric-label">PRD = 1.00 (Perfect)</div>
-                <div class="metric-desc">No assessment bias between high and low valued properties</div>
+                    <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+                  </svg>
+                </button>
               </div>
-              <div class="metric-item">
-                <div class="metric-label">PRD &gt; 1.03 (Regressive)</div>
-                <div class="metric-desc">High-value parcels are relatively under-appraised</div>
-              </div>
-              <div class="metric-item">
-                <div class="metric-label">PRD &lt; 0.98 (Progressive)</div>
-                <div class="metric-desc">High-value parcels are relatively over-appraised</div>
+              <p class="text-sm text-slate-600">COD measures horizontal equity—how consistent assessments are among similar properties. Lower values mean tighter groupings.</p>
+              <div class="mt-4 space-y-3">
+                <div class="metric-item">
+                  <div class="metric-label">COD ≤ 10</div>
+                  <div class="metric-desc">Excellent uniformity for residential parcels.</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-label">Above 15</div>
+                  <div class="metric-desc">Signals assessment drift or missing features.</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-        <!-- Sales Ratio Card -->
+        <div class="gauge-card" id="prd-card">
+          <div class="gauge-card__inner">
+            <div class="gauge-card__front">
+              <div class="gauge-card__header">
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-slate-400">Vertical equity</p>
+                  <h4 class="text-lg font-semibold text-slate-900">Price-Related Differential</h4>
+                </div>
+                <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip PRD card">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="gauge-container">
+                <canvas id="prd-gauge" width="200" height="120"></canvas>
+                <div class="gauge-value">{{ neighborhood.prd|default:1|floatformat:2 }}</div>
+              </div>
+              <div>
+                {% if neighborhood.prd and neighborhood.prd >= 0.98 and neighborhood.prd <= 1.03 %}
+                  <span class="status-badge status-badge--excellent">Balanced</span>
+                {% elif neighborhood.prd and neighborhood.prd > 1.03 %}
+                  <span class="status-badge status-badge--fair">Regressive</span>
+                {% else %}
+                  <span class="status-badge status-badge--fair">Progressive</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="gauge-card__back">
+              <div class="gauge-card__header">
+                <h4 class="text-lg font-semibold text-slate-900">What is PRD?</h4>
+                <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+                  </svg>
+                </button>
+              </div>
+              <p class="text-sm text-slate-600">PRD highlights whether high-value parcels are assessed differently than low-value parcels. Values above 1.03 suggest regressivity, below 0.98 suggest progressivity.</p>
+              <div class="mt-4 space-y-3">
+                <div class="metric-item">
+                  <div class="metric-label">Target 1.00</div>
+                  <div class="metric-desc">High- and low-value homes move together.</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-label">Rebalanced actions</div>
+                  <div class="metric-desc">Field reviews, model adjustments, or zoning-specific factors.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="gauge-card" id="sales-ratio-card">
           <div class="gauge-card__inner">
             <div class="gauge-card__front">
               <div class="gauge-card__header">
-                <h4 class="gauge-card__title">Assessment to Sales Ratio</h4>
-                <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip to see details">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="gauge-container">
-            <canvas id="sales-ratio-gauge" width="200" height="120"></canvas>
-            <div class="gauge-value">{{ neighborhood.sales_ratio|default:100|floatformat:0 }}%</div>
-          </div>
-          <div class="gauge-status">
-            {% if neighborhood.sales_ratio and neighborhood.sales_ratio >= 90 and neighborhood.sales_ratio <= 110 %}
-              <span class="status-badge status-badge--excellent">Within IAAO Standard</span>
-            {% else %}
-              <span class="status-badge status-badge--fair">Outside Standard</span>
-            {% endif %}
-          </div>
-        </div>
-        <div class="gauge-card__back">
-          <div class="gauge-card__header">
-            <h4 class="gauge-card__title">What is Sales Ratio?</h4>
-            <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip back">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="1 4 1 10 7 10"></polyline>
-                <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-              </svg>
-            </button>
-          </div>
-          <div class="gauge-explanation">
-            <p class="explanation-text">
-              This ratio compares <strong>assessed values to actual market values</strong> (sale prices).
-            </p>
-            <div class="explanation-section">
-              <h5>Ideal Target:</h5>
-              <p>A ratio of <strong>1.0 or 100%</strong> where assessed value equals market value.</p>
-            </div>
-            <div class="explanation-section">
-              <h5>IAAO Acceptable Range:</h5>
-              <p>Between <strong>0.90 and 1.10</strong> (90% to 110% of market value).</p>
-            </div>
-            <div class="explanation-section">
-              <h5>Purpose:</h5>
-              <p>Ensures properties are assessed consistently and fairly relative to their market value.</p>
-            </div>
-            <div class="explanation-metrics">
-              <div class="metric-item">
-                <div class="metric-label">Above 110%</div>
-                <div class="metric-desc">Properties may be over-assessed relative to market</div>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-slate-400">Level of assessment</p>
+                  <h4 class="text-lg font-semibold text-slate-900">Assessment to Sales Ratio</h4>
+                </div>
+                <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip ratio card">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                </button>
               </div>
-              <div class="metric-item">
-                <div class="metric-label">Below 90%</div>
-                <div class="metric-desc">Properties may be under-assessed relative to market</div>
+              <div class="gauge-container">
+                <canvas id="sales-ratio-gauge" width="200" height="120"></canvas>
+                <div class="gauge-value">{{ neighborhood.sales_ratio|default:100|floatformat:0 }}%</div>
+              </div>
+              <div>
+                {% if neighborhood.sales_ratio and neighborhood.sales_ratio >= 90 and neighborhood.sales_ratio <= 110 %}
+                  <span class="status-badge status-badge--excellent">Within IAAO standard</span>
+                {% else %}
+                  <span class="status-badge status-badge--fair">Outside band</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="gauge-card__back">
+              <div class="gauge-card__header">
+                <h4 class="text-lg font-semibold text-slate-900">Why watch the ratio?</h4>
+                <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip back">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+                  </svg>
+                </button>
+              </div>
+              <p class="text-sm text-slate-600">Assessment ÷ sale price compared to the IAAO 90–110% guidance. Sustained drift outside that window may warrant county-level study.</p>
+              <div class="mt-4 space-y-3">
+                <div class="metric-item">
+                  <div class="metric-label">Above 110%</div>
+                  <div class="metric-desc">Potential over-assessment relative to market.</div>
+                </div>
+                <div class="metric-item">
+                  <div class="metric-label">Below 90%</div>
+                  <div class="metric-desc">Signals under-assessment or lagging roll updates.</div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
       </div>
     </div>
     {% if neighborhood_geom_geojson %}
-      <div class="neighborhood-card__back">
-        <div class="gauge-card__header">
+      <div class="neighborhood-card__back neighborhood-back-panel neighborhood-back--map">
+        <div class="neighborhood-card__front-header">
           <div>
-            <div class="map-front-label">Neighborhood Footprint</div>
-            <h4 class="gauge-card__title" style="font-size: 1.25rem; color: var(--gray-900);">{{ neighborhood.name|default:"Neighborhood Outline" }}</h4>
-            <p class="map-instructions">Explore the official neighborhood boundary. Zoom or pan to understand how your property sits within the broader market area.</p>
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Neighborhood footprint</p>
+            <h3 class="text-2xl font-semibold text-slate-900">{{ neighborhood.name|default:"Map preview" }}</h3>
+            <p class="text-sm text-slate-600">Your parcel plotted inside the neighborhood boundary used for fairness diagnostics.</p>
           </div>
-          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection()" aria-label="Flip back to metrics">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('front')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <polyline points="1 4 1 10 7 10"></polyline>
               <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
             </svg>
             <span>Back to metrics</span>
           </button>
         </div>
-        <div class="neighborhood-map" id="neighborhood-map"></div>
+        <div id="neighborhood-map" class="h-80 w-full rounded-2xl border border-slate-100"></div>
       </div>
     {% endif %}
+    <div class="neighborhood-card__back neighborhood-back-panel neighborhood-back--trend" id="neighborhood-trend-panel" data-url="{% if neighborhood.code %}{% url 'neighborhood-trend-data' neighborhood.code %}{% endif %}">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Neighborhood trends</p>
+          <h4 class="text-2xl font-semibold text-slate-900">{{ neighborhood.name|default:subject.neighborhood_description|default:subject.neighborhood_code|default:"Trends" }}</h4>
+          <p class="text-sm text-slate-600">Compare market values, tax load, and fairness indicators over time.</p>
+        </div>
+        <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('front')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+          </svg>
+          <span>Back to metrics</span>
+        </button>
+      </div>
+      <div class="mt-4 grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
+        <div>
+          <div class="flex flex-wrap gap-2" id="trend-mode-buttons">
+            <button type="button" class="trend-mode-btn trend-mode-btn--active" data-trend-mode="values">Values</button>
+            <button type="button" class="trend-mode-btn" data-trend-mode="tax">Tax vs Value</button>
+            <button type="button" class="trend-mode-btn" data-trend-mode="yoy">YoY %</button>
+            <button type="button" class="trend-mode-btn" data-trend-mode="tax-percent">Tax % of Value</button>
+          </div>
+          <div class="relative mt-4 min-h-[280px] rounded-2xl border border-slate-100 bg-white/70 p-3 shadow-inner">
+            <canvas id="hood-trend-canvas" class="h-full w-full"></canvas>
+            <div id="trend-panel-message" class="absolute inset-3 hidden items-center justify-center text-center text-sm text-slate-500"></div>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 shadow-inner">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Summary</p>
+          <div class="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+            <div class="trend-summary-card">
+              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Range</p>
+              <p id="trend-summary-range" class="text-lg font-semibold text-slate-900">—</p>
+            </div>
+            <div class="trend-summary-card">
+              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Avg stability</p>
+              <p id="trend-summary-stability" class="text-lg font-semibold text-slate-900">—</p>
+            </div>
+            <div class="trend-summary-card">
+              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Sales ratio</p>
+              <p id="trend-summary-salesratio" class="text-lg font-semibold text-slate-900">—</p>
+            </div>
+            <div class="trend-summary-card">
+              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">COD</p>
+              <p id="trend-summary-cod" class="text-lg font-semibold text-slate-900">—</p>
+            </div>
+            <div class="trend-summary-card">
+              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">PRD</p>
+              <p id="trend-summary-prd" class="text-lg font-semibold text-slate-900">—</p>
+            </div>
+            <div class="trend-summary-card">
+              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">PRB</p>
+              <p id="trend-summary-prb" class="text-lg font-semibold text-slate-900">—</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-<div class="continue-section">
-  <button id="comparables-button" class="btn btn--primary btn--large" type="button" data-url="{{ comparables_url }}" onclick="window.appealFetchComparables()">
-    <span>View Comparable Sales</span>
-    <svg style="width: 1.25rem; height: 1.25rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="5" y1="12" x2="19" y2="12"></line>
-      <polyline points="12 5 19 12 12 19"></polyline>
-    </svg>
-  </button>
-</div>
-
-<div id="comparables-placeholder"></div>
+<div id="comparables-placeholder" class="mt-12" data-url="{{ comparables_url }}"></div>
 {% endblock %}
 
 {% block extra_js %}
@@ -817,67 +629,56 @@
   {{ neighborhood_geom_geojson|json_script:"neighborhood-geom-data" }}
 {% endif %}
 <script>
-  function flipCard(cardId) {
-    const card = document.getElementById(cardId);
-    if (!card) return;
-    
-    const flipped = card.classList.toggle('flipped');
-  }
-
   function createGauge(canvasId, value, min, max, idealMin, idealMax) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     const centerX = 100;
-    const centerY = 100;
+    const centerY = 110;
     const radius = 80;
     const startAngle = Math.PI;
     const endAngle = 2 * Math.PI;
 
     function drawGauge(currentValue) {
-      ctx.clearRect(0, 0, 200, 120);
-
-      // Background arc
+      ctx.clearRect(0, 0, 200, 140);
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-      ctx.lineWidth = 20;
-      ctx.strokeStyle = '#e5e5e5';
+      ctx.lineWidth = 18;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineCap = 'round';
       ctx.stroke();
 
-      // Ideal range (green zone)
       if (idealMin !== undefined && idealMax !== undefined) {
         const idealStartAngle = startAngle + ((idealMin - min) / (max - min)) * Math.PI;
         const idealEndAngle = startAngle + ((idealMax - min) / (max - min)) * Math.PI;
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, idealStartAngle, idealEndAngle);
-        ctx.lineWidth = 20;
-        ctx.strokeStyle = '#10b981';
-        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = 18;
+        ctx.strokeStyle = '#7FA693';
+        ctx.globalAlpha = 0.35;
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
 
-      // Value arc
-      const valueAngle = startAngle + ((currentValue - min) / (max - min)) * Math.PI;
+      const clampedValue = Math.max(min, Math.min(max, currentValue));
+      const valueAngle = startAngle + ((clampedValue - min) / (max - min)) * Math.PI;
       const gradient = ctx.createLinearGradient(0, 0, 200, 0);
-      gradient.addColorStop(0, '#6c698d');
-      gradient.addColorStop(1, '#aa968a');
+      gradient.addColorStop(0, '#6B9080');
+      gradient.addColorStop(1, '#8FA3D1');
 
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, startAngle, valueAngle);
-      ctx.lineWidth = 20;
+      ctx.lineWidth = 18;
       ctx.strokeStyle = gradient;
       ctx.lineCap = 'round';
       ctx.stroke();
     }
 
-    // Animate with anime.js
     if (typeof anime !== 'undefined') {
       anime({
         targets: { val: min },
         val: value,
-        duration: 1500,
+        duration: 1200,
         easing: 'easeOutQuad',
         update: function(anim) {
           drawGauge(anim.animations[0].currentValue);
@@ -888,54 +689,61 @@
     }
   }
 
+  function flipCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.classList.toggle('flipped');
+  }
+
   let neighborhoodMap = null;
   let neighborhoodMapInitialized = false;
+  let neighborhoodTrendChart = null;
+  let neighborhoodTrendData = null;
+  let neighborhoodTrendMode = 'values';
 
-  function flipNeighborhoodSection() {
+  function flipNeighborhoodSection(targetMode) {
     const card = document.getElementById('neighborhood-section-card');
     if (!card) return;
-    const flipped = card.classList.toggle('flipped');
-    if (flipped) {
-      setTimeout(() => {
-        initNeighborhoodMap();
-        updateNeighborhoodCardHeight();
-      }, 200);
-    } else {
-      card.style.height = "";
-      if (neighborhoodMap) {
-        setTimeout(() => neighborhoodMap.invalidateSize(), 200);
-      }
+    if (targetMode === 'front') {
+      card.classList.remove('flipped');
+      card.style.height = '';
+      return;
     }
+    const mode = targetMode || card.dataset.mode || 'map';
+    card.dataset.mode = mode;
+    if (!card.classList.contains('flipped')) {
+      card.classList.add('flipped');
+    }
+    setTimeout(() => {
+      if (mode === 'map') {
+        initNeighborhoodMap();
+      } else if (mode === 'trend') {
+        loadNeighborhoodTrend();
+      }
+      updateNeighborhoodCardHeight();
+    }, 150);
   }
 
   function initNeighborhoodMap() {
-    if (neighborhoodMapInitialized && neighborhoodMap) {
-      neighborhoodMap.invalidateSize();
-      return;
-    }
-
     const mapContainer = document.getElementById('neighborhood-map');
     const geomElement = document.getElementById('neighborhood-geom-data');
     if (!mapContainer || !geomElement) {
       return;
     }
-
+    if (neighborhoodMapInitialized && neighborhoodMap) {
+      neighborhoodMap.invalidateSize();
+      return;
+    }
     let geometry;
     try {
       geometry = JSON.parse(geomElement.textContent);
     } catch (error) {
-      console.warn('Unable to parse neighborhood geometry', error);
       return;
     }
-    if (!geometry) {
-      return;
-    }
-
     neighborhoodMap = L.map('neighborhood-map', {
       scrollWheelZoom: false,
       zoomControl: true,
     });
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '© OpenStreetMap contributors',
@@ -958,52 +766,256 @@
     }
 
     {% if subject.latitude and subject.longitude %}
-      const subjectMarker = L.circleMarker([{{ subject.latitude }}, {{ subject.longitude }}], {
+      L.circleMarker([{{ subject.latitude }}, {{ subject.longitude }}], {
         radius: 8,
         fillColor: '#ef4444',
         color: '#ffffff',
         weight: 2,
         fillOpacity: 1,
-      }).addTo(neighborhoodMap);
-      subjectMarker.bindPopup('<strong>Your Property</strong><div>{{ subject.address|default:""|escapejs }}</div>');
+      }).addTo(neighborhoodMap).bindPopup('<strong>Your Property</strong><div>{{ subject.address|default:""|escapejs }}</div>');
     {% endif %}
 
     neighborhoodMapInitialized = true;
-    setTimeout(() => {
-      neighborhoodMap.invalidateSize();
-      updateNeighborhoodCardHeight();
-    }, 150);
+    setTimeout(() => neighborhoodMap.invalidateSize(), 150);
   }
 
   function updateNeighborhoodCardHeight() {
     const card = document.getElementById('neighborhood-section-card');
     if (!card) return;
     const front = card.querySelector('.neighborhood-card__front');
-    const back = card.querySelector('.neighborhood-card__back');
-    const target = card.classList.contains('flipped') ? back : front;
+    let target = front;
+    if (card.classList.contains('flipped')) {
+      const mode = card.dataset.mode || 'map';
+      const back = card.querySelector(`.neighborhood-back--${mode}`);
+      target = back || front;
+    }
     if (!target) {
-      card.style.height = "";
+      card.style.height = '';
       return;
     }
     card.style.height = `${target.scrollHeight}px`;
   }
 
-  window.addEventListener('resize', () => {
-    const card = document.getElementById('neighborhood-section-card');
-    if (!card || !card.classList.contains('flipped')) {
+  function drawParcelHistoryCharts() {
+    document.querySelectorAll('[data-history-id]').forEach((container) => {
+      const historyId = container.dataset.historyId;
+      const script = document.getElementById(historyId);
+      if (!script) return;
+      let points;
+      try {
+        points = JSON.parse(script.textContent || '[]');
+      } catch (error) {
+        return;
+      }
+      if (!points.length) return;
+      const canvas = container.querySelector('canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const bounds = canvas.getBoundingClientRect();
+      const width = bounds.width || canvas.width;
+      const height = bounds.height || canvas.height;
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(width * ratio));
+      canvas.height = Math.max(1, Math.round(height * ratio));
+      ctx.scale(ratio, ratio);
+      ctx.clearRect(0, 0, width, height);
+
+      const values = points.map((p) => Number(p && p.value)).filter((v) => !Number.isNaN(v));
+      if (!values.length) return;
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const range = maxValue - minValue || 1;
+      const paddingX = 8;
+      const paddingY = 8;
+      const plotWidth = Math.max(width - paddingX * 2, 0);
+      const plotHeight = Math.max(height - paddingY * 2, 0);
+      const stepCount = Math.max(points.length - 1, 1);
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        const value = Number(point && point.value);
+        if (Number.isNaN(value)) return;
+        const normalized = (value - minValue) / range;
+        const x = paddingX + (plotWidth * index) / stepCount;
+        const y = paddingY + plotHeight * (1 - normalized);
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    });
+  }
+
+  function setTrendMessage(message) {
+    const messageEl = document.getElementById('trend-panel-message');
+    if (!messageEl) {
       return;
     }
-    updateNeighborhoodCardHeight();
-  });
+    messageEl.textContent = message || '';
+    if (message) {
+      messageEl.classList.remove('hidden');
+      messageEl.classList.add('flex');
+    } else {
+      messageEl.classList.add('hidden');
+      messageEl.classList.remove('flex');
+    }
+  }
+
+  function ensureTrendChart() {
+    const canvas = document.getElementById('hood-trend-canvas');
+    if (!canvas || typeof Chart === 'undefined') {
+      return null;
+    }
+    if (!neighborhoodTrendChart) {
+      neighborhoodTrendChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, labels: { color: '#334155' } },
+            tooltip: { mode: 'index', intersect: false },
+          },
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#475569' } },
+            y: { ticks: { color: '#475569' }, grid: { color: '#e2e8f0' } },
+          },
+        },
+      });
+    }
+    return neighborhoodTrendChart;
+  }
+
+  const trendModeConfig = {
+    values: [
+      { key: 'median_market_total', label: 'Total Market', color: '#6B9080' },
+      { key: 'median_land_market', label: 'Land Market', color: '#F3C6A8' },
+      { key: 'median_building', label: 'Building', color: '#8FA3D1' },
+    ],
+    tax: [
+      { key: 'median_market_total', label: 'Market', color: '#6B9080' },
+      { key: 'median_tax_amount', label: 'Median Tax', color: '#F3C6A8' },
+    ],
+    yoy: [
+      { key: 'yoy_change_total', label: 'YoY %', color: '#8FA3D1', format: (v) => (v == null ? null : Number(v)) },
+    ],
+    'tax-percent': [
+      { key: 'tax_percent_of_value', label: 'Tax % of Value', color: '#F3C6A8' },
+    ],
+  };
+
+  function renderTrendChart() {
+    if (!neighborhoodTrendData) {
+      setTrendMessage('Neighborhood trends unavailable.');
+      return;
+    }
+    const chart = ensureTrendChart();
+    if (!chart) {
+      setTrendMessage('Unable to render chart.');
+      return;
+    }
+    const labels = neighborhoodTrendData.years || [];
+    if (!labels.length) {
+      chart.data.labels = [];
+      chart.data.datasets = [];
+      chart.update();
+      setTrendMessage('Trend data unavailable.');
+      return;
+    }
+    setTrendMessage('');
+    chart.data.labels = labels;
+    const config = trendModeConfig[neighborhoodTrendMode] || trendModeConfig.values;
+    chart.data.datasets = config.map((item) => {
+      const rawSeries = (neighborhoodTrendData.series && neighborhoodTrendData.series[item.key]) || [];
+      return {
+        label: item.label,
+        data: rawSeries.map((value) => (typeof item.format === 'function' ? item.format(value) : value)),
+        borderColor: item.color,
+        backgroundColor: 'transparent',
+        tension: 0.25,
+        pointRadius: 2,
+        spanGaps: true,
+      };
+    });
+    chart.update();
+  }
+
+  function updateTrendSummary() {
+    const summary = neighborhoodTrendData?.summary || {};
+    const fairness = summary.fairness || {};
+    const rangeEl = document.getElementById('trend-summary-range');
+    const stabilityEl = document.getElementById('trend-summary-stability');
+    const salesRatioEl = document.getElementById('trend-summary-salesratio');
+    const codEl = document.getElementById('trend-summary-cod');
+    const prdEl = document.getElementById('trend-summary-prd');
+    const prbEl = document.getElementById('trend-summary-prb');
+
+    const firstYear = summary.first_year;
+    const lastYear = summary.last_year;
+    if (rangeEl) {
+      rangeEl.textContent = firstYear && lastYear ? `${firstYear} – ${lastYear}` : '—';
+    }
+    if (stabilityEl) {
+      stabilityEl.textContent = summary.avg_stability != null ? `${summary.avg_stability}` : '—';
+    }
+    if (salesRatioEl) {
+      salesRatioEl.textContent = fairness.sales_ratio != null ? `${fairness.sales_ratio.toFixed(0)}%` : '—';
+    }
+    if (codEl) {
+      codEl.textContent = fairness.cod != null ? fairness.cod.toFixed(1) : '—';
+    }
+    if (prdEl) {
+      prdEl.textContent = fairness.prd != null ? fairness.prd.toFixed(2) : '—';
+    }
+    if (prbEl) {
+      prbEl.textContent = fairness.prb != null ? fairness.prb.toFixed(2) : '—';
+    }
+  }
+
+  function loadNeighborhoodTrend(forceReload = false) {
+    const panel = document.getElementById('neighborhood-trend-panel');
+    if (!panel) return;
+    const url = panel.dataset.url;
+    if (!url) {
+      setTrendMessage('Neighborhood trends unavailable.');
+      return;
+    }
+    if (neighborhoodTrendData && !forceReload) {
+      renderTrendChart();
+      updateTrendSummary();
+      return;
+    }
+    setTrendMessage('Loading trend data…');
+    fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Trend request failed');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        neighborhoodTrendData = data;
+        renderTrendChart();
+        updateTrendSummary();
+        updateNeighborhoodCardHeight();
+      })
+      .catch(() => {
+        setTrendMessage('Unable to load trend data.');
+      });
+  }
 
   (function () {
-    const button = document.getElementById('comparables-button');
     const placeholder = document.getElementById('comparables-placeholder');
-    const baseUrl = button ? button.dataset.url : null;
+    const baseUrl = placeholder ? (placeholder.dataset.url || null) : null;
 
     function executeInlineScripts(container) {
-      const scripts = container.querySelectorAll('script');
-      scripts.forEach((oldScript) => {
+      container.querySelectorAll('script').forEach((oldScript) => {
         const s = document.createElement('script');
         if (oldScript.type) s.type = oldScript.type;
         if (oldScript.src) {
@@ -1031,16 +1043,9 @@
       return query ? `${baseUrl}?${query}` : baseUrl;
     }
 
-    function fetchComparables(url, { fromButton } = {}) {
+    function fetchComparables(url) {
       if (!url || !placeholder) return;
-      if (fromButton) {
-        if (!button || button.dataset.loading === 'running') return;
-        button.dataset.loading = 'running';
-        button.disabled = true;
-        button.innerHTML = '<div class="spinner"></div><span>Loading comparables...</span>';
-      } else {
-        placeholder.innerHTML = '<div class="comparables-loading"><div class="spinner"></div><span>Updating view…</span></div>';
-      }
+      placeholder.innerHTML = '<div class="flex items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-white/90 p-6 text-sm text-slate-500"><span class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></span>Loading comparables…</div>';
 
       fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then((response) => {
@@ -1050,164 +1055,59 @@
         .then((text) => {
           placeholder.innerHTML = text;
           executeInlineScripts(placeholder);
-          if (button) {
-            button.classList.add('hidden');
-            button.disabled = false;
-            button.dataset.loading = '';
-          }
         })
         .catch(() => {
-          if (fromButton && button) {
-            button.disabled = false;
-            button.dataset.loading = '';
-            button.innerHTML = '<span>Retry</span>';
-          } else if (placeholder) {
-            placeholder.innerHTML = '<div class="empty-state">Unable to update comparables. Please try again.</div>';
+          if (placeholder) {
+            placeholder.innerHTML = '<div class="rounded-2xl border border-rose-100 bg-rose-50 p-6 text-sm text-rose-600">Unable to load comparables. Please try again.</div>';
           }
         });
     }
 
     window.appealFetchComparables = function (viewMode = 'standard', params = {}) {
       const url = buildUrl(viewMode, params);
-      fetchComparables(url, { fromButton: true });
+      fetchComparables(url);
     };
 
     window.appealUpdateComparables = function (viewMode = 'standard', params = {}) {
       const url = buildUrl(viewMode, params);
-      fetchComparables(url, { fromButton: false });
+      fetchComparables(url);
     };
   })();
 
-  function drawParcelHistoryCharts() {
-    const containers = document.querySelectorAll('[data-history-id]');
-    if (!containers.length) {
-      return;
-    }
-    containers.forEach((container) => {
-      const historyId = container.dataset.historyId;
-      if (!historyId) {
-        return;
-      }
-      const script = document.getElementById(historyId);
-      if (!script) {
-        return;
-      }
-      let points;
-      try {
-        points = JSON.parse(script.textContent || "[]");
-      } catch (_) {
-        return;
-      }
-      if (!Array.isArray(points) || points.length === 0) {
-        return;
-      }
-      const canvas = container.querySelector('canvas');
-      if (!canvas) {
-        return;
-      }
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        return;
-      }
-      const bounds = canvas.getBoundingClientRect();
-      const width = bounds.width || canvas.width;
-      const height = bounds.height || canvas.height;
-      if (!width || !height) {
-        return;
-      }
-      const ratio = window.devicePixelRatio || 1;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      canvas.width = Math.max(1, Math.round(width * ratio));
-      canvas.height = Math.max(1, Math.round(height * ratio));
-      ctx.scale(ratio, ratio);
-      ctx.clearRect(0, 0, width, height);
-
-      const numericValues = points
-        .map((point) => Number(point && point.value))
-        .filter((value) => !Number.isNaN(value));
-      if (!numericValues.length) {
-        return;
-      }
-      const minValue = Math.min(...numericValues);
-      const maxValue = Math.max(...numericValues);
-      const range = maxValue - minValue || 1;
-      const paddingX = 12;
-      const paddingY = 12;
-      const plotWidth = Math.max(width - paddingX * 2, 0);
-      const plotHeight = Math.max(height - paddingY * 2, 0);
-      const stepCount = Math.max(points.length - 1, 1);
-      let pathStarted = false;
-
-      ctx.beginPath();
-      points.forEach((point, index) => {
-        const value = Number(point && point.value);
-        if (Number.isNaN(value)) {
-          return;
-        }
-        const normalized = (value - minValue) / range;
-        const x = paddingX + (plotWidth * index) / stepCount;
-        const y = paddingY + plotHeight * (1 - normalized);
-        if (!pathStarted) {
-          ctx.moveTo(x, y);
-          pathStarted = true;
-          return;
-        }
-        ctx.lineTo(x, y);
-      });
-
-      if (!pathStarted) {
-        return;
-      }
-
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-    });
-  }
-
   window.addEventListener('resize', () => {
     drawParcelHistoryCharts();
+    const card = document.getElementById('neighborhood-section-card');
+    if (card && card.classList.contains('flipped')) {
+      updateNeighborhoodCardHeight();
+    }
   });
 
   document.addEventListener('DOMContentLoaded', () => {
-    // Initialize gauges
     const codValue = {{ neighborhood.cod|default:0 }};
     const prdValue = {{ neighborhood.prd|default:1 }};
     const salesRatioValue = {{ neighborhood.sales_ratio|default:100 }};
-
     createGauge('cod-gauge', codValue, 0, 30, 5, 15);
-    createGauge('prd-gauge', prdValue, 0.80, 1.20, 0.98, 1.03);
+    createGauge('prd-gauge', prdValue, 0.8, 1.2, 0.98, 1.03);
     createGauge('sales-ratio-gauge', salesRatioValue, 70, 130, 90, 110);
-
     drawParcelHistoryCharts();
-
-    // Auto-load comparables
     window.appealFetchComparables();
+
+    const trendButtons = document.querySelectorAll('[data-trend-mode]');
+    trendButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const mode = button.dataset.trendMode || 'values';
+        neighborhoodTrendMode = mode;
+        trendButtons.forEach((btn) => {
+          btn.classList.toggle('trend-mode-btn--active', btn === button);
+        });
+        renderTrendChart();
+      });
+    });
+
+    const trendPanel = document.getElementById('neighborhood-trend-panel');
+    if (trendPanel && !trendPanel.dataset.url) {
+      setTrendMessage('Neighborhood trends unavailable.');
+    }
   });
 </script>
-<style>
-  .spinner {
-    display: inline-block;
-    width: 1rem;
-    height: 1rem;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-right-color: white;
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  .comparables-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 1.5rem;
-    font-size: 0.9375rem;
-    color: var(--gray-600);
-  }
-</style>
 {% endblock %}

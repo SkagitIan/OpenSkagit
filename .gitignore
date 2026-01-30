@@ -1,38 +1,54 @@
-staticfiles/
-*env
-manage.py
-# Local / temporary stuff
-*.log
-*.ipynb
-*.csv
-*.json
+# Secrets / environment files
+.env
+*.env
+
+# Python cache / build artifacts
 __pycache__/
-*.pyc
-*.db
-*.txt
-*.sh
-*.txt
+*.py[cod]
+*.pyo
+*.pyd
+
+# Databases, logs, diagnostics, and blobs
 *.sqlite3
+*.db
+*.db-journal
+*.log
+logs/
+diagnostics_*.json
+
+# Generated/static artifacts
+staticfiles/
+media/
+var/
+tmp/
+*.zip
+*.tar
+*.tar.gz
+*.gz
+
+# Heavy data/analysis directories not needed for deployment
+data/
+reference_data/
+reports/
+schemas/
+CODE_DOCS/
+docs/
+
+# Tooling we do not ship to Railway
+openskagit_dagster/
+metabase/
+METABASE_SETUP.md
+workspace.yaml
+
+# Keep static data minimal
+static/openskagit/data/*
+!static/openskagit/data/live_activity.json
+
+# GIS/tiles binaries we never commit
 *.osm.pbf
 *.pbf
 *.gdb
 *.gdbtable
 *.gdbtablx
 *.gdbindexes
-
-
-!static/openskagit/data/live_activity.json
-
-# Django project data
-django_project/data/*
-django_project/reference_data/source_files/*
-logs/
-django_project/openskagit/migrations/*
-analysis.ipynb
-regression.ipynb
-
-.env
-
-# Large local GIS archives
-reference_data/source_files/geopackages/
-*.zip
+HOMEPAGE_PORTAL_README.md

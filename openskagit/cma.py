@@ -7,15 +7,14 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from django.contrib.gis.db import models as gis_models
-from django.contrib.gis.geos import GEOSGeometry, Polygon
+from django.contrib.gis.geos import GEOSGeometry, Polygon, Point
 from django.contrib.gis.measure import D
-from django.db.models import F, OuterRef, Q, Subquery, Window
-from django.db.models.functions import RowNumber
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.contrib.gis.db.models.functions import Distance, Transform
+from django.db.models.functions import Coalesce
 
-from .models import Assessor, Sales
-from .improvement_utils import rollup_for_parcel
+from .models import MasterParcel, Sales
 from .valuation_areas import resolve_market_group
 from openskagit.models import AdjustmentCoefficient
 
@@ -25,9 +24,27 @@ MAX_COMPARABLE_LIMIT = 24
 DEFAULT_RADIUS_METERS = 3000
 DEFAULT_MAX_SALE_AGE_DAYS = 540
 logger = logging.getLogger(__name__)
-RollupCache = Dict[Tuple[str, Optional[int], Optional[int]], Dict[str, object]]
+RollupCache = Dict[str, Dict[str, object]]
 
 WGS84_SRID = 4326
+
+QUALITY_SCORE_LABELS = {
+    1: "Low",
+    2: "Fair",
+    3: "Average",
+    4: "Good",
+    5: "Very Good",
+    6: "Excellent",
+}
+
+CONDITION_SCORE_LABELS = {
+    1: "Poor",
+    2: "Fair",
+    3: "Average",
+    4: "Good",
+    5: "Very Good",
+    6: "Excellent",
+}
 
 
 def _ensure_wgs84(geom: Optional[GEOSGeometry]) -> Optional[GEOSGeometry]:
@@ -66,30 +83,153 @@ def _sale_date_cutoff(max_sale_age_days: Optional[int]) -> Optional[dt.datetime]
 def get_improvement_rollup(
     parcel_number: str,
     *,
-    roll_year: Optional[int] = None,
-    roll_id: Optional[int] = None,
-    assessor_building_style: Optional[str] = None,
     cache: Optional[RollupCache] = None,
+    master_parcel: Optional[MasterParcel] = None,
+    **_unused: object,
 ) -> Dict[str, object]:
     """
-    Fetch an improvement rollup, memoizing via the provided cache when available.
-    """
-    key = (parcel_number, roll_id, roll_year)
-    if cache is not None and key in cache:
-        return cache[key]
+    Build a lightweight improvement summary directly from the MasterParcel rollups.
 
-    try:
-        rollup = rollup_for_parcel(
-            parcel_number,
-            roll_year=roll_year,
-            roll_id=roll_id,
-            assessor_building_style=assessor_building_style,
+    Legacy callers still pass roll_year / roll_id kwargs; we accept **_unused to
+    remain source-compatible while ignoring those hints (single current roll now).
+    """
+
+    def _area_value(value: Optional[object]) -> Optional[int]:
+        try:
+            if value in (None, "", "null"):
+                return None
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return None
+        if numeric <= 0:
+            return None
+        return int(round(numeric))
+
+    def _score_label(score: Optional[object], mapping: Dict[int, str]) -> Optional[str]:
+        if score in (None, "", "null"):
+            return None
+        try:
+            idx = int(round(float(score)))
+        except (TypeError, ValueError):
+            return None
+        return mapping.get(idx)
+
+    cache_key = parcel_number
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
+    parcel = master_parcel
+    if parcel is None:
+        parcel = MasterParcel.objects.filter(parcel_number=parcel_number).first()
+    if parcel is None:
+        rollup: Dict[str, object] = {}
+    else:
+        style_value = parcel.building_style or parcel.buildingstyle
+        main_area_sqft = (
+            parcel.final_living_area
+            or parcel.total_living_area
+            or parcel.living_area
         )
-    except Exception:
-        rollup = {}
+        components: List[Dict[str, object]] = []
+
+        def _append_component(
+            code: str,
+            label: str,
+            area_value: Optional[object],
+            *,
+            count_value: Optional[object] = None,
+            category: str = "other",
+        ) -> None:
+            sqft = _area_value(area_value)
+            count: Optional[int]
+            if count_value in (None, "", "null"):
+                count = None
+            else:
+                try:
+                    count = int(count_value)
+                except (TypeError, ValueError):
+                    count = None
+            if sqft is None and count in (None, 0):
+                return
+            components.append(
+                {
+                    "code": code,
+                    "label": label,
+                    "count": count,
+                    "total_sqft": sqft,
+                    "category": category,
+                }
+            )
+
+        _append_component(
+            "GARAGE",
+            "Garage",
+            parcel.final_garage_area or parcel.total_garage_area or parcel.garagesqft,
+            category="garage",
+        )
+        _append_component(
+            "DECK",
+            "Deck",
+            parcel.total_deck_area,
+            category="amenity",
+        )
+        _append_component(
+            "PORCH",
+            "Porch",
+            parcel.total_porch_area,
+            category="amenity",
+        )
+        _append_component(
+            "BASEMENT",
+            "Basement",
+            parcel.total_basement_area,
+            category="home",
+        )
+        _append_component(
+            "SHOP",
+            "Shop / Outbuilding",
+            parcel.total_shop_area,
+            count_value=parcel.total_shop_count,
+            category="outbuilding",
+        )
+        _append_component(
+            "SHED",
+            "Shed",
+            parcel.total_shed_area,
+            count_value=parcel.total_shed_count,
+            category="outbuilding",
+        )
+        if parcel.has_pool:
+            _append_component(
+                "POOL",
+                "Pool",
+                None,
+                count_value=1,
+                category="amenity",
+            )
+
+        rollup = {
+            "style": style_value,
+            "quality": _score_label(parcel.quality_score, QUALITY_SCORE_LABELS),
+            "quality_code": None,
+            "condition": _score_label(parcel.condition_score, CONDITION_SCORE_LABELS),
+            "condition_code": None,
+            "main_area": {
+                "total_sqft": _area_value(main_area_sqft),
+                "by_story": {},
+            },
+            "components": components,
+            "primary": {
+                "code": "HOME",
+                "label": style_value or "Primary Home",
+                "building_style": style_value,
+                "total_sqft": _area_value(main_area_sqft),
+                "category": "home",
+            },
+        }
 
     if cache is not None:
-        cache[key] = rollup
+        cache[cache_key] = rollup
     return rollup
 
 DIFFERENCE_ALERTS: Dict[str, Decimal] = {
@@ -143,82 +283,171 @@ class PropertySnapshot:
     acres: Optional[Decimal]
     assessed_value: Optional[Decimal]
     geom: Optional[GEOSGeometry]
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    point: Optional[Point] = None
     metadata: Dict[str, object] = field(default_factory=dict)
 
-    @classmethod
-    def from_assessor_row(cls, row, *, rollup_cache=None, address_override=None):
+    def display_point(self) -> Optional[Point]:
+        if self.point is not None:
+            return self.point
+        candidate = _geometry_display_point(self.geom)
+        if candidate is None and self.latitude is not None and self.longitude is not None:
+            try:
+                candidate = Point(float(self.longitude), float(self.latitude), srid=WGS84_SRID)
+            except (TypeError, ValueError):
+                candidate = None
+        self.point = candidate
+        return self.point
+
+    def _metadata_dict(self) -> Dict[str, object]:
+        return self.metadata if isinstance(self.metadata, dict) else {}
+
+    @property
+    def neighborhood_code(self) -> Optional[str]:
         """
-        Build a PropertySnapshot from an Assessor row used in comparable selection.
+        Surface the best-known neighborhood identifier for template/view helpers.
+        """
+        metadata = self._metadata_dict()
+        raw_code = metadata.get("neighborhood_code")
+        if not raw_code:
+            assessor_meta = metadata.get("assessor")
+            if isinstance(assessor_meta, dict):
+                raw_code = assessor_meta.get("neighborhoodcode") or assessor_meta.get("neighborhood_code")
+        if not raw_code:
+            raw_code = metadata.get("neighborhood")
+        if isinstance(raw_code, str):
+            raw_code = raw_code.strip() or None
+        return raw_code
+
+    @property
+    def neighborhood_description(self) -> Optional[str]:
+        metadata = self._metadata_dict()
+        desc = metadata.get("neighborhood") or metadata.get("neighborhood_description")
+        if isinstance(desc, str):
+            desc = desc.strip() or None
+        return desc
+
+    @classmethod
+    def from_parcel_row(cls, row, *, rollup_cache=None, address_override=None):
+        """
+        Build a PropertySnapshot from a MasterParcel row used in comparable selection.
         Mirrors load_subject(), ensuring consistent metadata for CMA and adjustments.
         """
-        snapshot_geom = getattr(row, "geom", None)
-        if snapshot_geom is not None:
-            snapshot_geom = _ensure_wgs84(snapshot_geom)
+        geom_rel = getattr(row, "geometry", None)
+        geom_lat = _float_value(getattr(geom_rel, "latitude", None)) if geom_rel else None
+        geom_lon = _float_value(getattr(geom_rel, "longitude", None)) if geom_rel else None
 
-        roll = getattr(row, "roll", None)
-        roll_year = roll.year if roll else None
-        roll_id = getattr(row, "roll_id", None)
+        snapshot_geom = None
+        try:
+            snapshot_geom = _extract_subject_geometry(row)
+        except ValueError:
+            snapshot_geom = None
+        display_point = _geometry_display_point(snapshot_geom)
+        if display_point is None and geom_lat is not None and geom_lon is not None:
+            try:
+                display_point = Point(float(geom_lon), float(geom_lat), srid=WGS84_SRID)
+            except (TypeError, ValueError):
+                display_point = None
 
-        valuation_area = resolve_market_group(getattr(row, "neighborhood_code", None)) or getattr(
+        valuation_area = resolve_market_group(getattr(row, "hood_code", None)) or getattr(
             row, "city_district", None
         )
 
         market_value = current_property_value(row)
 
         metadata: Dict[str, Optional[object]] = {
-            "neighborhood_code": getattr(row, "neighborhood_code", None),
-            "neighborhood": getattr(row, "neighborhood_code_description", None),
+            "neighborhood_code": getattr(row, "hood_code", None),
+            "neighborhood": getattr(row, "hood_description", None),
             "land_use_code": getattr(row, "land_use_code", None),
+            "land_use_description": getattr(row, "land_use_description", None),
             "city_district": getattr(row, "city_district", None),
             "valuation_area": valuation_area,
-            "valuation_subarea": getattr(row, "neighborhood_code", None),
-            "assessment_roll_year": roll_year,
-            "roll_year": roll_year,
-            "roll_id": roll_id,
-            "assessor_building_style": getattr(row, "building_style", None),
+            "valuation_subarea": getattr(row, "hood_code", None),
+            "assessor_building_style": getattr(row, "building_style", None)
+            or getattr(row, "buildingstyle", None),
             "assessed_value": float(market_value) if market_value is not None else None,
-            "total_market_value": float(getattr(row, "total_market_value", None)) if getattr(row, "total_market_value", None) is not None else None,
-            "county_assessed_value": float(getattr(row, "assessed_value", None)) if getattr(row, "assessed_value", None) is not None else None,
-            "finished_basement_sqft": float(row.finished_basement) if getattr(row, "finished_basement", None) else None,
-            "unfinished_basement_sqft": float(row.unfinished_basement) if getattr(row, "unfinished_basement", None) else None,
+            "total_market_value": float(getattr(row, "total_market_value", None))
+            if getattr(row, "total_market_value", None) is not None
+            else None,
+            "county_assessed_value": float(getattr(row, "assessed_value", None))
+            if getattr(row, "assessed_value", None) is not None
+            else None,
+            "finished_basement_sqft": float(getattr(row, "finishedbasement", None))
+            if getattr(row, "finishedbasement", None)
+            else None,
+            "unfinished_basement_sqft": float(getattr(row, "unfinishedbasement", None))
+            if getattr(row, "unfinishedbasement", None)
+            else None,
         }
 
-        calculated_sqft = _to_decimal(getattr(row, "calculated_square_footage", None))
+        calculated_sqft = _preferred_living_area(row)
         metadata["calculated_square_footage"] = (
             float(calculated_sqft) if calculated_sqft is not None else None
         )
 
+        effective_year = None
+        for attr in ("final_eff_yr_blt", "effective_yr_blt", "eff_year_built"):
+            value = getattr(row, attr, None)
+            if value:
+                try:
+                    effective_year = int(value)
+                    break
+                except (TypeError, ValueError):
+                    continue
+
         age_value: Optional[int] = None
-        effective_year = int(row.eff_year_built) if row.eff_year_built else None
         if effective_year:
             age_value = max(0, timezone.now().year - effective_year)
 
-        garage_sqft_val = getattr(row, "garage_sqft", None)
+        garage_sqft_val = (
+            getattr(row, "final_garage_area", None)
+            or getattr(row, "total_garage_area", None)
+            or getattr(row, "garagesqft", None)
+        )
         has_garage = bool(_to_decimal(garage_sqft_val) not in (None, Decimal("0")))
-        has_basement = bool(getattr(row, "finished_basement", 0) or getattr(row, "unfinished_basement", 0))
+        has_basement = bool(
+            getattr(row, "total_basement_area", None)
+            or getattr(row, "finishedbasement", None)
+            or getattr(row, "unfinishedbasement", None)
+        )
 
         address_value = (
             address_override
             if address_override is not None
-            else _clean_address(getattr(row, "address", None)) or ""
+            else _clean_address(getattr(row, "situs_address", None)) or ""
         )
+
+        living_area = _preferred_living_area(row)
+        year_built_value = None
+        for attr in ("final_year_built", "year_built"):
+            value = getattr(row, attr, None)
+            if value:
+                try:
+                    year_built_value = int(value)
+                    break
+                except (TypeError, ValueError):
+                    continue
 
         snapshot = cls(
             parcel_number=row.parcel_number,
             address=address_value,
             sale_price=_to_decimal(getattr(row, "comp_sale_price", None)),
             sale_date=_safe_date(getattr(row, "comp_sale_date", None)),
-            property_type=row.property_type,
-            living_area=_preferred_living_area(row),
-            lot_acres=_to_decimal(row.acres),
-            bedrooms=_to_decimal(row.bedrooms),
-            bathrooms=_to_decimal(row.bathrooms),
-            year_built=int(row.year_built) if row.year_built else None,
+            property_type=getattr(row, "proptype", None),
+            living_area=living_area,
+            lot_acres=_to_decimal(getattr(row, "acres", None)),
+            bedrooms=_to_decimal(getattr(row, "number_of_bedrooms", None)),
+            bathrooms=_to_decimal(getattr(row, "total_baths", None)),
+            year_built=year_built_value,
             effective_year_built=effective_year,
-            garage_sqft=_to_decimal(row.garage_sqft),
-            acres=_to_decimal(row.acres),
+            garage_sqft=_to_decimal(garage_sqft_val),
+            acres=_to_decimal(getattr(row, "acres", None)),
             assessed_value=market_value,
             geom=snapshot_geom,
+            latitude=geom_lat,
+            longitude=geom_lon,
+            point=display_point,
             metadata=metadata,
         )
 
@@ -229,17 +458,19 @@ class PropertySnapshot:
                 "condition_score": getattr(row, "condition_score", None),
                 "has_garage": has_garage,
                 "has_basement": has_basement,
+                "has_unit": getattr(row, "has_unit", None),
+                "flag_multi_structure": getattr(row, "flag_multi_structure", None),
+                "lot_acres": float(getattr(row, "acres", None))
+                if getattr(row, "acres", None) is not None
+                else None,
             }
         )
 
-        # Improvement rollup
         if rollup_cache is not None:
             snapshot.metadata["improvements"] = get_improvement_rollup(
                 row.parcel_number,
-                roll_year=roll_year,
-                roll_id=roll_id,
-                assessor_building_style=getattr(row, "building_style", None),
                 cache=rollup_cache,
+                master_parcel=row,
             )
 
         return snapshot
@@ -302,13 +533,13 @@ class ComparableResult:
             raise TypeError("ComparableResult.snapshot must be a PropertySnapshot instance.")
 
     def marker_payload(self) -> Dict[str, object]:
-        geom = self.snapshot.geom
-        if not geom:
+        point = self.snapshot.display_point()
+        if not point:
             return {}
         return {
             "parcel_number": self.snapshot.parcel_number,
-            "lat": geom.y,
-            "lon": geom.x,
+            "lat": point.y,
+            "lon": point.x,
             "sale_price": float(self.sale_price) if self.sale_price is not None else None,
             "assessed_value": float(self.assessed_value) if self.assessed_value is not None else None,
             "address": self.snapshot.address,
@@ -354,14 +585,14 @@ class ComputationResult:
 
     def marker_payloads(self) -> List[Dict[str, object]]:
         markers: List[Dict[str, object]] = []
-        subject_geom = self.subject.geom
-        if subject_geom:
+        subject_point = self.subject.display_point()
+        if subject_point:
             markers.append(
                 {
                     "type": "subject",
                     "parcel_number": self.subject.parcel_number,
-                    "lat": subject_geom.y,
-                    "lon": subject_geom.x,
+                    "lat": subject_point.y,
+                    "lon": subject_point.x,
                     "address": self.subject.address,
                 }
             )
@@ -385,7 +616,7 @@ def _to_decimal(value: Optional[object]) -> Optional[Decimal]:
 def _preferred_living_area(record: Optional[object]) -> Optional[Decimal]:
     if record is None:
         return None
-    for attr in ("calculated_square_footage", "living_area"):
+    for attr in ("final_living_area", "total_living_area", "calculated_square_footage", "living_area"):
         if hasattr(record, attr):
             area_value = _to_decimal(getattr(record, attr))
             if area_value is not None:
@@ -438,13 +669,12 @@ def _metadata_dict(snapshot: PropertySnapshot) -> Dict[str, object]:
 
 def _subject_valuation_date(subject: PropertySnapshot) -> dt.date:
     metadata = _metadata_dict(subject)
-    roll_year = metadata.get("assessment_roll_year")
-    if roll_year is not None:
-        try:
-            year = int(roll_year)
-            return dt.date(year, 1, 1)
-        except (TypeError, ValueError):
-            pass
+    for key in ("valuation_date", "assessment_date"):
+        candidate = metadata.get(key)
+        if isinstance(candidate, dt.date):
+            return candidate
+        if isinstance(candidate, dt.datetime):
+            return candidate.date()
     if subject.sale_date:
         return subject.sale_date
     return timezone.now().date()
@@ -630,102 +860,190 @@ def load_subject(
     """
     Load a parcel snapshot for CMA workflows.
 
-    When multiple AssessmentRoll years exist, prefer the explicitly requested year,
-    or fall back to the most recent year available.
+    `roll_year` is retained for backward compatibility but ignored now that
+    MasterParcel represents a single current roll.
     """
-    qs = Assessor.objects.filter(parcel_number=parcel_number)
-    if roll_year is not None:
-        qs = qs.filter(roll__year=roll_year)
-    else:
-        qs = qs.order_by("-roll__year", "-id")
-
-    assessor = qs.select_related("roll").first()
-    if assessor is None:
+    parcel = (
+        MasterParcel.objects.select_related("geometry")
+        .filter(parcel_number=parcel_number)
+        .first()
+    )
+    if parcel is None:
         raise ValueError(f"Parcel {parcel_number} could not be located")
 
-    if assessor.geom is None:
-        raise ValueError("Subject property does not have geospatial coordinates.")
+    geom_rel = getattr(parcel, "geometry", None)
+    geom_lat = _float_value(getattr(geom_rel, "latitude", None)) if geom_rel else None
+    geom_lon = _float_value(getattr(geom_rel, "longitude", None)) if geom_rel else None
 
-    subject_geom = _ensure_wgs84(assessor.geom)
-    if subject_geom is None:
-        raise ValueError("Unable to project subject geometry to WGS84.")
+    subject_geom = _extract_subject_geometry(parcel)
+    subject_point = _geometry_display_point(subject_geom)
 
     # Prefer SALES table for last sale details; handle multiple rows safely
     sale_row = (
         Sales.objects.filter(
-            parcel_number=assessor.parcel_number,
+            parcel_number=parcel.parcel_number,
             sale_type__iregex=r"^\s*valid sale\s*$",
         )
         .order_by("-sale_date")
         .first()
     )
 
-    subject_roll_year = assessor.roll.year if getattr(assessor, "roll", None) else None
-    subject_roll_id = assessor.roll_id if getattr(assessor, "roll_id", None) else None
+    subject_market_group = resolve_market_group(parcel.hood_code) or parcel.city_district
 
-    subject_market_group = resolve_market_group(assessor.neighborhood_code) or assessor.city_district
+    market_value = current_property_value(parcel)
 
-    market_value = current_property_value(assessor)
-    calculated_sqft = _to_decimal(assessor.calculated_square_footage)
+    def _first_int(*values: Optional[object]) -> Optional[int]:
+        for value in values:
+            if value in (None, "", "null"):
+                continue
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    year_built_val = _first_int(parcel.final_year_built, parcel.year_built)
+    eff_year_built = _first_int(parcel.final_eff_yr_blt, parcel.effective_yr_blt, parcel.eff_year_built)
+    living_area = _preferred_living_area(parcel)
+    garage_sqft_val = (
+        parcel.final_garage_area or parcel.total_garage_area or parcel.garagesqft
+    )
+    lot_acres_val = _to_decimal(parcel.acres)
+
+    metadata: Dict[str, Optional[object]] = {
+        "neighborhood_code": parcel.hood_code,
+        "neighborhood": parcel.hood_description,
+        "land_use_code": parcel.land_use_code,
+        "land_use_description": parcel.land_use_description,
+        "city_district": parcel.city_district,
+        "valuation_area": subject_market_group,
+        "valuation_subarea": parcel.hood_code,
+        "assessor_building_style": parcel.building_style or parcel.buildingstyle,
+        "assessed_value": float(market_value) if market_value is not None else None,
+        "total_market_value": float(parcel.total_market_value)
+        if parcel.total_market_value is not None
+        else None,
+        "county_assessed_value": float(parcel.assessed_value)
+        if parcel.assessed_value is not None
+        else None,
+        "finished_basement_sqft": float(parcel.finishedbasement)
+        if parcel.finishedbasement
+        else None,
+        "unfinished_basement_sqft": float(parcel.unfinishedbasement)
+        if parcel.unfinishedbasement
+        else None,
+        "quality_score": parcel.quality_score,
+        "condition_score": parcel.condition_score,
+        "has_garage": bool(garage_sqft_val),
+        "has_basement": bool(
+            parcel.total_basement_area or parcel.finishedbasement or parcel.unfinishedbasement
+        ),
+        "lot_acres": float(parcel.acres) if parcel.acres is not None else None,
+        "age": (timezone.now().year - eff_year_built) if eff_year_built else None,
+        "has_unit": parcel.has_unit,
+        "flag_multi_structure": parcel.flag_multi_structure,
+    }
+    if living_area is not None:
+        metadata["calculated_square_footage"] = float(living_area)
 
     snapshot = PropertySnapshot(
-        parcel_number=assessor.parcel_number,
-        address=assessor.address or "Unknown address",
-        sale_price=_to_decimal(sale_row.sale_price if sale_row else assessor.sale_price),
-        sale_date=_safe_date(sale_row.sale_date if sale_row else assessor.sale_date),
-        property_type=assessor.property_type,
-        living_area=_preferred_living_area(assessor),
-        lot_acres=_to_decimal(assessor.acres),
-        bedrooms=_to_decimal(assessor.bedrooms),
-        bathrooms=_to_decimal(assessor.bathrooms),
-        year_built=int(assessor.year_built) if assessor.year_built else None,
-        effective_year_built=int(assessor.eff_year_built) if assessor.eff_year_built else None,
-        garage_sqft=_to_decimal(assessor.garage_sqft),
-        acres=_to_decimal(assessor.acres),
+        parcel_number=parcel.parcel_number,
+        address=parcel.situs_address or "Unknown address",
+        sale_price=_to_decimal(sale_row.sale_price if sale_row else parcel.sale_price),
+        sale_date=_safe_date(sale_row.sale_date if sale_row else None),
+        property_type=parcel.proptype,
+        living_area=living_area,
+        lot_acres=lot_acres_val,
+        bedrooms=_to_decimal(parcel.number_of_bedrooms),
+        bathrooms=_to_decimal(parcel.total_baths),
+        year_built=year_built_val,
+        effective_year_built=eff_year_built,
+        garage_sqft=_to_decimal(garage_sqft_val),
+        acres=_to_decimal(parcel.acres),
         assessed_value=market_value,
         geom=subject_geom,
-        metadata={
-            "neighborhood_code": assessor.neighborhood_code,
-            "land_use_code": assessor.land_use_code,
-            "city_district": assessor.city_district,
-        "valuation_area": subject_market_group,
-        "assessment_roll_year": subject_roll_year,
-        "roll_year": subject_roll_year,
-        "roll_id": subject_roll_id,
-        "assessor_building_style": assessor.building_style,
-        "assessed_value": float(market_value) if market_value is not None else None,
-        "total_market_value": float(assessor.total_market_value) if assessor.total_market_value is not None else None,
-        "county_assessed_value": float(assessor.assessed_value) if assessor.assessed_value is not None else None,
-        "finished_basement_sqft": float(assessor.finished_basement) if assessor.finished_basement else None,
-        "unfinished_basement_sqft": float(assessor.unfinished_basement) if assessor.unfinished_basement else None,
-        "quality_score": getattr(assessor, "quality_score", None),
-        "condition_score": getattr(assessor, "condition_score", None),
-        "calculated_square_footage": float(calculated_sqft) if calculated_sqft is not None else None,
-        "has_garage": bool(assessor.garage_sqft),
-            "has_basement": bool(
-                (assessor.finished_basement or 0) > 0 or (assessor.unfinished_basement or 0) > 0
-            ),
-            "lot_acres": float(assessor.acres) if assessor.acres is not None else None,
-            "age": (timezone.now().year - int(assessor.eff_year_built)) if assessor.eff_year_built else None,
-        },
+        latitude=geom_lat,
+        longitude=geom_lon,
+        point=subject_point,
+        metadata=metadata,
     )
-    has_basement = False
-    if assessor.finished_basement and assessor.finished_basement > 0:
-        has_basement = True
-    if assessor.unfinished_basement and assessor.unfinished_basement > 0:
-        has_basement = True
-    snapshot.metadata["has_basement"] = has_basement
 
     # Attach improvement rollup for subject display and downstream pages
     snapshot.metadata["improvements"] = get_improvement_rollup(
-        assessor.parcel_number,
-        roll_year=subject_roll_year,
-        roll_id=subject_roll_id,
-        assessor_building_style=assessor.building_style,
+        parcel.parcel_number,
         cache=rollup_cache,
+        master_parcel=parcel,
     )
 
     return snapshot
+
+
+def _extract_subject_geometry(parcel: MasterParcel) -> GEOSGeometry:
+    """
+    Locate a usable WGS84 geometry for the parcel, trying multiple fallbacks.
+    """
+    geom_rel = getattr(parcel, "geometry", None)
+    candidates: List[Optional[GEOSGeometry]] = []
+    if geom_rel is not None:
+        candidates.extend(
+            [
+                getattr(geom_rel, "geom", None),
+                getattr(geom_rel, "geom_2926", None),
+                getattr(geom_rel, "geom_backup", None),
+            ]
+        )
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        normalized = _ensure_wgs84(candidate)
+        if normalized is not None:
+            return normalized
+    centroid = getattr(geom_rel, "centroid_geog", None) if geom_rel is not None else None
+    if centroid is not None:
+        try:
+            if getattr(centroid, "srid", None) != WGS84_SRID:
+                centroid = centroid.clone()
+                centroid.transform(WGS84_SRID)
+            return centroid
+        except Exception:
+            pass
+
+    lat = getattr(geom_rel, "latitude", None) if geom_rel is not None else None
+    lon = getattr(geom_rel, "longitude", None) if geom_rel is not None else None
+    if lat in (None, "") or lon in (None, ""):
+        lat = getattr(parcel, "latitude", None)
+        lon = getattr(parcel, "longitude", None)
+    if lat not in (None, "") and lon not in (None, ""):
+        try:
+            return Point(float(lon), float(lat), srid=WGS84_SRID)
+        except (TypeError, ValueError):
+            pass
+    raise ValueError("Subject property does not have geospatial coordinates.")
+
+
+def _geometry_display_point(geom: Optional[GEOSGeometry]) -> Optional[Point]:
+    """
+    Convert any geometry into a WGS84 point suitable for map display.
+    """
+    if geom is None:
+        return None
+    point = geom
+    if not isinstance(point, Point):
+        try:
+            point = geom.centroid
+        except Exception:
+            return None
+    if point is None:
+        return None
+    point_srid = getattr(point, "srid", None)
+    if point_srid is None or point_srid != WGS84_SRID:
+        try:
+            normalized = GEOSGeometry(point.wkb, srid=point_srid or geom.srid or WGS84_SRID)
+            normalized.transform(WGS84_SRID)
+            point = normalized
+        except Exception:
+            return None
+    return point
 
 
 def _base_queryset(
@@ -733,7 +1051,7 @@ def _base_queryset(
     radius_meters: Optional[float] = None,
     *,
     max_sale_age_days: Optional[int] = DEFAULT_MAX_SALE_AGE_DAYS,
-) -> Iterable[Assessor]:
+) -> Iterable[MasterParcel]:
     # Subqueries for SALES table
     sale_sq_base = Sales.objects.filter(
         parcel_number=OuterRef("parcel_number"),
@@ -751,55 +1069,63 @@ def _base_queryset(
     # BASE QUERYSET – SPATIAL PRUNING FIRST (very fast)
     # -----------------------------------------------------
     qs = (
-        Assessor.objects
-        .filter(geom__isnull=False, roll__year=2025, property_type="R")
-        .annotate(geom_4326=Transform("geom", WGS84_SRID))
+        MasterParcel.objects
+        .select_related("geometry")
+        .filter(
+            Q(geometry__geom__isnull=False)
+            | Q(geometry__geom_2926__isnull=False)
+            | Q(geometry__centroid_geog__isnull=False)
+        )
+        .exclude(parcel_number=subject.parcel_number)
     )
 
+    subject_geom_3857: Optional[GEOSGeometry] = None
+    try:
+        subject_geom_3857 = GEOSGeometry(subject_geom.wkb, srid=subject_geom.srid)
+        subject_geom_3857.transform(3857)
+    except Exception:
+        subject_geom_3857 = None
+
+    subject_geom_2926: Optional[GEOSGeometry] = None
+    try:
+        subject_geom_2926 = GEOSGeometry(subject_geom.wkb, srid=subject_geom.srid)
+        subject_geom_2926.transform(2926)
+    except Exception:
+        subject_geom_2926 = None
+
     if radius_meters is not None:
-        qs = qs.filter(
-            geom_4326__distance_lte=(
+        distance_filter = Q()
+        if subject_geom_3857 is not None:
+            distance_filter |= Q(
+                geometry__geom__distance_lte=(
+                    subject_geom_3857,
+                    D(m=radius_meters),
+                )
+            )
+        if subject_geom_2926 is not None:
+            distance_filter |= Q(
+                geometry__geom_2926__distance_lte=(
+                    subject_geom_2926,
+                    D(m=radius_meters),
+                )
+            )
+        distance_filter |= Q(
+            geometry__centroid_geog__distance_lte=(
                 subject_geom,
                 D(m=radius_meters),
             )
         )
+        qs = qs.filter(distance_filter)
 
-    distance_expr = Distance("geom_4326", subject_geom, spheroid=True)
-    qs = qs.annotate(
-        distance_sort=distance_expr,
-        distance_meters=distance_expr,
+    geometry_expr = Coalesce(
+        Transform("geometry__geom", WGS84_SRID),
+        Transform("geometry__geom_2926", WGS84_SRID),
+        "geometry__centroid_geog",
+        output_field=gis_models.GeometryField(srid=WGS84_SRID),
     )
+    distance_expr = Distance(geometry_expr, subject_geom, spheroid=True)
+    qs = qs.annotate(distance_sort=distance_expr, distance_meters=distance_expr)
 
-    # Only select fields needed later
-    qs = qs.only(
-        "parcel_number",
-        "address",
-        "calculated_square_footage",
-        "living_area",
-        "bedrooms",
-        "bathrooms",
-        "garage_sqft",
-        "acres",
-        "year_built",
-        "eff_year_built",
-        "finished_basement",
-        "unfinished_basement",
-        "geom",
-        "property_type",
-        "neighborhood_code",
-        "building_style",
-        "city_district",
-        "assessed_value",
-        "total_market_value",
-        "quality_score",
-        "condition_score",
-        "condition_code",
-    )
-
-    # Exclude subject parcel
-    qs = qs.exclude(parcel_number=subject.parcel_number)
-
-    # Attach sales subqueries
     qs = qs.annotate(
         comp_sale_price=sale_sq_price,
         comp_sale_date=sale_sq_date,
@@ -811,23 +1137,15 @@ def _base_queryset(
         qs = qs.filter(comp_sale_date__isnull=False, comp_sale_date__gte=sale_cutoff)
     else:
         qs = qs.filter(comp_sale_date__isnull=False)
-    # Pick latest roll per parcel
-    qs = qs.annotate(
-        parcel_rank=Window(
-            expression=RowNumber(),
-            partition_by=[F("parcel_number")],
-            order_by=[
-                F("roll__year").desc(nulls_last=True),
-                F("id").desc(),
-            ],
-        )
-    ).filter(parcel_rank=1)
+    return qs
 
-    return qs.select_related()
-
-def apply_filters(qs: Iterable[Assessor], filters: CmaFilters) -> Iterable[Assessor]:
+def apply_filters(qs: Iterable[MasterParcel], filters: CmaFilters) -> Iterable[MasterParcel]:
     if filters.property_type:
-        qs = qs.filter(property_type__iexact=filters.property_type)
+        qs = qs.filter(
+            Q(proptype__iexact=filters.property_type)
+            | Q(proptype__isnull=True)
+            | Q(proptype__exact="")
+        )
     if filters.sale_date_min:
         start_dt = dt.datetime.combine(filters.sale_date_min, dt.time.min)
         if timezone.is_naive(start_dt):
@@ -843,11 +1161,17 @@ def apply_filters(qs: Iterable[Assessor], filters: CmaFilters) -> Iterable[Asses
     if filters.max_price is not None:
         qs = qs.filter(comp_sale_price__lte=filters.max_price)
     if filters.bedrooms is not None:
-        qs = qs.filter(bedrooms__gte=filters.bedrooms)
+        qs = qs.filter(
+            Q(number_of_bedrooms__gte=filters.bedrooms)
+            | Q(number_of_bedrooms__isnull=True)
+        )
     if filters.bathrooms is not None:
-        qs = qs.filter(bathrooms__gte=filters.bathrooms)
+        qs = qs.filter(
+            Q(total_baths__gte=filters.bathrooms)
+            | Q(total_baths__isnull=True)
+        )
     if filters.bbox:
-        qs = qs.filter(geom__within=filters.bbox)
+        qs = qs.filter(geometry__geom_2926__within=filters.bbox)
     return qs
 
 def build_comparables(
@@ -893,47 +1217,43 @@ def build_comparables(
     # ---------------------------------------
     excluded = excluded or []
 
-    qs = (
-        Assessor.objects
-        .filter(
-            geom__isnull=False,
-            property_type="R",
-        )
-        .exclude(parcel_number=subject.parcel_number)
-        .exclude(parcel_number__in=excluded)
-        .annotate(
-            geom_4326=Transform("geom", WGS84_SRID),
-        )
-        .select_related("roll")
-    )
+    qs = _base_queryset(
+        subject,
+        radius_meters=search_radius,
+        max_sale_age_days=max_sale_age_days,
+    ).exclude(parcel_number__in=excluded)
 
-    qs = (
-        qs.filter(
-            bedrooms__isnull=False,
-            bathrooms__isnull=False,
-            year_built__isnull=False,
+    subject_property_type = (subject.property_type or "").strip()
+    if subject_property_type:
+        qs = qs.filter(
+            Q(proptype__iexact=subject_property_type)
+            | Q(proptype__isnull=True)
+            | Q(proptype__exact="")
         )
-        .filter(
-            Q(calculated_square_footage__isnull=False) | Q(living_area__isnull=False)
+    else:
+        qs = qs.filter(
+            Q(proptype__iexact="R")
+            | Q(proptype__isnull=True)
+            | Q(proptype__exact="")
         )
+
+    qs = qs.filter(
+        Q(final_year_built__isnull=False)
+        | Q(year_built__isnull=False)
+        | Q(eff_year_built__isnull=False)
+        | Q(effective_yr_blt__isnull=False)
+    ).filter(
+        Q(final_living_area__isnull=False)
+        | Q(total_living_area__isnull=False)
+        | Q(living_area__isnull=False)
     )
 
     if subject_land_use:
-        qs = qs.filter(land_use_code__iexact=subject_land_use)
-
-    if search_radius is not None:
         qs = qs.filter(
-            geom_4326__distance_lte=(
-                geom,
-                D(m=search_radius),
-            )
+            Q(land_use_code__iexact=subject_land_use)
+            | Q(land_use_code__isnull=True)
+            | Q(land_use_code__exact="")
         )
-
-    distance_expr = Distance("geom_4326", geom, spheroid=True)
-    qs = qs.annotate(
-        distance_sort=distance_expr,
-        distance_meters=distance_expr,
-    )
 
     # ---------------------------------------
     # 2. Structural filters (safe access)
@@ -949,9 +1269,17 @@ def build_comparables(
         qs = qs.filter(acres__lte=max_acres)
 
     if min_year is not None:
-        qs = qs.filter(eff_year_built__gte=min_year)
+        qs = qs.filter(
+            Q(final_eff_yr_blt__gte=min_year)
+            | Q(effective_yr_blt__gte=min_year)
+            | Q(eff_year_built__gte=min_year)
+        )
     if max_year is not None:
-        qs = qs.filter(eff_year_built__lte=max_year)
+        qs = qs.filter(
+            Q(final_eff_yr_blt__lte=max_year)
+            | Q(effective_yr_blt__lte=max_year)
+            | Q(eff_year_built__lte=max_year)
+        )
 
     # ---------------------------------------
     # 3. Annotate: latest valid sale per parcel
@@ -1002,7 +1330,7 @@ def build_comparables(
     qs = qs.order_by(*distinct_order).distinct("parcel_number")
 
     total_needed = limit * oversample_factor
-    raw_rows: List[Assessor] = []
+    raw_rows: List[MasterParcel] = []
     fetched_parcels: set[str] = set()
 
     def _fetch_rows(base_qs, needed: int) -> None:
@@ -1016,7 +1344,7 @@ def build_comparables(
         raw_rows.extend(rows)
 
     if subject_neighborhood:
-        _fetch_rows(qs.filter(neighborhood_code=subject_neighborhood), total_needed)
+        _fetch_rows(qs.filter(hood_code=subject_neighborhood), total_needed)
 
     if len(raw_rows) < total_needed and subject_city:
         remaining = total_needed - len(raw_rows)
@@ -1045,10 +1373,10 @@ def build_comparables(
         parcel_id = getattr(row, "parcel_number", None)
         if not parcel_id or parcel_id in seen_parcels:
             continue
-        clean_address = _clean_address(getattr(row, "address", None))
+        clean_address = _clean_address(getattr(row, "situs_address", None))
         if clean_address is None:
             continue
-        snapshot = PropertySnapshot.from_assessor_row(
+        snapshot = PropertySnapshot.from_parcel_row(
             row,
             rollup_cache=rollup_cache,
             address_override=clean_address,
@@ -1114,9 +1442,6 @@ def _prefetch_improvements(comps, rollup_cache):
         if "improvements" not in snap.metadata:
             snap.metadata["improvements"] = get_improvement_rollup(
                 snap.parcel_number,
-                roll_year=snap.metadata.get("assessment_roll_year"),
-                roll_id=snap.metadata.get("roll_id"),
-                assessor_building_style=snap.metadata.get("assessor_building_style"),
                 cache=rollup_cache,
             )
 
@@ -1156,23 +1481,39 @@ def _sort_comparables(
     return sorted(comparables, key=key_func, reverse=reverse)
 
 
-def _compute_difference_flags(subject: PropertySnapshot, candidate: Assessor) -> Dict[str, bool]:
+def _compute_difference_flags(subject: PropertySnapshot, candidate: MasterParcel) -> Dict[str, bool]:
     """
     Compare basic property characteristics to flag notable deltas without applying adjustments.
     """
     flags: Dict[str, bool] = {}
     field_pairs = {
         "living_area": ("living_area", None),
-        "bedrooms": ("bedrooms", "bedrooms"),
-        "bathrooms": ("bathrooms", "bathrooms"),
-        "garage_sqft": ("garage_sqft", "garage_sqft"),
+        "bedrooms": ("bedrooms", "number_of_bedrooms"),
+        "bathrooms": ("bathrooms", "total_baths"),
+        "garage_sqft": ("garage_sqft", None),
         "acres": ("acres", "acres"),
-        "year_built": ("year_built", "year_built"),
+        "year_built": ("year_built", None),
     }
     for key, (subject_attr, candidate_attr) in field_pairs.items():
         if key == "living_area":
             subj_val = _to_decimal(getattr(subject, subject_attr, None))
             comp_val = _preferred_living_area(candidate)
+        elif key == "garage_sqft":
+            subj_val = _to_decimal(getattr(subject, subject_attr, None))
+            comp_val = _to_decimal(
+                getattr(candidate, "final_garage_area", None)
+                or getattr(candidate, "total_garage_area", None)
+                or getattr(candidate, "garagesqft", None)
+            )
+        elif key == "year_built":
+            subj_val = _to_decimal(getattr(subject, subject_attr, None))
+            comp_val = None
+            for attr in ("final_year_built", "year_built"):
+                value = getattr(candidate, attr, None)
+                if value:
+                    comp_val = _to_decimal(value)
+                    if comp_val is not None:
+                        break
         else:
             subj_val = _to_decimal(getattr(subject, subject_attr, None))
             comp_val = _to_decimal(getattr(candidate, candidate_attr, None))
@@ -1241,7 +1582,9 @@ def _parse_bbox(value: Optional[str]) -> Optional[Polygon]:
         coords = [float(coord) for coord in value.split(",")]
         if len(coords) != 4:
             return None
-        return Polygon.from_bbox(coords)
+        poly = Polygon.from_bbox(coords)
+        poly.srid = WGS84_SRID
+        return poly
     except (TypeError, ValueError):
         return None
 
@@ -1260,18 +1603,23 @@ def fetch_sales_within_view(
 
     markers: List[Dict[str, object]] = []
     for candidate in queryset:
-        if not candidate.geom:
+        try:
+            geom = _extract_subject_geometry(candidate)
+        except ValueError:
+            geom = None
+        point = _geometry_display_point(geom)
+        if point is None:
             continue
         markers.append(
             {
                 "parcel_number": candidate.parcel_number,
-                "lat": candidate.geom.y,
-                "lon": candidate.geom.x,
+                "lat": point.y,
+                "lon": point.x,
                 "sale_price": float(getattr(candidate, "comp_sale_price", 0)) if getattr(candidate, "comp_sale_price", None) else None,
                 "sale_date": _safe_date(getattr(candidate, "comp_sale_date", None)).isoformat()
                 if _safe_date(getattr(candidate, "comp_sale_date", None))
                 else None,
-                "address": candidate.address,
+                "address": getattr(candidate, "situs_address", None),
             }
         )
     return markers

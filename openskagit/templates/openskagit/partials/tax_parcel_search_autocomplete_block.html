@@ -1,0 +1,166 @@
+<div id="tax-selection-display" class="hidden w-full"></div>
+
+<form class="space-y-3 w-full" onsubmit="return false;">
+  <div class="relative">
+    <input
+      id="tax-search"
+      name="q"
+      type="text"
+      class="w-full rounded-2xl border border-slate-200 bg-white/70 py-4 px-4 text-base text-slate-900 shadow-inner shadow-slate-100 placeholder:text-slate-400 focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-100"
+      placeholder="e.g., 101 Main St or P12345"
+      autocomplete="off"
+      hx-get="{% url 'tax-parcel-search' %}"
+      hx-target="#tax-results"
+      hx-trigger="keyup changed delay:400ms"
+      hx-on::before-request="
+        const minLen = 3;
+        const indicator = document.getElementById('tax-search-loading');
+        const results = document.getElementById('tax-results');
+        const wrapper = document.getElementById('tax-results-wrapper');
+        if (this.value.trim().length < minLen) {
+          event.detail.shouldCancel = true;
+          results.innerHTML = '';
+          wrapper.classList.add('hidden');
+          if (indicator) indicator.classList.add('hidden');
+          return;
+        }
+        if (indicator) indicator.classList.remove('hidden');
+      "
+      hx-on::after-request="
+        const wrapper = document.getElementById('tax-results-wrapper');
+        const results = document.getElementById('tax-results');
+        const indicator = document.getElementById('tax-search-loading');
+        if (indicator) indicator.classList.add('hidden');
+        if (results.innerHTML.trim()) {
+          wrapper.classList.remove('hidden');
+        } else {
+          wrapper.classList.add('hidden');
+        }
+      "
+    />
+  </div>
+</form>
+
+<div id="tax-search-loading" class="mt-4 hidden items-center gap-2 text-sm text-slate-600">
+  <div class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></div>
+  Searching properties…
+</div>
+
+<div id="tax-results-wrapper" class="mt-6 hidden w-full rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/60">
+  <div id="tax-results" class="divide-y divide-slate-100"></div>
+</div>
+
+<script>
+  (function () {
+    const inputId = "tax-search";
+    const resultsId = "tax-results";
+    const wrapperId = "tax-results-wrapper";
+    const selectionId = "tax-selection-display";
+
+    function resolveButton(event) {
+      if (!event) {
+        return null;
+      }
+      if (event.detail && event.detail.elt) {
+        return event.detail.elt;
+      }
+      if (event.currentTarget) {
+        return event.currentTarget;
+      }
+      return event.target?.closest(".autocomplete-result") || null;
+    }
+
+    function dispatchSelection(detail) {
+      document.dispatchEvent(
+        new CustomEvent("tax-parcel-selected", {
+          detail,
+        })
+      );
+    }
+
+    function renderSelection(detail) {
+      const input = document.getElementById(inputId);
+      const display = document.getElementById(selectionId);
+      const results = document.getElementById(resultsId);
+      const wrapper = document.getElementById(wrapperId);
+
+      if (!input || !display || !results || !wrapper) {
+        return;
+      }
+
+      const address = detail.address || "";
+      const parcel = detail.parcel || "";
+      const details = detail.details || "";
+
+      input.classList.add("hidden");
+      display.innerHTML = `
+        <div class="flex w-full flex-wrap items-center gap-4 rounded-2xl border border-sage-100 bg-sage-50/80 p-5 shadow-xl">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-500 text-2xl font-semibold text-white">✓</div>
+          <div class="flex-1 min-w-[200px]">
+            <p class="text-xs font-semibold uppercase tracking-wide text-sage-500">Selected property</p>
+            <p class="text-lg font-semibold text-slate-900">${address || "Address unavailable"}</p>
+            <p class="text-sm text-slate-600">Parcel ${parcel}${details ? " • " + details : ""}</p>
+          </div>
+          <button class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-800" type="button" onclick="window.taxSearchReset()">
+            Change
+          </button>
+        </div>
+      `;
+      display.classList.remove("hidden");
+      results.innerHTML = "";
+      wrapper.classList.add("hidden");
+      input.blur();
+    }
+
+    window.taxSearchSelect = function (event) {
+      const button = resolveButton(event);
+      if (!button) {
+        return;
+      }
+
+      if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+      }
+
+      const address = button.dataset.address || "";
+      const parcel = button.dataset.parcel || "";
+      const details = button.dataset.details || "";
+      const neighborhood = button.dataset.neighborhood || "";
+
+      renderSelection({ address, parcel, details });
+      dispatchSelection({ parcel, address, details, neighborhood });
+    };
+
+    window.taxApplySelection = function (detail) {
+      if (!detail || !detail.parcel) {
+        return;
+      }
+      renderSelection(detail);
+      dispatchSelection(detail);
+    };
+
+    window.taxSearchReset = function () {
+      const input = document.getElementById(inputId);
+      const display = document.getElementById(selectionId);
+      const results = document.getElementById(resultsId);
+      const wrapper = document.getElementById(wrapperId);
+
+      if (!input || !display || !results || !wrapper) {
+        return;
+      }
+
+      display.classList.add("hidden");
+      display.textContent = "";
+      input.classList.remove("hidden");
+      input.value = "";
+      results.innerHTML = "";
+      wrapper.classList.add("hidden");
+      document.dispatchEvent(new CustomEvent("tax-parcel-reset"));
+      window.setTimeout(() => input.focus(), 0);
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById(inputId)?.focus();
+    });
+  })();
+</script>

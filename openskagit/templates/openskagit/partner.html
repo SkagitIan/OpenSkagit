@@ -1,0 +1,74 @@
+{% extends "openskagit/base.html" %}
+{% block content %}
+<section class="relative overflow-hidden py-24 sm:py-32 bg-gradient-to-b from-sage-50 via-white to-white">
+  <div class="absolute inset-0 -z-10">
+    <div class="absolute top-[-10rem] left-1/2 -translate-x-1/2 w-[32rem] h-[32rem] bg-sage-200/40 blur-3xl rounded-full"></div>
+    <div class="absolute bottom-[-8rem] right-[-6rem] w-[28rem] h-[28rem] bg-amber-100/40 blur-3xl rounded-full"></div>
+    <div class="absolute bottom-10 left-[-4rem] w-[18rem] h-[18rem] bg-sky-100/40 blur-3xl rounded-full"></div>
+  </div>
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
+    <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/80 border border-sage-100 shadow-sm text-sm font-semibold text-sage-700">
+      <span class="h-2 w-2 rounded-full bg-sage-500"></span>
+      Built with local records, geography &amp; lived context
+    </div>
+    <h1 class="text-4xl sm:text-5xl font-bold leading-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-sage-900 to-slate-900">
+      Building local understanding works better when it's shared.
+    </h1>
+    <p class="text-gray-700 text-lg sm:text-xl">OpenSkagit is being built as a public-facing data asset for Skagit Valley&mdash;grounded in local records, geography, and lived context. Partnerships matter because no single organization sees the whole picture. The strongest insight comes from collaboration between people who work with the data, teach it, question it, and use it in the real world.</p>
+    <p class="text-gray-700 text-lg sm:text-xl">We partner with groups who care about clarity, accuracy, and public trust&mdash;and who see shared understanding as something worth building together.</p>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a href="{% url 'contact' %}?topic=partnership" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-white bg-sage-600 hover:bg-sage-700 font-semibold shadow-lg shadow-sage-200 transition-colors">
+        Start a partnership conversation
+        <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 3l4 5-4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </a>
+      <a href="#ideal-partnerships" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-sage-700 border border-sage-200 font-semibold shadow-sm hover:border-sage-400">
+        See example partners
+      </a>
+    </div>
+    <div class="inline-flex items-center gap-3 px-5 py-3 rounded-3xl bg-gradient-to-r from-sage-200 via-rose-100 to-sky-200 text-slate-900 text-sm sm:text-base font-semibold shadow-lg shadow-sage-100/60">
+      <span class="h-2 w-2 rounded-full bg-slate-700"></span>
+      Collaboration is how we turn data, teaching, and lived experience into shared understanding.
+    </div>
+  </div>
+</section>
+
+<section id="ideal-partnerships" class="py-20 bg-sage-50">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl mb-12">
+      <p class="text-sm uppercase tracking-wide font-semibold text-sage-700">Examples of Ideal Partnerships</p>
+      <h2 class="text-3xl font-bold text-gray-900 mt-2">Collaborations that fit naturally with OpenSkagit's mission.</h2>
+      <p class="text-gray-700 text-lg mt-4">These examples show how partners use shared insight to make public data more practical, transparent, and actionable.</p>
+    </div>
+    <div class="grid gap-8 md:grid-cols-2">
+      <div class="p-8 border border-slate-200 rounded-3xl shadow-sm bg-slate-50">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-3">Housing &amp; Affordability Nonprofits</h3>
+        <p class="text-gray-700">Partners use neighborhood-level insight to understand housing pressure, zoning dynamics, permits, and participation. OpenSkagit supports advocacy and planning with source-linked maps, summaries, and data that can be shared publicly without losing nuance.</p>
+      </div>
+      <div class="p-8 border border-slate-200 rounded-3xl shadow-sm bg-slate-50">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-3">Schools, Educators &amp; Learning Programs</h3>
+        <p class="text-gray-700">Educators use OpenSkagit to teach civics, geography, and data literacy through real local examples. Students explore how neighborhoods differ, how decisions ripple outward, and how public data becomes understanding&mdash;not just numbers.</p>
+      </div>
+      <div class="p-8 border border-slate-200 rounded-3xl shadow-sm bg-slate-50">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-3">Neighborhood &amp; Community-Led Groups</h3>
+        <p class="text-gray-700">Community groups use OpenSkagit to explore planning, taxes, participation, and change together. Tools and shareable briefs help turn meetings and conversations into informed discussion built on shared facts.</p>
+      </div>
+      <div class="p-8 border border-slate-200 rounded-3xl shadow-sm bg-slate-50">
+        <h3 class="text-2xl font-semibold text-gray-900 mb-3">Business &amp; Economic Organizations</h3>
+        <p class="text-gray-700">Chambers, downtown associations, and economic groups use OpenSkagit to understand local demand, sentiment, and activity patterns derived from spending, menus, and reviews&mdash;adding context to decisions that are often driven by anecdotes alone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-20 bg-white">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+    <h2 class="text-3xl font-bold text-gray-900">Interested in partnering with OpenSkagit?</h2>
+    <p class="text-gray-700 text-lg">Tell us about your goals, the communities you support, and how shared understanding can help.</p>
+    <a href="{% url 'contact' %}?topic=partnership" class="inline-flex items-center px-6 py-3 rounded-2xl text-white bg-sage-600 hover:bg-sage-700 font-semibold shadow-md transition-colors">
+      Contact us
+    </a>
+  </div>
+</section>
+{% endblock %}

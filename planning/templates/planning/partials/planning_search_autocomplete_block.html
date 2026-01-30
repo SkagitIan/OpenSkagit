@@ -1,0 +1,65 @@
+<form class="planning-search-form" method="get" action="">
+  <div class="input-wrapper">
+    <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.35-4.35"></path>
+    </svg>
+    <input
+      id="planning-search-input"
+      name="q"
+      type="text"
+      class="input"
+      placeholder="Start typing an address or parcel number"
+      autocomplete="off"
+      hx-get="{% url 'planning-parcel-search' %}"
+      hx-target="#planning-search-results"
+      hx-trigger="keyup changed delay:400ms"
+      hx-indicator="#planning-search-loading"
+      hx-on::before-request="
+        const minLen = {{ min_length|default:3 }};
+        if(this.value.trim().length < minLen) {
+          event.detail.shouldCancel = true;
+          document.getElementById('planning-search-results').innerHTML = '';
+          document.getElementById('planning-search-wrapper').classList.remove('search-results-container--visible');
+        }
+      "
+      hx-on::after-request="
+        const wrapper = document.getElementById('planning-search-wrapper');
+        const results = document.getElementById('planning-search-results');
+        if(results.innerHTML.trim()) {
+          wrapper.classList.add('search-results-container--visible');
+        }
+      "
+    />
+    <button type="button" class="input-clear" onclick="
+      const input = document.getElementById('planning-search-input');
+      const results = document.getElementById('planning-search-results');
+      const wrapper = document.getElementById('planning-search-wrapper');
+      input.value = '';
+      results.innerHTML = '';
+      wrapper.classList.remove('search-results-container--visible');
+      input.focus();
+    " aria-label="Clear search">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+    <button type="submit" class="input-submit">
+      <span>Go</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12h14"></path>
+        <path d="m13 5 7 7-7 7"></path>
+      </svg>
+    </button>
+  </div>
+</form>
+
+<div id="planning-search-loading" class="hidden loading-indicator">
+  <div class="spinner"></div>
+  Searching parcels...
+</div>
+
+<div id="planning-search-wrapper" class="search-results-container">
+  <div id="planning-search-results"></div>
+</div>

@@ -1,0 +1,104 @@
+{% extends "openskagit/base.html" %}
+{% block content %}
+<section class="py-16 sm:py-20 bg-white">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid gap-12 lg:grid-cols-2 lg:gap-16 items-start">
+      <div class="space-y-6">
+        <div class="space-y-2">
+          <p class="text-sm font-semibold text-sage-700 uppercase tracking-wide">Contact</p>
+          <h1 class="text-4xl font-bold text-gray-900">We'd love to hear from you</h1>
+          <p class="text-lg text-slate-700">Tell us how we can help—product support, data partnerships, or a media request. Every note goes straight to Ian so we can respond quickly.</p>
+        </div>
+        <div class="rounded-3xl border border-slate-200 bg-slate-50/60 p-6 space-y-4">
+          <h2 class="text-xl font-semibold text-gray-900">Common topics</h2>
+          <ul class="space-y-3 text-slate-700">
+            <li class="flex items-start gap-3">
+              <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-sage-500"></span>
+              <div>
+                <p class="font-medium text-gray-900">Partnership comments</p>
+                <p>Collaborations with local governments, civic groups, or neighborhood coalitions.</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-sage-500"></span>
+              <div>
+                <p class="font-medium text-gray-900">Media requests</p>
+                <p>Interviews, story ideas, or data pulls for journalists and researchers.</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-sage-500"></span>
+              <div>
+                <p class="font-medium text-gray-900">Product feedback</p>
+                <p>Questions on assessments, parcel insights, or the VoteVector tools.</p>
+              </div>
+            </li>
+          </ul>
+          <div class="text-sm text-slate-600 pt-2 border-t border-slate-200">
+            Prefer email? Reach Ian directly at <a href="mailto:ian@openskagit.com" class="font-semibold text-sage-600 underline decoration-sage-300 hover:text-sage-700">ian@openskagit.com</a>.
+          </div>
+        </div>
+      </div>
+      <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 lg:p-8">
+        <div class="space-y-4">
+          {% if messages %}
+            <div class="space-y-3">
+              {% for message in messages %}
+                <div class="rounded-2xl border-l-4 px-4 py-3 text-sm font-medium
+                  {% if 'success' in message.tags %} border-sage-500 bg-sage-50 text-sage-900
+                  {% elif 'error' in message.tags %} border-red-500 bg-red-50 text-red-900
+                  {% elif 'warning' in message.tags %} border-amber-500 bg-amber-50 text-amber-900
+                  {% else %} border-slate-500 bg-slate-50 text-slate-900
+                  {% endif %}
+                ">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <form method="post" class="space-y-6">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                {% for error in form.non_field_errors %}
+                  <p>{{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <div>
+              <label for="{{ form.email.id_for_label }}" class="text-sm font-semibold text-gray-900">Email</label>
+              {{ form.email }}
+              {% for error in form.email.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ error }}</p>
+              {% endfor %}
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <label for="{{ form.topic.id_for_label }}" class="text-sm font-semibold text-gray-900">Topic</label>
+                {% if form.topic.help_text %}
+                  <p class="text-xs text-slate-500">{{ form.topic.help_text }}</p>
+                {% endif %}
+              </div>
+              {{ form.topic }}
+              {% for error in form.topic.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ error }}</p>
+              {% endfor %}
+            </div>
+            <div>
+              <label for="{{ form.message.id_for_label }}" class="text-sm font-semibold text-gray-900">{{ form.message.label }}</label>
+              {{ form.message }}
+              {% for error in form.message.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ error }}</p>
+              {% endfor %}
+            </div>
+            <button type="submit" class="inline-flex w-full items-center justify-center rounded-2xl bg-sage-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-sage-200/80 transition hover:bg-sage-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-500">
+              Send message
+            </button>
+            <p class="text-xs text-slate-500 text-center">We typically reply within one business day.</p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

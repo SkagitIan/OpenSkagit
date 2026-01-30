@@ -1,40 +1,75 @@
 from django.contrib import admin
-from .models import Assessor, Improvements, Land, Sales, AssessmentRoll, AdjustmentCoefficient,NeighborhoodGeom, NeighborhoodProfile
-from leaflet.admin import LeafletGeoAdmin
-from .models import ParcelHistory
 
-from .models import RegressionAdjustment, RegressionResult, ParcelWaterfacts
+from .models import (
+    AdjustmentCoefficient,
+    AssessmentRoll,
+    AgencyFinancialSnapshot,
+    AgencyLevyMap,
+    ContactSubmission,
+    Improvements,
+    Land,
+    MasterParcel,
+    NeighborhoodGeom,
+    NeighborhoodMetrics,
+    NeighborhoodProfile,
+    NeighborhoodTrend,
+    ParcelHistory,
+    ParcelWaterfacts,
+    RegressionAdjustment,
+    RegressionResult,
+    Sales,
+    TaxationWithoutRepresentation,
+    VoterElection,
+    VoterParcelMatch,
+    VoterReturnLocation,
+    VoterTurnoutRaw,
+    WeeklyBriefingSubscriber,
+)
 
+from django.contrib import admin
+
+from openskagit.models import ParcelDevelopmentProfile
+
+
+@admin.register(ParcelDevelopmentProfile)
+class ParcelDevelopmentProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "parcel",
+        "primary_development_form",
+        "confidence",
+        "generated_at",
+        "development_constraints",
+        "development_context",
+    )
+
+    list_filter = (
+        "primary_development_form",
+        "confidence",
+    )
+
+    search_fields = (
+        "parcel__parcel_number",
+    )
+
+    readonly_fields = (
+        "generated_at",
+    )
+
+    ordering = ("parcel",)
 
 
 @admin.register(ParcelHistory)
 class ParcelHistoryAdmin(admin.ModelAdmin):
-    list_display = ("parcel_number", "scraped_at", "row_count")
+    list_display = ("parcel_number", "scraped_at", "row_count","taxes")
     search_fields = ("parcel_number",)
     readonly_fields = ("scraped_at",)
     list_filter = ("scraped_at",)
     ordering = ("parcel_number",)
 
-    fieldsets = (
-        ("Parcel", {
-            "fields": ("parcel_number",)
-        }),
-        ("History Data", {
-            "classes": ("collapse",),
-            "fields": ("rows",)
-        }),
-        ("Metadata", {
-            "fields": ("scraped_at",),
-        }),
-    )
 
     def row_count(self, obj):
         return len(obj.rows)
     row_count.short_description = "Row Count"
-
-    
-from django.contrib import admin
-from .models import MasterParcel
 
 @admin.register(MasterParcel)
 class MasterParcelAdmin(admin.ModelAdmin):
@@ -64,8 +99,78 @@ class SalesAdmin(admin.ModelAdmin):
 admin.site.register(Land)
 admin.site.register(AssessmentRoll)
 admin.site.register(ParcelWaterfacts)
-from django.contrib import admin
-from openskagit.models import NeighborhoodMetrics
+
+
+@admin.register(AgencyFinancialSnapshot)
+class AgencyFinancialSnapshotAdmin(admin.ModelAdmin):
+    list_display = ("mcag", "name", "year", "gov_type_desc", "dataset_source")
+    list_filter = ("year", "gov_type_code", "dataset_source")
+    search_fields = ("mcag", "name", "legal_name")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("mcag", "-year")
+
+
+@admin.register(WeeklyBriefingSubscriber)
+class WeeklyBriefingSubscriberAdmin(admin.ModelAdmin):
+    list_display = ("email", "created_at")
+    search_fields = ("email",)
+    list_filter = ("created_at",)
+    ordering = ("-created_at",)
+
+
+@admin.register(AgencyLevyMap)
+class AgencyLevyMapAdmin(admin.ModelAdmin):
+    list_display = ("tdcode", "district_name", "mcag", "agency_name", "agency_type", "is_primary")
+    list_filter = ("agency_type", "is_primary")
+    search_fields = ("tdcode", "mcag", "agency_name")
+    list_editable = ("mcag", "agency_name", "agency_type", "is_primary")
+    ordering = ("tdcode", "mcag")
+    list_per_page = 50
+
+    actions = ("mark_primary", "mark_not_primary")
+
+    _tdcode_cache = None
+    _tdcode_cache_year = None
+
+    def mark_primary(self, request, queryset):
+        updated = queryset.update(is_primary=True)
+        self.message_user(request, f"Marked {updated} rows as primary.")
+
+    def mark_not_primary(self, request, queryset):
+        updated = queryset.update(is_primary=False)
+        self.message_user(request, f"Marked {updated} rows as not primary.")
+
+    mark_primary.short_description = "Mark selected rows as primary"
+    mark_not_primary.short_description = "Mark selected rows as not primary"
+
+    def _load_tdcode_cache(self):
+        if self._tdcode_cache is not None:
+            return
+        from django.db import connection
+
+        with connection.cursor() as cur:
+            cur.execute("SELECT MAX(assessment_year) FROM taxing_district_levy")
+            row = cur.fetchone()
+            year = row[0] if row else None
+            self._tdcode_cache_year = year
+            if year is None:
+                self._tdcode_cache = {}
+                return
+            cur.execute(
+                """
+                SELECT tdcode, district_name
+                FROM taxing_district_levy
+                WHERE assessment_year = %s
+                """,
+                [year],
+            )
+            self._tdcode_cache = {r[0]: r[1] for r in cur.fetchall()}
+
+    def district_name(self, obj):
+        self._load_tdcode_cache()
+        return self._tdcode_cache.get(obj.tdcode) if self._tdcode_cache else None
+
+    district_name.short_description = "Levy district name"
 
 
 @admin.register(NeighborhoodMetrics)
@@ -180,7 +285,7 @@ class NeighborhoodProfileAdmin(admin.ModelAdmin):
     # Keeps the form simple and predictable.
     fields = ("hood_id", "name", "city", "json_data", "updated_at","ai_summary")
 
-from .models import NeighborhoodTrend
+from .models import NeighborhoodTrend, SurveyConversation, SurveyInteraction
 
 
 @admin.register(NeighborhoodTrend)
@@ -215,6 +320,30 @@ class NeighborhoodTrendAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     list_per_page = 50
+
+
+@admin.register(SurveyConversation)
+class SurveyConversationAdmin(admin.ModelAdmin):
+    list_display = ("conversation_id", "status", "question_count", "created_at", "updated_at")
+    list_filter = ("status", "created_at")
+    search_fields = ("conversation_id",)
+    ordering = ("-created_at",)
+    readonly_fields = ("conversation_id", "created_at", "updated_at", "question_count")
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("interactions")
+
+
+@admin.register(SurveyInteraction)
+class SurveyInteractionAdmin(admin.ModelAdmin):
+    list_display = ("conversation", "role", "question_label", "topic", "created_at")
+    list_filter = ("role", "created_at")
+    search_fields = ("conversation__conversation_id", "question_label", "content")
+    ordering = ("-created_at",)
+    readonly_fields = ("created_at",)
+    list_per_page = 100
+
 
 # openskagit/admin.py (or wherever you're registering models)
 
@@ -366,3 +495,84 @@ class AssessorAdmin(admin.ModelAdmin):
         "in_flood_zone",
     )
 
+
+@admin.register(VoterElection)
+class VoterElectionAdmin(admin.ModelAdmin):
+    list_display = ("name", "category", "election_date")
+    list_filter = ("category",)
+    search_fields = ("name", "category", "slug")
+    ordering = ("-election_date", "name")
+    readonly_fields = ("slug", "created_at", "updated_at")
+
+
+@admin.register(VoterReturnLocation)
+class VoterReturnLocationAdmin(admin.ModelAdmin):
+    list_display = ("name", "method", "normalized_name")
+    list_filter = ("method",)
+    search_fields = ("name", "normalized_name")
+    ordering = ("name",)
+    readonly_fields = ("normalized_name", "normalized_method", "created_at")
+
+
+@admin.register(VoterTurnoutRaw)
+class VoterTurnoutRawAdmin(admin.ModelAdmin):
+    list_display = (
+        "ballot_id",
+        "election",
+        "last_name",
+        "first_name",
+        "precinct",
+        "received_date",
+        "ballot_status",
+    )
+    list_filter = ("election", "ballot_status", "return_method", "is_po_box")
+    search_fields = (
+        "ballot_id",
+        "voter_id",
+        "last_name",
+        "first_name",
+        "normalized_address",
+        "precinct",
+    )
+    raw_id_fields = ("election", "return_location")
+    date_hierarchy = "received_date"
+    ordering = ("-received_date", "ballot_id")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(VoterParcelMatch)
+class VoterParcelMatchAdmin(admin.ModelAdmin):
+    list_display = ("turnout", "parcel", "match_type", "confidence", "matched_at")
+    list_filter = ("match_type",)
+    search_fields = ("turnout__ballot_id", "parcel__parcel_number")
+    raw_id_fields = ("turnout", "parcel")
+    readonly_fields = ("matched_at",)
+
+
+@admin.register(TaxationWithoutRepresentation)
+class TaxationWithoutRepresentationAdmin(admin.ModelAdmin):
+    list_display = (
+        "parcel",
+        "election",
+        "tax_year",
+        "tax_amount",
+        "ballots_cast",
+        "generated_at",
+    )
+    list_filter = ("tax_year", "election")
+    search_fields = ("parcel__parcel_number", "flag_reason")
+    raw_id_fields = ("parcel", "election")
+    readonly_fields = ("generated_at",)
+
+
+@admin.register(ContactSubmission)
+class ContactSubmissionAdmin(admin.ModelAdmin):
+    list_display = ("email", "topic", "created_at", "short_message")
+    list_filter = ("topic", "created_at")
+    search_fields = ("email", "message")
+    readonly_fields = ("email", "topic", "message", "created_at")
+    ordering = ("-created_at",)
+
+    @admin.display(description="Message")
+    def short_message(self, obj):
+        return f"{obj.message[:80]}…" if len(obj.message) > 80 else obj.message

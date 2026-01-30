@@ -1,0 +1,771 @@
+{% extends "openskagit/base.html" %}
+{% load static humanize %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" referrerpolicy="no-referrer">
+<style>
+  .hero-stat-ticker {
+    position: relative;
+    overflow: hidden;
+    border-radius: 32px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.08), rgba(236, 72, 153, 0.08), rgba(16, 185, 129, 0.08));
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.08);
+  }
+
+  .hero-stat-ticker::before,
+  .hero-stat-ticker::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 80px;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .hero-stat-ticker::before {
+    left: 0;
+    background: linear-gradient(90deg, #ffffff, rgba(255, 255, 255, 0));
+  }
+
+  .hero-stat-ticker::after {
+    right: 0;
+    background: linear-gradient(270deg, #ffffff, rgba(255, 255, 255, 0));
+  }
+
+  .hero-stat-track {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1rem 0;
+    animation: hero-ticker-scroll 40s linear infinite;
+    width: max-content;
+  }
+
+  .hero-ticker-item {
+    min-width: 180px;
+    border-radius: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 18px 35px rgba(15, 23, 42, 0.08);
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .hero-ticker-item .label {
+    font-size: 0.75rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: #567566;
+    font-weight: 600;
+  }
+
+  .hero-ticker-item .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #32413a;
+  }
+
+  .hero-ticker-item .caption {
+    font-size: 0.85rem;
+    color: #475569;
+  }
+
+  @keyframes hero-ticker-scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .creative-slider {
+    width: 100%;
+    appearance: none;
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #6b9080, #f3c6a8);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .creative-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #1f2937;
+    border: 3px solid #f6fff8;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  }
+
+  .creative-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #1f2937;
+    border: 3px solid #f6fff8;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  }
+
+  .dish-flip-card {
+    perspective: 2000px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .dish-flip-inner {
+    position: relative;
+    width: 100%;
+    transform-style: preserve-3d;
+    min-height: 100%;
+    transform: rotateY(0deg);
+  }
+
+  .dish-face {
+    backface-visibility: hidden;
+    padding: 0;
+  }
+
+  .dish-face.dish-back {
+    position: absolute;
+    inset: 0;
+    transform: rotateY(180deg);
+  }
+
+  .dish-image-placeholder {
+    background: radial-gradient(circle at top, rgba(107, 144, 128, 0.4), rgba(107, 144, 128, 0.05));
+    border-radius: 1.5rem;
+    min-height: 12rem;
+  }
+
+  .dish-hero-img {
+    width: 100%;
+    height: 12rem;
+    object-fit: cover;
+    border-radius: 1.5rem;
+    border: 1px solid rgba(15, 118, 110, 0.1);
+    box-shadow: 0 15px 35px rgba(15, 23, 42, 0.12);
+  }
+
+  .gallery-image-placeholder,
+  .gallery-image {
+    width: 100%;
+    height: 8rem;
+    border-radius: 1.25rem;
+    object-fit: cover;
+  }
+
+  .gallery-image-placeholder {
+    background: radial-gradient(circle at top, rgba(107, 144, 128, 0.2), rgba(107, 144, 128, 0.05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #567566;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  @keyframes recipePulse {
+    0% { transform: scale(1); box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12); }
+    50% { transform: scale(1.01); box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18); }
+    100% { transform: scale(1); box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12); }
+  }
+
+  #dish-preview.dish-processing {
+    position: relative;
+  }
+
+  #dish-preview.dish-processing::after {
+    content: "Cooking & shooting…";
+    position: absolute;
+    inset: 1.5rem;
+    border-radius: 1.5rem;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: #32413a;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+
+  #dish-preview.dish-processing .dish-flip-card {
+    animation: recipePulse 1.4s ease-in-out infinite;
+  }
+
+  .flip-icon {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    background: #f3c6a8;
+    color: #1f2937;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 30px rgba(31, 41, 55, 0.2);
+    animation: flipPulse 1.8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes flipPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bg-[#f5f5f5] text-[#2f3d37] pb-24">
+  <header class="relative overflow-hidden bg-gradient-to-b from-[#f6fff8] via-[#eaf4f4] to-white py-20 sm:py-24" id="flavor-hero">
+    <div class="absolute -left-24 -top-16 h-80 w-80 rounded-full bg-[#7fa693]/50 blur-[90px]" aria-hidden="true"></div>
+    <div class="absolute -right-12 bottom-0 h-64 w-64 rounded-full bg-[#f3c6a8]/50 blur-[120px]" aria-hidden="true"></div>
+    <div class="relative mx-auto max-w-6xl px-6 sm:px-8">
+      <div class="grid gap-12 lg:[grid-template-columns:minmax(0,_1.15fr)_minmax(0,_380px)]">
+        <div class="flex flex-col gap-6">
+          <p class="inline-flex items-center gap-2 rounded-full border border-[#0f172a]/10 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-[#567566]">
+            <span class="h-2 w-2 rounded-full bg-[#f3c6a8]" aria-hidden="true"></span>
+            OpenSkagit Flavor Index
+          </p>
+          <h1 class="text-4xl font-bold tracking-tight text-[#32413a] sm:text-5xl">Skagit Valley Has a Flavor</h1>
+          <p class="text-lg leading-relaxed text-[#465e53]">
+  This is a flavor model of Skagit Valley.
+  It’s trained on real menus and diner behavior and used to generate dishes that work here.
+</p>
+          <p class="text-base leading-relaxed text-[#567566]">
+           <strong>Use our signals to create the perfect skagit dish.</strong>
+          </p>
+          <div class="flex flex-wrap gap-3">
+            <a href="#skagit-builder" class="inline-flex items-center justify-center rounded-2xl bg-[#567566] px-5 py-3 text-sm font-semibold text-white shadow-[0_20px_45px_rgba(50,65,58,0.25)] transition hover:bg-[#6b9080] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6b9080]">
+              Build a Skagit dish
+            </a>
+            <a href="#skagit-gallery" class="inline-flex items-center justify-center rounded-2xl border border-[#6b9080]/40 bg-white/80 px-5 py-3 text-sm font-semibold text-[#32413a] shadow-[0_8px_30px_rgba(15,23,42,0.08)] transition hover:border-[#6b9080] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6b9080]">
+              Browse the menu!
+            </a>
+          </div>
+        </div>
+        <div class="mx-auto w-full rounded-[28px] border border-white/80 bg-white/95 p-6 shadow-[0_30px_80px_rgba(15,23,42,0.15)]">
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#567566]">Flavor telemetry</p>
+          {% if identity_available %}
+          <div class="mt-6">
+            <div class="mx-auto flex max-w-[320px] items-center justify-center rounded-[24px] border border-[#cce3de] bg-[#f6fff8]/80 p-4">
+              <canvas id="county-flavor-radar" width="360" height="360" aria-label="County-wide flavor centroid chart" class="h-[280px] w-full"></canvas>
+            </div>
+          </div>
+          {% else %}
+          <p class="mt-6 text-sm text-[#567566]">Flavor identity data isn’t available right now. Check back soon.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="bg-white py-20 sm:py-24">
+    <div class="mx-auto max-w-6xl px-6 sm:px-10">
+      <div class="max-w-2xl space-y-3 text-center sm:text-left">
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Flavor telemetry signals</p>
+
+      </div>
+      <div class="mt-12">
+        {% if hero_stats %}
+        <div class="hero-stat-ticker" role="region" aria-label="Flavor telemetry ticker">
+          <div class="hero-stat-track">
+            {% for _ in '12' %}
+              {% for stat in hero_stats %}
+              <div class="hero-ticker-item">
+                <span class="label">{{ stat.label }}</span>
+                <span class="value">
+                  {% if stat.value|default_if_none:'' != '' %}
+                  {{ stat.value }}{% if stat.suffix|default_if_none:'' %}{{ stat.suffix }}{% else %}%{% endif %}
+                  {% elif stat.display %}
+                  {{ stat.display }}
+                  {% else %}
+                  —
+                  {% endif %}
+                </span>
+                {% if stat.caption %}
+                <span class="caption">{{ stat.caption }}</span>
+                {% endif %}
+              </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        </div>
+        {% else %}
+        <p class="text-center text-sm text-slate-600">Hero stats will appear once telemetry syncs.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="py-20 sm:py-24" id="skagit-builder">
+    <div class="mx-auto grid max-w-6xl gap-8 px-6 sm:px-10 lg:[grid-template-columns:minmax(0,_420px)_minmax(0,_1fr)]">
+      <div class="relative overflow-hidden rounded-[32px] border border-emerald-100 bg-gradient-to-br from-emerald-200/70 via-sky-100/60 to-cyan-100/70 p-8 text-gray-900 shadow-[0_25px_70px_rgba(16,185,129,0.25)]">
+        <div class="pointer-events-none absolute inset-4 rounded-[28px] border border-white/60 bg-white/40" aria-hidden="true"></div>
+        <div class="relative space-y-8">
+          <h2 class="text-3xl font-semibold text-gray-900">Build the Most Skagit Dish</h2>
+          <p class="text-lg text-emerald-800/90">Two calm steps. Dial how classic or creative you want, then let the identity artifact guide a single dish—no prompt box, no retries.</p>
+          <div class="space-y-8">
+            <div class="border-t border-white/70 pt-6">
+              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-900">Step 1 — Tune the classic/creative dial</p>
+              <div class="mt-4 space-y-4">
+                <input type="range" min="0" max="100" step="1" value="{{ default_creative_bias|default:48 }}" id="creative-slider" class="creative-slider" aria-describedby="creative-slider-helper">
+              </div>
+            </div>
+            <div class="border-t border-white/70 pt-6">
+              <button type="button" class="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-900 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_45px_rgba(15,23,42,0.25)] transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60" id="build-skagit-dish" data-endpoint="{% url 'flavor-build-skagit-dish' %}" data-default-label="Build a Skagit Dish" {% if not identity_available %}disabled{% endif %}>Build a Skagit Dish</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-[0_25px_70px_rgba(15,23,42,0.12)]" id="dish-preview">
+        {% if latest_dish %}
+        <div class="dish-flip-card" data-flip-card tabindex="0" role="button" aria-pressed="false" aria-label="Tap to flip the latest recipe card">
+          <div class="dish-flip-inner" data-flipped="false">
+            <div class="dish-face dish-front space-y-6">
+              {% if latest_dish.image_url %}
+              <img src="{{ latest_dish.image_url }}" alt="{{ latest_dish.dish_name }}" class="dish-hero-img">
+              {% else %}
+              <div class="dish-image-placeholder flex h-48 w-full items-center justify-center rounded-[28px] border border-emerald-50 bg-gradient-to-br from-emerald-50 via-white to-mint">
+                <span class="text-sm font-semibold text-emerald-800">Image coming soon</span>
+              </div>
+              {% endif %}
+              <div class="flex flex-wrap items-center gap-3 text-sm text-emerald-700">
+                <span class="inline-flex items-center rounded-full bg-emerald-100/90 px-3 py-1 text-xs font-semibold text-emerald-900">{{ latest_dish.direction_label }}</span>
+                {% if latest_dish.generated_at %}
+                <time datetime="{{ latest_dish.generated_at|date:'c' }}" class="text-xs font-semibold uppercase tracking-[0.35em] text-gray-500">Generated {{ latest_dish.generated_at|date:"M j, Y g:i a" }}</time>
+                {% endif %}
+              </div>
+              <h3 class="text-2xl font-semibold text-gray-900">{{ latest_dish.dish_name }}</h3>
+              <p class="text-base leading-relaxed text-[#465e53]">{{ latest_dish.description }}</p>
+              <p class="text-sm text-slate-500">Tap to view why it fits Skagit, ingredients, and confidence notes.</p>
+            </div>
+              <div class="dish-face dish-back space-y-6 rounded-[28px] bg-white/95 p-1 sm:p-2">
+                <div class="grid gap-6 md:grid-cols-3">
+                <div>
+                  <h4 class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Why it fits Skagit</h4>
+                  <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-gray-700">
+                    {% for note in latest_dish.why_it_fits_skagit %}
+                    <li>{{ note }}</li>
+                    {% empty %}
+                    <li class="text-gray-500">This will populate as soon as a dish is generated.</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div>
+                  <h4 class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Ingredients</h4>
+                  <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-gray-700">
+                    {% for ingredient in latest_dish.ingredients %}
+                    <li>{{ ingredient }}</li>
+                    {% empty %}
+                    <li class="text-gray-500">Grounded in the identity pantry.</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div>
+                  <h4 class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Confidence notes</h4>
+                  <ul class="mt-3 space-y-2 text-sm leading-relaxed text-gray-700">
+                    {% if latest_dish.confidence_notes.flavor_alignment %}
+                    <li><strong class="font-semibold text-emerald-900">Flavor:</strong> {{ latest_dish.confidence_notes.flavor_alignment }}</li>
+                    {% endif %}
+                    {% if latest_dish.confidence_notes.familiarity_alignment %}
+                    <li><strong class="font-semibold text-emerald-900">Familiarity:</strong> {{ latest_dish.confidence_notes.familiarity_alignment }}</li>
+                    {% endif %}
+                    {% if latest_dish.confidence_notes.local_alignment %}
+                    <li><strong class="font-semibold text-emerald-900">Local:</strong> {{ latest_dish.confidence_notes.local_alignment }}</li>
+                    {% endif %}
+                  </ul>
+                </div>
+              </div>
+              <div class="flip-icon" aria-hidden="true">
+                <i class="fa-solid fa-rotate-right"></i>
+              </div>
+              <div class="flip-icon" aria-hidden="true">
+                <i class="fa-solid fa-rotate-right"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="text-lg text-emerald-700">
+          This is a quiet co-creation tool. Generate a dish to see how the identity shows up in practice.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-[#f6fff8] py-20 sm:py-24" id="skagit-gallery">
+    <div class="mx-auto max-w-6xl px-6 sm:px-10">
+      <div class="space-y-3 text-center sm:text-left">
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Section 2 — The Gallery</p>
+        <h2 class="text-3xl font-semibold text-gray-900">Recently Generated Skagit Dishes</h2>
+        <p class="text-base text-slate-600">No voting. No comments. No ranking. This feed simply records the dishes that have been co-created with the Flavor Index.</p>
+      </div>
+      <div class="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3" id="dish-gallery">
+        {% if recent_dishes %}
+          {% for dish in recent_dishes %}
+          <article class="flex flex-col gap-3 rounded-[28px] border border-white/60 bg-white/90 p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)]" data-dish-id="{{ dish.id }}">
+            {% if dish.image_url %}
+            <img src="{{ dish.image_url }}" alt="{{ dish.dish_name }}" class="gallery-image object-cover border border-emerald-50">
+            {% else %}
+            <div class="gallery-image-placeholder border border-emerald-50">Image coming soon</div>
+            {% endif %}
+            <div class="flex items-center justify-between text-xs text-gray-500">
+              <span class="inline-flex items-center rounded-full bg-emerald-100/80 px-3 py-1 text-[0.7rem] font-semibold text-emerald-900">{{ dish.direction_label }}</span>
+              {% if dish.generated_at %}
+              <time datetime="{{ dish.generated_at|date:'c' }}" class="font-semibold uppercase tracking-[0.35em] text-gray-500">{{ dish.generated_at|date:"M j, Y g:i a" }}</time>
+              {% endif %}
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900">{{ dish.dish_name }}</h3>
+            <p class="text-base text-[#465e53]">{{ dish.description }}</p>
+          </article>
+          {% endfor %}
+        {% else %}
+          <p class="text-base font-medium text-emerald-700 gallery-empty">No dishes yet—your first build will appear here.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  {{ flavor_identity|json_script:"skagit-flavor-identity" }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const identityScript = document.getElementById("skagit-flavor-identity");
+      let identityData = {};
+      if (identityScript) {
+        try {
+          identityData = JSON.parse(identityScript.textContent);
+        } catch (error) {
+          console.warn("Unable to parse flavor identity JSON.");
+        }
+      }
+
+      const radarCanvas = document.getElementById("county-flavor-radar");
+      const flavorOrder = ["sweet", "salty", "sour", "bitter", "umami", "spicy", "smoky", "fatty", "acidic", "herbal"];
+      if (
+        radarCanvas &&
+        window.Chart &&
+        identityData &&
+        identityData.generation_hints &&
+        identityData.generation_hints.flavor_targets
+      ) {
+        const targets = identityData.generation_hints.flavor_targets || {};
+        const datasetValues = flavorOrder.map((key) => (Number(targets[key]) || 0) * 100);
+        const maxValue = Math.max(...datasetValues, 50);
+        new Chart(radarCanvas.getContext("2d"), {
+          type: "radar",
+          data: {
+            labels: flavorOrder.map((key) => key.charAt(0).toUpperCase() + key.slice(1)),
+            datasets: [
+              {
+                label: "Flavor centroid",
+                data: datasetValues,
+                backgroundColor: "rgba(107, 144, 128, 0.18)",
+                borderColor: "#6b9080",
+                borderWidth: 2.5,
+                pointBackgroundColor: "#ffffff",
+                pointBorderColor: "#6b9080",
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              r: {
+                beginAtZero: true,
+                suggestedMax: Math.min(100, maxValue + 15),
+                ticks: { display: false },
+                grid: { color: "rgba(0,0,0,0.08)" },
+                angleLines: { color: "rgba(0,0,0,0.08)" },
+                pointLabels: { color: "#32413a", font: { size: 13, weight: "600" } },
+              },
+            },
+            plugins: { legend: { display: false } },
+          },
+        });
+      }
+
+      const buildButton = document.getElementById("build-skagit-dish");
+      const statusEl = document.getElementById("builder-status");
+      const previewTarget = document.getElementById("dish-preview");
+      const galleryTarget = document.getElementById("dish-gallery");
+      const creativeSlider = document.getElementById("creative-slider");
+      const creativeLabel = document.getElementById("creative-slider-label");
+      const creativeHelper = document.getElementById("creative-slider-helper");
+      const creativeMetaBands = [
+        { max: 35, label: "Classic Skagit", helper: "Comfort-first, heritage carriers, no risks." },
+        { max: 70, label: "Balanced Familiar", helper: "Familiar core with one bright accent." },
+        { max: 100, label: "Creative Push", helper: "Approachable twist with Skagit grounding." },
+      ];
+
+      const describeBias = (value) => {
+        const numeric = Number(value);
+        const band = creativeMetaBands.find((candidate) => numeric <= candidate.max) || creativeMetaBands[creativeMetaBands.length - 1];
+        return band;
+      };
+
+      const STATUS_CLASSES = {
+        info: "text-emerald-800",
+        error: "text-rose-600",
+        active: "text-emerald-900",
+        success: "text-emerald-600",
+      };
+
+      const clearStatusClasses = () => {
+        if (!statusEl) return;
+        Object.values(STATUS_CLASSES).forEach((cls) => statusEl.classList.remove(cls));
+      };
+
+      const setStatus = (message, tone = "info") => {
+        if (!statusEl) return;
+        clearStatusClasses();
+        statusEl.classList.add(STATUS_CLASSES[tone] || STATUS_CLASSES.info);
+        statusEl.textContent = message;
+      };
+
+      const updateBiasUI = (fireStatus = false) => {
+        if (!creativeSlider) return;
+        const descriptor = describeBias(creativeSlider.value || 50);
+        if (creativeLabel) creativeLabel.textContent = descriptor.label;
+        if (creativeHelper) creativeHelper.textContent = descriptor.helper;
+        creativeSlider.dataset.biasLabel = descriptor.label;
+        if (fireStatus) {
+          setStatus(`Dialed to ${descriptor.label}.`, "info");
+        }
+      };
+
+      if (creativeSlider) {
+        creativeSlider.addEventListener("input", () => updateBiasUI(true));
+        updateBiasUI(false);
+      }
+
+      const getCsrfToken = () => {
+        const match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : "";
+      };
+
+      const escapeHtml = (value) => {
+        if (typeof value !== "string") return "";
+        return value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      };
+
+      const formatTimestamp = (iso) => {
+        if (!iso) return "";
+        try {
+          const date = new Date(iso);
+          return date.toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          });
+        } catch (error) {
+          return iso;
+        }
+      };
+
+      const toggleFlipCard = (card) => {
+        if (!card) return;
+        const inner = card.querySelector(".dish-flip-inner");
+        if (!inner) return;
+        const isFlipped = inner.dataset.flipped === "true";
+        const nextAngle = isFlipped ? 0 : 180;
+        inner.dataset.flipped = isFlipped ? "false" : "true";
+        if (window.anime) {
+          anime({
+            targets: inner,
+            rotateY: nextAngle,
+            duration: 600,
+            easing: "easeInOutQuad",
+          });
+        } else {
+          inner.style.transform = `rotateY(${nextAngle}deg)`;
+        }
+      };
+
+      const attachFlipCardHandlers = () => {
+        const cards = document.querySelectorAll("[data-flip-card]");
+        cards.forEach((card) => {
+          const clickHandler = () => toggleFlipCard(card);
+          const keyHandler = (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              toggleFlipCard(card);
+            }
+          };
+          card.removeEventListener("click", card._flipClick || (() => {}));
+          card.removeEventListener("keydown", card._flipKey || (() => {}));
+          card.addEventListener("click", clickHandler);
+          card.addEventListener("keydown", keyHandler);
+          card._flipClick = clickHandler;
+          card._flipKey = keyHandler;
+        });
+      };
+
+      const renderList = (items) => {
+        if (!Array.isArray(items) || !items.length) {
+          return '<li class="text-gray-500">—</li>';
+        }
+        return items
+          .map((item) => `<li class="leading-relaxed">${escapeHtml(item)}</li>`)
+          .join("");
+      };
+
+      const renderConfidence = (notes) => {
+        if (!notes || typeof notes !== "object") {
+          return '<li class="text-gray-500">—</li>';
+        }
+        const chunks = [];
+        if (notes.flavor_alignment) {
+          chunks.push(`<li class="leading-relaxed"><strong class="font-semibold text-emerald-900">Flavor:</strong> ${escapeHtml(notes.flavor_alignment)}</li>`);
+        }
+        if (notes.familiarity_alignment) {
+          chunks.push(`<li class="leading-relaxed"><strong class="font-semibold text-emerald-900">Familiarity:</strong> ${escapeHtml(notes.familiarity_alignment)}</li>`);
+        }
+        if (notes.local_alignment) {
+          chunks.push(`<li class="leading-relaxed"><strong class="font-semibold text-emerald-900">Local:</strong> ${escapeHtml(notes.local_alignment)}</li>`);
+        }
+        return chunks.join("") || '<li class="text-gray-500">—</li>';
+      };
+
+      const renderPreview = (dish) => {
+        const isoValue = dish.generated_at || "";
+        const generated = formatTimestamp(isoValue);
+        const directionLabel = dish.direction_label || dish.direction || "Skagit Dish";
+        const imageUrl = dish.image_url || "";
+        const imageMarkup = imageUrl
+          ? `<img src="${escapeHtml(imageUrl)}" alt="Dish image" class="dish-hero-img" />`
+          : '<div class="dish-image-placeholder flex h-48 w-full items-center justify-center rounded-[28px] border border-emerald-50"><span class="text-sm font-semibold text-emerald-800">Image coming soon</span></div>';
+        return `
+          <div class="dish-flip-card" data-flip-card tabindex="0" role="button" aria-pressed="false" aria-label="Tap to flip the latest recipe card">
+            <div class="dish-flip-inner" data-flipped="false">
+              <div class="dish-face dish-front space-y-6">
+                ${imageMarkup}
+                <div class="dish-detail-meta flex flex-wrap items-center gap-3 text-sm text-emerald-700">
+                  <span class="direction-badge inline-flex items-center rounded-full bg-emerald-100/90 px-3 py-1 text-xs font-semibold text-emerald-900">${escapeHtml(directionLabel)}</span>
+                  ${generated ? `<time datetime="${escapeHtml(isoValue)}" class="text-xs font-semibold uppercase tracking-[0.35em] text-gray-500">${escapeHtml(generated)}</time>` : ""}
+                </div>
+                <h3 class="text-2xl font-semibold text-gray-900">${escapeHtml(dish.dish_name || "")}</h3>
+                <p class="dish-detail-description text-base leading-relaxed text-[#465e53]">${escapeHtml(dish.description || "")}</p>
+                <p class="text-sm text-slate-500">Tap to view why it fits Skagit, ingredients, and confidence notes.</p>
+              </div>
+              <div class="dish-face dish-back space-y-6 rounded-[28px] bg-white/95 p-1 sm:p-2">
+                <div class="dish-detail-columns grid gap-6 md:grid-cols-3">
+                  <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Why it fits Skagit</h4>
+                    <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-gray-700">${renderList(dish.why_it_fits_skagit)}</ul>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Ingredients</h4>
+                    <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-gray-700">${renderList(dish.ingredients)}</ul>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-700">Confidence notes</h4>
+                    <ul class="mt-3 space-y-2 text-sm leading-relaxed text-gray-700">${renderConfidence(dish.confidence_notes)}</ul>
+                  </div>
+                </div>
+              </div>
+              <div class="flip-icon" aria-hidden="true">
+                <i class="fa-solid fa-rotate-right"></i>
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      const renderGalleryCard = (dish) => {
+        const isoValue = dish.generated_at || "";
+        const generated = formatTimestamp(isoValue);
+        const imageMarkup = dish.image_url
+          ? `<img src="${escapeHtml(dish.image_url)}" alt="${escapeHtml(dish.dish_name || "Dish image")}" class="gallery-image object-cover border border-emerald-50">`
+          : '<div class="gallery-image-placeholder border border-emerald-50">Image coming soon</div>';
+        return `
+          <article class="flex flex-col gap-3 rounded-[28px] border border-white/60 bg-white/90 p-6 shadow-[0_25px_60px_rgba(15,23,42,0.08)]" data-dish-id="${escapeHtml(dish.id || "")}">
+            ${imageMarkup}
+            <div class="flex items-center justify-between text-xs text-gray-500">
+              <span class="inline-flex items-center rounded-full bg-emerald-100/80 px-3 py-1 text-[0.7rem] font-semibold text-emerald-900">${escapeHtml(dish.direction_label || "")}</span>
+              ${generated ? `<time datetime="${escapeHtml(isoValue)}" class="font-semibold uppercase tracking-[0.35em] text-gray-500">${escapeHtml(generated)}</time>` : ""}
+            </div>
+            <h3 class="text-xl font-semibold text-gray-900">${escapeHtml(dish.dish_name || "")}</h3>
+            <p class="text-base text-[#465e53]">${escapeHtml(dish.description || "")}</p>
+          </article>
+        `;
+      };
+
+      attachFlipCardHandlers();
+
+      if (buildButton) {
+        buildButton.addEventListener("click", async () => {
+          const biasValue = creativeSlider ? Number(creativeSlider.value || 50) : 50;
+          const biasMeta = describeBias(biasValue);
+          buildButton.disabled = true;
+          buildButton.textContent = "Cooking…";
+          if (previewTarget) {
+            previewTarget.classList.add("dish-processing");
+          }
+          setStatus(`Cooking with the ${biasMeta.label.toLowerCase()} dial…`, "active");
+          try {
+            const response = await fetch(buildButton.dataset.endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCsrfToken(),
+              },
+              body: JSON.stringify({ creative_bias: biasValue }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+              const errorMessage = data && data.error ? data.error : "Couldn't finish cooking that dish. Try again.";
+              throw new Error(errorMessage);
+            }
+            if (data && data.dish) {
+              const previewMarkup = renderPreview(data.dish);
+              previewTarget.innerHTML = previewMarkup;
+              attachFlipCardHandlers();
+              if (galleryTarget) {
+                const galleryMarkup = renderGalleryCard(data.dish);
+                const placeholder = galleryTarget.querySelector(".gallery-empty");
+                if (placeholder) {
+                  placeholder.remove();
+                }
+                galleryTarget.insertAdjacentHTML("afterbegin", galleryMarkup);
+              }
+              setStatus("Dish plated.", "success");
+            }
+          } catch (error) {
+            console.error("Unable to build dish", error);
+            setStatus(error.message || "Couldn't finish cooking that dish.", "error");
+          } finally {
+            buildButton.textContent = buildButton.dataset.defaultLabel;
+            buildButton.disabled = false;
+            if (previewTarget) {
+              previewTarget.classList.remove("dish-processing");
+            }
+          }
+        });
+      }
+    });
+  </script>
+{% endblock %}

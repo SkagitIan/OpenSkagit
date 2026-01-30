@@ -1,0 +1,1314 @@
+{% extends "openskagit/base.html" %}
+{% load static humanize %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" referrerpolicy="no-referrer">
+<style>
+  :root {
+    --survey-deep: #0b1a2d;
+    --survey-glass: rgba(255, 255, 255, 0.9);
+    --survey-accent: #4f7f75;
+    --survey-slate: #0f172a;
+    --survey-border: rgba(15, 23, 42, 0.08);
+    --survey-muted: rgba(15, 23, 42, 0.6);
+  }
+
+  .survey-hero {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, #eaf2ff 0%, #dfe7ff 65%, #cdd7f8 100%);
+    color: var(--survey-slate);
+    padding: 4rem 0 5rem;
+    isolation: isolate;
+  }
+
+  .hero-topo-lines {
+    position: absolute;
+    inset: 0;
+    top: -40px;
+    width: 130%;
+    height: 220px;
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .hero-topo-lines svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .hero-kicker {
+    font-size: 0.75rem;
+    letter-spacing: 0.65em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .hero-title {
+    font-size: clamp(2.75rem, 4vw, 4.5rem);
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 0.75rem;
+  }
+
+  .hero-gradient-text {
+    background: linear-gradient(120deg, #6fd7d3, #2d7981, #8ad7ff);
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .hero-subtext {
+    max-width: 62ch;
+    color: rgba(15, 23, 42, 0.75);
+    font-size: 1.05rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-feature {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.9rem 1.4rem;
+    border-radius: 999px;
+    background: rgba(79, 127, 117, 0.08);
+    border: 1px solid rgba(79, 127, 117, 0.3);
+  }
+
+  .hero-feature-star {
+    font-size: 1.2rem;
+    color: #ffe7a3;
+  }
+
+  .hero-feature-label {
+    text-transform: uppercase;
+    letter-spacing: 0.35em;
+    font-size: 0.75rem;
+    color: var(--survey-slate);
+    margin-bottom: 0;
+  }
+
+  .hero-feature-copy {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+  }
+
+  .survey-panel {
+    background: #f5f8ff;
+  }
+
+  .survey-card {
+    background: #ffffff;
+    border: 1px solid var(--survey-border);
+    border-radius: 2rem;
+    padding: 2rem;
+    box-shadow: 0 20px 35px rgba(15, 23, 42, 0.08);
+  }
+
+  .survey-layout {
+    display: grid;
+    gap: 2.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    .survey-layout {
+      grid-template-columns: minmax(0, 1fr) 320px;
+    }
+  }
+
+  .survey-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    font-size: 0.85rem;
+  }
+
+  .progress-meta span:first-child {
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .progress-meta span:last-child {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f8fbff;
+  }
+
+  .progress-subtext {
+    font-size: 0.9rem;
+    color: var(--survey-muted);
+  }
+
+  .progress-track {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+  }
+
+  .progress-segment {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    transition: opacity 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    opacity: 0.3;
+  }
+
+  .progress-segment.is-active {
+    opacity: 1;
+    background: linear-gradient(120deg, #4fd1c5, #256a89);
+    box-shadow: 0 0 18px rgba(79, 127, 117, 0.9);
+    transform: translateY(-0.75px);
+  }
+
+  .survey-chat-shell {
+    margin-top: 1.5rem;
+    border-radius: 1.5rem;
+    border: 1px solid var(--survey-border);
+    background: #f9fafc;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .survey-chat-log {
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .survey-chat-log::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .survey-chat-log::-webkit-scrollbar-thumb {
+    background: rgba(79, 127, 117, 0.45);
+    border-radius: 999px;
+  }
+
+  .survey-message {
+    max-width: 78%;
+    border-radius: 1.35rem;
+    padding: 1.05rem 1.3rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    position: relative;
+  }
+
+  .survey-message--bot {
+    background: linear-gradient(180deg, #eef2ff, #fff);
+    border: 1px solid rgba(79, 95, 153, 0.2);
+    color: var(--survey-slate);
+  }
+
+  .survey-message--user {
+    background: linear-gradient(180deg, #d6edff, #b8dffc);
+    border: 1px solid rgba(49, 135, 205, 0.6);
+    align-self: flex-end;
+    color: #0f172a;
+  }
+
+  .survey-typing {
+    padding: 0.9rem 1.25rem;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .typing-dots {
+    display: inline-flex;
+    gap: 0.4rem;
+  }
+
+  .typing-dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #4fd1c5;
+    animation: typing-dots 0.9s infinite ease-in-out;
+  }
+
+  .typing-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .typing-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  @keyframes typing-dots {
+    0% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    50% {
+      transform: translateY(-3px);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+  }
+
+  .survey-input-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: 1.25rem;
+  }
+
+  .survey-input {
+    border-radius: 1.25rem;
+    border: 1px solid var(--survey-border);
+    background: #ffffff;
+    color: var(--survey-slate);
+    padding: 1rem 1.2rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    min-height: 5rem;
+    resize: none;
+  }
+
+  .survey-input:focus {
+    outline: none;
+    border-color: #4fd1c5;
+    box-shadow: 0 0 0 3px rgba(79, 127, 117, 0.35);
+  }
+
+  .survey-input-actions {
+    display: flex;
+    gap: 0.7rem;
+    margin-top: 0.4rem;
+  }
+
+  .survey-send-button {
+    flex: 1;
+    border-radius: 1rem;
+    border: none;
+    background: linear-gradient(135deg, #2b7a70, #0d4e4e);
+    color: #fff;
+    font-weight: 700;
+    padding: 0.95rem 0;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .survey-send-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 25px 55px rgba(6, 17, 32, 0.7);
+  }
+
+  .survey-send-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: 0 12px 30px rgba(7, 12, 24, 0.4);
+  }
+
+  .survey-skip-button {
+    flex: 1;
+    border-radius: 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.2);
+    background: transparent;
+    color: var(--survey-slate);
+    font-weight: 600;
+    padding: 0.95rem 0;
+    transition: border-color 0.2s ease, color 0.2s ease;
+  }
+
+  .survey-skip-button:hover:not(:disabled) {
+    border-color: #fff;
+    color: #fff;
+  }
+
+  .survey-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .survey-stats-card,
+  .survey-radar-card {
+    background: #fff;
+    border: 1px solid var(--survey-border);
+    border-radius: 1.5rem;
+    padding: 1.25rem;
+    box-shadow: 0 15px 35px rgba(15, 23, 42, 0.05);
+  }
+
+  .survey-section-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .survey-section-heading h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .survey-section-heading p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--survey-muted);
+  }
+
+  .survey-stats-card dl {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+  }
+
+  .survey-stats-card dl > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+
+  .survey-stats-card dt {
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--survey-muted);
+  }
+
+  .survey-stats-card dd {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--survey-slate);
+  }
+
+  .survey-radar-card canvas {
+    display: block;
+    margin: 0 auto;
+  }
+
+  .radar-legend-note {
+    margin-top: 0.65rem;
+    font-size: 0.8rem;
+    color: var(--survey-muted);
+    text-align: center;
+  }
+
+  .survey-finish-panel {
+    margin-top: 1.5rem;
+    border-radius: 1.5rem;
+    border: 1px solid var(--survey-border);
+    background: linear-gradient(180deg, #f0f4ff, #dfe7ff);
+    padding: 1.5rem;
+    color: var(--survey-slate);
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.1);
+  }
+
+  .survey-finish-panel h3 {
+    margin: 0;
+    font-size: 1.6rem;
+  }
+
+  .survey-finish-panel p {
+    margin-top: 0.75rem;
+    color: var(--survey-slate);
+  }
+
+  .finish-actions {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .finish-actions a {
+    border-radius: 999px;
+    padding: 0.6rem 1.2rem;
+    background: rgba(79, 127, 117, 0.12);
+    color: var(--survey-slate);
+    font-weight: 600;
+    border: 1px solid rgba(79, 127, 117, 0.35);
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .finish-actions a:hover {
+    background: rgba(79, 127, 117, 0.25);
+    border-color: rgba(79, 127, 117, 0.55);
+  }
+
+  .implicit-insights-card {
+    margin-top: 1.25rem;
+    border-radius: 1.25rem;
+    border: 1px solid var(--survey-border);
+    background: #fff;
+    padding: 1.4rem;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  }
+
+  .implicit-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+  }
+
+  .implicit-chip {
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(79, 127, 117, 0.12);
+    border: 1px solid rgba(79, 127, 117, 0.35);
+    color: #1f2b3d;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .implicit-placeholder {
+    color: var(--survey-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.45em;
+  }
+
+  .live-signals-section {
+    position: relative;
+  }
+
+  .stat-ticker-shell {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.75rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(120deg, rgba(79, 127, 117, 0.2), rgba(14, 165, 233, 0.15), rgba(8, 20, 46, 0.65));
+    box-shadow: 0 25px 60px rgba(5, 11, 21, 0.25);
+  }
+
+  .stat-ticker-shell::before,
+  .stat-ticker-shell::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 80px;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .stat-ticker-shell::before {
+    left: 0;
+    background: linear-gradient(90deg, rgba(235, 245, 255, 1), rgba(235, 245, 255, 0));
+  }
+
+  .stat-ticker-shell::after {
+    right: 0;
+    background: linear-gradient(270deg, rgba(235, 245, 255, 1), rgba(235, 245, 255, 0));
+  }
+
+  .stat-ticker-track {
+    display: flex;
+    gap: 1.25rem;
+    padding: 0.85rem 2rem;
+    animation: ticker-scroll 42s linear infinite;
+    width: fit-content;
+  }
+
+  .ticker-item {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 1.25rem;
+    padding: 0.85rem 1.5rem;
+    min-width: 220px;
+    box-shadow: 0 15px 35px rgba(5, 11, 21, 0.15);
+  }
+
+  .ticker-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+  }
+
+  .ticker-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+  }
+
+  .ticker-badge {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  .ticker-value {
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+
+  .ticker-caption {
+    font-size: 0.85rem;
+    color: #475569;
+  }
+
+  @keyframes ticker-scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stat-ticker-track {
+      animation: none;
+    }
+
+    .typing-dots span {
+      animation: none;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="survey-hero" aria-label="Citizen survey introduction">
+  <div class="hero-topo-lines" aria-hidden="true">
+    <svg viewBox="0 0 1440 220" preserveAspectRatio="none">
+      <path d="M0 160C160 80 320 140 480 80C640 20 800 110 960 60C1120 10 1280 120 1440 90" stroke="rgba(15,23,42,0.32)" stroke-width="2" fill="none" stroke-linecap="round" />
+      <path d="M0 190C120 120 280 90 440 130C600 170 760 60 920 120C1080 180 1240 40 1440 100" stroke="rgba(15,23,42,0.2)" stroke-width="1.5" fill="none" stroke-linecap="round" />
+      <path d="M0 130C160 40 320 80 480 50C640 20 800 70 960 30C1120 -10 1280 60 1440 40" stroke="rgba(15,23,42,0.15)" stroke-width="1" fill="none" stroke-linecap="round" />
+    </svg>
+  </div>
+  <div class="max-w-6xl mx-auto px-4 relative z-10">
+    <p class="hero-kicker">Cyber-rural conversation</p>
+    <h1 class="hero-title">Help shape <span class="hero-gradient-text">OpenSkagit</span></h1>
+    <p class="hero-subtext">
+      From the braided rhythms of the Skagit River to the craggy silhouettes of the North Cascades, this survey dresses the Valley in cyber-rural light.
+      Your answers feed AI-enhanced signals that stay grounded in real terrain.
+    </p>
+    <div class="hero-feature">
+      <span class="hero-feature-star">★</span>
+      <div>
+        <p class="hero-feature-label">Implicit insights</p>
+        <p class="hero-feature-copy">Signals update as you share.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="survey-panel" class="survey-panel py-14">
+  <div class="max-w-6xl mx-auto px-4">
+    <div class="survey-card">
+      <div class="survey-layout">
+        <div class="survey-main-column">
+          <div class="survey-progress-wrap">
+            <div class="progress-meta">
+              <span>Signal queue</span>
+              <span id="survey-progress-display">Question 1 of {{ survey_flow.max_questions }}</span>
+            </div>
+            <div id="survey-progress-track" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Survey progress segments"></div>
+            <p id="survey-progress-subtext" class="progress-subtext">Signal loaders warming up...</p>
+            <p id="survey-system-prompt" class="text-sm text-slate-500">{{ survey_flow.intro_hint }}</p>
+          </div>
+          <div class="survey-chat-shell" aria-live="polite" aria-label="Survey conversation">
+            <div id="survey-chat-log" class="survey-chat-log" role="log">
+              <!-- Messages injected by JavaScript -->
+            </div>
+            <div id="survey-typing-indicator" class="survey-typing hidden">
+              <span class="typing-dots">
+                <span></span><span></span><span></span>
+              </span>
+              <span class="sr-only">AI is typing</span>
+            </div>
+          </div>
+          <form id="survey-response-form" class="survey-input-form" novalidate>
+            {% csrf_token %}
+            <textarea id="survey-response-input" class="survey-input" rows="4" placeholder="Type your response..." aria-label="Your answer"></textarea>
+            <div class="survey-input-actions">
+              <button id="survey-send-button" type="submit" class="survey-send-button">
+                Send
+              </button>
+              <button id="survey-skip-button" type="button" class="survey-skip-button">
+                Skip question
+              </button>
+            </div>
+          </form>
+          <div class="survey-dashboard-grid">
+            <div class="survey-stats-card">
+              <div class="survey-section-heading">
+                <h3>Survey pulse</h3>
+                <p>Totals updated as you speak.</p>
+              </div>
+              <dl>
+                <div>
+                  <dt>Total prompts</dt>
+                  <dd id="stat-total-prompts">{{ survey_flow.max_questions }}</dd>
+                </div>
+                <div>
+                  <dt>Responses captured</dt>
+                  <dd id="stat-responses">0</dd>
+                </div>
+                <div>
+                  <dt>Unfinished prompts</dt>
+                  <dd id="stat-remaining">{{ survey_flow.max_questions }}</dd>
+                </div>
+                <div>
+                  <dt>Implicit insights surfaced</dt>
+                  <dd id="stat-insights">0</dd>
+                </div>
+              </dl>
+            </div>
+            <div class="survey-radar-card">
+              <div class="survey-section-heading">
+                <h3>Implicit insight radar</h3>
+                <p>Which signals are strongest right now.</p>
+              </div>
+              <canvas id="survey-radar-canvas" width="260" height="260" aria-label="Strength of implicit insights"></canvas>
+              <p class="radar-legend-note" id="radar-legend-note">No insights yet - answers bring them to life.</p>
+            </div>
+          </div>
+          <div class="implicit-insights-card">
+            <div class="survey-section-heading">
+              <h3>Implicit insights</h3>
+              <p>Signals update as you share.</p>
+            </div>
+            <div id="survey-implicit-insights" class="implicit-tags">
+              <span class="implicit-placeholder">Signals update as you share.</span>
+            </div>
+          </div>
+          <div id="survey-finish-panel" class="survey-finish-panel hidden" aria-live="polite" aria-hidden="true">
+            <h3>🎉 Thank you!</h3>
+            <p id="survey-finish-message">{{ survey_flow.closing }}</p>
+            <div class="finish-actions">
+              {% for action in survey_flow.finish_actions %}
+              <a href="{{ action.href }}">{{ action.label }}</a>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="live-signals-section bg-white py-14" id="stats">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <h2 class="text-3xl font-bold text-gray-900 mb-4">Live operational stats</h2>
+    <p class="text-gray-600">Real-time signals from active datasets and pipelines.</p>
+  </div>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+    <div class="stat-ticker-shell" role="region" aria-label="Live operational stats ticker">
+      <div class="stat-ticker-track">
+        {% for _ in '12' %}
+          {% for stat in stats_cards %}
+          <div class="ticker-item">
+            <div class="ticker-label">
+              <span class="ticker-dot {{ stat.accent_class|default:'bg-sage-400' }}"></span>
+              <span class="ticker-label-text">{{ stat.label }}</span>
+              {% if stat.badge_label %}
+              <span class="ticker-badge {{ stat.badge_class|default:'bg-gray-900/10 text-gray-800' }}">{{ stat.badge_label }}</span>
+              {% endif %}
+            </div>
+            <div class="ticker-value">
+              {% if stat.value|default_if_none:'' != '' and stat.animate|default:False %}
+              <span data-animate-number data-target="{{ stat.value }}">{{ stat.value|intcomma }}</span>
+              {% elif stat.value|default_if_none:'' != '' %}
+              <span>{{ stat.value|intcomma }}</span>
+              {% else %}
+              <span>{{ stat.display }}</span>
+              {% endif %}
+            </div>
+            {% if stat.caption %}
+            <div class="ticker-caption">{{ stat.caption }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{{ survey_flow|json_script:"survey-flow-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const flowNode = document.getElementById("survey-flow-data");
+  if (!flowNode) {
+    return;
+  }
+
+  const surveyFlow = JSON.parse(flowNode.textContent);
+  const conversationId = "{{ conversation_id|escapejs }}";
+  const responseEndpoint = "/survey/respond/";
+  const chatLog = document.getElementById("survey-chat-log");
+  const typingIndicator = document.getElementById("survey-typing-indicator");
+  const form = document.getElementById("survey-response-form");
+  const input = document.getElementById("survey-response-input");
+  const sendButton = document.getElementById("survey-send-button");
+  const skipButton = document.getElementById("survey-skip-button");
+  const progressDisplay = document.getElementById("survey-progress-display");
+  const progressTrack = document.getElementById("survey-progress-track");
+  const progressSubtext = document.getElementById("survey-progress-subtext");
+  const implicitContainer = document.getElementById("survey-implicit-insights");
+  const radarCanvas = document.getElementById("survey-radar-canvas");
+  const radarNote = document.getElementById("radar-legend-note");
+  const systemPrompt = document.getElementById("survey-system-prompt");
+  const finishPanel = document.getElementById("survey-finish-panel");
+  const statResponses = document.getElementById("stat-responses");
+  const statRemaining = document.getElementById("stat-remaining");
+  const statInsights = document.getElementById("stat-insights");
+  const EMPTY_PROFILE = {
+    primary_pain: null,
+    life_context: null,
+    emotional_tone: null,
+    time_horizon: null,
+    power_distance: null,
+  };
+
+  const INSIGHT_LABEL_MAP = {
+    clarity_gap: "Clarity gap",
+    fairness_concern: "Fairness concern",
+    process_friction: "Process friction",
+    trust_gap: "Trust gap",
+    access_gap: "Access gap",
+    frustrated: "Frustrated",
+    hopeful: "Hopeful",
+    curious: "Curious",
+    resigned: "Resigned",
+    energized: "Energized",
+    homeowner: "Homeowner",
+    renter: "Renter",
+    business_operator: "Business operator",
+    civic_participant: "Civic participant",
+    explorer_resident: "Explorer or resident",
+    short_term_problem: "Short-term problem",
+    long_term_planning: "Long-term planning",
+    systemic_issue: "Systemic issue",
+  };
+
+  const RADAR_CATEGORY_MAP = {
+    clarity_gap: "clarity",
+    fairness_concern: "fairness",
+    process_friction: "process",
+    trust_gap: "trust",
+    access_gap: "access",
+    short_term_problem: "process",
+    long_term_planning: "process",
+    systemic_issue: "process",
+    frustrated: "emotion",
+    hopeful: "emotion",
+    curious: "emotion",
+    resigned: "emotion",
+    energized: "emotion",
+    homeowner: "access",
+    renter: "access",
+    business_operator: "process",
+    civic_participant: "trust",
+    explorer_resident: "trust",
+  };
+
+  const RADAR_CATEGORIES = [
+    { key: "clarity", label: "Clarity" },
+    { key: "fairness", label: "Fairness" },
+    { key: "process", label: "Process" },
+    { key: "trust", label: "Trust" },
+    { key: "access", label: "Access" },
+    { key: "emotion", label: "Emotion" },
+  ];
+
+  const state = {
+    awaitingResponse: false,
+    finished: false,
+    insights: new Set(),
+    profile: { ...EMPTY_PROFILE },
+    questionCount: 1,
+  };
+
+  const baseHeaders = { "Content-Type": "application/json" };
+  const csrfTokenInput = document.querySelector('[name="csrfmiddlewaretoken"]');
+  if (csrfTokenInput) {
+    baseHeaders["X-CSRFToken"] = csrfTokenInput.value;
+  }
+
+  const progressSegments = [];
+
+  function buildProgressSegments(count) {
+    if (!progressTrack) {
+      return;
+    }
+    progressTrack.innerHTML = "";
+    progressSegments.length = 0;
+    const segmentCount = Math.max(count || 4, 4);
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < segmentCount; index++) {
+      const span = document.createElement("span");
+      span.className = "progress-segment";
+      span.setAttribute("data-segment", index + 1);
+      fragment.appendChild(span);
+      progressSegments.push(span);
+    }
+    progressTrack.appendChild(fragment);
+  }
+
+  function updateProgressSegments(ratio) {
+    if (!progressSegments.length) {
+      return;
+    }
+    const max = progressSegments.length;
+    const fillCount = ratio >= 1 ? max : Math.max(0, Math.round(ratio * max));
+    progressSegments.forEach((segment, index) => {
+      if (index < fillCount) {
+        segment.classList.add("is-active");
+      } else {
+        segment.classList.remove("is-active");
+      }
+    });
+  }
+
+  function updateProgressDisplay(count) {
+    const maxQuestions = surveyFlow.max_questions || 1;
+    const display = Math.min(count, maxQuestions);
+    if (progressDisplay) {
+      progressDisplay.textContent = `Question ${display} of ${maxQuestions}`;
+    }
+    const ratio = maxQuestions ? Math.min(display / maxQuestions, 1) : 0;
+    updateProgressSegments(ratio);
+    if (progressTrack) {
+      progressTrack.setAttribute("aria-valuenow", Math.round(ratio * 100));
+    }
+  }
+
+  function setProcessingState(isProcessing) {
+    if (progressSubtext) {
+      progressSubtext.textContent = isProcessing
+        ? "Analyzing your response..."
+        : "Answers keep the pulse going.";
+    }
+  }
+
+  function updateDashboardStats() {
+    if (!statResponses && !statRemaining && !statInsights) {
+      return;
+    }
+    const answered = Math.max(state.questionCount - 1, 0);
+    const total = surveyFlow.max_questions || answered;
+    const remaining = Math.max(total - answered, 0);
+    if (statResponses) {
+      statResponses.textContent = `${answered}`;
+    }
+    if (statRemaining) {
+      statRemaining.textContent = `${remaining}`;
+    }
+    if (statInsights) {
+      statInsights.textContent = `${state.insights.size}`;
+    }
+  }
+
+  const radarConfig = {
+    size: 260,
+    ctx: null,
+    initialized: false,
+  };
+
+  function initRadarCanvas() {
+    if (!radarCanvas || !radarCanvas.getContext) {
+      return;
+    }
+    const size = radarConfig.size;
+    const dpr = window.devicePixelRatio || 1;
+    radarCanvas.width = size * dpr;
+    radarCanvas.height = size * dpr;
+    radarCanvas.style.width = `${size}px`;
+    radarCanvas.style.height = `${size}px`;
+    const ctx = radarCanvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+    ctx.scale(dpr, dpr);
+    radarConfig.ctx = ctx;
+    radarConfig.initialized = true;
+  }
+
+  function computeRadarValues() {
+    const bucket = {};
+    RADAR_CATEGORIES.forEach((cat) => {
+      bucket[cat.key] = 0;
+    });
+    state.insights.forEach((label) => {
+      const category = RADAR_CATEGORY_MAP[label];
+      if (category) {
+        bucket[category] = (bucket[category] || 0) + 1;
+      }
+    });
+    return RADAR_CATEGORIES.map((category) => {
+      const base = bucket[category.key] || 0;
+      const normalized = Math.min(1, base / 2);
+      const value = state.insights.size ? Math.max(0.15, normalized) : 0.15;
+      return { label: category.label, key: category.key, value };
+    });
+  }
+
+  function drawRadar(values) {
+    if (!radarConfig.ctx) {
+      return;
+    }
+    const ctx = radarConfig.ctx;
+    const size = radarConfig.size;
+    const center = size / 2;
+    const radius = center - 32;
+    ctx.clearRect(0, 0, size, size);
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = "rgba(4, 12, 24, 0.8)";
+    ctx.fillRect(0, 0, size, size);
+    ctx.restore();
+    const levels = 4;
+    for (let level = levels; level >= 1; level--) {
+      const levelRadius = (radius / levels) * level;
+      ctx.beginPath();
+      values.forEach((value, index) => {
+        const angle = (Math.PI * 2 * index) / values.length - Math.PI / 2;
+        const x = center + Math.cos(angle) * levelRadius;
+        const y = center + Math.sin(angle) * levelRadius;
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.closePath();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(79, 127, 117, 0.05)";
+      ctx.fill();
+      ctx.stroke();
+    }
+    values.forEach((value, index) => {
+      const angle = (Math.PI * 2 * index) / values.length - Math.PI / 2;
+      const x = center + Math.cos(angle) * radius;
+      const y = center + Math.sin(angle) * radius;
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+    ctx.beginPath();
+    values.forEach((value, index) => {
+      const strength = value.value * radius;
+      const angle = (Math.PI * 2 * index) / values.length - Math.PI / 2;
+      const x = center + Math.cos(angle) * strength;
+      const y = center + Math.sin(angle) * strength;
+      if (index === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    });
+    ctx.closePath();
+    ctx.fillStyle = "rgba(129, 210, 255, 0.35)";
+    ctx.strokeStyle = "rgba(129, 210, 255, 0.9)";
+    ctx.lineWidth = 2;
+    ctx.fill();
+    ctx.stroke();
+    values.forEach((value, index) => {
+      const strength = value.value * radius;
+      const angle = (Math.PI * 2 * index) / values.length - Math.PI / 2;
+      const x = center + Math.cos(angle) * strength;
+      const y = center + Math.sin(angle) * strength;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#f5fbff";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(33, 180, 158, 0.85)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      const labelAngle = angle;
+      const labelX = center + Math.cos(labelAngle) * (radius + 18);
+      const labelY = center + Math.sin(labelAngle) * (radius + 18);
+      ctx.font = "12px 'Inter', system-ui, sans-serif";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctx.textAlign =
+        labelAngle > Math.PI / 2 && labelAngle < (3 * Math.PI) / 2 ? "right" : "left";
+      ctx.textBaseline = labelAngle >= Math.PI ? "bottom" : "top";
+      ctx.fillText(value.label, labelX, labelY);
+    });
+  }
+
+  function refreshRadar() {
+    if (!radarConfig.initialized) {
+      initRadarCanvas();
+    }
+    const values = computeRadarValues();
+    drawRadar(values);
+    if (radarNote) {
+      if (!state.insights.size) {
+      radarNote.textContent = "No insights yet - answers bring them to life.";
+      } else {
+        const highlight = [...state.insights][0];
+        radarNote.textContent = `${INSIGHT_LABEL_MAP[highlight] || highlight} is trending in this conversation.`;
+      }
+    }
+  }
+
+  function renderImplicitInsights() {
+    if (!implicitContainer) {
+      return;
+    }
+    implicitContainer.innerHTML = "";
+    if (!state.insights.size) {
+      const placeholder = document.createElement("span");
+      placeholder.className = "implicit-placeholder";
+      placeholder.textContent = "Signals update as you share.";
+      implicitContainer.appendChild(placeholder);
+      refreshRadar();
+      updateDashboardStats();
+      return;
+    }
+    state.insights.forEach((label) => {
+      const chip = document.createElement("span");
+      chip.className = "implicit-chip";
+      chip.textContent = INSIGHT_LABEL_MAP[label] || label;
+      implicitContainer.appendChild(chip);
+    });
+    refreshRadar();
+    updateDashboardStats();
+  }
+
+  function appendMessage(text, isUser) {
+    if (!text || !chatLog) {
+      return;
+    }
+    const container = document.createElement("div");
+    container.className = "flex";
+    container.classList.add(isUser ? "justify-end" : "justify-start");
+    const bubble = document.createElement("div");
+    bubble.className = `survey-message ${isUser ? "survey-message--user" : "survey-message--bot"}`;
+    bubble.textContent = text;
+    if (isUser) {
+      bubble.setAttribute("aria-label", "Your response");
+    }
+    container.appendChild(bubble);
+    chatLog.appendChild(container);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  function showTyping() {
+    if (typingIndicator) {
+      typingIndicator.classList.remove("hidden");
+    }
+  }
+
+  function hideTyping() {
+    if (typingIndicator) {
+      typingIndicator.classList.add("hidden");
+    }
+  }
+
+  function setControlsDisabled(disabled) {
+    if (input) {
+      input.disabled = disabled;
+    }
+    if (sendButton) {
+      sendButton.disabled = disabled;
+    }
+    if (skipButton) {
+      skipButton.disabled = disabled;
+    }
+  }
+
+  function finishConversation() {
+    if (state.finished) {
+      return;
+    }
+    state.finished = true;
+    state.awaitingResponse = false;
+    setControlsDisabled(true);
+    setProcessingState(false);
+    if (finishPanel) {
+      finishPanel.classList.remove("hidden");
+      finishPanel.setAttribute("aria-hidden", "false");
+    }
+  }
+
+  async function postSurveyPayload(payload) {
+    const response = await fetch(responseEndpoint, {
+      method: "POST",
+      headers: baseHeaders,
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Survey response failed (${response.status})`);
+    }
+    return response.json();
+  }
+
+  function handleSurveyResponse(data) {
+    if (Array.isArray(data.insights)) {
+      state.insights = new Set(data.insights);
+      renderImplicitInsights();
+    }
+    if (data.profile) {
+      Object.entries(data.profile).forEach(([key, value]) => {
+        if (value !== null && typeof value !== "undefined") {
+          state.profile[key] = value;
+        }
+      });
+    }
+    if (typeof data.question_count === "number") {
+      state.questionCount = data.question_count;
+      updateProgressDisplay(state.questionCount);
+      updateDashboardStats();
+    }
+    if (data.bot_message) {
+      appendMessage(data.bot_message, false);
+    }
+    if (data.done) {
+      finishConversation();
+      return;
+    }
+    state.awaitingResponse = true;
+    setControlsDisabled(false);
+    setProcessingState(false);
+    if (input) {
+      input.focus();
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (state.finished || !state.awaitingResponse) {
+      return;
+    }
+    const answer = input ? input.value.trim() : "";
+    if (!answer) {
+      return;
+    }
+    state.awaitingResponse = false;
+    appendMessage(answer, true);
+    if (input) {
+      input.value = "";
+    }
+    setControlsDisabled(true);
+    setProcessingState(true);
+    showTyping();
+
+    let data;
+    try {
+      data = await postSurveyPayload({
+        conversation_id: conversationId,
+        user_answer: answer,
+      });
+    } catch (error) {
+      console.error("Survey response error:", error);
+      hideTyping();
+      setControlsDisabled(false);
+      state.awaitingResponse = true;
+      setProcessingState(false);
+      if (input) {
+        input.focus();
+      }
+      return;
+    }
+
+    hideTyping();
+    handleSurveyResponse(data);
+  }
+
+  async function handleSkip(event) {
+    event.preventDefault();
+    if (state.finished || !state.awaitingResponse) {
+      return;
+    }
+    state.awaitingResponse = false;
+    appendMessage("Skipped this question", true);
+    if (input) {
+      input.value = "";
+    }
+    setControlsDisabled(true);
+    setProcessingState(true);
+    showTyping();
+
+    let data;
+    try {
+      data = await postSurveyPayload({
+        conversation_id: conversationId,
+        skip_question: true,
+      });
+    } catch (error) {
+      console.error("Survey skip error:", error);
+      hideTyping();
+      setControlsDisabled(false);
+      state.awaitingResponse = true;
+      setProcessingState(false);
+      return;
+    }
+
+    hideTyping();
+    handleSurveyResponse(data);
+  }
+
+  function startConversation() {
+    if (systemPrompt) {
+      systemPrompt.textContent = surveyFlow.intro_hint || "";
+    }
+    appendMessage(surveyFlow.opening_question, false);
+    updateProgressDisplay(state.questionCount);
+    renderImplicitInsights();
+    updateDashboardStats();
+    state.awaitingResponse = true;
+    setControlsDisabled(false);
+    setProcessingState(false);
+    if (input) {
+      input.focus();
+    }
+  }
+
+  if (form) {
+    form.addEventListener("submit", handleSubmit);
+  }
+  if (skipButton) {
+    skipButton.addEventListener("click", handleSkip);
+  }
+  buildProgressSegments(Math.max(surveyFlow.max_questions || 4, 4));
+  initRadarCanvas();
+  startConversation();
+})();
+</script>
+{% endblock %}

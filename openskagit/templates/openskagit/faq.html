@@ -1,5 +1,9 @@
 {% extends "openskagit/appeal_base_v3.html" %}
 {% load static %}
+{% block meta_description %}
+Answers to the most frequent questions about OpenSkagit's mission, tools, and how we handle civic data responsibly.
+{% endblock %}
+{% block og_title %}FAQ · OpenSkagit{% endblock %}
 
 {% block page_title %}Frequently Asked Questions — OpenSkagit{% endblock %}
 
@@ -661,7 +665,7 @@
                 <div class="faq-answer-content">
                   <p>All data comes from official Skagit County public records:</p>
                   <ul>
-                    <li><strong>Assessor Database:</strong> Property characteristics, assessments, and ownership information</li>
+                    <li><strong>MasterParcel Database:</strong> Property characteristics, assessments, and ownership information</li>
                     <li><strong>Sales Records:</strong> Verified real estate transactions from county records</li>
                     <li><strong>Tax Records:</strong> Property tax information and assessment history</li>
                     <li><strong>Geographic Data:</strong> Parcel boundaries, neighborhoods, and location data</li>
@@ -881,7 +885,7 @@ GET /api/neighborhoods/ANA/stats/</code></pre>
   <div class="cta-box">
     <h2>Still Have Questions?</h2>
     <p>Explore the Property Helper or FAQ, or contact us directly for clarification.</p>
-    <a href="/appeal/" class="cta-btn">
+    <a href="{% url 'appeal-home' %}" class="cta-btn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/>
       </svg>

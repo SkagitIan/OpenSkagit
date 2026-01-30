@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { width: 320px; font-family: sans-serif; padding: 15px; }
+    .btn { width: 100%; padding: 10px; margin-bottom: 8px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; }
+    #btn-next { background: #3b82f6; color: white; }
+    #btn-scrape { background: #8b5cf6; color: white; }
+    #btn-save { background: #10b981; color: white; display: none; }
+    #status { font-size: 12px; color: #666; margin-top: 10px; background: #f3f4f6; padding: 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div id="restaurant-name" style="font-weight: bold; margin-bottom: 10px;">No Restaurant Loaded</div>
+  <button id="btn-next" class="btn">1. Load Next Restaurant</button>
+  <button id="btn-scrape" class="btn">2. Scrape & AI Extract</button>
+  <button id="btn-save" class="btn">3. Confirm & Save</button>
+  <div id="status">Ready. Make sure you are logged into openskagit.com in another tab.</div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+{% extends "openskagit/parcel_portal_base.html" %}
+
+{% block page_title %}Tax Levy Agency Mapping{% endblock %}
+
+{% block hero %}
+<div class="space-y-4 text-center">
+  <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-500">Tax Levy Explorer</p>
+  <h1 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">Agency levy map editor</h1>
+  <p class="text-sm text-slate-500">Swap levy district codes to the matching SAO agency snapshot so each parcel charge can link back to financial data. Staff-only tool.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-lg">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="space-y-1">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Map status</p>
+        <p class="text-lg font-semibold text-slate-900">{{ mapping_count }} row{{ mapping_count|pluralize }}</p>
+        <p class="text-sm text-slate-500">
+          {{ unmapped_count }} unmapped levy{{ unmapped_count|pluralize }} · {{ snapshot_count }} agency snapshot{{ snapshot_count|pluralize }}
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 text-sm">
+        {% if show_all %}
+        <a class="rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50" href="{% url 'tax-agency-mapping' %}">Show only unmapped rows</a>
+        {% else %}
+        <a class="rounded-full border border-amber-400 bg-amber-50 px-4 py-2 font-semibold text-amber-700 hover:bg-amber-100" href="{% url 'tax-agency-mapping' %}?show=all">Show all mappings</a>
+        {% endif %}
+        <span class="text-xs uppercase tracking-[0.3em] text-slate-400">Staff access</span>
+      </div>
+    </div>
+    <p class="mt-4 text-sm text-slate-500">Use the dropdown to associate a levy district with the SAO agency snapshot that best matches the levy name and type. Saving tags the levy as the primary mapping for downstream parcel levies.</p>
+  </section>
+
+  {% if messages %}
+  <div class="space-y-2">
+    {% for message in messages %}
+    <div class="rounded-2xl border border-slate-200 bg-emerald-50 px-4 py-3 text-sm text-slate-800">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="space-y-4">
+    {% for row in mapping_rows %}
+    <form method="post" class="space-y-4 rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm">
+      {% csrf_token %}
+      <input type="hidden" name="mapping_id" value="{{ row.id }}">
+      <div class="grid gap-4 md:grid-cols-3">
+        <div class="space-y-1">
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Levy code</p>
+          <p class="text-lg font-semibold text-slate-900">{{ row.tdcode }}</p>
+          {% if row.district_name %}
+          <p class="text-sm text-slate-500">
+            {{ row.district_name }}{% if row.district_year %} · {{ row.district_year }}{% endif %}
+          </p>
+          {% endif %}
+          {% if row.notes %}
+          <p class="text-xs text-slate-500">Notes: {{ row.notes }}</p>
+          {% endif %}
+        </div>
+        <div class="space-y-2">
+          <label class="text-xs uppercase tracking-[0.3em] text-slate-400">Agency reference (MCAG)</label>
+          <select name="mcag" class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-slate-400 focus:outline-none">
+            <option value="" {% if not row.mcag %}selected{% endif %}>Unassigned</option>
+            {% for option in snapshot_options %}
+            <option value="{{ option.mcag }}" {% if row.mcag == option.mcag %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+          {% if row.snapshot_label %}
+          <p class="text-xs text-slate-500">Current snapshot: {{ row.snapshot_label }}</p>
+          {% endif %}
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs uppercase tracking-[0.3em] text-slate-400">Agency name</label>
+            <input type="text" name="agency_name" value="{{ row.agency_name }}" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none" placeholder="e.g. City of Mount Vernon">
+          </div>
+          <div>
+            <label class="text-xs uppercase tracking-[0.3em] text-slate-400">Agency type</label>
+            <input type="text" name="agency_type" value="{{ row.agency_type }}" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none" placeholder="e.g. City">
+          </div>
+          <label class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+            <input type="checkbox" name="is_primary" value="1" class="h-4 w-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500" {% if row.is_primary %}checked{% endif %}>
+            Mark as primary mapping
+          </label>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-between border-t border-slate-100 pt-3 text-sm text-slate-500">
+        <p>Saving here updates the notice for downstream tax breakdowns.</p>
+        <button type="submit" class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white shadow-lg transition hover:bg-slate-800">Save mapping</button>
+      </div>
+    </form>
+    {% empty %}
+    <p class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No levy mappings found for this filter.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

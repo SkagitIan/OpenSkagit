@@ -1,0 +1,54 @@
+<div
+  id="analysis-progress"
+  hx-get="{% url 'competition-analysis-status' job.id %}"
+  hx-trigger="load, every 4s"
+  hx-target="#analysis-progress"
+  hx-swap="outerHTML"
+  class="space-y-4 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm text-sm text-slate-600"
+>
+  <div class="flex items-center justify-between">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-slate-500">Job status</p>
+      <p class="text-base font-semibold text-slate-900">{{ job.get_status_display }}</p>
+    </div>
+    <div class="text-xs text-slate-500">Job ID {{ job.id }}</div>
+  </div>
+
+  <section class="space-y-2">
+    <p class="text-xs uppercase tracking-wide text-slate-500">Progress log</p>
+    <ol class="list-decimal space-y-1 pl-4">
+      {% if job.progress_log %}
+        {% for step in job.progress_log %}
+          <li class="text-xs text-slate-500">
+            <span class="font-mono text-[0.7rem] text-slate-400">{{ step.ts }}</span>
+            <span class="block text-slate-700">{{ step.message }}</span>
+          </li>
+        {% endfor %}
+      {% else %}
+        <li class="text-xs text-slate-500">No log entries were emitted yet.</li>
+      {% endif %}
+    </ol>
+  </section>
+
+  {% if job.error_message %}
+    <div class="rounded-lg border border-rose-200 bg-rose-50/80 px-3 py-2 text-xs text-rose-900">
+      {{ job.error_message }}
+    </div>
+  {% endif %}
+
+  {% if final_payload %}
+    <section class="space-y-2">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs uppercase tracking-wide text-slate-500">Final JSON payload</h3>
+        <span class="text-xs text-slate-400">distilled reviews + intel</span>
+      </div>
+      <pre class="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-950/80 p-3 text-[0.7rem] text-slate-50">{{ final_payload }}</pre>
+    </section>
+  {% elif job.status == job.STATUS_COMPLETED %}
+    <p class="text-xs text-slate-500">Waiting for the final payload to appear.</p>
+  {% else %}
+    <p class="text-xs text-slate-500">
+      The deep analysis continues to run—this panel refreshes every few seconds until the JSON is done.
+    </p>
+  {% endif %}
+</div>

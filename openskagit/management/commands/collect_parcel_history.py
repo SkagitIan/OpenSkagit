@@ -2,6 +2,7 @@
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -123,10 +124,15 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--force", action="store_true")
+        parser.add_argument(
+            "--taxes",
+            action="store_true",
+            help="Refresh existing parcel history (alias for --force).",
+        )
         parser.add_argument("--limit", type=int, default=None)
 
     def handle(self, *args, **opts):
-        force = opts["force"]
+        force = opts["force"] or opts["taxes"]
         limit = opts["limit"]
 
         base_qs = Assessor.objects.values_list("parcel_number", flat=True).distinct()
@@ -174,7 +180,7 @@ class Command(BaseCommand):
 
             # Flush DB batch
             if len(batch_objs) >= BATCH_SIZE:
-                self._flush_batch(batch_objs)
+                self._flush_batch(batch_objs, allow_updates=force)
                 batch_objs = []
 
             # Memory cleanup
@@ -184,7 +190,7 @@ class Command(BaseCommand):
             time.sleep(SLEEP_BETWEEN_REQUESTS)
 
         if batch_objs:
-            self._flush_batch(batch_objs)
+            self._flush_batch(batch_objs, allow_updates=force)
 
         self.stdout.write(self.style.SUCCESS(f"Done. Processed {total} parcels."))
 
@@ -193,8 +199,37 @@ class Command(BaseCommand):
         s.get(SEARCH_URL, timeout=20)
         return s
 
-    def _flush_batch(self, objs):
+    def _flush_batch(self, objs, allow_updates=False):
         if not objs:
             return
+        if not allow_updates:
+            with transaction.atomic():
+                ParcelHistory.objects.bulk_create(objs, ignore_conflicts=True)
+            return
+
+        parcel_numbers = [obj.parcel_number for obj in objs]
+        existing = {
+            ph.parcel_number: ph
+            for ph in ParcelHistory.objects.filter(parcel_number__in=parcel_numbers).only(
+                "id", "parcel_number"
+            )
+        }
+
+        to_create = []
+        to_update = []
+        now = timezone.now()
+
+        for obj in objs:
+            current = existing.get(obj.parcel_number)
+            if current:
+                current.rows = obj.rows
+                current.scraped_at = now
+                to_update.append(current)
+            else:
+                to_create.append(obj)
+
         with transaction.atomic():
-            ParcelHistory.objects.bulk_create(objs, ignore_conflicts=True)
+            if to_create:
+                ParcelHistory.objects.bulk_create(to_create)
+            if to_update:
+                ParcelHistory.objects.bulk_update(to_update, ["rows", "scraped_at"])

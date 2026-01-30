@@ -1,49 +1,67 @@
-<div id="appeal-selection-display" class="hidden"></div>
+<div id="appeal-selection-display" class="hidden w-full"></div>
 
-<form class="form-group" onsubmit="return false;">
-  <div class="input-wrapper">
-    <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="11" cy="11" r="8"></circle>
-      <path d="m21 21-4.35-4.35"></path>
-    </svg>
+<form class="space-y-3 w-full" onsubmit="return false;">
+  <label for="appeal-search" class="text-sm font-semibold text-slate-600">Property address or parcel number</label>
+  <div class="relative">
+    <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+    </span>
     <input
       id="appeal-search"
       name="q"
       type="text"
-      class="input"
+      class="w-full rounded-2xl border border-slate-200 bg-white/70 py-4 pl-12 pr-12 text-base text-slate-900 shadow-inner shadow-slate-100 placeholder:text-slate-400 focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-100"
       placeholder="e.g., 101 Main St or P12345"
       autocomplete="off"
       hx-get="{% url 'appeal-parcel-search' %}"
       hx-target="#appeal-results"
       hx-trigger="keyup changed delay:400ms"
-      hx-indicator="#search-loading"
       hx-vals='{"source":"{{ search_source|default:"appeal" }}"}'
       hx-on::before-request="
         const minLen = 3;
-        if(this.value.trim().length < minLen) {
+        const indicator = document.getElementById('search-loading');
+        const results = document.getElementById('appeal-results');
+        const wrapper = document.getElementById('search-results-wrapper');
+        if (this.value.trim().length < minLen) {
           event.detail.shouldCancel = true;
-          document.getElementById('appeal-results').innerHTML = '';
-          document.getElementById('search-results-wrapper').classList.remove('search-results-container--visible');
+          results.innerHTML = '';
+          wrapper.classList.add('hidden');
+          if (indicator) indicator.classList.add('hidden');
+          return;
         }
+        if (indicator) indicator.classList.remove('hidden');
       "
       hx-on::after-request="
         const wrapper = document.getElementById('search-results-wrapper');
         const results = document.getElementById('appeal-results');
-        if(results.innerHTML.trim()) {
-          wrapper.classList.add('search-results-container--visible');
+        const indicator = document.getElementById('search-loading');
+        if (indicator) indicator.classList.add('hidden');
+        if (results.innerHTML.trim()) {
+          wrapper.classList.remove('hidden');
+        } else {
+          wrapper.classList.add('hidden');
         }
       "
     />
-    <button type="button" class="input-clear" onclick="
-      const input = document.getElementById('appeal-search');
-      const results = document.getElementById('appeal-results');
-      const wrapper = document.getElementById('search-results-wrapper');
-      input.value = '';
-      results.innerHTML = '';
-      wrapper.classList.remove('search-results-container--visible');
-      input.focus();
-    " aria-label="Clear search">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <button
+      type="button"
+      class="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:text-slate-600"
+      onclick="
+        const input = document.getElementById('appeal-search');
+        const results = document.getElementById('appeal-results');
+        const wrapper = document.getElementById('search-results-wrapper');
+        const indicator = document.getElementById('search-loading');
+        input.value = '';
+        results.innerHTML = '';
+        wrapper.classList.add('hidden');
+        indicator?.classList.add('hidden');
+        input.focus();
+      "
+      aria-label="Clear search">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="18" y1="6" x2="6" y2="18"></line>
         <line x1="6" y1="6" x2="18" y2="18"></line>
       </svg>
@@ -51,13 +69,13 @@
   </div>
 </form>
 
-<div id="search-loading" class="hidden loading-indicator">
-  <div class="spinner"></div>
-  Searching properties...
+<div id="search-loading" class="mt-4 hidden items-center gap-2 text-sm text-slate-600">
+  <div class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></div>
+  Searching properties…
 </div>
 
-<div id="search-results-wrapper" class="search-results-container">
-  <div id="appeal-results"></div>
+<div id="search-results-wrapper" class="mt-6 hidden w-full rounded-2xl border border-slate-100 bg-white shadow-xl shadow-slate-200/60">
+  <div id="appeal-results" class="divide-y divide-slate-100"></div>
 </div>
 
 <script>
@@ -115,21 +133,21 @@
 
       input.classList.add("hidden");
       display.innerHTML = `
-        <div class="selected-property">
-          <div class="selected-property__icon">✓</div>
-          <div class="selected-property__content">
-            <div class="selected-property__title">Selected Property</div>
-            <div class="selected-property__address">${address}</div>
-            <div class="selected-property__details">Parcel ${parcel}${details ? " • " + details : ""}</div>
+        <div class="flex w-full flex-wrap items-center gap-4 rounded-2xl border border-sage-100 bg-sage-50/80 p-5 shadow-xl">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-500 text-2xl font-semibold text-white">✓</div>
+          <div class="flex-1 min-w-[200px]">
+            <p class="text-xs font-semibold uppercase tracking-wide text-sage-500">Selected property</p>
+            <p class="text-lg font-semibold text-slate-900">${address || "Address unavailable"}</p>
+            <p class="text-sm text-slate-600">Parcel ${parcel}${details ? " • " + details : ""}</p>
           </div>
-          <button class="selected-property__change" type="button" onclick="window.appealSearchReset()">
+          <button class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-800" type="button" onclick="window.appealSearchReset()">
             Change
           </button>
         </div>
       `;
       display.classList.remove("hidden");
       results.innerHTML = "";
-      wrapper.classList.remove("search-results-container--visible");
+      wrapper.classList.add("hidden");
       input.blur();
       dispatchSelection({ parcel, address, details, neighborhood });
     };
@@ -149,7 +167,7 @@
       input.classList.remove("hidden");
       input.value = "";
       results.innerHTML = "";
-      wrapper.classList.remove("search-results-container--visible");
+      wrapper.classList.add("hidden");
       document.dispatchEvent(new CustomEvent("parcel-search-reset"));
       window.setTimeout(() => input.focus(), 0);
     };

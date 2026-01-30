@@ -1,0 +1,57 @@
+{% load humanize %}
+{% if query_too_short %}
+  <div class="flex flex-col items-center gap-3 px-6 py-8 text-center text-sm text-slate-500">
+    <svg class="h-10 w-10 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.35-4.35"></path>
+    </svg>
+    <p>Enter at least {{ min_search_length|default:3 }} characters to search.</p>
+  </div>
+{% elif query %}
+  {% if results %}
+    {% for parcel in results %}
+      {% with sale_price=parcel.sale_price %}
+        <button
+          type="button"
+          class="autocomplete-result block w-full px-6 py-5 text-left transition hover:bg-sage-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-300"
+          data-address="{{ parcel.address|default:'Address unavailable'|escape }}"
+          data-parcel="{{ parcel.parcel_number|escape }}"
+          data-details="{% if sale_price %}Last sold for ${{ sale_price|floatformat:0|intcomma }}{% endif %}"
+          data-neighborhood="{{ parcel.neighborhood_code|default:''|escape }}"
+          onclick="window.taxSearchSelect(event)">
+          <div class="flex flex-col gap-1">
+            <p class="text-base font-semibold text-slate-900">{{ parcel.address|default:"Address unavailable" }}</p>
+            <p class="text-sm font-medium text-sage-600">Parcel {{ parcel.parcel_number }}</p>
+            {% if sale_price %}
+              <p class="text-xs text-slate-500">Last sold for ${{ sale_price|floatformat:0|intcomma }}</p>
+            {% endif %}
+          </div>
+          <div class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-sage-600">
+            Select
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </div>
+        </button>
+      {% endwith %}
+    {% endfor %}
+  {% else %}
+    <div class="flex flex-col items-center gap-3 px-6 py-8 text-center text-sm text-slate-500">
+      <svg class="h-10 w-10 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+      </svg>
+      <p>No properties found for “{{ query }}”. Try a different address or parcel number.</p>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="flex flex-col items-center gap-3 px-6 py-8 text-center text-sm text-slate-500">
+    <svg class="h-10 w-10 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"></circle>
+      <path d="m21 21-4.35-4.35"></path>
+    </svg>
+    <p>Start typing to find your property.</p>
+  </div>
+{% endif %}

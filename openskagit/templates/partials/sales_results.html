@@ -1,0 +1,74 @@
+{% load humanize %}
+<div class="bg-gradient-to-br from-white via-white to-sage-50 border border-sage-100 rounded-3xl shadow-md overflow-hidden">
+  <div class="px-4 py-3 border-b border-sage-100 flex items-center justify-between bg-white/80 backdrop-blur-sm">
+    <p class="text-sm font-semibold text-sage-800">{{ table_caption }}</p>
+    {% if needs_query %}
+      <span class="text-xs text-sage-600">Waiting for input</span>
+    {% endif %}
+  </div>
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100">
+      <thead class="bg-sage-50">
+        <tr class="text-xs uppercase tracking-wider text-sage-700">
+          <th class="px-4 py-3 text-left">Sale date</th>
+          <th class="px-4 py-3 text-left">Parcel</th>
+          <th class="px-4 py-3 text-right">Price</th>
+          <th class="px-4 py-3 text-left">Story</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 bg-white">
+        {% if rows %}
+          {% for row in rows %}
+            {% with sale=row.sale parcel=row.parcel %}
+            <tr class="hover:bg-sage-50/40">
+              <td class="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">{{ sale.sale_date|date:"M j, Y"|default:"—" }}</td>
+              <td class="px-4 py-3 text-sm">
+                <div class="font-semibold text-gray-900">{{ sale.parcel_number }}</div>
+                <div class="text-xs text-gray-500 truncate w-56">
+                  {% if parcel and parcel.situs_address %}
+                    {{ parcel.situs_address }}
+                  {% elif sale.zoning_jurisdiction %}
+                    {{ sale.zoning_jurisdiction }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+              </td>
+              <td class="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                {% if sale.sale_price %}
+                  ${{ sale.sale_price|floatformat:0|intcomma }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-700">
+                <p>{{ row.story }}</p>
+                <div class="mt-1 text-xs">
+                  {% if sale.is_arms_length %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 mr-1">Arms-length</span>
+                  {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 mr-1">Non-market</span>
+                  {% endif %}
+                  {% if sale.ratio_trim_bucket %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-sage-50 text-sage-700 border border-sage-100">{{ sale.ratio_trim_bucket|title }}</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500">
+              {% if needs_query %}
+                Enter a location to see comparable sales.
+              {% else %}
+                No sales found for this mode yet.
+              {% endif %}
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>

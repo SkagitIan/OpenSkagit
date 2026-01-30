@@ -1,0 +1,155 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Real-Estate Sales · OpenSkagit</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sage: {
+              50: '#f6f8f7',
+              100: '#e3e9e6',
+              200: '#c7d3cd',
+              300: '#a4b8ad',
+              400: '#7fa693',
+              500: '#6b9080',
+              600: '#567566',
+              700: '#465e53',
+              800: '#3a4e45',
+              900: '#32413a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="{% static 'openskagit/portal.css' %}">
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <a href="/" class="flex items-center space-x-3">
+          <div class="w-10 h-10 bg-gradient-to-br from-sage-500 to-sage-600 rounded-lg flex items-center justify-center shadow-md">
+            <span class="text-white font-bold text-lg">OS</span>
+          </div>
+          <div>
+            <p class="text-lg font-bold text-gray-900">OpenSkagit</p>
+            <p class="text-xs text-gray-600">Real-Estate Sales Intelligence</p>
+          </div>
+        </a>
+      </div>
+      <div class="hidden sm:flex items-center space-x-3 text-sm">
+        <a href="/#tools" class="text-gray-600 hover:text-sage-600 transition-colors">Tools</a>
+        <a href="/api/docs/" class="text-gray-600 hover:text-sage-600 transition-colors">API</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <section>
+      <div class="flex flex-wrap items-center gap-2">
+        {% for item in mode_nav %}
+          <a href="?mode={{ item.key }}{% if item.key == 'compare' and compare_query %}&q={{ compare_query|urlencode }}{% endif %}"
+             class="px-4 py-2 rounded-full border text-sm font-semibold transition-colors {% if item.active %}bg-sage-600 text-white border-sage-600{% else %}border-gray-200 text-gray-700 hover:border-sage-400{% endif %}">
+            {{ item.label }}
+          </a>
+        {% endfor %}
+      </div>
+
+      {% if mode == "compare" %}
+        <form id="compare-form" method="get" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+          <input type="hidden" name="mode" value="compare" />
+          <input id="compare-input" type="text" name="q" value="{{ compare_query }}" placeholder="Enter parcel, address, or city"
+                 class="flex-1 border-2 border-gray-200 rounded-xl px-4 py-2 focus:border-sage-500 focus:ring-sage-500 text-sm"
+                 autocomplete="off"
+                 hx-get="{% url 'sales-compare-search' %}"
+                 hx-trigger="keyup changed delay:300ms"
+                 hx-target="#compare-search-results" />
+          <button type="submit"
+                  class="inline-flex items-center justify-center px-4 py-2 text-white bg-sage-600 rounded-xl shadow hover:bg-sage-700 transition-colors text-sm font-semibold">
+            Compare
+          </button>
+        </form>
+        <div id="compare-search-results" class="mt-2"></div>
+        {% if compare_assumption %}
+          <p class="mt-2 text-xs text-gray-500">{{ compare_assumption }}</p>
+        {% endif %}
+        {% if compare_error %}
+          <p class="mt-2 text-sm text-rose-600">{{ compare_error }}</p>
+        {% endif %}
+      {% endif %}
+    </section>
+
+    <section class="space-y-4">
+      <div>
+        <p class="text-xs uppercase tracking-wide text-sage-700 font-semibold">{{ mode|title }}</p>
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mt-1">{{ headline }}</h1>
+        <p class="text-gray-600 mt-2">{{ mode_intro }}</p>
+      </div>
+
+      {% if metrics %}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {% for metric in metrics %}
+            <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+              <p class="text-xs uppercase tracking-wide text-gray-500">{{ metric.label }}</p>
+              <p class="text-2xl font-bold text-gray-900 mt-1">{{ metric.value }}</p>
+              {% if metric.delta %}
+                {% with sign=metric.delta|slice:":1" %}
+                  {% if sign == "+" %}
+                    <p class="text-sm font-semibold text-emerald-600">{{ metric.delta }}</p>
+                  {% elif sign == "-" %}
+                    <p class="text-sm font-semibold text-rose-600">{{ metric.delta }}</p>
+                  {% else %}
+                    <p class="text-sm font-semibold text-gray-500">{{ metric.delta }}</p>
+                  {% endif %}
+                {% endwith %}
+              {% endif %}
+              {% if metric.caption %}
+                <p class="text-xs text-gray-500 mt-1">{{ metric.caption }}</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if secondary_metrics %}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {% for metric in secondary_metrics %}
+            <div class="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+              <p class="text-xs text-gray-500">{{ metric.label }}</p>
+              <p class="text-lg font-semibold text-gray-900 mt-1">{{ metric.value }}</p>
+              {% if metric.caption %}
+                <p class="text-xs text-gray-500 mt-1">{{ metric.caption }}</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+
+    <section>
+      {% include "partials/sales_results.html" %}
+    </section>
+  </main>
+
+  <div id="sale-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-200 relative">
+      <button
+        type="button"
+        class="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+        onclick="document.getElementById('sale-modal').classList.add('hidden'); document.getElementById('sale-modal-content').innerHTML='';"
+      >
+        ✕
+      </button>
+      <div id="sale-modal-content" class="p-5"></div>
+    </div>
+  </div>
+</body>
+</html>

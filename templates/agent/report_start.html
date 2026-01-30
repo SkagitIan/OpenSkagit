@@ -1,0 +1,144 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Restaurant Competitive Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="{% static "openskagit/portal.css" %}" rel="stylesheet" />
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <main class="max-w-3xl mx-auto py-12 px-4">
+      <section class="mb-10 space-y-4">
+        <p class="text-xs uppercase tracking-wider text-blue-500 font-semibold">
+          Turbo-style guide
+        </p>
+        <h1 class="text-3xl font-semibold mb-2">Why do customers choose someone else?</h1>
+        <p class="text-gray-600 leading-relaxed">
+          Pick your restaurant, let us scout the competitive field, and we’ll deliver a crisp
+          playbook with one primary move + supporting cues in under 30 days.
+        </p>
+        <div class="bg-white border border-blue-100 rounded-lg p-4 shadow-sm grid gap-3 sm:grid-cols-3">
+          <article class="space-y-1">
+            <p class="text-xs uppercase text-gray-400">Step 1</p>
+            <h3 class="text-lg font-semibold">Find your place</h3>
+            <p class="text-sm text-gray-500">Autocomplete knows restaurants, even the ones without fancy sites.</p>
+          </article>
+          <article class="space-y-1">
+            <p class="text-xs uppercase text-gray-400">Step 2</p>
+            <h3 class="text-lg font-semibold">Pay & queue</h3>
+            <p class="text-sm text-gray-500">A secure checkout unlocks the full six-agent pipeline.</p>
+          </article>
+          <article class="space-y-1">
+            <p class="text-xs uppercase text-gray-400">Step 3</p>
+            <h3 class="text-lg font-semibold">Get the report</h3>
+            <p class="text-sm text-gray-500">Status updates + shareable report once Celery finishes.</p>
+          </article>
+        </div>
+      </section>
+
+      <form id="report-form" class="space-y-4 bg-white p-6 rounded shadow">
+        {% csrf_token %}
+        <label class="block text-sm font-medium text-gray-700" for="place-input">
+          Restaurant name or address
+        </label>
+        <input
+          id="place-input"
+          class="w-full border px-3 py-2 rounded text-sm focus:outline-none focus:ring focus:border-blue-300"
+          type="text"
+          name="query"
+          placeholder="e.g., SeaSalt Kitchen, Seattle"
+          autocomplete="off"
+        />
+        <input type="hidden" name="place_id" id="selected-place-id" />
+        <input type="hidden" name="place_name" id="selected-place-name" />
+        <input type="hidden" name="address" id="selected-place-address" />
+        <button
+          type="submit"
+          class="w-full bg-blue-600 text-white py-2 rounded font-semibold hover:bg-blue-700 transition"
+        >
+          Start analysis
+        </button>
+      </form>
+
+      <section id="status-prompt" class="mt-8 text-sm text-gray-500">
+        After you submit, we’ll show a live timeline and status page. Celery keeps working even if the server restarts.
+      </section>
+    </main>
+
+    <script>
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      }
+
+      async function submitJob(event) {
+        event.preventDefault();
+        const placeId = document.getElementById('selected-place-id').value;
+        const placeName = document.getElementById('selected-place-name').value;
+        const address = document.getElementById('selected-place-address').value;
+        if (!placeId) {
+          alert('Please select a restaurant from the autocomplete.');
+          return;
+        }
+        const payload = {
+          place_id: placeId,
+          place_name: placeName,
+          address,
+        };
+        const response = await fetch("{% url 'agent-report-create' %}", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken') || '',
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (data.job_id) {
+          const dest = "{% url 'agent-report-status-page' 'JOB_ID' %}".replace(
+            'JOB_ID',
+            data.job_id
+          );
+          window.location.href = dest;
+        } else if (data.error) {
+          alert(data.error);
+        }
+      }
+
+      document.getElementById('report-form').addEventListener('submit', submitJob);
+
+      function initReportAutocomplete() {
+        if (!window.google || !window.google.maps) {
+          return;
+        }
+        const input = document.getElementById('place-input');
+        const autocomplete = new google.maps.places.Autocomplete(input, {
+          types: ['establishment'],
+        });
+        autocomplete.setFields(['place_id', 'name', 'formatted_address']);
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          document.getElementById('selected-place-id').value = place.place_id || '';
+          document.getElementById('selected-place-name').value = place.name || '';
+          document.getElementById('selected-place-address').value = place.formatted_address || '';
+        });
+      }
+
+      window.initReportAutocomplete = initReportAutocomplete;
+    </script>
+
+    {% if google_places_api_key %}
+      <script
+        async
+        defer
+        src="https://maps.googleapis.com/maps/api/js?key={{ google_places_api_key }}&libraries=places&callback=initReportAutocomplete"
+      ></script>
+    {% else %}
+      <script>
+        console.warn('Set GOOGLE_PLACES_API_KEY to enable autocomplete.');
+      </script>
+    {% endif %}
+  </body>
+</html>

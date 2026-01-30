@@ -1,0 +1,363 @@
+{% if error_message %}
+  <div class="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+    {{ error_message }}
+  </div>
+{% else %}
+  <div class="grid gap-6">
+    <section class="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-lg">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Parcel summary</p>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">Parcel {{ parcel.parcel_number }}</h2>
+          <p class="text-sm text-slate-600">{{ parcel.situs_address|default:"Address unavailable" }}</p>
+        </div>
+        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">Source: MasterParcel</span>
+      </div>
+      <div id="parcel-intent-summary" class="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">LLM intent</p>
+        <div id="parcel-intent-values" class="mt-2 min-h-[32px] text-sm text-slate-900">
+          <span class="text-slate-500">Describe your project to see the parcel intent.</span>
+        </div>
+      </div>
+    </section>
+
+    <section
+      id="planning-intent"
+      class="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-lg"
+      data-endpoint="{% url 'planning-intent-classify' %}"
+      data-parcel-id="{{ parcel.parcel_number }}"
+      {% if governing_jurisdiction %}
+        data-jurisdiction-id="{{ governing_jurisdiction.id }}"
+      {% endif %}
+    >
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Intent classification</p>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">Describe the project</h2>
+          <p class="text-sm text-slate-600">
+            Tell us about the project you want to build on this parcel. Please be detailed about use, size, height,
+            number of units, and any secondary structures.
+          </p>
+        </div>
+        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">Source: user input</span>
+      </div>
+
+      <div class="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+        <div id="intent-chat-log" class="space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold uppercase text-white">AI</div>
+            <div class="max-w-2xl rounded-2xl rounded-tl-none bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+              What are you planning to build on this parcel? Include the primary use, scale, and any extra structures.
+            </div>
+          </div>
+        </div>
+
+        <form id="intent-form" class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" onsubmit="return false;">
+          {% csrf_token %}
+          <label class="sr-only" for="intent-input">Project description</label>
+          <textarea
+            id="intent-input"
+            class="min-h-[120px] w-full flex-1 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-900 shadow-inner shadow-slate-100 focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-100"
+            placeholder="Example: Build a 900 sq ft accessory dwelling unit behind the existing house, plus a detached 2-car garage and a small workshop."
+          ></textarea>
+          <button
+            id="intent-submit"
+            type="button"
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            Classify intent
+          </button>
+        </form>
+      </div>
+
+    </section>
+
+    {% if primary_zone %}
+      <section class="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-lg">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Governing zoning</p>
+            <h2 class="mt-2 text-2xl font-semibold text-slate-900">Zone {{ primary_zone.zone_code }}</h2>
+            <p class="text-sm text-slate-600">{{ primary_zone.jurisdiction|default:"Jurisdiction unknown" }}</p>
+          </div>
+          <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">Source: zoning_zone</span>
+        </div>
+
+        <dl class="mt-6 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Governing jurisdiction</dt>
+            <dd class="mt-2 text-base font-semibold text-slate-900">
+              {% if governing_jurisdiction %}
+                {{ governing_jurisdiction.name }}
+              {% else %}
+                {{ primary_zone.jurisdiction|default:"Unknown" }}
+              {% endif %}
+            </dd>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Zoning code</dt>
+            <dd class="mt-2 text-base font-semibold text-slate-900">{{ primary_zone.zone_code }}</dd>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">General class</dt>
+            <dd class="mt-2 text-base font-semibold text-slate-900">{{ primary_zone.zoning_general_class|default:"Unknown" }}</dd>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Specific class</dt>
+            <dd class="mt-2 text-base font-semibold text-slate-900">{{ primary_zone.zoning_specific_class|default:"Unknown" }}</dd>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Coverage</dt>
+            <dd class="mt-2 text-base font-semibold text-slate-900">
+              {% if primary_zone.pct_of_parcel == None %}
+                <span class="text-slate-500">Unknown</span>
+              {% else %}
+                {{ primary_zone.pct_of_parcel }}%
+              {% endif %}
+            </dd>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Source</dt>
+            <dd class="mt-2 text-base font-semibold text-slate-900">{{ primary_zone.source|default:"Unknown" }}</dd>
+          </div>
+        </dl>
+
+        {% if primary_zone.reference_url %}
+          <a class="mt-4 inline-flex text-xs font-semibold text-slate-600 hover:text-slate-900" href="{{ primary_zone.reference_url }}" target="_blank" rel="noopener">Reference link</a>
+        {% endif %}
+
+        {% if primary_zone.jurisdiction and not jurisdiction_alias %}
+          <div class="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 p-4 text-xs text-amber-700">
+            No jurisdiction alias match for "{{ primary_zone.jurisdiction }}".
+            {% if jurisdiction_normalized %}Normalized key: {{ jurisdiction_normalized }}.{% endif %}
+          </div>
+        {% endif %}
+      </section>
+    {% else %}
+      <div class="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm font-semibold text-amber-700">
+        No primary zoning zone was found for this parcel.
+      </div>
+    {% endif %}
+
+    <section class="rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-lg">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Legal code matches</p>
+          <h2 class="mt-2 text-2xl font-semibold text-slate-900">Applicable law corpus</h2>
+          <p class="text-sm text-slate-600">Resolved from the primary zoning jurisdiction.</p>
+        </div>
+        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">Source: legal_code</span>
+      </div>
+
+      {% if not primary_zone %}
+        <div class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
+          Legal authority cannot be resolved without a primary zoning zone.
+        </div>
+      {% elif not jurisdiction_alias %}
+        <div class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
+          No legal code match because the zoning jurisdiction has no alias mapping.
+        </div>
+      {% else %}
+        <div class="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Jurisdiction</p>
+          <h3 class="mt-2 text-lg font-semibold text-slate-900">{{ governing_jurisdiction.name }}</h3>
+          <p class="text-sm text-slate-600">{{ law_documents_total }} documents - {{ law_sections_total }} sections</p>
+        </div>
+
+        {% if law_sections %}
+          <ul class="mt-4 space-y-3">
+            {% for section in law_sections %}
+              <li class="rounded-xl border border-slate-100 bg-white/80 p-3">
+                <p class="text-sm font-semibold text-slate-900">
+                  {{ section.section_id }} - {{ section.heading }}
+                </p>
+                <p class="text-xs text-slate-500">
+                  {{ section.chapter.document.title_name }} - Chapter {{ section.chapter.chapter_number }}{% if section.chapter.chapter_name %} - {{ section.chapter.chapter_name }}{% endif %}
+                </p>
+                {% if section.source_url %}
+                  <a class="mt-2 inline-flex text-xs font-semibold text-slate-600 hover:text-slate-900" href="{{ section.source_url }}" target="_blank" rel="noopener">Source link</a>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          {% if law_sections_total > law_section_limit %}
+            <p class="mt-4 text-xs text-slate-500">Showing first {{ law_section_limit }} sections.</p>
+          {% endif %}
+        {% else %}
+          <p class="mt-4 text-sm text-slate-600">No law sections were found for this jurisdiction.</p>
+        {% endif %}
+      {% endif %}
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const container = document.getElementById("planning-intent");
+      if (!container) {
+        return;
+      }
+
+      const endpoint = container.dataset.endpoint;
+      const parcelId = container.dataset.parcelId;
+      const jurisdictionId = container.dataset.jurisdictionId;
+      const form = container.querySelector("#intent-form");
+      const input = container.querySelector("#intent-input");
+      const submit = container.querySelector("#intent-submit");
+      const chatLog = container.querySelector("#intent-chat-log");
+      const propertyIntentDisplay = document.getElementById("parcel-intent-values");
+
+      let initialInput = null;
+      let pendingQuestion = null;
+
+      function getCsrfToken() {
+        const tokenInput = form ? form.querySelector('input[name="csrfmiddlewaretoken"]') : null;
+        if (tokenInput && tokenInput.value) {
+          return tokenInput.value;
+        }
+        const match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? match[1] : "";
+      }
+
+      function addMessage(role, text) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "flex items-start gap-3";
+
+        const badge = document.createElement("div");
+        badge.className =
+          "mt-1 flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold uppercase text-white";
+        badge.textContent = role === "user" ? "You" : "AI";
+        badge.classList.add(role === "user" ? "bg-sage-600" : "bg-slate-900");
+
+        const bubble = document.createElement("div");
+        bubble.className =
+          "max-w-2xl rounded-2xl px-4 py-3 text-sm text-slate-700 shadow-sm";
+        if (role === "user") {
+          bubble.classList.add("rounded-tr-none", "bg-sage-50");
+        } else {
+          bubble.classList.add("rounded-tl-none", "bg-white");
+        }
+        bubble.textContent = text;
+
+        wrapper.appendChild(badge);
+        wrapper.appendChild(bubble);
+        chatLog.appendChild(wrapper);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+
+      function formatIntentLabel(intent) {
+        if (!intent) {
+          return "";
+        }
+        return intent
+          .split("_")
+          .filter(Boolean)
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+      }
+
+      function renderPropertyIntent(payload, status, fallbackMessage) {
+        if (!propertyIntentDisplay) {
+          return;
+        }
+        const intents = Array.isArray(payload?.parcel_intents) ? payload.parcel_intents : [];
+        if (status === "classified" && intents.length) {
+          propertyIntentDisplay.innerHTML = "";
+          intents.forEach((intent) => {
+            const chip = document.createElement("span");
+            chip.className =
+              "inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500";
+            chip.textContent = formatIntentLabel(intent);
+            propertyIntentDisplay.appendChild(chip);
+          });
+          return;
+        }
+        propertyIntentDisplay.innerHTML = `<span class="text-sm text-slate-500">${fallbackMessage ||
+          "Describe your project to see the parcel intent."}</span>`;
+      }
+
+      async function submitIntent() {
+        if (!endpoint || !input) {
+          return;
+        }
+        const text = (input.value || "").trim();
+        if (!text) {
+          return;
+        }
+
+        addMessage("user", text);
+        input.value = "";
+        submit.disabled = true;
+        submit.textContent = "Classifying...";
+        renderPropertyIntent(null, null, "Classifying project…");
+
+        const payload = {
+          parcel_id: parcelId,
+          user_input: text,
+          is_followup: Boolean(pendingQuestion),
+          previous_input: initialInput,
+          clarifying_question: pendingQuestion,
+          jurisdiction_id: jurisdictionId || "",
+        };
+
+        if (pendingQuestion) {
+          initialInput = initialInput ? `${initialInput} ${text}` : text;
+        } else {
+          initialInput = text;
+        }
+
+        let responseData = null;
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCsrfToken(),
+            },
+            body: JSON.stringify(payload),
+          });
+          responseData = await response.json();
+        } catch (error) {
+          responseData = { ok: false, error: "Intent request failed." };
+        }
+
+        if (!responseData) {
+          responseData = { ok: false, error: "Empty intent response." };
+        }
+
+        const fallbackMessage = responseData.ok
+          ? responseData.status === "clarify"
+            ? "Need more details to classify the project."
+            : "Describe your project to see the parcel intent."
+          : responseData.error || "Unable to classify the project.";
+        renderPropertyIntent(responseData.payload, responseData.status, fallbackMessage);
+
+        if (!responseData.ok) {
+          addMessage("ai", responseData.error || "Unable to classify the intent.");
+          submit.disabled = false;
+          submit.textContent = "Classify intent";
+          return;
+        }
+
+        if (responseData.status === "clarify") {
+          const question = responseData.payload?.clarifying_question || "Can you share more details?";
+          pendingQuestion = question;
+          addMessage("ai", question);
+        } else {
+          pendingQuestion = null;
+          initialInput = null;
+        }
+
+        submit.disabled = false;
+        submit.textContent = "Classify intent";
+      }
+
+      if (form && submit) {
+        submit.addEventListener("click", submitIntent);
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          submitIntent();
+        });
+      }
+    })();
+  </script>
+{% endif %}

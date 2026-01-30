@@ -7,11 +7,21 @@ Based on these images of the OpenSkagit.com data portal, here's a comprehensive 
 You are creating a web page that follows the OpenSkagit.com design system. Adhere strictly to these visual and functional guidelines:
 
 **Color Palette:**
-- Primary brand color: Sage green (#6B9080 or similar muted teal-green)
-- Accent green for buttons and CTAs: Medium sage (#7FA693)
-- Text: Dark gray/charcoal for headings, medium gray for body text
-- Background: Off-white/light gray (#F5F5F5 or #FAFAFA)
-- Cards: Pure white (#FFFFFF) with subtle shadows
+Primary Color Palette
+Lime Green: A bright, energetic green located in the top petal.
+Sky Blue: A bold, medium blue found in the top-right petal.
+Golden Yellow: A warm, sunny yellow in the bottom-right petal.
+Deep Teal/Dark Cyan: A rich, dark blue-green used in the bottom-left and far-left petals.
+Charcoal Gray: The dark, nearly black shade used for the mountain base in the center.
+White: Used for the mountain peak (snow cap) and the negative space/borders separating the petals.
+
+-Element	Color Name	Hex Code
+Top Petal	Lime Green	#7DB61C
+Right Petal	Sky Blue	#0071BC
+Bottom Right Petal	Golden Yellow	#FDB913
+Bottom/Left Petals	Deep Teal	#00828A
+Mountain Base	Charcoal Gray	#2E3D49
+Mountain Peak	White	#FFFFFF
 
 **Typography:**
 - Headings: Bold, sans-serif (appears to be a modern geometric sans-serif)

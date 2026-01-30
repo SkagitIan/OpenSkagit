@@ -1,0 +1,105 @@
+{% load humanize %}
+<div class="border border-gray-200 rounded-2xl shadow-sm p-5">
+  <div class="flex items-start justify-between gap-3 mb-4">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-sage-700 font-semibold">Sale detail</p>
+      <h3 class="text-xl font-bold text-gray-900">Parcel {{ sale.parcel_number }}</h3>
+      <p class="text-sm text-gray-600">{{ sale.sale_date|date:"M j, Y" }}</p>
+      <div class="mt-2 space-x-2">
+        {% if sale.is_arms_length %}
+          <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Valid sale</span>
+        {% else %}
+          <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700 border border-gray-200">Non-valid</span>
+        {% endif %}
+        {% if sale.ratio_trim_bucket %}
+          <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-sage-50 text-sage-700 border border-sage-200">{{ sale.ratio_trim_bucket|title }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="text-right">
+      <p class="text-sm text-gray-500">Sale price</p>
+      <p class="text-3xl font-bold text-gray-900">${{ sale.sale_price|floatformat:0|intcomma }}</p>
+      <p class="text-xs text-gray-500 mt-1">
+        Sale/Market:
+        {% if sale.sale_to_market_ratio %}
+          {{ sale.sale_to_market_ratio|floatformat:2 }}
+        {% else %}—{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="space-y-3">
+      <div class="bg-gray-50 border border-gray-100 rounded-lg p-3">
+        <p class="text-xs text-gray-500">Address</p>
+        <p class="text-sm font-semibold text-gray-900">
+          {% if parcel and parcel.situs_address %}{{ parcel.situs_address }}{% else %}Address pending{% endif %}
+        </p>
+        <p class="text-xs text-gray-600">
+          {{ parcel.city_district|default:"" }}{% if parcel.hood_code %} · {{ parcel.hood_code }}{% endif %}{% if parcel.hood_description %} — {{ parcel.hood_description }}{% endif %}
+        </p>
+      </div>
+
+      <div class="bg-white border border-gray-100 rounded-lg p-3">
+        <p class="text-xs text-gray-500">Property facts</p>
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-800">
+          <div><dt class="text-gray-500 text-xs">Type</dt><dd class="font-semibold">{{ parcel.proptype|default:"—" }}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Land use</dt><dd class="font-semibold">{{ parcel.land_use_code|default:"—" }}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Living area</dt><dd class="font-semibold">{% if parcel.final_living_area %}{{ parcel.final_living_area|floatformat:0|intcomma }} sf{% elif parcel.living_area %}{{ parcel.living_area|floatformat:0|intcomma }} sf{% else %}—{% endif %}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Lot size</dt><dd class="font-semibold">{% if parcel.acres %}{{ parcel.acres|floatformat:2 }} ac{% else %}—{% endif %}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Year built</dt><dd class="font-semibold">{% if parcel.final_year_built %}{{ parcel.final_year_built }}{% elif parcel.year_built %}{{ parcel.year_built }}{% else %}—{% endif %}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Beds / Baths</dt><dd class="font-semibold">{% if parcel.number_of_bedrooms %}{{ parcel.number_of_bedrooms|floatformat:0 }}{% else %}—{% endif %} / {% if parcel.total_baths %}{{ parcel.total_baths|floatformat:1 }}{% else %}—{% endif %}</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      <div class="bg-white border border-gray-100 rounded-lg p-3">
+        <p class="text-xs text-gray-500">Zoning / Planning</p>
+        {% if planning %}
+          <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-800">
+            <div><dt class="text-gray-500 text-xs">Jurisdiction</dt><dd class="font-semibold">{{ planning.zoning_jurisdiction|default:"—" }}</dd></div>
+            <div><dt class="text-gray-500 text-xs">Zone</dt><dd class="font-semibold">{{ planning.zone_code|default:"—" }}</dd></div>
+            <div><dt class="text-gray-500 text-xs">General class</dt><dd class="font-semibold">{{ planning.zoning_general_class|default:"—" }}</dd></div>
+            <div><dt class="text-gray-500 text-xs">Specific</dt><dd class="font-semibold">{{ planning.zoning_specific_class|default:"—" }}</dd></div>
+            <div><dt class="text-gray-500 text-xs">Min lot size (sf)</dt><dd class="font-semibold">{{ planning.zoning_min_lot_size_sqft|default:"—" }}</dd></div>
+            <div><dt class="text-gray-500 text-xs">Max height (ft)</dt><dd class="font-semibold">{{ planning.zoning_max_height_ft|default:"—" }}</dd></div>
+            <div><dt class="text-gray-500 text-xs">Max FAR</dt><dd class="font-semibold">{{ planning.zoning_max_far|default:"—" }}</dd></div>
+            <div><dt class="text-gray-500 text-xs">Parking (res)</dt><dd class="font-semibold">{{ planning.zoning_parking_min_residential|default:"—" }}</dd></div>
+          </dl>
+        {% else %}
+          <p class="text-sm text-gray-600">No planning facts loaded for this parcel.</p>
+        {% endif %}
+      </div>
+
+      <div class="bg-white border border-gray-100 rounded-lg p-3">
+        <p class="text-xs text-gray-500">Terrain / Risk</p>
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-800">
+          <div><dt class="text-gray-500 text-xs">Flood zone</dt><dd class="font-semibold">{% if geometry and geometry.in_flood_zone %}In flood zone{% elif geometry %}No{% else %}—{% endif %}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Flood distance (m)</dt><dd class="font-semibold">{{ geometry.flood_distance|default:"—" }}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Elevation (m)</dt><dd class="font-semibold">{{ geometry.elev|default:"—" }}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Slope</dt><dd class="font-semibold">{{ geometry.slope|default:"—" }}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Nearest school (m)</dt><dd class="font-semibold">{{ geometry.dist_school|default:"—" }}</dd></div>
+          <div><dt class="text-gray-500 text-xs">Nearest park (m)</dt><dd class="font-semibold">{{ geometry.dist_park|default:"—" }}</dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-5">
+    <p class="text-xs text-gray-500 mb-2">Recent sales for this parcel</p>
+    {% if recent_sales %}
+      <div class="border border-gray-100 rounded-lg divide-y divide-gray-100">
+        {% for rs in recent_sales %}
+          <div class="flex items-center justify-between px-3 py-2 text-sm">
+            <div class="text-gray-800">{{ rs.sale_date|date:"M j, Y" }}</div>
+            <div class="font-semibold text-gray-900">${{ rs.sale_price|floatformat:0|intcomma }}</div>
+            <div class="text-xs text-gray-600">{% if rs.is_arms_length %}Valid{% else %}Non-valid{% endif %}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-sm text-gray-600">No other sales on record for this parcel.</p>
+    {% endif %}
+  </div>
+</div>

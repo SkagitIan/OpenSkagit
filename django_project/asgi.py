@@ -9,8 +9,10 @@ https://docs.djangoproject.com/en/5.0/howto/deployment/asgi/
 
 import os
 
+from config.bootstrap import ensure_config
 from django.core.asgi import get_asgi_application
 
+ensure_config()
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'django_project.settings')
 
 application = get_asgi_application()

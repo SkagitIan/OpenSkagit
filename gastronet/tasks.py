@@ -5,6 +5,7 @@ from gastronet.management.commands.seed_places import Command as SeedPlacesComma
 from gastronet.management.commands.fetch_reviews import Command as FetchReviewsCommand
 from gastronet.management.commands.schedule_refresh import Command as ScheduleRefreshCommand
 from gastronet.models import CrawlLog
+from gastronet.openai_batches import services as batch_services
 
 
 @shared_task(bind=True, max_retries=3)
@@ -62,3 +63,25 @@ def render_menu_page(self, url):
         return asyncio.run(_render())
     except Exception:
         return ""
+
+
+@shared_task(bind=True, max_retries=3)
+def openai_batch_submit_task(self, job_type, params=None, limit=5000, batch_size=5000):
+    jobs = batch_services.submit_batches(job_type, params or {}, limit, batch_size)
+    return [job.batch_id for job in jobs]
+
+
+@shared_task(bind=True)
+def openai_batch_poll_active(self, batch_ids=None):
+    updated = batch_services.poll_active_jobs(batch_ids=batch_ids)
+    return [job.batch_id for job in updated]
+
+
+@shared_task(bind=True)
+def openai_batch_apply_job(self, job_id):
+    return batch_services.apply_job(job_id)
+
+
+@shared_task(bind=True)
+def openai_batch_apply_ready(self, limit=None, job_type=None):
+    return batch_services.apply_ready_jobs(limit=limit, job_type=job_type)

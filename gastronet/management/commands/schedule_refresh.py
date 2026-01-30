@@ -33,12 +33,12 @@ class Command(BaseCommand):
             limit,
         )
 
-        log = CrawlLog.objects.using("gastronet").create(
+        log = CrawlLog.objects.create(
             task="schedule_refresh", scope=f"alpha={alpha}"
         )
 
         qs = (
-            Restaurant.objects.using("gastronet")
+            Restaurant.objects
             .filter(active=True)
             .order_by(models.F("next_fetch_at").asc(nulls_first=True))[:limit]
         )
@@ -46,7 +46,7 @@ class Command(BaseCommand):
 
         for restaurant in qs:
             recent = list(
-                restaurant.reviews.using("gastronet")
+                restaurant.reviews
                 .order_by("-created_at")
                 .values_list("created_at", flat=True)[:15]
             )
@@ -62,7 +62,7 @@ class Command(BaseCommand):
                 days = max(min_days, min(max_days, alpha * avg_gap))
 
             restaurant.next_fetch_at = now + datetime.timedelta(days=days)
-            restaurant.save(using="gastronet", update_fields=["avg_review_gap_days", "next_fetch_at"])
+            restaurant.save(update_fields=["avg_review_gap_days", "next_fetch_at"])
             log.success_count += 1
             logger.debug(
                 "Scheduled %s next_fetch_at=%s avg_gap=%s days=%s",

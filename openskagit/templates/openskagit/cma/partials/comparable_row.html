@@ -26,7 +26,7 @@
         {% endif %}
         <div
             class="mt-2 text-[11px] text-slate-400"
-            hx-get="{% url 'cma-comparable-improvements' parcel_number comparable.snapshot.parcel_number %}?roll_id={{ comparable.snapshot.metadata.roll_id|default_if_none:'' }}&roll_year={{ comparable.snapshot.metadata.roll_year|default_if_none:'' }}{% if comparable.snapshot.metadata.assessor_building_style %}&assessor_style={{ comparable.snapshot.metadata.assessor_building_style|urlencode }}{% endif %}"
+            hx-get="{% url 'cma-comparable-improvements' parcel_number comparable.snapshot.parcel_number %}"
             hx-trigger="load"
             hx-target="this"
             hx-swap="outerHTML"

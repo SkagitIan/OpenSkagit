@@ -1,39 +1,20 @@
-import json
 import logging
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from django.conf import settings
 from django.utils.timezone import now
 
 logger = logging.getLogger(__name__)
 
-LIVE_ACTIVITY_FILE = Path(settings.BASE_DIR) / "static/openskagit/data/live_activity.json"
 LIVE_ACTIVITY_LIMIT = 20
+LIVE_ACTIVITY_ENABLED = False
 
 
 def _load_entries() -> List[Dict[str, Any]]:
-    if not LIVE_ACTIVITY_FILE.exists():
-        return []
-    try:
-        with LIVE_ACTIVITY_FILE.open("r", encoding="utf-8") as fh:
-            payload = json.load(fh)
-            if isinstance(payload, list):
-                return payload
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Unable to read live activity feed: %s", exc)
     return []
 
 
 def _write_entries(entries: List[Dict[str, Any]]) -> None:
-    LIVE_ACTIVITY_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = LIVE_ACTIVITY_FILE.with_name(f"{LIVE_ACTIVITY_FILE.name}.tmp")
-    try:
-        with tmp_path.open("w", encoding="utf-8") as fh:
-            json.dump(entries, fh, ensure_ascii=False, indent=2)
-        tmp_path.replace(LIVE_ACTIVITY_FILE)
-    except OSError as exc:
-        logger.warning("Failed to persist live activity feed: %s", exc)
+    return None
 
 
 def log_activity(
@@ -45,6 +26,9 @@ def log_activity(
     """
     Append an event to the live activity feed.
     """
+    if not LIVE_ACTIVITY_ENABLED:
+        return
+
     normalized_value = (value or "").strip()
     if not normalized_value or not label:
         return
@@ -71,6 +55,8 @@ def get_recent_activity(limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Return recent activity entries with an optional limit.
     """
+    if not LIVE_ACTIVITY_ENABLED:
+        return []
     entries = _load_entries()
     if limit is None or limit <= 0:
         return entries[:LIVE_ACTIVITY_LIMIT]

@@ -14,8 +14,10 @@ import os
 import sys
 import netifaces
 from pathlib import Path
-from dotenv import load_dotenv
-load_dotenv()
+
+from config.bootstrap import ensure_config
+
+ensure_config()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,7 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'd0644e6ff126cf9ac1b3171a868ae05b'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 # Find out what the IP addresses are at run time
 # This is necessary because otherwise Gunicorn will reject the connections
@@ -34,7 +36,7 @@ def ip_addresses():
     try:
         interfaces = netifaces.interfaces()
     except PermissionError:
-        return ["127.0.0.1", "::1","159.65.103.78"]
+        return ["127.0.0.1", "::1","159.65.103.78","73.239.250.243"]
 
     ip_list = []
     for interface in interfaces:
@@ -48,7 +50,21 @@ def ip_addresses():
 
     return ip_list or ["127.0.0.1", "::1"]
 
-ALLOWED_HOSTS = list(dict.fromkeys(ip_addresses() + ["localhost", "127.0.0.1", "testserver","159.65.103.78","openskagit.com","www.openskagit.com"]))
+ALLOWED_HOSTS = list(dict.fromkeys(ip_addresses() + ["code.openskagit.com","localhost", "127.0.0.1", "testserver","159.65.103.78","openskagit.com","www.openskagit.com"]))
+
+
+def _csv_env(name: str):
+    raw = os.getenv(name, "")
+    if not raw:
+        return []
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 # Application definition
@@ -60,7 +76,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'planning',
     'openskagit',
+    'openskagit.kidslab',
     'rest_framework',
     "django.contrib.gis",
     "leaflet",
@@ -68,6 +86,9 @@ INSTALLED_APPS = [
     'agent',
     'reference_data',
     'gastronet',
+    'anymail',
+    'django_extensions',
+    'legal_code',
 ]
 
 LEAFLET_CONFIG = {
@@ -82,6 +103,18 @@ CESIUM_ION_TOKEN = os.getenv("CESIUM_API_KEY")
 
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY", "")
+GENAI_API_KEY = os.getenv("GENAI_API_KEY", "")
+OUTSCRAPER_API_KEY = os.getenv("OUTSCRAPER_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
+
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 
 
 def _log_file_path(preferred: Path) -> str:
@@ -161,6 +194,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'openskagit.context_processors.primary_nav_links',
             ],
         },
     },
@@ -178,7 +212,7 @@ DATABASES = {
         'NAME': 'skagit',
         'USER': 'django',
         'PASSWORD': 'grandson2025',
-        'HOST': 'localhost',
+        'HOST': '127.0.0.1',
         'PORT': '5432',
         'OPTIONS': {'sslmode': 'require'},
     }
@@ -192,7 +226,13 @@ if os.environ.get("USE_SQLITE_FOR_TESTS") or ("test" in sys.argv and not os.envi
         }
     }
 
-
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "re_8xaofjgX_CySH4hoJVnprbWJD67mN4HGE")
+SITE_URL = os.getenv("SITE_URL", "https://openskagit.com")
+DEFAULT_FROM_EMAIL = "newsletter@openskagit.com"
+EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+ANYMAIL = {
+    "RESEND_API_KEY": RESEND_API_KEY,
+}
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
 
@@ -232,6 +272,9 @@ USE_TZ = True
 # URL that serves static files
 STATIC_URL = '/static/'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Directory where 'collectstatic' will put everything
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -240,9 +283,17 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
+# Use hashed filenames for static assets in production so browsers
+# receive cache-busted URLs whenever assets change.
+if not DEBUG:
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+
 # Optional cache optimization for production
 
-
+SESSION_COOKIE_SAMESITE = None
+CSRF_COOKIE_SAMESITE = None
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
@@ -253,9 +304,12 @@ REST_FRAMEWORK = {
 
 # Vector search configuration
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-
+SERP_API_KEY = "0bd10550fdad36c9024ec6f910559b3c8c2c29e895cd62b894f9816d54b26080"
+DIFFBOT_TOKEN = "d8fe54ba8882f217f75307eb2a286d99"
 # OpenAI configuration
 OPENAI_RESPONSES_MODEL = os.environ.get("OPENAI_RESPONSES_MODEL", "gpt-4o-mini")
+OPENAI_SKAGIT_DISH_MODEL = os.environ.get("OPENAI_SKAGIT_DISH_MODEL", "gpt-5-nano")
+REPLICATE_API_KEY = os.environ.get("REPLICATE_API_KEY")
 
 # Appeal helper configuration
 # Optional JSON with pre-parsed ratio summary; if not present, we attempt a best-effort PDF parse.

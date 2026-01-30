@@ -9,6 +9,11 @@ urlpatterns = [
     path("search/", views.ParcelSearchView.as_view(), name="parcel-search"),
     path("summary/", views.ParcelSummaryView.as_view(), name="parcel-summary"),
     path("semantic_search/", views.SemanticSearchView.as_view(), name="semantic-search"),
+    path("parcel_tax_fairness/", views.ParcelTaxFairnessView.as_view(), name="parcel-tax-fairness"),
+    path("parcel_tax_story/", views.ParcelTaxStoryView.as_view(), name="parcel-tax-story"),
+    path("parcel_tax_ai_summary/", views.ParcelTaxAiSummaryView.as_view(), name="parcel-tax-ai-summary"),
+    path("county_etr/", views.CountyEtrView.as_view(), name="county-etr"),
+    path("hood_tax_map/", views.NeighborhoodTaxMapView.as_view(), name="hood-tax-map"),
     path("nearby/", views.NearbyParcelsView.as_view(), name="parcel-nearby"),
     path("neighborhood_stats/<str:neighborhood_code>/", views.NeighborhoodStatsView.as_view(), name="neighborhood-stats"),
     path("appeal_analysis/<str:parcel_number>/", views.AppealAnalysisView.as_view(), name="appeal-analysis"),
@@ -26,4 +31,6 @@ urlpatterns = [
         views.CoAppraiserAdjustmentView.as_view(),
         name="co-appraiser-adjustments",
     ),
+    path("flavor-signals/ai/", views.FlavorSignalAiView.as_view(), name="flavor-signals-ai"),
+    path("civic-balance-map/", views.CivicBalanceMapView.as_view(), name="civic-balance-map"),
 ]

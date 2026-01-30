@@ -1,0 +1,41 @@
+{% if error %}
+  <div class="rounded-lg border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm text-rose-900">
+    {{ error }}
+  </div>
+{% elif results %}
+  <div class="space-y-3">
+    {% for place in results %}
+      <article class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+        <div class="flex flex-col gap-1">
+          <p class="text-lg font-semibold text-slate-900">
+            {{ place.displayName.text|default:"Untitled place" }}
+          </p>
+          <p class="text-sm text-slate-600">
+            {{ place.formattedAddress|default:"Address unavailable" }}
+          </p>
+        </div>
+        <form
+          hx-post="{% url 'competition-analysis-subject' %}"
+          hx-target="#subject-preview"
+          hx-swap="innerHTML"
+          class="grid gap-2 sm:grid-cols-[1fr_auto]"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="place_id" value="{{ place.id }}">
+          <p class="text-xs uppercase tracking-wide text-slate-500">Place ID</p>
+          <p class="text-xs font-mono text-slate-500 break-all">{{ place.id }}</p>
+          <button
+            class="sm:col-span-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+            type="submit"
+          >
+            Use this as the subject
+          </button>
+        </form>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="rounded-lg border border-dashed border-slate-300 bg-slate-50/80 px-4 py-3 text-sm text-slate-500">
+    No results yet. Try a new search term to prime the Google Places auto-suggest.
+  </p>
+{% endif %}

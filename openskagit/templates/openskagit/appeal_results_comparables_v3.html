@@ -755,6 +755,26 @@
     border-radius: var(--radius-lg);
   }
 
+  .house-marker {
+    background: transparent;
+    border: none;
+    animation: marker-pop 0.3s cubic-bezier(0.24, 0.82, 0.42, 1.04);
+  }
+
+  .house-marker svg {
+    display: block;
+    filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.35));
+    transform-origin: center bottom;
+  }
+
+  .house-marker--subject svg {
+    transform: scale(1.05);
+  }
+
+  .house-marker--comp svg {
+    transform: scale(0.95);
+  }
+
   .popup-content {
     padding: var(--space-2);
     min-width: 200px;
@@ -771,6 +791,17 @@
     font-size: 0.8125rem;
     color: var(--gray-600);
     margin-bottom: var(--space-1);
+  }
+
+  @keyframes marker-pop {
+    from {
+      opacity: 0;
+      transform: translateY(-12px) scale(0.6);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   @keyframes slideInRight {
@@ -1190,6 +1221,32 @@
 <script>
   let comparablesMap = null;
   let markersGroup = null;
+  const SUBJECT_MARKER_COLOR = '#dc2626';
+  const COMPARABLE_MARKER_COLOR = '#16a34a';
+
+  function buildHouseIcon(fillColor, extraClass = '') {
+    return L.divIcon({
+      className: `leaflet-div-icon house-marker ${extraClass}`.trim(),
+      html: `
+        <svg viewBox="0 0 36 36" width="34" height="34" aria-hidden="true" focusable="false">
+          <path d="M18 5.5L6 15.6V31h8.2v-8.2h7.6V31H30V15.6z"
+                fill="${fillColor}"
+                stroke="#ffffff"
+                stroke-width="2"
+                stroke-linejoin="round" />
+          <path d="M6 16l12-9 12 9"
+                fill="none"
+                stroke="#ffffff"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round" />
+        </svg>
+      `,
+      iconSize: [34, 34],
+      iconAnchor: [17, 30],
+      popupAnchor: [0, -28]
+    });
+  }
 
   function handleComparablesMode(mode) {
     const root = document.getElementById('appeal-comparables-root');
@@ -1245,21 +1302,16 @@
 
     markersGroup = L.featureGroup().addTo(comparablesMap);
 
-    // Add subject property marker (red)
+    // Add subject property marker (red house icon)
     {% if subject.latitude and subject.longitude %}
       const subjectMarker = L.marker([{{ subject.latitude }}, {{ subject.longitude }}], {
-        icon: L.divIcon({
-          className: 'subject-marker',
-          html: '<div style="background: #ef4444; width: 14px; height: 14px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
-          iconSize: [20, 20],
-          iconAnchor: [10, 10]
-        })
+        icon: buildHouseIcon(SUBJECT_MARKER_COLOR, 'house-marker--subject')
       }).addTo(markersGroup);
 
       subjectMarker.bindPopup('<div class="popup-content"><strong>Your Property</strong><div>{{ subject.address|default:"" }}</div></div>');
     {% endif %}
 
-    // Add comparable markers (dusty grape color)
+    // Add comparable markers (green house icons)
     const comparables = [
       {% for comp in comparables %}
         {% if comp.latitude and comp.longitude %}
@@ -1282,14 +1334,9 @@
       {% endfor %}
     ];
 
-    comparables.forEach((comp, index) => {
+    comparables.forEach((comp) => {
       const marker = L.marker([comp.lat, comp.lon], {
-        icon: L.divIcon({
-          className: 'comp-marker',
-          html: '<div style="background: #6c698d; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.2);"></div>',
-          iconSize: [16, 16],
-          iconAnchor: [8, 8]
-        })
+        icon: buildHouseIcon(COMPARABLE_MARKER_COLOR, 'house-marker--comp')
       }).addTo(markersGroup);
 
       marker.bindPopup(`

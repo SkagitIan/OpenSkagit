@@ -1,0 +1,85 @@
+{% load static %}
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% with description=meta_description|default:"OpenSkagit turns public records, menus, and local documents into responsive tools, live signals, and citeable answers for Skagit Valley." %}
+<meta name="description" content="{{ description }}">
+{% endwith %}
+{% if meta_robots %}
+<meta name="robots" content="{{ meta_robots }}">
+{% endif %}
+{% with title=page_title|default:"OpenSkagit · AI-Enhanced Data Portal for Skagit County" %}
+<title>{{ title }}</title>
+<meta property="og:title" content="{{ og_title|default:title }}">
+<meta name="twitter:title" content="{{ twitter_title|default:title }}">
+{% endwith %}
+{% with og_desc=og_description|default:meta_description %}
+<meta property="og:description" content="{{ og_desc }}">
+<meta name="twitter:description" content="{{ twitter_description|default:og_desc }}">
+{% endwith %}
+<meta property="og:type" content="{{ og_type|default:'website' }}">
+{% with canonical=canonical_url|default:og_url %}
+{% if canonical %}
+<link rel="canonical" href="{{ canonical }}">
+{% endif %}
+{% endwith %}
+{% if og_url %}
+<meta property="og:url" content="{{ og_url }}">
+{% endif %}
+{% with image=og_image|default:'https://res.cloudinary.com/dfz4bhlzs/image/upload/c_thumb,w_200,g_face/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png' %}
+<meta property="og:image" content="{{ image }}">
+<meta name="twitter:image" content="{{ twitter_image|default:image }}">
+{% endwith %}
+<meta name="twitter:card" content="{{ twitter_card|default:'summary_large_image' }}">
+<meta name="theme-color" content="#2E3D49">
+<link rel="icon" href="{{ favicon|default:'https://res.cloudinary.com/dfz4bhlzs/image/upload/v1768253765/logoicon_c_crop_w_480_h_467_x_0_y_0-Picsart-BackgroundRemover_uklqfi.png' }}" sizes="any">
+<link rel="apple-touch-icon" href="{{ apple_touch_icon|default:'https://res.cloudinary.com/dfz4bhlzs/image/upload/v1768253765/logoicon_c_crop_w_480_h_467_x_0_y_0-Picsart-BackgroundRemover_uklqfi.png' }}">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          sage: {
+            50: '#f0fbfb',
+            100: '#d6f1f2',
+            200: '#a9e1e3',
+            300: '#73c9cc',
+            400: '#33abb1',
+            500: '#00828a',
+            600: '#006c73',
+            700: '#00565c',
+            800: '#004247',
+            900: '#003238'
+          },
+          mist: '#EFF7FF',
+          mint: '#F8FFF9',
+          os: {
+            lime: '#7DB61C',
+            sky: '#0071BC',
+            gold: '#FDB913',
+            teal: '#00828A',
+            charcoal: '#2E3D49'
+          },
+          legacy: {
+            sage: {
+              50: '#f6f8f7',
+              100: '#e3e9e6',
+              200: '#c7d3cd',
+              300: '#a4b8ad',
+              400: '#7fa693',
+              500: '#6b9080',
+              600: '#567566',
+              700: '#465e53',
+              800: '#3a4e45',
+              900: '#32413a'
+            },
+            mist: '#EAF4F4',
+            mint: '#F6FFF8'
+          }
+        }
+      }
+    }
+  };
+</script>
+<link rel="stylesheet" href="{% static 'openskagit/portal.css' %}">

@@ -1,543 +1,528 @@
+{% extends "openskagit/base.html" %}
 {% load static humanize %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="https://res.cloudinary.com/dfz4bhlzs/image/upload/c_thumb,w_200,g_face/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png" sizes="any">
-<link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
-<link rel="apple-touch-icon" href="https://res.cloudinary.com/dfz4bhlzs/image/upload/c_thumb,w_200,g_face/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png">
 
-  <title>OpenSkagit.com - AI-Enhanced Data Portal for Skagit County</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            sage: {
-              50: '#f6f8f7',
-              100: '#e3e9e6',
-              200: '#c7d3cd',
-              300: '#a4b8ad',
-              400: '#7fa693',
-              500: '#6b9080',
-              600: '#567566',
-              700: '#465e53',
-              800: '#3a4e45',
-              900: '#32413a',
-            }
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="stylesheet" href="{% static 'openskagit/portal.css' %}">
-</head>
-<body class="bg-gray-50">
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" referrerpolicy="no-referrer">
+{% endblock %}
 
-  <!-- Header -->
-  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between items-center py-4">
-        <a href="/" class="flex items-center space-x-3 group">
-          <div class="w-10 h-10 bg-gradient-to-br from-sage-500 to-sage-600 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-            <span class="text-white font-bold text-lg">OS</span>
-          </div>
-          <div class="flex flex-col">
-            <span class="text-xl font-bold text-gray-900">OpenSkagit.com</span>
-            <span class="text-xs text-gray-600 hidden sm:block">AI-Enhanced Data Portal</span>
-          </div>
-        </a>
-        <nav class="hidden md:flex items-center space-x-6">
-          <a href="#tools" class="text-gray-700 hover:text-sage-600 transition-colors font-medium">Tools</a>
-          <a href="#insights" class="text-gray-700 hover:text-sage-600 transition-colors font-medium">Insights</a>
-          <a href="/api/docs/" class="text-gray-700 hover:text-sage-600 transition-colors font-medium">API</a>
-          <a href="#about" class="text-gray-700 hover:text-sage-600 transition-colors font-medium">About</a>
-        </nav>
-      </div>
-    </div>
-  </header>
+{% block content %}
+<div class="home-portal-theme">
+<div id="ai-modal-overlay" class="ai-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title" aria-describedby="ai-modal-body" hidden>
+  <div class="ai-modal">
+    <h2 id="ai-modal-title" class="text-xl font-bold text-gray-900 mb-3">Heads up: AI-assisted data</h2>
+    <p id="ai-modal-body" class="text-gray-700 text-sm leading-relaxed">Some insights are generated or enriched with AI and may be incomplete, outdated, or wrong. Do not rely on OpenSkagit for life-safety, legal, medical, or emergency decisions—verify with official sources.</p>
+    <button id="ai-modal-confirm" type="button" class="mt-5 w-full inline-flex justify-center px-4 py-2.5 bg-os-teal text-white font-semibold rounded-xl shadow hover:bg-os-teal/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-os-teal/40">I understand</button>
+  </div>
+</div>
+<!-- Hero -->
+  <section class="relative overflow-hidden bg-gradient-to-b from-os-teal/10 via-white to-white py-16 sm:py-24">
+    <div class="orb w-80 h-80 bg-os-lime/30 -left-24 -top-10"></div>
+    <div class="orb w-72 h-72 bg-os-sky/20 right-0 bottom-0"></div>
 
-  <!-- Hero Section -->
-  <section class="relative bg-gradient-to-b from-white to-gray-50 py-16 sm:py-24 overflow-hidden">
-    <div class="absolute inset-0 opacity-5">
-      <svg class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#6b9080" stroke-width="1"/>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
-      </svg>
-    </div>
-
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-      <div class="text-center animate-fade-in-up">
-        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-          Discover <span class="gradient-text">Skagit County</span> Data
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <div class="text-center space-y-6">
+        <div class="inline-flex items-center justify-center ">
+          <img src="https://res.cloudinary.com/dfz4bhlzs/image/upload/v1768253765/logoicon_c_crop_w_480_h_467_x_0_y_0-Picsart-BackgroundRemover_uklqfi.png" alt="OpenSkagit logo" class="h-18 w-18 object-contain" loading="lazy">
+        </div>
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+          Skagit <span class="text-os-lime">Valley</span>. Understood.
         </h1>
-        <p class="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-          Access AI-enhanced property assessments, neighborhood insights, and civic data.
-          Built for citizens who want to get to the bottom of what matters.
+        <p class="text-xl text-gray-700 max-w-3xl mx-auto">
+          OpenSkagit is the foundational model, the thinking layer for Skagit Valley—turning fragmented information into clear 
+          answers, practical tools, and shareable reports grounded in real data.
         </p>
-
-        <!-- Live Stats Counter -->
-        <div class="flex flex-wrap justify-center gap-8 mb-12">
-          <div class="text-center">
-            <div class="text-3xl sm:text-4xl font-bold text-sage-600 stat-number" id="stat-parcels">0</div>
-            <div class="text-sm text-gray-600 mt-1">Parcels Analyzed</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl sm:text-4xl font-bold text-sage-600 stat-number" id="stat-sales">0</div>
-            <div class="text-sm text-gray-600 mt-1">Sales Analyzed</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl sm:text-4xl font-bold text-sage-600 stat-number" id="stat-enrichments">0</div>
-            <div class="text-sm text-gray-600 mt-1">Parcel Enrichments</div>
-          </div>
-        </div>
-
-        <!-- Search Bar -->
-        <div class="max-w-2xl mx-auto">
-          <div class="relative">
-            <input
-              type="text"
-              placeholder="Search by address, parcel number, or neighborhood..."
-              class="w-full px-6 py-4 rounded-full border-2 border-gray-200 focus:border-sage-500 focus:outline-none shadow-lg text-lg"
-              id="hero-search"
-            />
-            <button class="absolute right-2 top-1/2 -translate-y-1/2 bg-sage-600 text-white px-6 py-2 rounded-full hover:bg-sage-700 transition-colors font-medium">
-              Search
-            </button>
-          </div>
-          <p class="text-sm text-gray-500 mt-3">
-            <span class="inline-flex items-center">
-              <svg class="w-4 h-4 mr-1 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-              </svg>
-              Last updated: <span id="last-update">Loading...</span>
-            </span>
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Featured Insights Carousel -->
-  <section id="insights" class="py-16 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-3">Featured Insights</h2>
-        <p class="text-gray-600">Real data from Skagit County, enhanced and analyzed</p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <!-- Insight Card 1: Assessment Quality -->
-        <div class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg p-8 card-hover border border-gray-100">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-gray-900">Assessment Quality</h3>
-            <svg class="w-5 h-5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
-          </div>
-
-          <!-- Circular Gauge -->
-          <div class="flex justify-center mb-6">
-            <div class="relative w-32 h-32">
-              <svg class="transform -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="12"/>
-                <circle cx="60" cy="60" r="50" fill="none" stroke="#6b9080" stroke-width="12"
-                        stroke-dasharray="314" stroke-dashoffset="94"
-                        class="gauge-circle" stroke-linecap="round"/>
-              </svg>
-              <div class="absolute inset-0 flex items-center justify-center">
-                <span class="text-3xl font-bold text-gray-900">90%</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="text-center">
-            <div class="inline-block bg-sage-100 text-sage-800 px-3 py-1 rounded-full text-sm font-medium mb-3">
-              Excellent Uniformity
-            </div>
-            <p class="text-sm text-gray-600">County assessments meet IAAO standards for equity</p>
-          </div>
-        </div>
-
-        <!-- Insight Card 2: Market Trends -->
-        <div class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg p-8 card-hover border border-gray-100">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-gray-900">Market Activity</h3>
-            <svg class="w-5 h-5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-            </svg>
-          </div>
-
-          <!-- Mini Chart -->
-          <div class="h-32 mb-6 relative">
-            <svg class="w-full h-full" viewBox="0 0 200 80">
-              <polyline
-                points="0,60 40,50 80,45 120,35 160,30 200,25"
-                fill="none"
-                stroke="#6b9080"
-                stroke-width="3"
-                class="transition-all"
-              />
-              <polyline
-                points="0,60 40,50 80,45 120,35 160,30 200,25 200,80 0,80"
-                fill="url(#gradient)"
-                opacity="0.2"
-              />
-              <defs>
-                <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" style="stop-color:#6b9080;stop-opacity:0.8" />
-                  <stop offset="100%" style="stop-color:#6b9080;stop-opacity:0" />
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-
-          <div class="text-center">
-            <div class="text-2xl font-bold text-gray-900 mb-1">+12.4%</div>
-            <p class="text-sm text-gray-600">Median home value increase this year</p>
-          </div>
-        </div>
-
-        <!-- Insight Card 3: Recent Activity -->
-        <div class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg p-8 card-hover border border-gray-100">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-gray-900">Live Activity</h3>
-            <div class="w-2 h-2 bg-sage-500 rounded-full animate-pulse"></div>
-          </div>
-
-          <div class="space-y-4" id="activity-feed">
-            <div class="text-sm text-gray-500 animate-pulse">
-              Loading live activity...
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- County Overview Dashboard -->
-  <section class="py-16 bg-gray-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-3">Skagit County at a Glance</h2>
-        <p class="text-gray-600">Key metrics and data quality indicators</p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-        <div class="bg-white rounded-xl shadow-md p-6 card-hover">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-sage-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-              </svg>
-            </div>
-            <span class="text-xs font-medium text-sage-600 bg-sage-50 px-2 py-1 rounded">Live</span>
-          </div>
-          <div class="text-3xl font-bold text-gray-900 mb-1">{{ total_parcels|intcomma }}</div>
-          <div class="text-sm text-gray-600">Total Parcels</div>
-          <div class="mt-3 flex items-center text-xs text-gray-500">
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-            </svg>
-            Updated daily
-          </div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-md p-6 card-hover">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-sage-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-              </svg>
-            </div>
-            <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">98%</span>
-          </div>
-          <div class="text-3xl font-bold text-gray-900 mb-1">{{ median_value_display }}</div>
-          <div class="text-sm text-gray-600">Median Home Value</div>
-          <div class="mt-3 flex items-center text-xs text-green-600">
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"/>
-            </svg>
-            +12.4% YoY
-          </div>
-        </div>
-
-
-        <div class="bg-white rounded-xl shadow-md p-6 card-hover">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-sage-100 rounded-lg flex items-center justify-center">
-              <svg class="w-6 h-6 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-              </svg>
-            </div>
-            <span class="text-xs font-medium text-sage-600 bg-sage-50 px-2 py-1 rounded">A+</span>
-          </div>
-          <div class="text-3xl font-bold text-gray-900 mb-1">{{ data_quality_score }}</div>
-          <div class="text-sm text-gray-600">Data Quality Score</div>
-          <div class="mt-3 flex items-center text-xs text-gray-500">
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-            </svg>
-            AI-verified
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Tools Grid -->
-  <section id="tools" class="py-16 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-3">Tools & Reports</h2>
-        <p class="text-gray-600">Powerful analytics and insights at your fingertips</p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- Property Helper Tool -->
-        <a href="/appeal/" class="group bg-white border-2 border-gray-200 rounded-xl p-6 card-hover hover:border-sage-500 transition-all">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-sage-100 rounded-lg flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-              ⚖️
-            </div>
-            <span class="inline-flex items-center text-xs font-medium text-sage-700 bg-sage-50 px-2.5 py-1 rounded-full">
-              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-              </svg>
-              Available
-            </span>
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-sage-600 transition-colors">Property Helper</h3>
-          <p class="text-gray-600 text-sm mb-4">Review your property assessment and compare with similar properties in your neighborhood.</p>
-          <div class="flex items-center text-sm text-gray-500">
-            <svg class="w-4 h-4 mr-1.5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-            </svg>
-            <span class="group-hover:text-sage-600 transition-colors">Start comparing</span>
-          </div>
-        </a>
-
-        <!-- FAQ Tool -->
-        <a href="/faq/" class="group bg-white border-2 border-gray-200 rounded-xl p-6 card-hover hover:border-sage-500 transition-all">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-sage-100 rounded-lg flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-              ❓
-            </div>
-            <span class="inline-flex items-center text-xs font-medium text-sage-700 bg-sage-50 px-2.5 py-1 rounded-full">
-              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-              </svg>
-              Available
-            </span>
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-sage-600 transition-colors">Frequently Asked Questions</h3>
-          <p class="text-gray-600 text-sm mb-4">Find answers to common questions about data, tools, methodology, and how to use OpenSkagit.</p>
-          <div class="flex items-center text-sm text-gray-500">
-            <svg class="w-4 h-4 mr-1.5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-            </svg>
-            <span class="group-hover:text-sage-600 transition-colors">Get answers</span>
-          </div>
-        </a>
-
-        <!-- Neighborhood Reports Tool -->
-        <a href="/neighborhood-trends/" class="group bg-white border-2 border-gray-200 rounded-xl p-6 card-hover hover:border-sage-500 transition-all">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-sage-100 rounded-lg flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-              🏘️
-            </div>
-            <span class="inline-flex items-center text-xs font-medium text-sage-700 bg-sage-50 px-2.5 py-1 rounded-full">
-              <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-              </svg>
-              Available
-            </span>
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-sage-600 transition-colors">Neighborhood Reports</h3>
-          <p class="text-gray-600 text-sm mb-4">Detailed insights about neighborhoods including demographics, schools, and amenities.</p>
-          <div class="flex items-center text-sm text-gray-500">
-            <svg class="w-4 h-4 mr-1.5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-            </svg>
-            <span class="group-hover:text-sage-600 transition-colors">Explore neighborhoods</span>
-          </div>
-        </a>
-
-        <!-- Budget Insights - Coming Soon -->
-        <div class="bg-white border-2 border-gray-100 rounded-xl p-6 opacity-75">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-              💰
-            </div>
-            <span class="inline-flex items-center text-xs font-medium text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full">
-              Coming Soon
-            </span>
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">Budget Insights</h3>
-          <p class="text-gray-600 text-sm mb-4">Explore Skagit County budget allocations, spending trends, and departmental financial data.</p>
-        </div>
-
-        <!-- Regression Analysis -->
-        <a href="/methodology/" class="group bg-white border-2 border-gray-200 rounded-xl p-6 card-hover hover:border-sage-500 transition-all">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-sage-100 rounded-lg flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-              📈
-            </div>
-            <span class="inline-flex items-center text-xs font-medium text-sage-700 bg-sage-50 px-2.5 py-1 rounded-full">
-              Methodology
-            </span>
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-sage-600 transition-colors">Regression Analysis</h3>
-          <p class="text-gray-600 text-sm mb-4">Follow our regression methodology to understand trends, forecasts, and the models powering OpenSkagit insights.</p>
-          <div class="flex items-center text-sm text-gray-500">
-            <svg class="w-4 h-4 mr-1.5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-            </svg>
-            <span class="group-hover:text-sage-600 transition-colors">Explore Methodology</span>
-          </div>
-        </a>
-
-        <!-- Custom Reports - Coming Soon -->
-        <div class="bg-white border-2 border-gray-100 rounded-xl p-6 opacity-75">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-              📋
-            </div>
-            <span class="inline-flex items-center text-xs font-medium text-gray-600 bg-gray-100 px-2.5 py-1 rounded-full">
-              Coming Soon
-            </span>
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">Custom Reports</h3>
-          <p class="text-gray-600 text-sm mb-4">Generate custom data reports and visualizations based on county records and analytics.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- About / Mission Section -->
-  <section id="about" class="py-16 bg-gradient-to-b from-gray-50 to-white">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="bg-white rounded-2xl shadow-xl p-8 md:p-12 border border-gray-100">
-        <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-16 h-16 bg-sage-100 rounded-full mb-4">
-            <svg class="w-8 h-8 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
-          </div>
-          <h2 class="text-3xl font-bold text-gray-900 mb-3">Empowering Citizens with Data</h2>
-        </div>
-
-        <div class="prose prose-lg max-w-none text-gray-600">
-          <p class="text-center mb-6">
-            OpenSkagit is a personal portfolio project dedicated to making Skagit County public data accessible,
-            understandable, and actionable for everyone. Using AI to enhance and clean raw data, I create tools
-            that help citizens get to the bottom of what they want to know.
-          </p>
-
-          <div class="grid md:grid-cols-3 gap-6 mt-10 text-center">
-            <div>
-              <div class="text-sage-600 font-bold text-2xl mb-2">AI-Enhanced</div>
-              <p class="text-sm">Machine learning improves data quality and discovers insights</p>
-            </div>
-            <div>
-              <div class="text-sage-600 font-bold text-2xl mb-2">Open Access</div>
-              <p class="text-sm">Free tools and API for developers to build upon</p>
-            </div>
-            <div>
-              <div class="text-sage-600 font-bold text-2xl mb-2">Transparent</div>
-              <p class="text-sm">Clear methodology and data sources you can trust</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-10 text-center">
-          <a href="/api/docs/" class="inline-flex items-center px-6 py-3 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors font-medium shadow-lg hover:shadow-xl">
-            Explore the API
+        <div class="flex flex-wrap justify-center gap-4">
+          <a href="#tools" class="inline-flex items-center px-6 py-3 bg-os-teal text-white rounded-xl font-semibold shadow-lg hover:bg-os-teal/90 transition-colors">
+            Explore tools
             <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+          <a href="#cta-briefing" class="inline-flex items-center px-6 py-3 bg-white text-os-teal border border-os-teal/30 rounded-xl font-semibold shadow-sm hover:border-os-teal/60 transition-colors">
+            Get the weekly briefing
+            <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M13 5l7 7-7 7"/>
             </svg>
           </a>
         </div>
+        {% if hero_questions %}
+        <div class="flex justify-center">
+          <div class="hero-question-pill inline-flex items-center space-x-3" role="status" aria-live="polite">
+            <span class="w-2 h-2 bg-os-lime rounded-full animate-pulse"></span>
+            <span id="hero-question-text" class="hero-question-text">{{ hero_questions.0 }}</span>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="bg-gray-900 text-gray-300 py-12">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-        <div class="col-span-1 md:col-span-2">
-          <div class="flex items-center space-x-3 mb-4">
-            <div class="w-10 h-10 bg-sage-600 rounded-lg flex items-center justify-center">
-              <span class="text-white font-bold">OS</span>
+  {% if hero_questions %}
+    {{ hero_questions|json_script:"hero-question-data" }}
+  {% endif %}
+
+  <!-- Live stats -->
+  <section class="bg-white py-14" id="stats">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h2 class="text-3xl font-bold text-gray-900 mb-4">Live operational stats</h2>
+      <p class="text-gray-600">Real-time signals from active datasets and pipelines.</p>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+      <div class="stat-ticker-shell" role="region" aria-label="Live operational stats ticker">
+        <div class="stat-ticker-track">
+          {% for _ in '12' %}
+            {% for stat in stats_cards %}
+            <div class="ticker-item">
+              <div class="ticker-label">
+                <span class="ticker-dot {{ stat.accent_class|default:'bg-os-sky' }}"></span>
+                <span class="ticker-label-text">{{ stat.label }}</span>
+                {% if stat.badge_label %}
+                <span class="ticker-badge {{ stat.badge_class|default:'bg-gray-900/10 text-gray-800' }}">{{ stat.badge_label }}</span>
+                {% endif %}
+              </div>
+              <div class="ticker-value">
+                {% if stat.value|default_if_none:'' != '' and stat.animate|default:False %}
+                <span data-animate-number data-target="{{ stat.value }}">{{ stat.value|intcomma }}</span>
+                {% elif stat.value|default_if_none:'' != '' %}
+                <span>{{ stat.value|intcomma }}</span>
+                {% else %}
+                <span>{{ stat.display }}</span>
+                {% endif %}
+              </div>
+              {% if stat.caption %}
+              <div class="ticker-caption">{{ stat.caption }}</div>
+              {% endif %}
             </div>
-            <span class="text-xl font-bold text-white">OpenSkagit.com</span>
-          </div>
-          <p class="text-gray-400 mb-4 max-w-md">
-            AI-enhanced data portal making Skagit County information accessible to all citizens.
-            Not affiliated with Skagit County Government.
-          </p>
-          <div class="flex space-x-4">
-            <a href="#" class="text-gray-400 hover:text-sage-400 transition-colors">
-              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-            </a>
-          </div>
-        </div>
-
-        <div>
-          <h3 class="text-white font-bold mb-4">Tools</h3>
-          <ul class="space-y-2">
-            <li><a href="/appeal/" class="hover:text-sage-400 transition-colors">Property Helper</a></li>
-            <li><a href="/neighborhood-trends/" class="hover:text-sage-400 transition-colors">Neighborhood Reports</a></li>
-            <li><a href="/faq/" class="hover:text-sage-400 transition-colors">FAQ</a></li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 class="text-white font-bold mb-4">Resources</h3>
-          <ul class="space-y-2">
-            <li><a href="/api/docs/" class="hover:text-sage-400 transition-colors">API Documentation</a></li>
-            <li><a href="#about" class="hover:text-sage-400 transition-colors">About</a></li>
-            <li><a href="#" class="hover:text-sage-400 transition-colors">Contact</a></li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="border-t border-gray-800 pt-8">
-        <div class="flex flex-col md:flex-row justify-between items-center">
-          <p class="text-gray-400 text-sm mb-4 md:mb-0">
-            <strong class="text-white">NOT AFFILIATED WITH SKAGIT COUNTY GOVERNMENT</strong><br/>
-            Data sourced from public records. Information updated regularly but may not reflect real-time changes.
-          </p>
-          <p class="text-gray-500 text-sm">
-            © 2024 OpenSkagit.com
-          </p>
+            {% endfor %}
+          {% endfor %}
         </div>
       </div>
     </div>
-  </footer>
+  </section>
 
-  <!-- JavaScript -->
+  <!-- How OpenSkagit Works -->
+  <section class="py-16 bg-gray-50" id="model">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-10">
+        <p class="text-sm uppercase tracking-[0.4em] text-slate-400">How it works</p>
+        <h2 class="text-3xl font-bold text-gray-900 mt-3">How OpenSkagit turns civic data into place-based intelligence</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="flip-card" data-flip-card tabindex="0" role="button" aria-pressed="false">
+          <div class="flip-card-inner">
+            <div class="flip-face flip-front has-flip-hint" style="--bg-base: #E6F6F4;">
+              <div class="flip-hint" aria-hidden="true"><i class="fa-solid fa-rotate-right"></i></div>
+              <div class="flip-icon-shell">
+                <i class="fa-solid fa-map-location-dot text-os-teal text-lg"></i>
+              </div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">Collect & Enrich</h3>
+              <p class="text-gray-700 text-sm">We grab scattered local data—permits, parcels, shorelines, zoning—and connect the dots that aren't obvious when you look at them separately.</p>
+              <span class="sr-only">Flip card for details.</span>
+            </div>
+            <div class="flip-face flip-back">
+              <p class="text-gray-600 text-sm mb-3"><strong>Anacortes:</strong> Shoreline permits + water quality data show what's really happening along the coast</p>
+              <p class="text-gray-600 text-sm mb-3"><strong>Burlington:</strong> Building permits crossed with floodplain maps reveal where growth is pushing into risky areas</p>
+              <p class="text-gray-600 text-sm"><strong>County-wide:</strong> Property sales linked to zoning changes track where development is actually heading</p>
+            </div>
+          </div>
+        </div>
+        <div class="flip-card" data-flip-card tabindex="0" role="button" aria-pressed="false">
+          <div class="flip-card-inner">
+            <div class="flip-face flip-front has-flip-hint" style="--bg-base: #E7F1FB;">
+              <div class="flip-hint" aria-hidden="true"><i class="fa-solid fa-rotate-right"></i></div>
+              <div class="flip-icon-shell">
+                <i class="fa-solid fa-compass-drafting text-os-sky text-lg"></i>
+              </div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">Build & Analyze</h3>
+              <p class="text-gray-700 text-sm">
+              We make tools that turn messy local data into something you can actually use, showing how decisions ripple through your community.
+              </p>
+<span class="sr-only">Flip card for details.</span>
+            </div>
+            <div class="flip-face flip-back">
+              <p class="text-gray-600 text-sm mb-3"><strong>Permit timelines:</strong> See how long different projects actually take and where things get stuck</p>
+              <p class="text-gray-600 text-sm mb-3"><strong>Zoning impacts:</strong> Map how code changes affect what can get built in your neighborhood</p>
+              <p class="text-gray-600 text-sm"><strong>Growth patterns:</strong> Track where development is piling up and what it means for roads, schools, and services</p>
+            </div>
+          </div>
+        </div>
+        <div class="flip-card" data-flip-card tabindex="0" role="button" aria-pressed="false">
+          <div class="flip-card-inner">
+            <div class="flip-face flip-front has-flip-hint" style="--bg-base: #FFF3D6;">
+              <div class="flip-hint" aria-hidden="true"><i class="fa-solid fa-rotate-right"></i></div>
+              <div class="flip-icon-shell">
+                <i class="fa-solid fa-brain text-os-gold text-lg"></i>
+              </div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">Train & Refine</h3>
+              <p class="text-gray-700 text-sm">
+We train a local-first AI on Skagit Valley's unique context, so it can think about place, policy, and community like someone who's lived here for years.
+</p>
+ <span class="sr-only">Flip card for details.</span>
+            </div>
+            <div class="flip-face flip-back">
+              <p class="text-gray-600 text-sm mb-3"><strong>Ask complex questions:</strong> "How might new stormwater rules affect downtown Sedro-Woolley redevelopment?"</p>
+              <p class="text-gray-600 text-sm mb-3"><strong>Surface connections:</strong> Links between watershed health, farmland conversion, and housing policy</p>
+              <p class="text-gray-600 text-sm"><strong>Built-in accountability:</strong> Cites parcels, permits, and sources so you can check every claim</p>
+</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tools -->
+  <section id="tools" class="py-16 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">Tools for Skagit Valley</h2>
+        <p class="text-gray-700 max-w-3xl mx-auto">Built to be used. New tools and datasets roll out continuously.</p>
+      </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <a href="/parcel/" class="group bg-white border-2 border-gray-200 rounded-2xl p-6 card-hover hover:border-os-teal transition-all shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-os-teal/10 rounded-xl flex items-center justify-center text-os-teal text-xl">
+              <i class="fa-solid fa-map-location-dot"></i>
+            </div>
+            <span class="inline-flex items-center text-xs font-semibold text-white bg-os-teal px-2.5 py-1 rounded-full shadow">Live</span>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-os-teal transition-colors">Parcel Partner</h3>
+          <p class="text-gray-600 text-sm mb-4">A parcel-first view of Skagit Valley: key facts, mapping layers, and location-aware insights in one place.</p>
+          <div class="flex items-center text-sm text-os-teal font-semibold">
+            <span>{{ total_parcels|intcomma }} parcels covered →</span>
+          </div>
+        </a>
+
+        <a href="/flavor/" class="group bg-white border-2 border-gray-200 rounded-2xl p-6 card-hover hover:border-os-teal transition-all shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-os-teal/10 rounded-xl flex items-center justify-center text-os-teal text-lg">
+              <i class="fa-solid fa-utensils"></i>
+            </div>
+            <span class="inline-flex items-center text-xs font-semibold text-white bg-os-teal px-2.5 py-1 rounded-full shadow">Live</span>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-os-teal transition-colors">Skagit Flavor Index</h3>
+          <p class="text-gray-600 text-sm mb-4">What people are talking about, what’s rising, what’s fading—built from menus, reviews, and real patterns across the Valley.</p>
+          <div class="flex items-center text-sm text-os-teal font-semibold">
+            <span>{{ restaurant_count|intcomma }} restaurants · {{ menu_items_count|intcomma }} menu items</span>
+          </div>
+        </a>
+
+        <a href="/votevector/" class="group bg-white border-2 border-gray-200 rounded-2xl p-6 card-hover hover:border-os-teal transition-all shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-os-teal/10 rounded-xl flex items-center justify-center text-os-teal text-lg">
+              <i class="fa-solid fa-vote-yea"></i>
+            </div>
+            <span class="inline-flex items-center text-xs font-semibold text-white bg-os-teal px-2.5 py-1 rounded-full shadow">Live</span>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-os-teal transition-colors">VoteVector</h3>
+          <p class="text-gray-600 text-sm mb-4">VoteVector analyzes voting behavior through a neighborhood lens—connecting ballots, parcels, and geography to surface meaningful engagement patterns.</p>
+          <div class="flex items-center text-sm text-os-teal font-semibold">
+            <span>Explore ballots, parcels, and civic signals →</span>
+          </div>
+        </a>
+
+        <div class="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-lg">
+              <i class="fa-solid fa-magnifying-glass-location"></i>
+            </div>
+            <span class="inline-flex items-center text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-full">Coming soon</span>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-2">Parcel Profiler</h3>
+          <p class="text-gray-600 text-sm mb-4">Parcel Profiler surfaces constraints, risk signals, and smart next steps for any property so you know what’s behind the headline.</p>
+        </div>
+
+        <div class="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-lg">
+              <i class="fa-solid fa-money-bill-wave"></i>
+            </div>
+            <span class="inline-flex items-center text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-full">Coming soon</span>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-2">Where Your Taxes Go</h3>
+          <p class="text-gray-600 text-sm mb-4">Clear breakdown of property taxes with trend context and plain-English explanations of what changed.</p>
+        </div>
+
+        <div class="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-lg">
+              <i class="fa-solid fa-newspaper"></i>
+            </div>
+            <span class="inline-flex items-center text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-full">Coming soon</span>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-2">Civic Briefings</h3>
+          <p class="text-gray-600 text-sm mb-4">Agenda and document summaries tagged by impact area—housing, flood, roads, taxes, business—with links back to sources.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Consulting -->
+  <section id="community" class="py-16 bg-gradient-to-b from-white to-os-teal/10">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="bg-white border border-os-teal/15 rounded-2xl shadow-xl p-8 md:p-10">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+          <div class="space-y-4 max-w-3xl">
+            <p class="text-sm font-semibold text-os-teal uppercase tracking-wide">Consulting</p>
+            <h2 class="text-3xl font-bold text-gray-900">Get your time back. Reduce mistakes. Move faster.</h2>
+            <p class="text-gray-700 text-lg">I help Skagit small teams fix one high-friction workflow&mdash;so work moves without extra meetings, dropped balls, or rework. AI is just the lever.</p>
+            <ul class="text-sm text-gray-600 space-y-2">
+              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Built for small crews and real budgets.</span></li>
+              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Clear scope, clear &ldquo;done.&rdquo;</span></li>
+              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Your team stays in control.</span></li>
+            </ul>
+            <ul class="text-sm text-gray-600 space-y-2 pt-2 border-t border-slate-200">
+              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Save hours weekly by removing repetitive steps.</span></li>
+              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Reduce errors with simple checks + consistent outputs.</span></li>
+              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Speed up turnaround on the work that customers feel.</span></li>
+              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Make knowledge shareable so it’s not stuck in one person’s head.</span></li>
+            </ul>
+          </div>
+          <div class="flex-shrink-0">
+            <a href="/consult/" class="inline-flex items-center px-6 py-3 rounded-xl bg-os-teal text-white font-semibold shadow-lg hover:bg-os-teal/90 transition-colors">
+              Explore consulting
+              <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </a>
+            <div class="mt-3 text-center">
+              <a href="/consult/#services" class="text-sm font-semibold text-os-teal underline decoration-os-teal/40 hover:text-os-teal/90">See packages</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<section class="py-16 bg-gray-50" aria-label="How OpenSkagit works overview">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex flex-col gap-2 mb-8">
+      <p class="text-sm uppercase tracking-[0.3em] text-slate-400">How we work</p>
+      <h2 class="text-3xl font-bold text-gray-900">Built from public data. Organized by place.</h2>
+      <p class="text-gray-600 max-w-3xl">
+        These tight signals describe how we collect, contextualize, and translate civic data into tools that help people understand
+        the Valley without digging through PDFs or silos.
+      </p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <article class="rounded-2xl border border-os-teal/20 bg-gradient-to-br from-os-teal/10 to-white p-5 shadow-sm flex flex-col gap-3 text-slate-700">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 bg-white/85 rounded-2xl border border-os-teal/20 flex items-center justify-center text-os-teal text-lg">
+              <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold uppercase tracking-wide text-os-teal">Process</p>
+              <h3 class="text-xl font-semibold text-gray-900">Structured civic infrastructure</h3>
+            </div>
+          </div>
+        <p class="text-sm leading-relaxed">
+          We normalize parcel records, zoning, permits, elections, and other public sources into a single system with no PDFs, no silos.
+        </p>
+        <p class="text-xs font-semibold text-os-teal/90">Place data · Planning · Public records</p>
+      </article>
+      <article class="rounded-2xl border border-os-sky/25 bg-gradient-to-br from-os-sky/10 to-white p-5 shadow-sm flex flex-col gap-3 text-slate-700">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 bg-white/90 rounded-2xl border border-os-sky/25 flex items-center justify-center text-os-sky text-lg">
+              <i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold uppercase tracking-wide text-os-sky">Spatial intelligence</p>
+              <h3 class="text-xl font-semibold text-gray-900">Every signal is spatial</h3>
+            </div>
+          </div>
+        <p class="text-sm leading-relaxed">
+          Patterns surface when every record links to parcels, neighborhoods, or districts—so we can compare where pressure concentrates and participation shifts.
+        </p>
+        <p class="text-xs font-semibold text-os-sky">Parcels · Neighborhood context · Maps</p>
+      </article>
+      <article class="rounded-2xl border border-os-gold/30 bg-gradient-to-br from-os-gold/15 to-white p-5 shadow-sm flex flex-col gap-3 text-slate-700">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 bg-white/85 rounded-2xl border border-os-gold/30 flex items-center justify-center text-os-gold text-lg">
+              <i class="fa-solid fa-wave-square" aria-hidden="true"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold uppercase tracking-wide text-os-gold">Signals</p>
+              <h3 class="text-xl font-semibold text-gray-900">Derived for decisions</h3>
+            </div>
+          </div>
+        <p class="text-sm leading-relaxed">
+          We transform raw tables into interpretable indexes, classifications, and confidence-weighted summaries that stay transparent and source-linked.
+        </p>
+        <p class="text-xs font-semibold text-os-gold">Indicators · Comparisons · Confidence</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+
+  <!-- How We Use AI -->
+  <section class="py-16 bg-white" id="ai">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">How we use AI</h2>
+        <p class="text-gray-700 max-w-4xl mx-auto">AI augments specific workflows—it doesn’t replace data provenance. Here’s where we apply it, with humans reviewing the results.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-os-teal/5 border border-os-teal/20 rounded-2xl p-6">
+          <div class="flex items-center gap-3 mb-2">
+              <div class="w-10 h-10 bg-white/90 border border-os-teal/20 rounded-lg flex items-center justify-center text-os-teal text-lg">
+                <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+              </div>
+            <h3 class="text-lg font-semibold text-os-charcoal mb-0">Data enrichment &amp; pattern detection</h3>
+          </div>
+          <p class="text-gray-700 text-sm">Models help detect anomalies in assessments, menu sentiment swings, and zoning changes. We feed them structured joins, let them spot patterns, then log the output for auditors.</p>
+        </div>
+        <div class="bg-os-sky/5 border border-os-sky/20 rounded-2xl p-6">
+          <div class="flex items-center gap-3 mb-2">
+              <div class="w-10 h-10 bg-white/90 border border-os-sky/20 rounded-lg flex items-center justify-center text-os-sky text-lg">
+                <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+              </div>
+            <h3 class="text-lg font-semibold text-os-charcoal mb-0">Summarization &amp; synthesis</h3>
+          </div>
+          <p class="text-gray-700 text-sm">Briefings and parcel narratives start with AI summaries, but every paragraph keeps citations, timestamps, and clear uncertainty labels before publication.</p>
+        </div>
+        <div class="bg-os-lime/10 border border-os-lime/30 rounded-2xl p-6">
+          <div class="flex items-center gap-3 mb-2">
+              <div class="w-10 h-10 bg-white/90 border border-os-lime/30 rounded-lg flex items-center justify-center text-os-lime text-lg">
+                <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+              </div>
+            <h3 class="text-lg font-semibold text-os-charcoal mb-0">Coding + automation</h3>
+          </div>
+          <p class="text-gray-700 text-sm">We use AI pair-programming to scaffold ETL scripts, QA checks, and regression dashboards—always reviewed in Git before they touch production pipelines.</p>
+        </div>
+        <div class="bg-os-gold/10 border border-os-gold/30 rounded-2xl p-6">
+          <div class="flex items-center gap-3 mb-2">
+              <div class="w-10 h-10 bg-white/90 border border-os-gold/30 rounded-lg flex items-center justify-center text-os-gold text-lg">
+                <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+              </div>
+            <h3 class="text-lg font-semibold text-os-charcoal mb-0">Ideation &amp; analysis</h3>
+          </div>
+          <p class="text-gray-700 text-sm">For explorations—“what if we map parcel preflight constraints?”—AI helps storyboard, but the decision to ship still depends on real data coverage and community impact.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<!-- Partnerships -->
+<!-- <section id="partners" class="py-16 bg-white">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold text-gray-900 mb-3">Partnerships</h2>
+      <p class="text-gray-700 max-w-3xl mx-auto">
+        OpenSkagit is being built as shared local infrastructure. We partner with
+        organizations that work close to the ground—and care about accuracy,
+        context, and public trust.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 card-hover">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Property &amp; land professionals</h3>
+        <p class="text-gray-600 text-sm">
+          Parcel context, constraint signals, and preflight insight that supports
+          better decisions—and improves with real-world feedback.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 card-hover">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Business &amp; economic groups</h3>
+        <p class="text-gray-600 text-sm">
+          Local demand, sentiment, and activity patterns derived from spending,
+          menus, and reviews—interpreted, not just counted.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 card-hover">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Civic &amp; nonprofit organizations</h3>
+        <p class="text-gray-600 text-sm">
+          Source-linked summaries, alerts, and issue tracking that support
+          accountability without losing nuance.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 card-hover">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Local media &amp; educators</h3>
+        <p class="text-gray-600 text-sm">
+          Explainable data, background context, and co-created briefings that help
+          translate complexity for the public.
+        </p>
+      </div>
+
+    </div>
+
+    <p class="text-sm text-gray-600 text-center mt-6">
+      Early partners help shape what gets built, how it’s validated, and how it’s shared.
+      Access, influence, and co-branded public tools—when it fits.
+    </p>
+
+    <div class="text-center mt-6">
+      <a href="{% url 'contact' %}?topic=partnership"
+         class="inline-flex items-center px-5 py-3 bg-sage-600 text-white rounded-xl font-semibold shadow-md hover:bg-sage-700 transition-colors">
+        Start a conversation
+      </a>
+    </div>
+
+  </div>
+</section> -->
+
+
+<!-- Closing CTA -->
+  <section id="cta-briefing" class="py-16 bg-gradient-to-b from-white to-os-teal/10">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="bg-white border border-os-teal/20 rounded-2xl shadow-xl p-8 md:p-10 space-y-6">
+        <div class="text-center space-y-3">
+          <h2 class="text-3xl font-bold text-gray-900">Inside the OpenSkagit lab</h2>
+          <p class="text-gray-700">Watch us build tools that make Skagit Valley's data actually useful—and see what we're discovering along the way.</p>
+        </div>
+        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Fresh tools: VoteVector, Flavor Index, Parcel Helper</li>
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Weird stuff we found in the data this week</li>
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Survey results from your neighbors</li>
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Sneak peeks at what's next</li>
+        </ul>
+        <form id="briefing-form" class="flex flex-col md:flex-row gap-3" method="post" novalidate>
+          {% csrf_token %}
+          <input
+            id="briefing-email"
+            type="email"
+            name="email"
+            required
+            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-os-teal focus:ring-2 focus:ring-os-teal/20 transition"
+            placeholder="you@example.com"
+            autocomplete="email"
+          />
+          <button type="submit" id="briefing-submit" class="px-6 py-3 bg-os-teal text-white rounded-xl font-semibold shadow-md hover:bg-os-teal/90 transition-colors">
+            Get updates
+          </button>
+        </form>
+        <p id="briefing-success" class="text-sm text-os-teal text-center hidden">Subscribed — thanks for helping us keep the Valley informed.</p>
+
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- JavaScript -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" crossorigin="anonymous"></script>
   <script>
-    // Counter Animation
-    function animateCounter(element, target, duration = 2000) {
+    function animateCounter(element, target, duration = 1600) {
+      const end = Number(target);
+      if (!Number.isFinite(end)) {
+        return;
+      }
       const start = 0;
-      const increment = target / (duration / 16);
+      const increment = end / (duration / 16 || 1);
       let current = start;
-
       const timer = setInterval(() => {
         current += increment;
-        if (current >= target) {
-          element.textContent = target.toLocaleString();
+        if ((increment >= 0 && current >= end) || (increment < 0 && current <= end)) {
+          element.textContent = Number(end).toLocaleString();
           clearInterval(timer);
         } else {
           element.textContent = Math.floor(current).toLocaleString();
@@ -545,126 +530,127 @@
       }, 16);
     }
 
-    // Initialize counters when page loads
     document.addEventListener('DOMContentLoaded', function() {
-      // Animate stat counters
-      setTimeout(() => {
-        animateCounter(document.getElementById('stat-parcels'), 77652, 2000);
-        animateCounter(document.getElementById('stat-sales'), 30696, 1500);
-        animateCounter(document.getElementById('stat-enrichments'), 136, 1500);
-      }, 300);
-
-      // Set last update time
-      const now = new Date();
-      const options = { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
-      document.getElementById('last-update').textContent = now.toLocaleDateString('en-US', options);
-
-      const activityFeedElement = document.getElementById('activity-feed');
-      const liveActivityUrl = "{% url 'live-activity-feed' %}";
-      const activityIconMap = {
-        comparison: '<svg class="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>',
-        neighborhood: '<svg class="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd"/></svg>',
-        appeal: '<svg class="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>'
+      const disclaimerKey = 'openskagitAiDisclaimerAccepted';
+      const aiModalOverlay = document.getElementById('ai-modal-overlay');
+      const aiModalConfirm = document.getElementById('ai-modal-confirm');
+      const getAcknowledged = () => {
+        try {
+          return window.localStorage.getItem(disclaimerKey) === '1';
+        } catch (error) {
+          console.warn('Local storage unavailable', error);
+          return false;
+        }
       };
-
-      function formatRelativeTime(date) {
-        const nowMs = Date.now();
-        const elapsedSeconds = Math.max(0, Math.floor((nowMs - date.getTime()) / 1000));
-        if (elapsedSeconds < 60) {
-          return 'Just now';
+      const setAcknowledged = () => {
+        try {
+          window.localStorage.setItem(disclaimerKey, '1');
+        } catch (error) {
+          console.warn('Unable to persist AI disclaimer state', error);
         }
-        if (elapsedSeconds < 3600) {
-          const minutes = Math.floor(elapsedSeconds / 60);
-          return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-        }
-        if (elapsedSeconds < 86400) {
-          const hours = Math.floor(elapsedSeconds / 3600);
-          return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-        }
-        if (elapsedSeconds < 172800) {
-          return 'Yesterday';
-        }
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      }
-
-      function getActivityTime(entry) {
-        if (entry.timestamp) {
-          const parsed = Date.parse(entry.timestamp);
-          if (!Number.isNaN(parsed)) {
-            return formatRelativeTime(new Date(parsed));
-          }
-        }
-        return entry.time || 'Just now';
-      }
-
-      function createActivityItem(entry, index) {
-        const item = document.createElement('div');
-        item.className = 'flex items-start space-x-3 activity-item';
-        item.style.animationDelay = `${index * 0.05}s`;
-
-        const iconWrapper = document.createElement('div');
-        iconWrapper.className =
-          'w-8 h-8 bg-sage-100 rounded-full flex items-center justify-center flex-shrink-0';
-        iconWrapper.innerHTML = activityIconMap[entry.type] || activityIconMap.comparison;
-
-        const copy = document.createElement('div');
-        copy.className = 'flex-1';
-
-        const message = document.createElement('p');
-        message.className = 'text-sm text-gray-700';
-        message.textContent = `${entry.label} `;
-        const highlight = document.createElement('span');
-        highlight.className = 'font-medium';
-        highlight.textContent = entry.value;
-        message.appendChild(highlight);
-
-        const timeStamp = document.createElement('p');
-        timeStamp.className = 'text-xs text-gray-500';
-        timeStamp.textContent = getActivityTime(entry);
-
-        copy.appendChild(message);
-        copy.appendChild(timeStamp);
-        item.appendChild(iconWrapper);
-        item.appendChild(copy);
-        return item;
-      }
-
-      function renderActivityFeed(entries) {
-        if (!activityFeedElement) return;
-        activityFeedElement.innerHTML = '';
-        if (!Array.isArray(entries) || entries.length === 0) {
-          activityFeedElement.innerHTML =
-            '<p class="text-sm text-gray-500">No recent activity reported yet.</p>';
+      };
+      const showAiModal = () => {
+        if (!aiModalOverlay) {
           return;
         }
-        entries.slice(0, 5).forEach((entry, index) => {
-          activityFeedElement.appendChild(createActivityItem(entry, index));
+        aiModalOverlay.hidden = false;
+        aiModalOverlay.classList.add('is-visible');
+        document.body.classList.add('modal-open');
+        if (aiModalConfirm) {
+          aiModalConfirm.focus();
+        }
+      };
+      const hideAiModal = () => {
+        if (!aiModalOverlay) {
+          return;
+        }
+        aiModalOverlay.classList.remove('is-visible');
+        document.body.classList.remove('modal-open');
+        aiModalOverlay.hidden = true;
+      };
+      if (aiModalOverlay && aiModalConfirm) {
+        if (!getAcknowledged()) {
+          showAiModal();
+        } else {
+          aiModalOverlay.hidden = true;
+        }
+        aiModalConfirm.addEventListener('click', () => {
+          setAcknowledged();
+          hideAiModal();
         });
       }
 
-      async function refreshActivityFeed() {
-        if (!activityFeedElement) return;
+      document.querySelectorAll('[data-animate-number]').forEach((element) => {
+        const targetAttr = element.getAttribute('data-target');
+        const value = Number(targetAttr);
+        if (!Number.isFinite(value)) {
+          return;
+        }
+        animateCounter(element, value);
+      });
+
+      const heroDataNode = document.getElementById('hero-question-data');
+      const heroQuestionText = document.getElementById('hero-question-text');
+      if (heroDataNode && heroQuestionText) {
         try {
-          const response = await fetch(liveActivityUrl, { cache: 'no-cache' });
-          if (!response.ok) {
-            throw new Error(`Live activity fetch failed: ${response.status}`);
+          const heroQuestions = JSON.parse(heroDataNode.textContent).filter(Boolean);
+          if (heroQuestions.length > 1) {
+            let heroIndex = 0;
+            setInterval(() => {
+              heroIndex = (heroIndex + 1) % heroQuestions.length;
+              heroQuestionText.classList.add('is-hiding');
+              setTimeout(() => {
+                heroQuestionText.textContent = heroQuestions[heroIndex];
+                heroQuestionText.classList.remove('is-hiding');
+              }, 220);
+            }, 4200);
           }
-          const payload = await response.json();
-          renderActivityFeed(payload);
         } catch (error) {
-          console.error('Live activity feed update failed', error);
-          activityFeedElement.innerHTML =
-            '<p class="text-sm text-gray-500">Live activity temporarily unavailable.</p>';
+          console.warn('Unable to load hero questions', error);
         }
       }
 
-      refreshActivityFeed();
-      setInterval(refreshActivityFeed, 30000);
+      const rotateFlipInner = (inner, deg) => {
+        if (window.anime) {
+          window.anime({
+            targets: inner,
+            rotateY: deg,
+            duration: 520,
+            easing: 'easeOutQuad'
+          });
+        } else {
+          inner.style.transform = `rotateY(${deg}deg)`;
+        }
+      };
 
-      // Intersection Observer for scroll animations
+      const initFlipCard = (card) => {
+        const inner = card.querySelector('.flip-card-inner');
+        if (!inner) {
+          return;
+        }
+        inner.style.transform = 'rotateY(0deg)';
+        let flipped = false;
+        const setFlip = (state) => {
+          flipped = state;
+          card.setAttribute('aria-pressed', state ? 'true' : 'false');
+          rotateFlipInner(inner, state ? 180 : 0);
+        };
+        card.addEventListener('mouseenter', () => setFlip(true));
+        card.addEventListener('mouseleave', () => setFlip(false));
+        card.addEventListener('click', () => setFlip(!flipped));
+        card.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setFlip(!flipped);
+          }
+        });
+      };
+
+      document.querySelectorAll('[data-flip-card]').forEach(initFlipCard);
+
       const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -100px 0px'
+        threshold: 0.15,
+        rootMargin: '0px 0px -80px 0px'
       };
 
       const observer = new IntersectionObserver((entries) => {
@@ -676,56 +662,84 @@
         });
       }, observerOptions);
 
-      // Observe all cards for animation
       document.querySelectorAll('.card-hover').forEach(card => {
         card.style.opacity = '0';
-        card.style.transform = 'translateY(20px)';
+        card.style.transform = 'translateY(18px)';
         card.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
         observer.observe(card);
       });
 
-      // Search functionality placeholder
-      const searchInput = document.getElementById('hero-search');
-      if (searchInput) {
-        searchInput.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') {
-            const query = this.value.trim();
-            if (query) {
-              // In production, this would redirect to search results
-              console.log('Searching for:', query);
-              // window.location.href = `/search/?q=${encodeURIComponent(query)}`;
-            }
-          }
-        });
-      }
-
-      // Smooth scroll for anchor links
-      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      const smoothScrollLinks = document.querySelectorAll('a[href^="#"], a[href^="/#"]');
+      smoothScrollLinks.forEach(anchor => {
         anchor.addEventListener('click', function (e) {
           const href = this.getAttribute('href');
-          if (href !== '#') {
+          if (!href || href === '#') {
+            return;
+          }
+          const hash = href.startsWith('/#') ? href.substring(1) : href;
+          const target = document.querySelector(hash);
+          if (target) {
             e.preventDefault();
-            const target = document.querySelector(href);
-            if (target) {
-              target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-              });
-            }
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         });
       });
-    });
 
-    // Add parallax effect to hero section
-    window.addEventListener('scroll', function() {
-      const scrolled = window.pageYOffset;
-      const heroSection = document.querySelector('section');
-      if (heroSection && scrolled < window.innerHeight) {
-        heroSection.style.transform = `translateY(${scrolled * 0.3}px)`;
-        heroSection.style.opacity = 1 - (scrolled / 600);
+      const briefingForm = document.getElementById('briefing-form');
+      const emailInput = document.getElementById('briefing-email');
+      const successMessage = document.getElementById('briefing-success');
+      const briefingSubmit = document.getElementById('briefing-submit');
+      const getCsrfToken = () => {
+        const tokenInput = briefingForm ? briefingForm.querySelector('input[name="csrfmiddlewaretoken"]') : null;
+        return tokenInput ? tokenInput.value : '';
+      };
+      const toggleSuccess = (text, isError = false) => {
+        if (!successMessage) {
+          return;
+        }
+        successMessage.textContent = text;
+        successMessage.classList.remove('hidden');
+        successMessage.classList.toggle('text-red-600', isError);
+        successMessage.classList.toggle('text-os-teal', !isError);
+      };
+      if (briefingForm && emailInput) {
+        briefingForm.addEventListener('submit', async function(event) {
+          event.preventDefault();
+          const email = emailInput.value.trim();
+          if (!email) {
+            toggleSuccess('Please enter an email address.', true);
+            return;
+          }
+          if (briefingSubmit) {
+            briefingSubmit.disabled = true;
+            briefingSubmit.classList.add('opacity-70');
+          }
+          try {
+            const response = await fetch('/briefing/subscribe/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+              },
+              body: JSON.stringify({ email }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+              throw new Error(data.error || 'Unable to subscribe right now.');
+            }
+            toggleSuccess('Subscribed — thanks for helping us keep the Valley informed.');
+            briefingForm.reset();
+          } catch (error) {
+            toggleSuccess(error.message || 'Unable to subscribe right now.', true);
+            if (briefingSubmit) {
+              briefingSubmit.disabled = false;
+              briefingSubmit.classList.remove('opacity-70');
+            }
+            return;
+          }
+        });
       }
     });
   </script>
-</body>
-</html>
+
+{% endblock %}

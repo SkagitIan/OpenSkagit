@@ -2,15 +2,24 @@ import math
 import os
 from datetime import date as dt_date
 from decimal import Decimal
+from pathlib import Path
 
 os.environ.setdefault("USE_SQLITE_FOR_TESTS", "1")
 
+from django.conf import settings
+from django.core.cache import cache
 from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from . import adjustment_engine, cma
-from .models import AdjustmentCoefficient
+from .models import AdjustmentCoefficient, ParcelHistory
 from .valuation_areas import resolve_market_group
 from .views import _merge_request_params, _subject_market_group
+from .services.tca_ingest import (
+    TaxReportParseError,
+    load_tax_report_from_har,
+    parse_tax_report_html,
+)
+from .tax import county_etr_insights
 
 
 class CmaHelperTests(TestCase):
@@ -201,6 +210,42 @@ class AdjustmentEngineTests(TestCase):
         self.assertAlmostEqual(predicted, expected_price, places=2)
 
 
+class TaxReportParsingTests(SimpleTestCase):
+    SAMPLE_HTML = r"""
+    <script type="text/javascript">
+        var mf=parent;
+        if(1==1){
+            var c=mf.document.getElementById('spResult');
+            c.innerHTML='<table class=TblG91 width="100%" style="border-collapse:collapse;" cellpadding=3 borderColor=darkblue border=2><tr align=center bgcolor="#d3d3d3"><td nowrap><b>Tax Code Area</b></td><td nowrap><b>County Name</B></td><td nowrap><b>Districts in TCA</B></td></tr><tr align=center><td><a id=BlueLink class=NoDec href=\"javascript:ZoomMap(-13605305.7827571,6194431.1297197,\\'0080\\',\\'\\');\">0080</a></td><td>Skagit</td><TD width=400>PUD: 1; SCHOOL: 101; PORT: 2; HOSPITAL: 304; CITY: SEDRO-WOOLLEY; EMS: SKA; </TD></tr></table>';
+        }
+    </script>
+    """
+
+    def test_parse_tax_report_html_extracts_districts(self):
+        result = parse_tax_report_html(self.SAMPLE_HTML)
+
+        self.assertEqual(result.tca_code, "0080")
+        self.assertEqual(result.county, "Skagit")
+        self.assertEqual(len(result.districts), 6)
+        self.assertEqual(result.districts[0].district_type, "PUD")
+        self.assertEqual(result.districts[0].district_identifier, "1")
+        self.assertIn("CITY: SEDRO-WOOLLEY", result.raw_districts_text)
+
+    def test_load_tax_report_from_har_matches_expected_tca(self):
+        har_path = Path(settings.BASE_DIR) / "data" / "webgis.dor.wa.gov.har"
+        if not har_path.exists():
+            self.skipTest("HAR file not available in this environment.")
+
+        html = load_tax_report_from_har(har_path, "0080", 2024)
+        result = parse_tax_report_html(html)
+        self.assertEqual(result.tca_code, "0080")
+        self.assertGreaterEqual(len(result.districts), 1)
+
+    def test_parse_tax_report_errors_on_missing_marker(self):
+        with self.assertRaises(TaxReportParseError):
+            parse_tax_report_html("<html><body>No districts table</body></html>")
+
+
 class ValuationAreaMappingTests(SimpleTestCase):
     def test_resolve_market_group_by_prefix(self):
         self.assertEqual(resolve_market_group("20B123"), "BURLINGTON")
@@ -243,3 +288,37 @@ class SubjectMarketGroupHelperTests(SimpleTestCase):
     def test_falls_back_to_neighborhood_mapping(self):
         snapshot = self._snapshot({"neighborhood_code": "20B789"})
         self.assertEqual(_subject_market_group(snapshot), "BURLINGTON")
+
+
+class TaxMetricsTests(TestCase):
+    def test_county_etr_insights(self):
+        cache.clear()
+        ParcelHistory.objects.create(
+            parcel_number="P1000001",
+            rows=[{"VALUE YEAR": 2025, "TOTAL TAX": 1500, "MARKET TOTAL": 150000}],
+        )
+        ParcelHistory.objects.create(
+            parcel_number="P1000002",
+            rows=[{"VALUE YEAR": 2025, "TOTAL TAX": 3000, "MARKET TOTAL": 300000}],
+        )
+        ParcelHistory.objects.create(
+            parcel_number="P1000003",
+            rows=[{"VALUE YEAR": 2025, "TOTAL TAX": 3500, "MARKET TOTAL": 500000}],
+        )
+
+        insights = county_etr_insights(2025)
+        self.assertIsNotNone(insights)
+        self.assertEqual(insights["year"], 2025)
+        self.assertEqual(insights["count"], 3)
+        self.assertAlmostEqual(insights["median"], 0.01)
+
+        under_bracket = next(entry for entry in insights["brackets"] if entry["label"] == "Under $250k")
+        self.assertEqual(under_bracket["count"], 1)
+        self.assertAlmostEqual(under_bracket["avg_etr"], 0.01)
+
+        high_bracket = next(entry for entry in insights["brackets"] if entry["label"] == "$400k–$600k")
+        self.assertEqual(high_bracket["count"], 1)
+        self.assertAlmostEqual(high_bracket["avg_etr"], 0.007)
+
+        self.assertEqual(insights["regressivity_direction"], "regressive")
+        self.assertAlmostEqual(insights["regressivity_score"], 0.3)

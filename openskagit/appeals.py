@@ -9,7 +9,7 @@ from django.contrib.gis.geos import Point
 from django.utils import timezone
 
 from . import cma
-from .models import AssessmentRoll, Assessor, ComparableCache
+from .models import ComparableCache
 from .neighborhood import get_neighborhood_snapshot
 
 
@@ -120,7 +120,15 @@ def _centroid_lat_lon(geom) -> Tuple[Optional[float], Optional[float]]:
 
 def _snapshot_payload(snapshot: cma.PropertySnapshot) -> Dict[str, Any]:
     metadata = dict(snapshot.metadata) if isinstance(snapshot.metadata, dict) else {}
-    lat, lon = _centroid_lat_lon(snapshot.geom)
+    lat = getattr(snapshot, "latitude", None)
+    lon = getattr(snapshot, "longitude", None)
+    if lat is None or lon is None:
+        lat, lon = _centroid_lat_lon(snapshot.geom)
+    if (lat is None or lon is None) and hasattr(snapshot, "display_point"):
+        point = snapshot.display_point()
+        if point is not None:
+            lat = getattr(point, "y", None)
+            lon = getattr(point, "x", None)
     return {
         "parcel_number": snapshot.parcel_number,
         "address": snapshot.address,
@@ -197,6 +205,8 @@ def _snapshot_from_payload(payload: Dict[str, Any]) -> cma.PropertySnapshot:
         acres=_deserialize_decimal(payload.get("acres")),
         assessed_value=_deserialize_decimal(payload.get("assessed_value")),
         geom=geom,
+        latitude=latitude,
+        longitude=longitude,
         metadata=metadata,
     )
 
@@ -277,115 +287,27 @@ def extract_assessment_change_pct(metadata: Any) -> Optional[float]:
     return None
 
 
-def current_assessment_year() -> int:
-    year = (
-        AssessmentRoll.objects.order_by("-year")
-        .values_list("year", flat=True)
-        .first()
-    )
-    if year is None:
-        return timezone.now().year
-    return int(year)
-
-
 def load_subject_with_roll_context(parcel_number: str) -> Tuple[cma.PropertySnapshot, int]:
-    current_roll_year = current_assessment_year()
-    active_roll_year = current_roll_year
     try:
-        subject = cma.load_subject(parcel_number, roll_year=current_roll_year)
+        subject = cma.load_subject(parcel_number)
     except ValueError as exc:
-        logger.warning(
-            "Appeal helper failed to load parcel %s for roll %s: %s",
-            parcel_number,
-            current_roll_year,
-            exc,
-        )
-        try:
-            subject = cma.load_subject(parcel_number)
-        except ValueError:
-            raise exc
+        logger.warning("Appeal helper failed to load parcel %s: %s", parcel_number, exc)
+        raise
 
-        fallback_year: Optional[int] = None
-        metadata_for_year = subject.metadata if isinstance(subject.metadata, dict) else {}
-        raw_year = metadata_for_year.get("assessment_roll_year")
-        if raw_year is not None:
-            try:
-                fallback_year = int(raw_year)
-            except (TypeError, ValueError):
-                fallback_year = None
-        if fallback_year is None:
-            assessor_meta = metadata_for_year.get("assessor") if isinstance(metadata_for_year, dict) else None
-            if isinstance(assessor_meta, dict):
-                raw_year = assessor_meta.get("assessment_year") or assessor_meta.get("year")
-                if raw_year is not None:
-                    try:
-                        fallback_year = int(raw_year)
-                    except (TypeError, ValueError):
-                        fallback_year = None
-        if fallback_year is not None:
-            active_roll_year = fallback_year
-            if fallback_year != current_roll_year:
-                logger.info(
-                    "Appeal helper using roll %s for parcel %s (current roll %s unavailable)",
-                    fallback_year,
-                    parcel_number,
-                    current_roll_year,
-                )
-
+    active_roll_year = timezone.now().year
     metadata = subject.metadata if isinstance(subject.metadata, dict) else {}
     metadata["assessment_roll_year"] = active_roll_year
-
-    assessor_row = (
-        Assessor.objects.select_related("roll")
-        .filter(parcel_number=parcel_number, roll__year=active_roll_year)
-        .first()
-    )
-    if assessor_row:
-        active_value = cma.current_property_value(assessor_row)
-        if active_value is not None:
-            metadata["assessed_value"] = float(active_value)
-        else:
-            metadata.pop("assessed_value", None)
-
-    prior_roll_year = active_roll_year - 1
-    prior_assessor = (
-        Assessor.objects.select_related("roll")
-        .filter(parcel_number=parcel_number, roll__year=prior_roll_year)
-        .first()
-        if prior_roll_year > 0
-        else None
-    )
-
     assessor_meta = metadata.setdefault("assessor", {})
-    if assessor_row:
-        assessor_meta["assessment_year"] = active_roll_year
-        active_value = cma.current_property_value(assessor_row)
-        if active_value is not None:
-            assessor_meta["assessed_value"] = float(active_value)
-        else:
-            assessor_meta.pop("assessed_value", None)
-    if prior_assessor:
-        assessor_meta["prior_assessment_year"] = prior_roll_year
-        prior_value = cma.current_property_value(prior_assessor)
-        if prior_value is not None:
-            assessor_meta["prior_assessed_value"] = float(prior_value)
-        else:
-            assessor_meta.pop("prior_assessed_value", None)
-
-    assessed_change_pct: Optional[float] = None
-    active_value = cma.current_property_value(assessor_row) if assessor_row else None
-    prior_value = cma.current_property_value(prior_assessor) if prior_assessor else None
-    if active_value is not None and prior_value not in (None, Decimal("0")):
-        try:
-            change_pct = (active_value - prior_value) / prior_value * Decimal("100")
-            assessed_change_pct = float(change_pct)
-        except (InvalidOperation, ZeroDivisionError):
-            assessed_change_pct = None
-
-    if assessed_change_pct is not None:
-        metadata["assessed_change_pct"] = assessed_change_pct
-        assessor_meta["assessment_change_pct"] = assessed_change_pct
-
+    assessor_meta["assessment_year"] = active_roll_year
+    assessed_value = subject.assessed_value or _to_decimal_safe(metadata.get("assessed_value"))
+    if assessed_value is not None:
+        assessor_meta["assessed_value"] = float(assessed_value)
+    else:
+        assessor_meta.pop("assessed_value", None)
+    assessor_meta.pop("prior_assessment_year", None)
+    assessor_meta.pop("prior_assessed_value", None)
+    assessor_meta.pop("assessment_change_pct", None)
+    metadata.pop("assessed_change_pct", None)
     subject.metadata = metadata
     return subject, active_roll_year
 
@@ -411,19 +333,6 @@ def _subject_neighborhood_code(subject: cma.PropertySnapshot) -> Optional[str]:
     return raw_neighborhood
 
 
-def _subject_roll_year(subject: cma.PropertySnapshot) -> Optional[int]:
-    metadata = subject.metadata if isinstance(subject.metadata, dict) else {}
-    roll_year = metadata.get("assessment_roll_year")
-    if roll_year is None:
-        assessor_meta = metadata.get("assessor") if isinstance(metadata, dict) else None
-        if isinstance(assessor_meta, dict):
-            roll_year = assessor_meta.get("assessment_year") or assessor_meta.get("year")
-    try:
-        return int(roll_year) if roll_year is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
 def get_subject_neighborhood_snapshot(subject: cma.PropertySnapshot) -> Dict[str, Any]:
     raw_code = _subject_neighborhood_code(subject)
     return _resolve_neighborhood_context(raw_code)
@@ -438,7 +347,7 @@ def _months_ago(months: int) -> dt.date:
 
 
 def _cached_comparables(subject: cma.PropertySnapshot, radius_meters: float, limit: int) -> List[cma.ComparableResult]:
-    roll_year = _subject_roll_year(subject) or 0
+    roll_year = timezone.now().year
     entry = ComparableCache.objects.filter(
         parcel_number=subject.parcel_number,
         roll_year=roll_year,
@@ -542,6 +451,14 @@ def choose_citizen_comps(
 
     within_one_mile = [c for c in comps if (c.distance_miles or Decimal("0")) <= Decimal("1.0")]
     shortlisted = within_one_mile[:limit] if len(within_one_mile) >= 3 else comps[:limit]
+    logger.info(
+        "Citizen comps subject=%s total=%s within_one_mile=%s limit=%s radius=%s",
+        subject.parcel_number,
+        len(comps),
+        len(within_one_mile),
+        limit,
+        radius_meters,
+    )
     return shortlisted
 
 
@@ -561,16 +478,17 @@ def compute_over_assessment(subject_assessed: Optional[Decimal], comparable_pric
     Return (percent_over, comp_count) comparing assessed value to the median comp sale price.
     Positive means assessed > market estimate. Percent as +X% if over-assessed.
     """
+    comp_len = len(comparable_prices)
     if subject_assessed in (None, Decimal("0")):
-        return None, None
+        return None, comp_len
     median_adj = _median(comparable_prices)
     if median_adj in (None, Decimal("0")):
-        return None, len(comparable_prices)
+        return None, comp_len
     try:
         diff = (Decimal(str(subject_assessed)) - Decimal(str(median_adj))) / Decimal(str(median_adj)) * Decimal("100")
-        return float(diff), len(comparable_prices)
+        return float(diff), comp_len
     except Exception:
-        return None, len(comparable_prices)
+        return None, comp_len
 
 
 def score_appeal(

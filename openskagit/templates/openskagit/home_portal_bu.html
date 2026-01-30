@@ -36,7 +36,7 @@
       <section class="tools-section">
         <h2 class="section-title">Tools & Reports</h2>
         <div class="tools-grid">
-          <a href="/appeal/" class="tool-card active">
+          <a href="{% url 'appeal-home' %}" class="tool-card active">
             <div class="tool-icon">⚖️</div>
             <h3 class="tool-title">Property Helper</h3>
             <p class="tool-description">
@@ -139,13 +139,15 @@
         }
       }
 
+      const appealResultTemplate = "{% url 'appeal-result' '__PARCEL_PLACEHOLDER__' %}";
+
       function updatePanel(detail) {
         if (!detail || !detail.parcel || !panel || !parcelNumberEl || !appealLink) {
           return;
         }
 
         parcelNumberEl.textContent = detail.parcel;
-        appealLink.href = `/appeal/results/${detail.parcel}`;
+        appealLink.href = appealResultTemplate.replace("__PARCEL_PLACEHOLDER__", detail.parcel);
         if (neighborhoodLink) {
           if (detail.neighborhood) {
             neighborhoodLink.href = `https://openskagit.com/neighborhood-trends/${detail.neighborhood}`;

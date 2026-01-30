@@ -1,8 +1,11 @@
 import uuid
+from typing import Optional
+
 from django.conf import settings
 from django.contrib.gis.db import models as gis_models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GistIndex
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from pgvector.django import VectorField
 from django.db import models
 from django.utils import timezone
@@ -18,13 +21,125 @@ class ReferenceDataImportLog(models.Model):
     row_count = models.IntegerField(default=0)
     srid = models.IntegerField(default=2926)
     created_at = models.DateTimeField(default=timezone.now)
-    
+
     class Meta:
         ordering = ['-created_at']
-        
+
     def __str__(self):
         status = "✓" if self.success else "✗"
         return f"{status} {self.dataset_name} - {self.row_count} rows ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
+
+
+class TaxCodeArea(models.Model):
+    """Authoritative district membership metadata from WA DOR."""
+
+    SOURCE_LABEL = "WA DOR TaxReport.aspx"
+
+    id = models.BigAutoField(primary_key=True)
+    tca_code = models.CharField(max_length=10)
+    tax_year = models.IntegerField()
+    county = models.CharField(max_length=100)
+    raw_districts_text = models.TextField()
+    source = models.CharField(max_length=100, default=SOURCE_LABEL)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("tca_code", "tax_year")
+        indexes = [
+            models.Index(fields=["tca_code", "tax_year"]),
+        ]
+        ordering = ["tca_code", "-tax_year"]
+
+    def __str__(self):
+        return f"{self.tca_code} ({self.tax_year})"
+
+
+class TaxCodeAreaDistrict(models.Model):
+    """Individual taxing districts that compose a TCA."""
+
+    SOURCE_LABEL = TaxCodeArea.SOURCE_LABEL
+
+    id = models.BigAutoField(primary_key=True)
+    tax_code_area = models.ForeignKey(
+        "TaxCodeArea",
+        on_delete=models.CASCADE,
+        related_name="districts",
+    )
+    tca_code = models.CharField(max_length=10)
+    tax_year = models.IntegerField()
+    district_type = models.CharField(max_length=100)
+    district_identifier = models.CharField(max_length=200, blank=True)
+    raw_label = models.CharField(max_length=255)
+    source = models.CharField(max_length=100, default=SOURCE_LABEL)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["tca_code", "tax_year"]),
+            models.Index(fields=["district_type"]),
+        ]
+        unique_together = (
+            "tca_code",
+            "tax_year",
+            "district_type",
+            "district_identifier",
+        )
+        ordering = ["tca_code", "-tax_year", "district_type"]
+
+    def __str__(self):
+        return f"{self.tca_code} {self.district_type}: {self.district_identifier}"
+
+class TaxingDistrictLevy(models.Model):
+    tdcode = models.CharField(
+        max_length=9,
+        db_index=True,
+        help_text="Taxing District Code (TDCODE)"
+    )
+
+    district_name = models.CharField(
+        max_length=255,
+        help_text="District name from levy sheet"
+    )
+
+    locally_assessed_value = models.BigIntegerField(null=True, blank=True)
+    levy_rate = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True)
+    district_levy = models.BigIntegerField(null=True, blank=True)
+    highest_prior_levy = models.BigIntegerField(null=True, blank=True)
+    new_construction_assessed_value = models.BigIntegerField(null=True, blank=True)
+
+    levy_rate_2024 = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True)
+
+    state_assessed_property_2024 = models.BigIntegerField(null=True, blank=True)
+    state_assessed_property_2023 = models.BigIntegerField(null=True, blank=True)
+
+    annexation_assessed_value_2023 = models.BigIntegerField(null=True, blank=True)
+    annex_tax_due_2023 = models.BigIntegerField(null=True, blank=True)
+    refund_tax_due_2023 = models.BigIntegerField(null=True, blank=True)
+
+    max_allowable_levy = models.BigIntegerField(null=True, blank=True)
+
+    statutory_max_rate = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
+    levy_limit_percent_increase = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
+
+    assessment_year = models.PositiveSmallIntegerField(
+        default=2024,
+        db_index=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "taxing_district_levy"
+        indexes = [
+            models.Index(fields=["tdcode"]),
+            models.Index(fields=["assessment_year"]),
+        ]
+        unique_together = ("tdcode", "assessment_year")
+
+    def __str__(self):
+        return f"{self.tdcode} ({self.assessment_year})"
 
 class MasterParcel(models.Model):
     # Identifiers
@@ -128,6 +243,7 @@ class ParcelGeometry(models.Model):
     geom = gis_models.MultiPolygonField(srid=3857, null=True, blank=True)
     embedding = VectorField(dimensions=384, null=True, blank=True)
     centroid_geog = gis_models.PointField(srid=4326, null=True, blank=True)
+    centroid_2926 = gis_models.PointField(srid=2926, null=True, blank=True)
 
     # terrain
     elev = models.FloatField(null=True, blank=True)
@@ -135,17 +251,6 @@ class ParcelGeometry(models.Model):
     slope = models.FloatField(null=True, blank=True)
     aspect = models.FloatField(null=True, blank=True)
     aspect_dir = models.TextField(null=True, blank=True)
-
-    # flood
-    in_flood_zone = models.BooleanField(null=True, blank=True)
-    flood_distance = models.FloatField(null=True, blank=True)
-    flood_static_bfe = models.FloatField(null=True, blank=True)
-    flood_depth = models.FloatField(null=True, blank=True)
-    flood_velocity = models.FloatField(null=True, blank=True)
-    flood_sfha = models.TextField(null=True, blank=True)
-    flood_zone = models.TextField(null=True, blank=True)
-    flood_zone_subtype = models.TextField(null=True, blank=True)
-    flood_zone_id = models.TextField(null=True, blank=True)
 
     # distances/amenities
     dist_major_road = models.FloatField(null=True, blank=True)
@@ -169,6 +274,7 @@ class ParcelGeometry(models.Model):
             GistIndex(fields=["geom"]),        # GiST on 3857 geom
             GistIndex(fields=["geom_2926"]),   # GiST on 2926 geom
             GistIndex(fields=["centroid_geog"]),
+            GistIndex(fields=["centroid_2926"]),
         ]
 
 class ParcelPlanningFacts(models.Model):
@@ -187,47 +293,10 @@ class ParcelPlanningFacts(models.Model):
     # ZONING RULES (requires zoning_rules lookup table)
     # ---------------------------------------------------------
     zone_code = models.CharField(max_length=50, null=True, blank=True)
+    zone_id = models.TextField(null=True, blank=True)
     zoning_jurisdiction = models.CharField(max_length=50, null=True, blank=True)
     zoning_general_class = models.CharField(max_length=30, null=True, blank=True)  # Residential, Commercial, Industrial, Mixed, Resource, Civic, Unknown
     zoning_specific_class = models.CharField(max_length=100, null=True, blank=True)
-
-    zoning_allows_residential = models.BooleanField(null=True, blank=True)
-    zoning_allows_duplex = models.BooleanField(null=True, blank=True)
-    zoning_allows_multifamily = models.BooleanField(null=True, blank=True)
-    zoning_allows_retail = models.BooleanField(null=True, blank=True)
-    zoning_allows_office = models.BooleanField(null=True, blank=True)
-    zoning_allows_industrial = models.BooleanField(null=True, blank=True)
-    zoning_allows_heavy_industrial = models.BooleanField(null=True, blank=True)
-    zoning_allows_agriculture = models.BooleanField(null=True, blank=True)
-    zoning_allows_forestry = models.BooleanField(null=True, blank=True)
-    zoning_allows_green_energy = models.BooleanField(null=True, blank=True)
-    zoning_allows_data_center = models.BooleanField(null=True, blank=True)
-    zoning_allows_warehouse = models.BooleanField(null=True, blank=True)
-
-
-    zoning_min_lot_size_sqft = models.FloatField(null=True, blank=True)
-    zoning_max_lot_coverage_pct = models.FloatField(null=True, blank=True)
-    zoning_max_height_ft = models.FloatField(null=True, blank=True)
-    zoning_max_stories = models.FloatField(null=True, blank=True)
-    zoning_max_far = models.FloatField(null=True, blank=True)
-    zoning_min_far = models.FloatField(null=True, blank=True)
-
-    zoning_max_density_du_ac = models.FloatField(null=True, blank=True)
-    zoning_min_density_du_ac = models.FloatField(null=True, blank=True)
-    zoning_max_units_per_lot = models.IntegerField(null=True, blank=True)
-    zoning_adus_allowed_count = models.IntegerField(null=True, blank=True)
-    zoning_adu_owner_occupancy_required = models.BooleanField(null=True, blank=True)
-
-    zoning_parking_min_residential = models.FloatField(null=True, blank=True)
-    zoning_parking_min_middle_housing = models.FloatField(null=True, blank=True)
-    zoning_parking_min_apartment = models.FloatField(null=True, blank=True)
-    zoning_parking_min_retail = models.FloatField(null=True, blank=True)
-    zoning_parking_min_restaurant = models.FloatField(null=True, blank=True)
-    zoning_parking_min_office = models.FloatField(null=True, blank=True)
-
-    zoning_front_setback_ft = models.FloatField(null=True, blank=True)
-    zoning_side_setback_ft = models.FloatField(null=True, blank=True)
-    zoning_rear_setback_ft = models.FloatField(null=True, blank=True)
 
     zoning_source = models.CharField(max_length=50, null=True, blank=True)  # WAZA, City GIS, Manual Override
     zoning_reference_url = models.URLField(max_length=500, null=True, blank=True)
@@ -236,34 +305,40 @@ class ParcelPlanningFacts(models.Model):
     # ---------------------------------------------------------
     # CRITICAL AREAS (computed by PostGIS overlays)
     # ---------------------------------------------------------
-    ## WETLANDS
+    # WETLANDS
     in_wetland = models.BooleanField(null=True, blank=True)
     pct_area_in_wetland = models.FloatField(null=True, blank=True)
     wetland_intersect_area = models.FloatField(null=True, blank=True)
     wetland_buffer_intersect_area = models.FloatField(null=True, blank=True)
     in_wetland_buffer = models.BooleanField(null=True, blank=True)
     dist_to_wetland_ft = models.FloatField(null=True, blank=True)
-
+    # STREAM BUFFER
     in_stream_buffer = models.BooleanField(null=True, blank=True)
     pct_area_in_stream_buffer = models.FloatField(null=True, blank=True)
     dist_to_nearest_stream_ft = models.FloatField(null=True, blank=True)
     stream_type = models.CharField(max_length=20, null=True, blank=True)
     stream_buffer_required_ft = models.FloatField(null=True, blank=True)
 
-    in_sfha = models.BooleanField(null=True, blank=True)   # Special Flood Hazard Area
-    pct_area_in_sfha = models.FloatField(null=True, blank=True)
-
-    in_floodway = models.BooleanField(null=True, blank=True)
-    pct_area_in_floodway = models.FloatField(null=True, blank=True)
-
+    # SHORELINE
     in_shoreline_jurisdiction = models.BooleanField(null=True, blank=True)
     pct_area_in_shoreline = models.FloatField(null=True, blank=True)
     shoreline_env_designation = models.CharField(max_length=50, null=True, blank=True)
     dist_to_shoreline_ft = models.FloatField(null=True, blank=True)
 
-    in_geologic_hazard_area = models.BooleanField(null=True, blank=True)
-    max_slope_pct = models.FloatField(null=True, blank=True)
-    pct_area_slope_gt_30 = models.FloatField(null=True, blank=True)
+    # FLOODING
+    in_flood_zone = models.BooleanField(null=True, blank=True)
+    flood_distance = models.FloatField(null=True, blank=True)
+    flood_static_bfe = models.FloatField(null=True, blank=True)
+    flood_depth = models.FloatField(null=True, blank=True)
+    flood_velocity = models.FloatField(null=True, blank=True)
+    flood_sfha = models.TextField(null=True, blank=True)
+    flood_zone = models.TextField(null=True, blank=True)
+    flood_zone_subtype = models.TextField(null=True, blank=True)
+    flood_zone_id = models.TextField(null=True, blank=True)
+    in_sfha = models.BooleanField(null=True, blank=True)   # Special Flood Hazard Area
+    pct_area_in_sfha = models.FloatField(null=True, blank=True)
+    in_floodway = models.BooleanField(null=True, blank=True)
+    pct_area_in_floodway = models.FloatField(null=True, blank=True)
 
     # ---------------------------------------------------------
     # BUILDABLE AREA SUMMARY
@@ -273,20 +348,12 @@ class ParcelPlanningFacts(models.Model):
     # ---------------------------------------------------------
     # WATER / WASTEWATER
     # ---------------------------------------------------------
-    public_water_available = models.BooleanField(null=True, blank=True)
-    public_water_system_id = models.CharField(max_length=100, null=True, blank=True)
     dist_to_water_main_ft = models.FloatField(null=True, blank=True)
-
     public_sewer_available = models.BooleanField(null=True, blank=True)
     sewer_district_id = models.CharField(max_length=100, null=True, blank=True)
     dist_to_sewer_main_ft = models.FloatField(null=True, blank=True)
-
-    in_instream_flow_rule_area = models.BooleanField(null=True, blank=True)
-    instream_flow_rule_name = models.CharField(max_length=200, null=True, blank=True)
-
     nearest_well_distance_ft = models.FloatField(null=True, blank=True)
     well_density_per_acre = models.FloatField(null=True, blank=True)
-
     in_wellhead_protection_zone = models.BooleanField(null=True, blank=True)
     wellhead_zone_category = models.CharField(max_length=20, null=True, blank=True)
 
@@ -319,13 +386,12 @@ class ParcelPlanningFacts(models.Model):
     in_skagit_mitigation_area = models.BooleanField(null=True, blank=True)
     skagit_mitigation_class = models.CharField(max_length=20, null=True, blank=True) #GREEN, YELLOW, RED
     in_airport_environs = models.BooleanField(null=True, blank=True)
-    airport_environs_zone = models.CharField(max_length=20, null=True, blank=True)
+    airport_environs_zone = models.CharField(max_length=255, null=True, blank=True)
 
     # ---------------------------------------------------------
     # PERMIT-RELATED INDICATORS
     # ---------------------------------------------------------
     has_recent_permits_5yr = models.BooleanField(null=True, blank=True)
-
     # ---------------------------------------------------------
     # METADATA
     # ---------------------------------------------------------
@@ -335,7 +401,6 @@ class ParcelPlanningFacts(models.Model):
         db_table = "parcel_planning_facts"
         indexes = [
             models.Index(fields=["zone_code"]),
-            models.Index(fields=["public_water_available"]),
             models.Index(fields=["public_sewer_available"]),
             models.Index(fields=["in_sfha"]),
             models.Index(fields=["in_floodway"]),
@@ -350,38 +415,49 @@ class ParcelWaterfacts(models.Model):
         "MasterParcel",
         to_field="parcel_number",
         db_column="parcel_id",
+        primary_key=True,
+        null=False, blank=False,
         on_delete=models.CASCADE,
     )
+
     public_water_available = models.BooleanField(null=True, blank=True)
     public_water_system_id = models.TextField(null=True, blank=True)
+
     in_instream_flow_rule_area = models.BooleanField(null=True, blank=True)
     instream_flow_rule_name = models.TextField(null=True, blank=True)
-    nearest_diversion_right = models.TextField(null=True, blank=True)
-    nearest_right_priority_date = models.DateField(null=True, blank=True)
+
     low_flow_stream_area = models.BooleanField(null=True, blank=True)
     in_wellhead_protection_area = models.BooleanField(null=True, blank=True)
     surface_water_limited = models.BooleanField(null=True, blank=True)
+
     water_feasibility_rating = models.TextField(null=True, blank=True)
-    # Step 7
+
+    # Wells
     nearest_well_distance_m = models.FloatField(null=True, blank=True)
     nearest_well_id = models.TextField(null=True, blank=True)
     nearest_well_depth = models.FloatField(null=True, blank=True)
     nearest_well_yield = models.FloatField(null=True, blank=True)
-    # Step 8
+
+    # Water rights
     has_pou_water_right = models.BooleanField(null=True, blank=True)
-    pou_right_numbers = ArrayField(models.TextField(null=True, blank=True), null=True, blank=True)
+    pou_right_numbers = ArrayField(models.TextField(), null=True, blank=True)
+    nearest_diversion_right = models.TextField(null=True, blank=True)
     nearest_diversion_distance_m = models.FloatField(null=True, blank=True)
+    nearest_right_priority_date = models.DateField(null=True, blank=True)
+
     aquifer_yield_category = models.TextField(null=True, blank=True)
     well_drilling_feasible = models.BooleanField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
-    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "assessor_waterfacts"
+        db_table = "openskagit_parcelwaterfacts"
         indexes = [
             models.Index(fields=["public_water_available"]),
             models.Index(fields=["has_pou_water_right"]),
         ]
+
 
 class AdjustmentRunSummary(models.Model):
     run_id = models.CharField(max_length=20, unique=True, db_index=True)
@@ -570,6 +646,7 @@ class ComparableCache(models.Model):
         return f"{self.parcel_number} [{self.roll_year}] limit={self.limit}"
 
 
+##INDEXED FOR QUICK AUTOSEARCH
 class Parcel(models.Model):
     parcel_number = models.CharField(max_length=20, unique=True, db_index=True)
     address = models.CharField(max_length=255, blank=True, null=True)  # includes city & ZIP
@@ -593,41 +670,58 @@ class Parcel(models.Model):
         return f"{self.parcel_number} - {self.address or 'No Address'}"
 
 
-class ParcelWaterfacts(models.Model):
-    parcel_number = models.TextField(primary_key=True)
-    public_water_available = models.BooleanField(null=True, blank=True)
-    public_water_system_id = models.TextField(null=True, blank=True)
-    in_instream_flow_rule_area = models.BooleanField(null=True, blank=True)
-    instream_flow_rule_name = models.TextField(null=True, blank=True)
-    nearest_diversion_right = models.TextField(null=True, blank=True)
-    nearest_diversion_distance_m = models.FloatField(null=True, blank=True)
-    nearest_right_priority_date = models.DateField(null=True, blank=True)
-    low_flow_stream_area = models.BooleanField(null=True, blank=True)
-    in_wellhead_protection_area = models.BooleanField(null=True, blank=True)
-    surface_water_limited = models.BooleanField(null=True, blank=True)
-    water_feasibility_rating = models.TextField(null=True, blank=True)
-    # --- Step 7: Ecology Well Metrics ---
-    nearest_well_distance_m = models.FloatField(null=True, blank=True)
-    nearest_well_id = models.TextField(null=True, blank=True)
-    nearest_well_depth = models.FloatField(null=True, blank=True)
-    nearest_well_yield = models.FloatField(null=True, blank=True)
-    # --- Step 8: Water Rights: Points of Diversion + Place of Use ---
-    has_pou_water_right = models.BooleanField(null=True, blank=True)
-    pou_right_numbers = ArrayField(models.TextField(null=True, blank=True), null=True, blank=True)
-    nearest_diversion_right = models.TextField(null=True, blank=True)
-    nearest_diversion_distance_m = models.FloatField(null=True, blank=True)
-    nearest_right_priority_date = models.DateField(null=True, blank=True)
+
+from django.db import models
 
 
-    aquifer_yield_category = models.TextField(null=True, blank=True) # e.g., LOW, MEDIUM, HIGH, UNKNOWN
-    well_drilling_feasible = models.BooleanField(null=True, blank=True) # TRUE/FALSE/NULL (for UNKNOWN)
-    created_at = models.DateTimeField(null=True, blank=True)
-    updated_at = models.DateTimeField(null=True, blank=True)
+class ParcelDevelopmentProfile(models.Model):
+    parcel = models.OneToOneField(
+        "MasterParcel",
+        to_field="parcel_number",
+        db_column="parcel_id",
+        on_delete=models.CASCADE,
+        primary_key=True,
+    )
+
+    primary_development_form = models.CharField(
+        max_length=32,
+        choices=[
+            ("ACCESSORY", "Accessory"),
+            ("MOBILE", "Manufactured / Mobile"),
+            ("SFR", "Single-Family Residential"),
+            ("MULTI", "Multi-Family"),
+            ("COMMERCIAL_PLUS", "Commercial / Mixed Use"),
+            ("UNKNOWN", "Unknown"),
+        ],
+    )
+
+    development_context = models.CharField(
+        max_length=16,
+        choices=[
+            ("READY", "Ready"),
+            ("URBAN", "Urban"),
+            ("RURAL", "Rural"),
+            ("CONSTRAINED", "Constrained"),
+            ("RESTRICTED", "Restricted"),
+        ],
+    )
+
+    confidence = models.CharField(
+        max_length=16,
+        choices=[
+            ("high", "High"),
+            ("medium", "Medium"),
+            ("low", "Low"),
+        ],
+    )
+
+    development_constraints = models.JSONField(default=list)
+    reasons = models.JSONField(default=list)
+
+    generated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "assessor_waterfacts"
-        managed = True
-
+        db_table = "parcel_development_profile"
 
 class AssessmentRoll(models.Model):
     year = models.IntegerField(db_index=True)
@@ -642,6 +736,13 @@ class Assessor(models.Model):
     roll = models.ForeignKey("AssessmentRoll", on_delete=models.CASCADE, related_name="assessors", null=True)
     parcel_number = models.TextField(blank=True)
     address = models.TextField(blank=True, null=True)
+    owner_name = models.TextField(blank=True, null=True)
+    owner_add_1 = models.TextField(blank=True, null=True)
+    owner_add_2 = models.TextField(blank=True, null=True)
+    owner_add_3 = models.TextField(blank=True, null=True)
+    owner_city = models.TextField(blank=True, null=True)
+    owner_state = models.TextField(blank=True, null=True)
+    owner_zip = models.TextField(blank=True, null=True)
     neighborhood_code = models.TextField(blank=True, null=True)
     neighborhood_code_description = models.TextField(blank=True, null=True)
     land_use_code = models.TextField(blank=True, null=True)
@@ -853,6 +954,57 @@ class Sales(models.Model):
         managed = True
         db_table = 'sales'
 
+class SalesSearch(models.Model):
+    sale_id = models.BigIntegerField(primary_key=True)
+
+    parcel_number = models.CharField(max_length=20, db_index=True)
+    sale_date = models.DateField(db_index=True)
+    sale_price = models.FloatField()
+
+    market_value = models.FloatField(null=True, blank=True)
+    assessed_value = models.FloatField(null=True, blank=True)
+
+    sale_to_market_ratio = models.FloatField(null=True, blank=True)
+
+    # Property attributes
+    living_area = models.FloatField(null=True, blank=True)
+    lot_size_acres = models.FloatField(null=True, blank=True)
+
+    zoning_jurisdiction = models.CharField(max_length=50, null=True, blank=True)
+    zone_id = models.CharField(max_length=50, null=True, blank=True)
+
+    # QA / analysis
+    is_arms_length = models.BooleanField(default=True)
+    exclude_from_analysis = models.BooleanField(default=False)
+
+    ratio_trim_bucket = models.CharField(
+        max_length=20,
+        choices=[
+            ("inside_iaao", "Inside IAAO"),
+            ("outside_iaao", "Outside IAAO"),
+            ("extreme", "Extreme"),
+            ("missing", "Missing"),
+        ],
+        db_index=True,
+    )
+
+    qa_flags = models.JSONField(default=list)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "sales_search"
+        indexes = [
+            models.Index(fields=["sale_date"]),
+            models.Index(fields=["sale_price"]),
+            models.Index(fields=["ratio_trim_bucket"]),
+            models.Index(fields=["exclude_from_analysis"]),
+            models.Index(fields=["parcel_number", "sale_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.parcel_number} – {self.sale_date} – ${self.sale_price:,.0f}"
+
 
 class CmaAnalysis(models.Model):
     """
@@ -937,6 +1089,7 @@ class NeighborhoodProfile(models.Model):
 class ParcelHistory(models.Model):
     parcel_number = models.CharField(max_length=20, unique=True)
     rows = models.JSONField(default=list)      # list of dicts (history rows)
+    taxes = models.JSONField(default=dict)     # current taxes payload (separate schema)
     scraped_at = models.DateTimeField(auto_now=True)
     neighborhood_code = models.CharField(
         max_length=20, blank=True, null=True, db_index=True
@@ -945,6 +1098,216 @@ class ParcelHistory(models.Model):
 
     def __str__(self):
         return self.parcel_number
+
+from django.contrib.gis.db import models
+
+class VotingPrecinctBase(models.Model):
+    prec_code = models.BigIntegerField(primary_key=True)
+    geom_2926 = models.PolygonField(srid=2926)
+    area_sq_m = models.FloatField()
+
+    class Meta:
+        db_table = "reference_votingprecinct_base"
+        managed = False
+
+    def __str__(self):
+        return f"Precinct {self.prec_code}"
+
+class FactPrecinctCivicBalance(models.Model):
+    prec_code = models.BigIntegerField(db_index=True)
+    tax_year = models.IntegerField(db_index=True)
+
+    total_tax_paid = models.FloatField()
+    ballots_cast = models.IntegerField()
+
+    tax_per_ballot = models.FloatField()
+
+    class Meta:
+        db_table = "fact_precinct_civic_balance"
+        managed = False
+        unique_together = ("prec_code", "tax_year")
+
+    def __str__(self):
+        return f"{self.prec_code} – {self.tax_year}"
+
+class PrecinctCivicClassification(models.Model):
+    prec_code = models.BigIntegerField(db_index=True)
+    tax_year = models.IntegerField(db_index=True)
+
+    total_tax_paid = models.FloatField()
+    ballots_cast = models.IntegerField()
+    tax_per_ballot = models.FloatField()
+
+    tax_burden_quartile = models.IntegerField()
+
+    class Meta:
+        db_table = "precinct_civic_classification"
+        managed = False
+        unique_together = ("prec_code", "tax_year")
+
+class CivicBalanceMap(models.Model):
+    prec_code = models.BigIntegerField(db_index=True)
+    tax_year = models.IntegerField(db_index=True)
+
+    total_tax_paid = models.FloatField()
+    ballots_cast = models.IntegerField()
+    tax_per_ballot = models.FloatField()
+    tax_burden_quartile = models.IntegerField()
+
+    geom_2926 = models.PolygonField(srid=2926)
+
+    class Meta:
+        db_table = "civic_balance_map"
+        managed = False
+
+
+class VoterElection(models.Model):
+    name = models.CharField(max_length=255)
+    category = models.CharField(max_length=50, blank=True)
+    election_date = models.DateField()
+    slug = models.SlugField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-election_date", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "election_date"], name="unique_voter_election_name_date"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.election_date})"
+
+
+class VoterReturnLocation(models.Model):
+    name = models.CharField(max_length=255)
+    method = models.CharField(max_length=100, blank=True)
+    normalized_name = models.CharField(max_length=255, db_index=True)
+    normalized_method = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["normalized_name", "normalized_method"],
+                name="unique_voter_return_location",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.method})"
+
+
+class VoterTurnoutRaw(models.Model):
+    election = models.ForeignKey(VoterElection, on_delete=models.CASCADE, related_name="ballots")
+    return_location = models.ForeignKey(
+        VoterReturnLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="turnouts",
+    )
+    ballot_id = models.CharField(max_length=50)
+    voter_id = models.CharField(max_length=50, blank=True)
+    county = models.CharField(max_length=50, blank=True)
+    first_name = models.CharField(max_length=100, blank=True)
+    last_name = models.CharField(max_length=100, blank=True)
+    gender = models.CharField(max_length=10, blank=True)
+    ballot_status = models.CharField(max_length=50, blank=True)
+    challenge_reason = models.CharField(max_length=255, blank=True)
+    sent_date = models.DateTimeField(null=True, blank=True)
+    received_date = models.DateTimeField(null=True, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    normalized_address = models.CharField(max_length=255, blank=True, db_index=True)
+    is_po_box = models.BooleanField(default=False)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=10, blank=True)
+    zip5 = models.CharField(max_length=5, blank=True)
+    zip4 = models.CharField(max_length=4, blank=True)
+    country = models.CharField(max_length=50, blank=True)
+    split = models.CharField(max_length=50, blank=True)
+    precinct = models.CharField(max_length=100, blank=True)
+    normalized_precinct = models.CharField(max_length=100, blank=True, db_index=True)
+    return_method = models.CharField(max_length=100, blank=True)
+    return_location_name = models.CharField(max_length=255, blank=True)
+    party = models.CharField(max_length=20, blank=True)
+    source_file = models.CharField(max_length=255, blank=True)
+    source_row = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["ballot_id", "election"]),
+            models.Index(fields=["precinct"]),
+            models.Index(fields=["normalized_address"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["ballot_id", "election"], name="unique_ballot_per_election"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.ballot_id} – {self.election.name}"
+
+
+class VoterParcelMatch(models.Model):
+    turnout = models.OneToOneField(
+        VoterTurnoutRaw,
+        on_delete=models.CASCADE,
+        related_name="parcel_match",
+    )
+    parcel = models.ForeignKey(
+        MasterParcel,
+        on_delete=models.CASCADE,
+        related_name="voter_turnout_matches",
+    )
+    match_type = models.CharField(max_length=50, default="address")
+    confidence = models.FloatField(null=True, blank=True)
+    matched_at = models.DateTimeField(auto_now_add=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["match_type"]),
+            models.Index(fields=["parcel"]),
+        ]
+
+    def __str__(self):
+        return f"{self.turnout_id} → {self.parcel_id}"
+
+
+class TaxationWithoutRepresentation(models.Model):
+    parcel = models.ForeignKey(
+        MasterParcel,
+        on_delete=models.CASCADE,
+        related_name="taxation_reports",
+    )
+    election = models.ForeignKey(
+        VoterElection,
+        on_delete=models.CASCADE,
+        related_name="taxation_reports",
+    )
+    tax_year = models.IntegerField(null=True, blank=True)
+    tax_amount = models.BigIntegerField(null=True, blank=True)
+    ballots_cast = models.IntegerField(default=0)
+    flag_reason = models.CharField(max_length=255)
+    metadata = models.JSONField(default=dict, blank=True)
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parcel", "election"],
+                name="unique_taxation_report_per_parcel_election",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.parcel_id} – {self.election.name}"
 
 
 class Conversation(models.Model):
@@ -1108,3 +1471,444 @@ class ParcelLidarStats(models.Model):
 
     class Meta:
         verbose_name_plural = "Parcel Lidar Stats"
+
+class DorQuarter(models.Model):
+    """
+    Represents a DOR reporting quarter (e.g. 2025Q2).
+    """
+    period = models.CharField(
+        max_length=6,
+        unique=True,
+        help_text="Format: YYYYQ# (e.g. 2025Q2)"
+    )
+    year = models.PositiveSmallIntegerField()
+    quarter = models.PositiveSmallIntegerField()
+
+    class Meta:
+        ordering = ["year", "quarter"]
+
+    def __str__(self):
+        return self.period
+
+
+class DorLocation(models.Model):
+    """
+    DOR location codes (cities, unincorporated areas, county totals).
+    """
+    LOCATION_TYPE_CHOICES = (
+        ("city", "City"),
+        ("unincorporated", "Unincorporated"),
+        ("county_total", "County Total"),
+        ("ptba", "PTBA"),
+    )
+
+    location_code = models.PositiveIntegerField(unique=True)
+    name = models.CharField(max_length=255)
+    location_type = models.CharField(
+        max_length=20,
+        choices=LOCATION_TYPE_CHOICES,
+    )
+
+    class Meta:
+        ordering = ["location_code"]
+
+    def __str__(self):
+        return f"{self.location_code} – {self.name}"
+
+
+class DorNaicsRecord(models.Model):
+    """
+    One row from the Quarterly Business Review NAICS tables.
+    This is the core fact table.
+    """
+
+    quarter = models.ForeignKey(
+        DorQuarter,
+        on_delete=models.CASCADE,
+        related_name="naics_records",
+    )
+    location = models.ForeignKey(
+        DorLocation,
+        on_delete=models.CASCADE,
+        related_name="naics_records",
+    )
+
+    # Sector-level info (e.g. Retail Trade 44-45)
+    sector_code = models.CharField(
+        max_length=10,
+        help_text="NAICS sector code (e.g. 44-45, 72)"
+    )
+    sector_name = models.CharField(
+        max_length=255,
+        help_text="Sector name (e.g. Retail Trade)"
+    )
+
+    # Row-level NAICS (nullable for sector rollups)
+    naics_code = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        help_text="Specific NAICS code (e.g. 722, 4411). Null for sector rollups."
+    )
+    naics_label = models.CharField(
+        max_length=255,
+        help_text="Industry label as shown by DOR"
+    )
+
+    units = models.PositiveIntegerField(
+            null=True,
+            blank=True,
+            help_text="Number of reporting units (null if suppressed by DOR)"
+        )
+
+    taxable_sales = models.BigIntegerField(
+            null=True,
+            blank=True,
+            help_text="Taxable retail sales in whole dollars (null if suppressed by DOR)"
+        )
+
+
+    is_total_row = models.BooleanField(
+        default=False,
+        help_text="True if this row is a DOR 'Total:' row"
+    )
+
+    source_url = models.URLField(
+        max_length=500,
+        help_text="Exact DOR URL used to retrieve this record"
+    )
+    scraped_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "quarter",
+                    "location",
+                    "sector_code",
+                    "naics_code",
+                ],
+                name="unique_dor_naics_record"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["sector_code"]),
+            models.Index(fields=["naics_code"]),
+            models.Index(fields=["location", "quarter"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.location} | {self.quarter} | "
+            f"{self.naics_code or self.sector_code}"
+        )
+
+
+class WeeklyBriefingSubscriber(models.Model):
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.email
+
+    def unsubscribe_token(self) -> str:
+        """Return a short-lived signed token that can be embedded into emails."""
+        signer = TimestampSigner()
+        return signer.sign(self.email)
+
+    @staticmethod
+    def from_unsubscribe_token(token: str, max_age: int = 60 * 60 * 24 * 60) -> Optional["WeeklyBriefingSubscriber"]:
+        signer = TimestampSigner()
+        try:
+            email = signer.unsign(token, max_age=max_age)
+        except (BadSignature, SignatureExpired):
+            return None
+        return WeeklyBriefingSubscriber.objects.filter(email=email).first()
+
+
+class WeeklyBriefingTemplate(models.Model):
+    subject = models.CharField(max_length=200, default="Weekly Briefing · OpenSkagit")
+    preheader = models.CharField(max_length=255, blank=True, default="County data, stories, and updates curated for you.")
+    hero_title = models.CharField(max_length=200, default="Skagit County by the numbers")
+    hero_lede = models.TextField(blank=True, default="Fresh data, approachable context, and stories that help Skagit neighborhoods move forward.")
+    hero_stat_label = models.CharField(max_length=100, blank=True, default="County updates")
+    hero_stat_value = models.CharField(max_length=50, blank=True, default="Up next")
+    cta_label = models.CharField(max_length=100, default="View the portal")
+    cta_url = models.URLField(blank=True, default="https://openskagit.com")
+    footer_note = models.TextField(blank=True, default="You are receiving this because you signed up for the OpenSkagit Weekly Briefing.")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return f"Briefing template · Last updated {self.updated_at:%Y-%m-%d}"
+
+
+class WeeklyBriefingSection(models.Model):
+    template = models.ForeignKey(
+        WeeklyBriefingTemplate,
+        on_delete=models.CASCADE,
+        related_name="sections",
+    )
+    title = models.CharField(max_length=120)
+    summary = models.TextField(blank=True)
+    badge = models.CharField(max_length=80, blank=True)
+    highlight = models.CharField(max_length=80, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class WeeklyBriefingSendLog(models.Model):
+    subject = models.CharField(max_length=200)
+    sent_count = models.PositiveIntegerField(default=0)
+    error_count = models.PositiveIntegerField(default=0)
+    error_snapshot = models.TextField(blank=True)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-sent_at"]
+
+    def __str__(self) -> str:
+        return f"{self.subject} ({self.sent_at:%Y-%m-%d %H:%M})"
+
+
+class ContactSubmission(models.Model):
+    TOPIC_SUPPORT = "support"
+    TOPIC_PARTNERSHIP = "partnership"
+    TOPIC_MEDIA = "media"
+    TOPIC_DATA = "data"
+    TOPIC_CONSULTING = "consulting"
+
+    TOPIC_CHOICES = [
+        (TOPIC_SUPPORT, "Support & product help"),
+        (TOPIC_PARTNERSHIP, "Partnership or collaboration"),
+        (TOPIC_MEDIA, "Press or media request"),
+        (TOPIC_DATA, "Data or research question"),
+        (TOPIC_CONSULTING, "Consulting & workflow help"),
+    ]
+
+    email = models.EmailField()
+    topic = models.CharField(max_length=32, choices=TOPIC_CHOICES, default=TOPIC_SUPPORT)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.email} – {self.get_topic_display()} ({self.created_at:%Y-%m-%d})"
+
+
+class SurveyConversation(models.Model):
+    STATUS_OPEN = "open"
+    STATUS_CLOSED = "closed"
+
+    STATUS_CHOICES = [
+        (STATUS_OPEN, "Open"),
+        (STATUS_CLOSED, "Closed"),
+    ]
+
+    conversation_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    question_count = models.PositiveIntegerField(default=0)
+    implicit_insights = models.JSONField(default=list, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return str(self.conversation_id)
+
+
+class SurveyInteraction(models.Model):
+    ROLE_USER = "user"
+    ROLE_BOT = "bot"
+
+    ROLE_CHOICES = [
+        (ROLE_USER, "User"),
+        (ROLE_BOT, "Bot"),
+    ]
+
+    conversation = models.ForeignKey(
+        SurveyConversation,
+        on_delete=models.CASCADE,
+        related_name="interactions",
+    )
+    role = models.CharField(max_length=8, choices=ROLE_CHOICES)
+    question_id = models.CharField(max_length=64, null=True, blank=True)
+    question_label = models.TextField(blank=True)
+    topic = models.CharField(max_length=64, blank=True)
+    content = models.TextField()
+    metadata = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self) -> str:
+        prefix = "Bot" if self.role == self.ROLE_BOT else "User"
+        return f"{prefix} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class AgencyFinancialSnapshot(models.Model):
+    """Stores scraped SAO portal data for a single agency/year."""
+
+    DATASET_OSPI = "ospi"
+    DATASET_SNAPSHOT = "snapshot31"
+
+    DATASET_CHOICES = [
+        (DATASET_OSPI, "OSPI (School District portal)"),
+        (DATASET_SNAPSHOT, "Snapshot 31 (Non-school governments)"),
+    ]
+
+    mcag = models.CharField(max_length=10, db_index=True)
+    year = models.PositiveIntegerField(db_index=True)
+    name = models.CharField(max_length=255)
+    legal_name = models.CharField(max_length=255, blank=True)
+    gov_type_code = models.CharField(max_length=4, blank=True)
+    gov_type_desc = models.CharField(max_length=100, blank=True)
+    county_code = models.PositiveIntegerField(null=True, blank=True)
+    county_name = models.CharField(max_length=100, blank=True)
+    is_school = models.BooleanField(default=False)
+    dataset_source = models.CharField(
+        max_length=32,
+        choices=DATASET_CHOICES,
+        default=DATASET_OSPI,
+    )
+    website = models.CharField(max_length=255, blank=True)
+    street_address = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=120, blank=True)
+    state = models.CharField(max_length=2, blank=True)
+    postal_code = models.CharField(max_length=10, blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    fiscal_year_end = models.CharField(max_length=20, blank=True)
+
+    financial_summary = models.JSONField(default=dict, blank=True)
+    revenues = models.JSONField(default=list, blank=True)
+    expenditures = models.JSONField(default=list, blank=True)
+    revenues_detail = models.JSONField(default=list, blank=True)
+    expenditures_detail = models.JSONField(default=list, blank=True)
+    indicators = models.JSONField(default=list, blank=True)
+    rankings = models.JSONField(default=dict, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    raw_payloads = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["mcag", "-year"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mcag", "year"],
+                name="uniq_agency_financial_snapshot",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.mcag} · {self.year}"
+
+
+class AgencyLevyMap(models.Model):
+    """Crosswalk between levy TDCODE and SAO MCAG agencies."""
+
+    tdcode = models.CharField(max_length=9, db_index=True)
+    mcag = models.CharField(max_length=10, db_index=True, blank=True, default="")
+    agency_name = models.CharField(max_length=255, blank=True)
+    agency_type = models.CharField(max_length=100, blank=True)
+    notes = models.TextField(blank=True)
+    is_primary = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "agency_levy_map"
+        constraints = [
+            models.UniqueConstraint(fields=["tdcode", "mcag"], name="uniq_agency_levy_map"),
+        ]
+        indexes = [
+            models.Index(fields=["tdcode"]),
+            models.Index(fields=["mcag"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tdcode} → {self.mcag}"
+
+from django.db import models
+
+
+class ParcelIntent(models.Model):
+    """
+    Canonical intent vocabulary.
+    This is NOT parcel-specific.
+    """
+    key = models.CharField(max_length=64, primary_key=True)
+    label = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+
+    # routing metadata
+    triggers_law_classes = models.JSONField(default=list)
+    external_authorities = models.JSONField(default=list)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.label
+
+
+class PermitType(models.Model):
+    """
+    Raw permit types as published by the county.
+    """
+    name = models.CharField(max_length=255, unique=True)
+    category = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class PermitTypeIntentMap(models.Model):
+    """
+    Deterministic mapping: permit_type -> parcel_intent
+    """
+    permit_type = models.ForeignKey(PermitType, on_delete=models.CASCADE)
+    intent = models.ForeignKey(ParcelIntent, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ("permit_type", "intent")
+
+# models.py
+
+class JurisdictionCodeSet(models.Model):
+    jurisdiction_key = models.CharField(max_length=50)
+    code_set = models.CharField(max_length=100)
+    source = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        db_table = "jurisdiction_code_set"
+        unique_together = ("jurisdiction_key", "code_set")
+
+    def __str__(self):
+        return f"{self.jurisdiction_key} → {self.code_set}"
+
+class CodeSetActivationRule(models.Model):
+    code_set = models.CharField(max_length=100)
+    parcel_intent = models.CharField(max_length=100, null=True, blank=True)
+    zoning_use_class = models.CharField(max_length=50, null=True, blank=True)
+    requires_overlay = models.CharField(max_length=50, null=True, blank=True)
+
+    class Meta:
+        db_table = "code_set_activation_rule"

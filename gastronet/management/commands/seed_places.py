@@ -68,7 +68,7 @@ class Command(BaseCommand):
         limit = int(opts["limit"])
         page_size = max(1, min(int(opts["pagesize"]), 20))
 
-        log = CrawlLog.objects.using("gastronet").create(task="seed_places_v1", scope=query)
+        log = CrawlLog.objects.create(task="seed_places_v1", scope=query)
 
         # v1 requires the field mask via HTTP header
         headers = {
@@ -132,7 +132,7 @@ class Command(BaseCommand):
                         defaults["location"] = Point(lng, lat)
 
                     # Upsert
-                    _, created = Restaurant.objects.using("gastronet").update_or_create(
+                    _, created = Restaurant.objects.update_or_create(
                         place_id=place_id,
                         defaults=defaults,
                     )

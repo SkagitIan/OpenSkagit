@@ -1,0 +1,25 @@
+{% if query_too_short %}
+  <div class="autocomplete-empty">
+    Enter at least {{ min_search_length }} characters to search parcels.
+  </div>
+{% elif results %}
+  {% for parcel in results %}
+    <a class="autocomplete-result" href="{% url 'planning-home' %}?q={{ parcel.parcel_number|urlencode }}">
+      <div class="result-address">{{ parcel.address|default:parcel.parcel_number }}</div>
+      <div class="result-parcel">Parcel {{ parcel.parcel_number }}</div>
+      {% if parcel.neighborhood_description %}
+        <div class="result-sale-info">{{ parcel.neighborhood_description }}</div>
+      {% endif %}
+      <div class="result-cta">
+        View planning preview
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18l6-6-6-6"></path>
+        </svg>
+      </div>
+    </a>
+  {% endfor %}
+{% else %}
+  <div class="autocomplete-empty">
+    No parcels match “{{ query }}”.
+  </div>
+{% endif %}

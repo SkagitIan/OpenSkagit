@@ -37,7 +37,7 @@
             <button
               type="button"
               class="link-button"
-              hx-get="{% url 'cma-comparable-improvements' parcel_number comp.snapshot.parcel_number %}?roll_id={{ comp.snapshot.metadata.roll_id|default_if_none:'' }}&roll_year={{ comp.snapshot.metadata.roll_year|default_if_none:'' }}{% if comp.snapshot.metadata.assessor_building_style %}&assessor_style={{ comp.snapshot.metadata.assessor_building_style|urlencode }}{% endif %}"
+                              hx-get="{% url 'cma-comparable-improvements' parcel_number comp.snapshot.parcel_number %}"
               hx-target="#appeal-improvements-{{ comp.snapshot.parcel_number }}"
               hx-swap="innerHTML"
             >

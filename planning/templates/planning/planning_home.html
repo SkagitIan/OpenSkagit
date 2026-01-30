@@ -1,0 +1,576 @@
+{% extends "openskagit/parcel_portal_base.html" %}
+
+{% block page_title %}Parcel Planning{% endblock %}
+
+{% block hero %}
+<div class="space-y-4 text-center">
+  <p class="text-xs font-semibold uppercase tracking-[0.4em] text-sage-500">Parcel Planning</p>
+  <h1 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">Describe your project</h1>
+  <p class="mx-auto max-w-3xl text-base text-slate-600">
+    Tell us what you want to build and we’ll deterministically lock in the legal scope before any reasoning ever runs.
+  </p>
+</div>
+{% endblock %}
+
+{% block stepper %}
+<div class="mt-10 grid gap-4 lg:grid-cols-3">
+  <article class="how-we-work-card border-sage-100 bg-gradient-to-br from-sage-50/90 to-white text-slate-700">
+    <p class="text-xs font-semibold uppercase tracking-wide text-sage-500">Step 1</p>
+    <h3 class="text-xl font-semibold text-slate-900">Specify parcel</h3>
+    <p class="text-sm">Lookup is limited to authoritative parcels (master parcel table).</p>
+    <p class="text-xs font-semibold text-sage-600">Status: Ready</p>
+  </article>
+  <article class="how-we-work-card border-sky-100 bg-gradient-to-br from-sky-50/90 to-white text-slate-700">
+    <p class="text-xs font-semibold uppercase tracking-wide text-sky-500">Step 2</p>
+    <h3 class="text-xl font-semibold text-slate-900">Describe your intent</h3>
+    <p class="text-sm">Free-text description feeds the intent classifier before any deterministic lookup.</p>
+    <p class="text-xs font-semibold text-sky-500">Status: Awaiting intent</p>
+  </article>
+  <article class="how-we-work-card border-amber-100 bg-gradient-to-br from-amber-50/90 to-white text-slate-700">
+    <p class="text-xs font-semibold uppercase tracking-wide text-amber-500">Step 3</p>
+    <h3 class="text-xl font-semibold text-slate-900">Lock the scope</h3>
+    <p class="text-sm">Base, activated, and final code sets load deterministically once intent is known.</p>
+    <p class="text-xs font-semibold text-amber-500">Status: Ready</p>
+  </article>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+  <section class="rounded-3xl border border-slate-100 bg-white/90 p-8 shadow-lg shadow-slate-900/5">
+    <div class="flex flex-wrap items-start gap-4">
+      <div class="rounded-2xl bg-slate-100 p-4 text-slate-700">
+        <i class="fa-solid fa-pencil-ruler text-2xl" aria-hidden="true"></i>
+      </div>
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Project description</p>
+        <h2 class="text-2xl font-semibold text-slate-900">Tell us what you want to build</h2>
+        <p class="mt-1 text-sm text-slate-500">
+          We classify the intent for you, then resolve zoning, overlays, and code sets deterministically.
+        </p>
+      </div>
+    </div>
+
+    <form id="planning-intent-form" class="mt-6 space-y-6" data-endpoint="{{ scope_resolve_url }}">
+      <div class="grid gap-4 md:grid-cols-2">
+        <label class="space-y-2 text-sm font-semibold text-slate-500">
+          Parcel number
+          <input
+            name="parcel_number"
+            type="text"
+            maxlength="64"
+            required
+            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 transition focus:border-sage-500 focus:bg-white focus:outline-none"
+            placeholder="P123456"
+          />
+        </label>
+        <label class="space-y-2 text-sm font-semibold text-slate-500">
+          What are you trying to do?
+          <textarea
+            name="description"
+            rows="3"
+            required
+            class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 transition focus:border-sage-500 focus:bg-white focus:outline-none"
+            placeholder="Add an ADU attached to the back of the house."
+          ></textarea>
+        </label>
+      </div>
+      <div class="flex flex-wrap items-center gap-4">
+        <button
+          type="submit"
+          class="rounded-2xl bg-sage-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-sage-500/50 transition hover:bg-sage-600"
+        >
+          Classify intent & resolve scope
+        </button>
+        <a href="{{ planning_debug_url }}" class="text-sm font-semibold text-slate-500 underline">
+          Open internal scope debugger
+        </a>
+      </div>
+    </form>
+  </section>
+
+  <section id="planning-status" class="rounded-3xl border border-slate-100 bg-white/70 p-6 text-sm text-slate-600 shadow-sm">
+    Enter a parcel number and a short description to lock scope.
+  </section>
+
+  <section
+    id="planning-selected-panel"
+    class="planning-details-panel hidden rounded-3xl border border-slate-100 bg-white/90 p-6 shadow-lg shadow-slate-900/5"
+  >
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-500">Parcel details</p>
+        <h2 class="text-lg font-semibold text-slate-900">
+          <span id="planning-selected-parcel-number">Parcel — —</span>
+        </h2>
+        <p id="planning-selected-address" class="text-sm text-slate-600">Address will appear here.</p>
+      </div>
+      <button
+        type="button"
+        class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:text-slate-800"
+        onclick="document.getElementById('planning-selected-panel').classList.add('hidden')"
+      >
+        Close
+      </button>
+    </div>
+    <div class="mt-5 grid gap-4 lg:grid-cols-2">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Zoning</p>
+        <dl class="mt-2 space-y-2 text-sm text-slate-600">
+          <div class="flex justify-between">
+            <dt class="font-semibold text-slate-900">Jurisdiction</dt>
+            <dd id="planning-selected-jurisdiction">—</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="font-semibold text-slate-900">Zone code</dt>
+            <dd id="planning-selected-zone">—</dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="font-semibold text-slate-900">Use class</dt>
+            <dd id="planning-selected-use-class">—</dd>
+          </div>
+        </dl>
+      </div>
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400">Overlays</p>
+        <div class="mt-2 grid gap-2 text-sm text-slate-700">
+          <div class="flex justify-between">
+            <span>Shoreline jurisdiction</span>
+            <span id="planning-overlay-shoreline">—</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Special flood hazard area</span>
+            <span id="planning-overlay-sfha">—</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Wetland overlay</span>
+            <span id="planning-overlay-wetland">—</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Stream buffer</span>
+            <span id="planning-overlay-stream">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="planning-results" class="hidden space-y-6">
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Intent</p>
+        <h3 class="text-xl font-semibold text-slate-900">Derived intent</h3>
+      </div>
+      <div class="grid gap-3 px-6 py-5 text-sm text-slate-600">
+        <div class="flex items-center justify-between">
+          <span>Intent key</span>
+          <span id="planning-intent-key" class="font-semibold text-slate-900">—</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Confidence</span>
+          <span id="planning-intent-confidence" class="font-semibold text-slate-900">—</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Jurisdiction</p>
+        <h3 class="text-xl font-semibold text-slate-900">Resolved governance</h3>
+      </div>
+      <div class="grid gap-3 px-6 py-5 text-sm text-slate-600">
+        <div class="flex items-center justify-between text-base">
+          <span>Raw jurisdiction</span>
+          <span id="planning-jurisdiction-raw" class="font-semibold text-slate-900">—</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Normalized jurisdiction ID</span>
+          <span id="planning-jurisdiction-normalized" class="font-semibold text-slate-900">—</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Zoning</p>
+        <h3 class="text-xl font-semibold text-slate-900">Primary zone</h3>
+      </div>
+      <div class="grid gap-3 px-6 py-5 text-sm text-slate-600">
+        <div class="flex items-center justify-between">
+          <span>Zone ID</span>
+          <span id="planning-zone-id" class="font-semibold text-slate-900">—</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Zone code</span>
+          <span id="planning-zone-code" class="font-semibold text-slate-900">—</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Zoning use class</span>
+          <span id="planning-zone-use-class" class="font-semibold text-slate-900">—</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>General class</span>
+          <span id="planning-zone-general" class="font-semibold text-slate-900">—</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span>Specific class</span>
+          <span id="planning-zone-specific" class="font-semibold text-slate-900">—</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Overlay facts</p>
+        <h3 class="text-lg font-semibold text-slate-900">Computed overlays</h3>
+      </div>
+      <div class="overflow-x-auto px-6 pb-5">
+        <table class="min-w-full text-left text-xs text-slate-500">
+          <thead>
+            <tr>
+              <th class="px-3 py-2 font-medium text-slate-500">Overlay</th>
+              <th class="px-3 py-2 font-medium text-slate-500">Flag</th>
+            </tr>
+          </thead>
+          <tbody id="planning-overlay-body" data-colspan="2"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Base code sets</p>
+        <h3 class="text-lg font-semibold text-slate-900">Always-on scope</h3>
+      </div>
+      <div class="overflow-x-auto px-6 pb-6">
+        <table class="min-w-full text-left text-xs text-slate-500">
+          <thead>
+            <tr>
+              <th class="px-3 py-2 font-medium text-slate-500">Code set</th>
+              <th class="px-3 py-2 font-medium text-slate-500">Source</th>
+            </tr>
+          </thead>
+          <tbody id="planning-base-body" data-colspan="2"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Activated code sets</p>
+        <h3 class="text-lg font-semibold text-slate-900">Intent + overlay triggers</h3>
+      </div>
+      <div class="overflow-x-auto px-6 pb-6">
+        <table class="min-w-full text-left text-xs text-slate-500">
+          <thead>
+            <tr>
+              <th class="px-3 py-2 font-medium text-slate-500">Code set</th>
+              <th class="px-3 py-2 font-medium text-slate-500">Intent match</th>
+              <th class="px-3 py-2 font-medium text-slate-500">Zoning match</th>
+              <th class="px-3 py-2 font-medium text-slate-500">Overlay condition</th>
+            </tr>
+          </thead>
+          <tbody id="planning-activation-body" data-colspan="4"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Final active code sets</p>
+        <h3 class="text-lg font-semibold text-slate-900">Locked legal search space</h3>
+      </div>
+      <div class="overflow-x-auto px-6 pb-6">
+        <table class="min-w-full text-left text-xs text-slate-500">
+          <thead>
+            <tr>
+              <th class="px-3 py-2 font-medium text-slate-500">Code set</th>
+            </tr>
+          </thead>
+          <tbody id="planning-final-body" data-colspan="1"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Candidate chapters</p>
+        <h3 class="text-lg font-semibold text-slate-900">Indexed along active code sets</h3>
+      </div>
+      <div class="overflow-x-auto px-6 pb-6">
+        <table class="min-w-full text-left text-xs text-slate-500">
+          <thead>
+            <tr>
+              <th class="px-3 py-2 font-medium text-slate-500">Code set</th>
+              <th class="px-3 py-2 font-medium text-slate-500">Chapter #</th>
+              <th class="px-3 py-2 font-medium text-slate-500">Chapter name</th>
+            </tr>
+          </thead>
+          <tbody id="planning-chapters-body" data-colspan="3"></tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-slate-100 bg-white/80 shadow-sm">
+      <div class="space-y-1 border-b border-slate-100 px-6 py-4">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Resolved context</p>
+        <h3 class="text-lg font-semibold text-slate-900">JSON output</h3>
+      </div>
+      <div class="px-6 pb-6">
+        <pre
+          id="planning-json"
+          class="max-h-72 overflow-auto rounded-2xl border border-slate-100 bg-slate-950/80 p-4 text-xs text-slate-200"
+        >{ }</pre>
+      </div>
+    </article>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const form = document.getElementById("planning-intent-form");
+    const statusEl = document.getElementById("planning-status");
+    const results = document.getElementById("planning-results");
+    const jsonOutput = document.getElementById("planning-json");
+    const intentKey = document.getElementById("planning-intent-key");
+    const intentConfidence = document.getElementById("planning-intent-confidence");
+    const jurisdictionRaw = document.getElementById("planning-jurisdiction-raw");
+    const jurisdictionNormalized = document.getElementById("planning-jurisdiction-normalized");
+    const zoneId = document.getElementById("planning-zone-id");
+    const zoneCode = document.getElementById("planning-zone-code");
+    const zoneUseClass = document.getElementById("planning-zone-use-class");
+    const zoneGeneral = document.getElementById("planning-zone-general");
+    const zoneSpecific = document.getElementById("planning-zone-specific");
+
+    const overlayBody = document.getElementById("planning-overlay-body");
+    const baseBody = document.getElementById("planning-base-body");
+    const activationBody = document.getElementById("planning-activation-body");
+    const finalBody = document.getElementById("planning-final-body");
+    const chaptersBody = document.getElementById("planning-chapters-body");
+
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) {
+        return parts.pop().split(";").shift();
+      }
+      return "";
+    }
+
+    function renderTable(bodyElement, rows, renderRow) {
+      if (!bodyElement) {
+        return;
+      }
+      bodyElement.innerHTML = "";
+      if (!rows || rows.length === 0) {
+        const emptyRow = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.setAttribute("colspan", bodyElement.dataset.colspan || "1");
+        cell.className = "px-3 py-3 text-sm text-slate-500";
+        cell.textContent = "No entries";
+        emptyRow.appendChild(cell);
+        bodyElement.appendChild(emptyRow);
+        return;
+      }
+      rows.forEach((row) => {
+        const tr = renderRow(row);
+        if (tr) {
+          bodyElement.appendChild(tr);
+        }
+      });
+    }
+
+    function boolToLabel(value) {
+      if (value === null || value === undefined) {
+        return "—";
+      }
+      return value ? "Yes" : "No";
+    }
+
+    function updateOverlayTable(facts) {
+      const overlays = [
+        { label: "Shoreline jurisdiction", key: "in_shoreline_jurisdiction" },
+        { label: "Special flood hazard area", key: "in_sfha" },
+        { label: "Wetland overlay", key: "in_wetland" },
+        { label: "Stream buffer", key: "in_stream_buffer" },
+      ];
+      renderTable(overlayBody, overlays, ({ label, key }) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-600">${label}</td>
+          <td class="px-3 py-2 font-semibold text-slate-900">${boolToLabel(facts[key])}</td>
+        `;
+        return tr;
+      });
+    }
+
+    function updateTable(bodyElement, rows, rowRenderer) {
+      renderTable(bodyElement, rows, rowRenderer);
+    }
+
+    if (!form) {
+      return;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const endpoint = form.dataset.endpoint;
+      const parcelNumber = form.querySelector("input[name='parcel_number']").value.trim();
+      const description = form.querySelector("textarea[name='description']").value.trim();
+      if (!parcelNumber || !description) {
+        statusEl.textContent = "Parcel number and description are required.";
+        results.classList.add("hidden");
+        return;
+      }
+      statusEl.textContent = `Classifying intent and resolving scope for ${parcelNumber}…`;
+      const payload = { parcel_number: parcelNumber, description };
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken"),
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || "Scope resolution failed");
+        }
+        const ctx = data.resolved_context || {};
+        const derived = ctx.derived_intent || {};
+        intentKey.textContent = derived.parcel_intent || "—";
+        intentConfidence.textContent = derived.confidence
+          ? Number(derived.confidence).toFixed(2)
+          : "—";
+        jurisdictionRaw.textContent = ctx.jurisdiction?.raw || "—";
+        jurisdictionNormalized.textContent = ctx.jurisdiction?.normalized_jurisdiction_id || "—";
+        zoneId.textContent = ctx.zoning?.zoning_zone_id || "—";
+        zoneCode.textContent = ctx.zoning?.zone_code || "—";
+        zoneUseClass.textContent = ctx.zoning?.zoning_use_class || "—";
+        zoneGeneral.textContent = ctx.zoning?.zoning_general_class || "—";
+        zoneSpecific.textContent = ctx.zoning?.zoning_specific_class || "—";
+        updateOverlayTable(ctx.overlay_facts_used || {});
+        updateTable(baseBody, ctx.base_code_sets || [], (row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="px-3 py-2 font-medium text-slate-900">${row.code_set}</td>
+            <td class="px-3 py-2 text-slate-600">${row.source}</td>
+          `;
+          return tr;
+        });
+        updateTable(activationBody, ctx.activated_code_sets || [], (row) => {
+          const reason = row.activation_reason || {};
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="px-3 py-2 font-medium text-slate-900">${row.code_set}</td>
+            <td class="px-3 py-2 text-slate-600">${boolToLabel(reason.intent_match)}</td>
+            <td class="px-3 py-2 text-slate-600">${boolToLabel(reason.zoning_use_class_match)}</td>
+            <td class="px-3 py-2 text-slate-600">${reason.overlay_condition || "—"}</td>
+          `;
+          return tr;
+        });
+        updateTable(finalBody, ctx.final_active_code_sets || [], (row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="px-3 py-2 font-medium text-slate-900">${row}</td>
+          `;
+          return tr;
+        });
+        updateTable(chaptersBody, ctx.candidate_chapters || [], (row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="px-3 py-2 font-medium text-slate-900">${row.code_set}</td>
+            <td class="px-3 py-2 text-slate-600">${row.chapter_number}</td>
+            <td class="px-3 py-2 text-slate-600">${row.chapter_name}</td>
+          `;
+          return tr;
+        });
+        jsonOutput.textContent = JSON.stringify(ctx, null, 2);
+        results.classList.remove("hidden");
+        statusEl.textContent = `Resolved legal scope for ${ctx.parcel_number || parcelNumber}.`;
+      } catch (error) {
+        console.error(error);
+        statusEl.textContent = error.message || "Scope resolution failed.";
+        results.classList.add("hidden");
+      }
+    });
+  })();
+</script>
+<script>
+  (function () {
+    const detailUrl = "{% url 'planning-parcel-detail-json' %}";
+
+    document.addEventListener("parcel-search-selected", async (event) => {
+      const parcelNumber = event?.detail?.parcel;
+      if (!parcelNumber) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${detailUrl}?parcel_number=${encodeURIComponent(parcelNumber)}`,
+          {
+            credentials: "same-origin",
+          }
+        );
+        if (!response.ok) {
+          throw new Error("Parcel detail lookup failed.");
+        }
+        const detail = await response.json();
+        document.dispatchEvent(
+          new CustomEvent("planning-parcel-detail-loaded", {
+            detail,
+          })
+        );
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  })();
+</script>
+<script>
+  (function () {
+    const panel = document.getElementById("planning-selected-panel");
+
+    function boolLabel(value) {
+      if (value === null || value === undefined) {
+        return "—";
+      }
+      return value ? "Yes" : "No";
+    }
+
+    document.addEventListener("planning-parcel-detail-loaded", (event) => {
+      const detail = event?.detail;
+      if (!detail || !panel) {
+        return;
+      }
+
+      document.getElementById("planning-selected-parcel-number").textContent =
+        detail.parcel_number || "Parcel — —";
+      document.getElementById("planning-selected-address").textContent =
+        detail.situs_address || "Address unavailable";
+      document.getElementById("planning-selected-jurisdiction").textContent =
+        detail.zoning_jurisdiction || "—";
+      document.getElementById("planning-selected-zone").textContent =
+        detail.zone_code || "—";
+      document.getElementById("planning-selected-use-class").textContent =
+        detail.zoning_use_class || "—";
+
+      const overlays = detail.overlays || {};
+      document.getElementById("planning-overlay-shoreline").textContent =
+        boolLabel(overlays.in_shoreline_jurisdiction);
+      document.getElementById("planning-overlay-sfha").textContent =
+        boolLabel(overlays.in_sfha);
+      document.getElementById("planning-overlay-wetland").textContent =
+        boolLabel(overlays.in_wetland);
+      document.getElementById("planning-overlay-stream").textContent =
+        boolLabel(overlays.in_stream_buffer);
+
+      panel.classList.remove("hidden");
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  {% include "openskagit/head.html" %}
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased min-h-screen flex flex-col">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  {% include "openskagit/nav.html" %}
+  <main id="main-content" role="main" class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+  {% include "openskagit/footer.html" %}
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

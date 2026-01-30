@@ -1,214 +1,211 @@
-import os, json, time, requests, logging
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+import requests
+from urllib.parse import urlparse
+from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.utils import timezone
-from openai import OpenAI
-from gastronet.models import Restaurant, CrawlLog
+from django.db.models import Q
 
-logger = logging.getLogger(__name__)
-BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
+from gastronet.models import Restaurant  # adjust app name
 
 
-# -----------------------------------------------------------
-# Helpers
-# -----------------------------------------------------------
-
-def brave_find_homepage(name, city, api_key):
-    """Use Brave API to find a restaurant’s main site."""
-    headers = {"Accept": "application/json", "X-Subscription-Token": api_key}
-    queries = [
-        f"{name} {city} restaurant official site",
-        f"{name} {city} restaurant",
-        f"{name} restaurant"
-    ]
-    for q in queries:
-        try:
-            res = requests.get(BRAVE_URL, params={"q": q, "count": 5, "country": "US"},
-                               headers=headers, timeout=15)
-            if res.status_code != 200:
-                logger.warning("Brave query %s -> %s", q, res.status_code)
-                continue
-            data = res.json()
-            for hit in (data.get("web") or {}).get("results", []):
-                url = hit.get("url")
-                if not url:
-                    continue
-                if any(bad in url.lower() for bad in ["yelp", "tripadvisor", "facebook", "ubereats", "grubhub"]):
-                    continue
-                logger.debug("Brave candidate: %s", url)
-                return url
-        except Exception as exc:
-            logger.warning("Brave query failed for %s: %s", q, exc, exc_info=True)
-            continue
-    return None
+SERP_API_ENDPOINT = "https://serpapi.com/search.json"
 
 
-def clean_html_body(url):
-    """Fetch homepage HTML and return only the <body> cleaned of scripts/styles."""
-    try:
-        res = requests.get(url, timeout=12, headers={"User-Agent": "GastroNetBot/1.0"})
-        soup = BeautifulSoup(res.text, "lxml")
-        for tag in soup(["script", "style", "noscript"]):
-            tag.decompose()
-        body = soup.body or soup
-        html = body.prettify()
-        logger.debug("Fetched and cleaned body from %s (%d chars)", url, len(html))
-        return html
-    except Exception as exc:
-        logger.warning("Failed to fetch/clean HTML from %s: %s", url, exc)
-        return ""
+def _domain(url: str | None) -> str | None:
+    if not url:
+        return None
+
+    parsed = urlparse(url)
+    host = parsed.netloc.lower() or parsed.path.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host or None
 
 
-def find_menu_urls_llm(html_body, base_url, openai_key):
-    """Ask small LLM to find food/drink menu URLs in homepage HTML."""
-    client = OpenAI(api_key=openai_key)
-    prompt = f"""
-    You are analyzing HTML code from a restaurant homepage.
-    Find URLs that likely point to the restaurant's FOOD or DRINK menus.
-    These may be on this domain or external ordering platforms.
-    Do NOT return navigation, privacy policy, careers, or non-food links.
-    also look in the anchor text, you might see website.com/page but the text is 'Menu'
-    Base URL: {base_url}
+def infer_platform(url: str | None) -> str | None:
+    host = _domain(url)
+    if not host:
+        return None
 
-    Return ONLY a JSON list of absolute URLs.
-    Example:
-    ["https://example.com/menu", "https://toasttab.com/example/menu"]
+    if "toasttab.com" in host:
+        return "toast"
+    if "square.site" in host or "squareup.com" in host:
+        return "square"
+    if "clover.com" in host:
+        return "clover"
+    if "order.online" in host:
+        return "order_online"
+    if "ubereats.com" in host:
+        return "ubereats"
+    if "doordash.com" in host or "trycaviar.com" in host:
+        return "doordash"
+    if "grubhub.com" in host or "seamless.com" in host:
+        return "grubhub"
+    if "postmates.com" in host:
+        return "postmates"
+    if "chownow.com" in host:
+        return "chownow"
+    if "slice.life" in host or "slicelife.com" in host:
+        return "slice"
+    if "delivery.com" in host:
+        return "delivery.com"
+    if "ezcater.com" in host:
+        return "ezcater"
 
-    ---
-    {html_body[:8000]}
-    """
-    try:
-        logger.info("Submitting HTML prompt to OpenAI for %s (chars=%d)", base_url, len(prompt))
-        resp = client.responses.create(model="gpt-4o-mini", input=prompt)
-        raw_output = getattr(resp, "output_text", "") or ""
-        logger.info("OpenAI raw output for %s: %s", base_url, raw_output[:600].strip())
-        if not raw_output:
-            # Fallback: try to read from first choice if SDK structure changes.
-            first_content = (
-                resp.output[0].content[0].text
-                if getattr(resp, "output", None)
-                else ""
-            )
-            raw_output = first_content or ""
-            logger.debug("Fallback raw output for %s: %s", base_url, raw_output[:600].strip())
-        data = json.loads(raw_output)
-        urls = [u for u in data if isinstance(u, str) and u.startswith("http")]
-        logger.debug("LLM discovered %d candidate URLs", len(urls))
-        return urls
-    except Exception as exc:
-        logger.warning("LLM menu discovery failed for %s: %s", base_url, exc, exc_info=True)
-        return []
+    return host
 
-
-def verify_url_live(url):
-    """HEAD-check a URL for 200/OK."""
-    try:
-        r = requests.head(url, allow_redirects=True, timeout=8)
-        ok = 200 <= r.status_code < 400
-        logger.debug("HEAD %s -> %s", url, r.status_code)
-        return ok
-    except Exception as exc:
-        logger.debug("HEAD failed for %s: %s", url, exc)
-        return False
-
-
-# -----------------------------------------------------------
-# Command
-# -----------------------------------------------------------
 
 class Command(BaseCommand):
-    help = "Discover restaurant websites and menu URLs via Brave + LLM (HTML body parsing)."
+    help = "Inspect SerpAPI results for a restaurant and persist menu links + profiles"
 
     def add_arguments(self, parser):
-        parser.add_argument("--batch", type=int, default=100)
-        parser.add_argument("--city", type=str, default="Seattle")
+        parser.add_argument(
+            "--restaurant-id",
+            type=int,
+            help="Restaurant ID to inspect",
+        )
+        parser.add_argument(
+            "--new",
+            action="store_true",
+            help="Target restaurants that do not have a website URL yet.",
+        )
+        parser.add_argument(
+            "--menu",
+            action="store_true",
+            help="Target restaurants that do not have a menu_url yet.",
+        )
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=1,
+            help="Number of restaurants to process when using --new/--menu (default: 1).",
+        )
 
-    def handle(self, *args, **opts):
-        batch = opts["batch"]
-        city = opts["city"]
-
-        brave_key = os.getenv("BRAVE_API_KEY")
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if not brave_key or not openai_key:
-            self.stderr.write("Missing BRAVE_API_KEY or OPENAI_API_KEY.")
+    def handle(self, *args, **options):
+        api_key = getattr(settings, "SERP_API_KEY", None)
+        if not api_key:
+            self.stderr.write("SERP_API_KEY not set")
             return
 
-        log = CrawlLog.objects.using("gastronet").create(task="discover_urls_llmhtml", scope=city)
-        logger.info("Starting discovery batch=%s city=%s", batch, city)
+        targets = []
+        limit = max(1, options.get("limit") or 1)
 
-        qs = Restaurant.objects.using("gastronet").filter(website__isnull=True).order_by("id")[:batch]
-
-        for r in qs:
+        if options.get("restaurant_id"):
             try:
-                logger.info("Processing restaurant id=%s name=%s", r.id, r.name)
+                restaurant = Restaurant.objects.get(id=options["restaurant_id"])
+            except Restaurant.DoesNotExist:
+                self.stderr.write(f"Restaurant {options['restaurant_id']} not found")
+                return
 
-                # 1️⃣ Find homepage
-                site = brave_find_homepage(r.name, city, brave_key)
-                if not site:
-                    log.skip_count += 1
-                    logger.info("No homepage found for %s", r.name)
+            if getattr(restaurant, "is_chain", False):
+                self.stdout.write(f"Skipping restaurant {restaurant.id} ({restaurant.name}): is_chain=True")
+                return
+
+            targets = [restaurant]
+        else:
+            qs = Restaurant.objects.filter(is_chain=False)
+
+            if options.get("new"):
+                qs = qs.filter(Q(website__isnull=True) | Q(website__exact=""))
+
+            if options.get("menu"):
+                qs = qs.filter(Q(menu_url__isnull=True) | Q(menu_url__exact=""))
+
+            if not options.get("new") and not options.get("menu"):
+                self.stderr.write("Provide --restaurant-id or use --new and/or --menu.")
+                return
+
+            targets = list(qs.order_by("id")[:limit])
+            if not targets:
+                self.stdout.write("No restaurants matched the provided filters.")
+                return
+
+        for restaurant in targets:
+            params = {
+                "engine": "google",
+                "q": f"Online Menu for {restaurant.name} in {restaurant.address}",
+                "hl": "en",
+                "gl": "us",
+                #"location":"Mount Vernon, WA",
+                "ludocid": str(restaurant.place_id),
+                "api_key": api_key,
+            }
+
+            resp = requests.get(SERP_API_ENDPOINT, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            kg = data.get("knowledge_graph", {})
+
+            website = kg.get("website")
+            website_domain = _domain(website)
+            profiles = kg.get("profiles") or []
+
+            ordering_urls = []
+
+            # knowledge graph menu links
+            for link in kg.get("menu_links", []):
+                if link.get("link"):
+                    ordering_urls.append(link["link"])
+
+            # explicit "order online" link
+            order_link = kg.get("links", {}).get("order_online")
+            if order_link:
+                ordering_urls.append(order_link)
+
+            # organic results (own site + any third-party platforms)
+            for r in data.get("organic_results", []):
+                link = r.get("link", "")
+                if not link:
                     continue
-                logger.info("Homepage candidate for %s resolved via Brave: %s", r.name, site)
-                r.website = site
-                r.url_source = "brave"
-                self.stdout.write(f"🌐 {r.name}: {site}")
-
-                # 2️⃣ Fetch & clean HTML
-                html_body = clean_html_body(site)
-                if not html_body:
-                    log.skip_count += 1
-                    logger.info("HTML body empty for %s, skipping.", r.name)
+                domain = _domain(link)
+                if website_domain and domain == website_domain:
+                    ordering_urls.append(link)
                     continue
-                logger.info("Fetched HTML body for %s (%d chars).", r.name, len(html_body))
+                ordering_urls.append(link)
 
-                # 3️⃣ Ask LLM for menu URLs
-                candidates = find_menu_urls_llm(html_body, site, openai_key)
-                candidates = [urljoin(site, u) if u.startswith("/") else u for u in candidates]
-                candidates = [u for u in candidates if any(k in u.lower() for k in ["menu", "order", "food"])]
-                logger.debug("Candidate count for %s: %d", r.name, len(candidates))
-                if not candidates:
-                    logger.info("LLM returned no usable menu candidates for %s.", r.name)
+            ordering_urls = list(dict.fromkeys(ordering_urls))  # de-dupe
 
-                # 4️⃣ Verify candidates
-                found = None
-                for url in candidates:
-                    logger.info("Verifying candidate for %s: %s", r.name, url)
-                    if verify_url_live(url):
-                        found = url
-                        logger.info("Verified menu URL for %s: %s", r.name, url)
-                        break
+            update_fields = []
+            if website and not restaurant.website:
+                restaurant.website = website
+                update_fields.append("website")
+            if ordering_urls:
+                restaurant.order_links = ordering_urls
+                update_fields.append("order_links")
+                if not restaurant.menu_url:
+                    restaurant.menu_url = ordering_urls[0]
+                    update_fields.append("menu_url")
+            if profiles:
+                restaurant.profiles = profiles
+                update_fields.append("profiles")
 
-                # 5️⃣ Save
-                r.url_checked_at = timezone.now()
-                if found:
-                    r.menu_url = found
-                    r.url_source = "llm_htmlbody"
-                    log.success_count += 1
-                    self.stdout.write(f"🍽️  Menu found: {found}")
-                else:
-                    log.skip_count += 1
-                    self.stdout.write(f"⚠️  No menu found for {r.name}")
+            if update_fields:
+                restaurant.save(update_fields=sorted(set(update_fields)))
 
-                r.save(using="gastronet", update_fields=["website","menu_url","url_source","url_checked_at"])
-                time.sleep(0.3)
+            self.stdout.write("")
+            self.stdout.write("=" * 72)
+            self.stdout.write(f"Restaurant: {restaurant.name}")
+            self.stdout.write("-" * 72)
 
-            except Exception as exc:
-                log.error_count += 1
-                logger.exception("Error processing %s: %s", r.name, exc)
-                self.stderr.write(f"Error {r.name}: {exc}")
-                continue
+            self.stdout.write(f"Website URL: {restaurant.website or website or '—'}")
 
-        log.ended_at = timezone.now()
-        log.save(update_fields=["success_count","skip_count","error_count","ended_at"])
-        logger.info("Discovery done success=%s skip=%s error=%s",
-                    log.success_count, log.skip_count, log.error_count)
-        self.stdout.write(self.style.SUCCESS(
-            f"✅ Discovery complete. Found={log.success_count}, Skipped={log.skip_count}, Errors={log.error_count}"
-        ))
+            self.stdout.write("")
+            self.stdout.write("Ordering / Menu URLs:")
+            if not ordering_urls:
+                self.stdout.write("  — none found")
+            else:
+                for url in ordering_urls:
+                    platform = infer_platform(url)
+                    self.stdout.write(f"  - {url}")
+                    self.stdout.write(f"    platform: {platform}")
 
+            if profiles:
+                self.stdout.write("")
+                self.stdout.write("Profiles:")
+                for p in profiles:
+                    name = p.get("name") or "Profile"
+                    link = p.get("link") or "—"
+                    self.stdout.write(f"  - {name}: {link}")
 
-
-
-
-
+            self.stdout.write("=" * 72)
+            self.stdout.write("")

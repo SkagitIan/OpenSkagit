@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "OpenSkagit Menu Scraper",
+  "version": "1.0",
+  "description": "Extracts menu data from restaurant sites and saves to OpenSkagit.",
+  "permissions": ["activeTab", "scripting", "tabs"],
+  "host_permissions": [
+    "https://openskagit.com/*",
+    "https://*.com/*",
+    "https://*.net/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://openskagit.com/*"],
+      "js": ["menu_helper.js"]
+    }
+  ]
+}

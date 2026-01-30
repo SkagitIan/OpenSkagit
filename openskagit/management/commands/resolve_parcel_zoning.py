@@ -1,12 +1,64 @@
 from django.core.management.base import BaseCommand
 from django.db import connection, transaction
 
+from reference_data.management.commands.spatial_eval import dataset_is_available
+
 
 class Command(BaseCommand):
     help = "Resolve zoning envelopes onto parcels and populate ParcelPlanningFacts"
 
     def handle(self, *args, **options):
         self.stdout.write("Resolving parcel zoning envelopes…")
+
+        dataset_available = dataset_is_available("reference_zoning_envelope")
+
+        clear_sql = """
+        UPDATE parcel_planning_facts
+        SET
+            zoning_jurisdiction = NULL,
+            zone_code = NULL,
+            zoning_general_class = NULL,
+            zoning_specific_class = NULL,
+
+            zoning_allows_residential = NULL,
+            zoning_allows_duplex = NULL,
+            zoning_allows_multifamily = NULL,
+            zoning_allows_retail = NULL,
+            zoning_allows_office = NULL,
+            zoning_allows_industrial = NULL,
+            zoning_allows_heavy_industrial = NULL,
+            zoning_allows_agriculture = NULL,
+            zoning_allows_forestry = NULL,
+            zoning_allows_green_energy = NULL,
+            zoning_allows_data_center = NULL,
+            zoning_allows_warehouse = NULL,
+
+            zoning_min_lot_size_sqft = NULL,
+            zoning_max_lot_coverage_pct = NULL,
+            zoning_max_height_ft = NULL,
+            zoning_max_stories = NULL,
+            zoning_max_far = NULL,
+            zoning_min_far = NULL,
+
+            zoning_max_density_du_ac = NULL,
+            zoning_min_density_du_ac = NULL,
+            zoning_max_units_per_lot = NULL,
+            zoning_adus_allowed_count = NULL,
+            zoning_adu_owner_occupancy_required = NULL,
+
+            zoning_parking_min_residential = NULL,
+            zoning_parking_min_middle_housing = NULL,
+            zoning_parking_min_apartment = NULL,
+            zoning_parking_min_retail = NULL,
+            zoning_parking_min_restaurant = NULL,
+            zoning_parking_min_office = NULL,
+
+            zoning_source = NULL,
+            zoning_reference_url = NULL,
+            zoning_last_verified = NULL,
+
+            last_updated = NOW();
+        """
 
         sql = """
         WITH zoning_hits AS (
@@ -97,6 +149,14 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             with connection.cursor() as cursor:
+                cursor.execute(clear_sql)
+                if not dataset_available:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "reference_zoning_envelope unavailable; zoning fields set to unknown."
+                        )
+                    )
+                    return
                 cursor.execute(sql)
 
         self.stdout.write(self.style.SUCCESS("Parcel zoning resolution complete."))

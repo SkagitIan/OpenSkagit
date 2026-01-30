@@ -1,0 +1,815 @@
+{% extends "openskagit/base.html" %}
+{% load static humanize %}
+
+{% block head_extra %}
+{{ block.super }}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  .voice-tooltip {
+    background-color: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(15, 23, 42, 0.9);
+    color: #f8fafc;
+    border-radius: 12px;
+    padding: 0.65rem 0.8rem;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+  }
+  .voice-tooltip .leaflet-tooltip-content {
+    font-size: 0.85rem;
+    line-height: 1.3;
+  }
+  .voice-tooltip::before,
+  .voice-tooltip::after {
+    display: none;
+  }
+  .stat-ticker-shell {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.75rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(90deg, rgba(107, 144, 128, 0.25), rgba(243, 198, 168, 0.3), rgba(143, 163, 209, 0.35));
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.08);
+  }
+  .stat-ticker-shell::before,
+  .stat-ticker-shell::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 80px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .stat-ticker-shell::before {
+    left: 0;
+    background: linear-gradient(90deg, rgba(246, 255, 248, 1), rgba(246, 255, 248, 0));
+  }
+  .stat-ticker-shell::after {
+    right: 0;
+    background: linear-gradient(270deg, rgba(246, 255, 248, 1), rgba(246, 255, 248, 0));
+  }
+  .stat-ticker-track {
+    display: flex;
+    gap: 1.5rem;
+    padding: 0.85rem 2rem;
+    animation: ticker-scroll 42s linear infinite;
+    width: fit-content;
+  }
+  .ticker-item {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 1.25rem;
+    padding: 0.85rem 1.5rem;
+    min-width: 220px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+  }
+  .ticker-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+  }
+  .ticker-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(15, 23, 42, 0.15);
+  }
+  .ticker-badge {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 9999px;
+    font-weight: 600;
+  }
+  .ticker-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+  .ticker-caption {
+    font-size: 0.85rem;
+    color: #475569;
+  }
+  @keyframes ticker-scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stat-ticker-track {
+      animation: none;
+    }
+  }
+  .vv-faq summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .vv-faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .vv-faq__indicator {
+    transition: transform 0.2s ease;
+  }
+  .vv-faq[open] .vv-faq__indicator {
+    transform: rotate(-180deg);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% with vv=votevector %}
+<section class="bg-slate-900 text-white py-20">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <p class="text-sm font-semibold tracking-wide uppercase text-sage-300">Your Voice. Understood.</p>
+    <h1 class="text-4xl sm:text-5xl font-bold">VoteVector</h1>
+    <p class="text-xl text-sage-100">Measuring civic participation across place and time.</p>
+    <p class="text-lg text-sage-50 max-w-3xl">VoteVector analyzes voting behavior through a neighborhood lens—connecting ballots, parcels, and geography to surface meaningful engagement patterns</p>
+  </div>
+</section>
+
+{% if votevector_stats %}
+<section class="bg-white py-14" id="votevector-stats">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <h2 class="text-3xl font-bold text-gray-900 mb-4">VoteVector operational stats</h2>
+    <p class="text-gray-600">Live countywide counts that drive the Neighborhood Participation Index.</p>
+  </div>
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+    <div class="stat-ticker-shell" role="region" aria-label="VoteVector stats ticker">
+      <div class="stat-ticker-track">
+        {% for _ in '12' %}
+          {% for stat in votevector_stats %}
+          <div class="ticker-item">
+            <div class="ticker-label">
+              <span class="ticker-dot {{ stat.accent_class|default:'bg-sage-400' }}"></span>
+              <span class="ticker-label-text">{{ stat.label }}</span>
+              {% if stat.badge_label %}
+              <span class="ticker-badge {{ stat.badge_class|default:'bg-gray-900/10 text-gray-800' }}">{{ stat.badge_label }}</span>
+              {% endif %}
+            </div>
+            <div class="ticker-value">
+              {% if stat.value|default_if_none:'' != '' and stat.animate %}
+              <span data-animate-number data-target="{{ stat.value }}">{{ stat.value|intcomma }}</span>
+              {% elif stat.display %}
+              <span>{{ stat.display }}</span>
+              {% elif stat.value|default_if_none:'' != '' %}
+              <span>{{ stat.value|intcomma }}</span>
+              {% else %}
+              <span>—</span>
+              {% endif %}
+            </div>
+            {% if stat.caption %}
+            <div class="ticker-caption">{{ stat.caption }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  </section>
+{% endif %}
+
+<section class="bg-slate-900 text-white py-16">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+    <div class="flex flex-col gap-10 lg:flex-row lg:items-start">
+      <div class="flex-1 space-y-4">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-wide text-sage-300">Neighborhood Participation Index</p>
+          <h2 class="text-3xl font-bold">Participation density per neighborhood</h2>
+          <p class="text-base text-sage-100">
+            Each selection loads the latest election year so analysts can compare turnout density neighborhood by neighborhood without changing context.
+          </p>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-sm font-semibold text-sage-200" for="votevector-year-select">Election year</label>
+          <select id="votevector-year-select" data-vv-year-select class="w-full rounded-2xl border border-white/30 bg-white/10 px-4 py-2 text-white placeholder-slate-200 focus:outline-none focus:ring-2 focus:ring-sage-300 disabled:opacity-60">
+            <option>Loading years…</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex-1 space-y-3 bg-white/5 rounded-3xl p-5 border border-white/10">
+        <p class="text-xs font-semibold uppercase tracking-wide text-sage-200">Legend</p>
+        <p class="text-lg font-semibold text-white">Neighborhood Participation Index (NPI)</p>
+        <p class="text-xs text-slate-200">{{ vv.legend_subtitle }}</p>
+        <div data-vv-legend class="space-y-3 text-sm pt-2"></div>
+      </div>
+    </div>
+    <div class="space-y-3">
+      <div id="civic-balance-map" class="w-full rounded-3xl overflow-hidden border border-slate-200 shadow-2xl" style="min-height: 640px; background: #0f172a;"></div>
+      <p class="text-sm text-slate-200" data-vv-status>Loading neighborhoods…</p>
+      <p class="text-xs text-slate-300">
+        This map shows neighborhood-level participation patterns using public records. It does not reflect individual behavior or political preference.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="bg-white py-16">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 text-slate-700">
+    <div class="space-y-2">
+      <p class="text-sm font-semibold text-sage-700 uppercase tracking-wide">VoteVector FAQ</p>
+      <h3 class="text-3xl font-bold text-slate-900">Understanding how the map operates</h3>
+      <p class="text-base text-slate-600">Hover, click, or change the election year selector to explore the Neighborhood Participation Index (NPI) with confidence. These answers explain what the metrics mean and how they are derived inside VoteVector.</p>
+    </div>
+    <div class="space-y-3">
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">What does VoteVector measure?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          VoteVector links county election ballots to residential parcels and neighborhood polygons so analysts can see where voting participation is concentrated. The experience focuses on participation density rather than individual preference—no party or candidate data is displayed.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">How is the Neighborhood Participation Index (NPI) calculated?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          NPI is a structural diagnostic: <strong>assigned ballots ÷ residential (situs) parcels</strong> for each neighborhood. Scores above 1.0 mean more than one ballot per home, signaling a denser civic footprint; lower values highlight neighborhoods with slack participation.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">What do the colors and quartiles represent?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          The legend reflects NPI quartiles: deep green (Quartile 4) marks the highest participation density, lighter green (Quartile 3) is above-average, amber (Quartile 2) is below-average, and warm orange (Quartile 1) highlights the lowest density. Each bucket shares identical geometry, so color shifts immediately show how one neighborhood compares with the rest of the county.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">What is assignment coverage?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          Assignment coverage shows the percent of precinct ballots that VoteVector successfully matched to a parcel inside the neighborhood (<em>assigned ÷ precinct ballots</em>). Strong coverage signals a clean parcel-to-ballot alignment; lower values flag precincts where PO Boxes or outside-the-neighborhood addresses limit coverage.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">Why does the map show “excluded (ambiguous matches)”?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          Ambiguous matches count ballots that could not be tied to a single parcel (duplicates, unresolved PO Boxes, or non-locatable records). They are withheld from the NPI math but surfaced in every tooltip and popup so you always know how many ballots were excluded.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">How does the precinct context help me?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          Each popup includes a precinct participation indicator (PPI = precinct ballots ÷ precinct residential parcels) plus the precinct PO Box rate. Comparing NPI to PPI shows whether a neighborhood is driving or lagging the larger precinct context.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">How are PO Box voters handled?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          PO Box ballots stay in the precinct totals (so they influence PPI and the PO Box rate), but they cannot be reliably geocoded to parcels. When the service can’t locate them, they appear inside the assignment coverage and ambiguous lines—making the gap transparent rather than silently inflating a neighborhood’s NPI.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">How can I compare different election years?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          The year selector above the legend pulls the latest election year automatically, and the API surfaces additional years in the dropdown. Switch years to redraw the map and ticker with that election’s fact table so you can spot whether density tightened or loosened over time.
+        </div>
+      </details>
+
+      <details class="vv-faq rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+        <summary class="flex items-center justify-between gap-4 text-left">
+          <span class="text-base font-semibold text-slate-900">What will I see when I hover or click on a neighborhood?</span>
+          <span class="vv-faq__indicator text-sage-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </span>
+        </summary>
+        <div class="mt-3 text-sm leading-relaxed text-slate-600">
+          Hover tooltips stream a quick-read card: neighborhood name, code, quartile, ballots, parcels, NPI, assignment coverage, ambiguous totals, and precinct context. Clicking locks the boundary, deepens the outline, and opens a popup with the full detail stack (including the election year, residential baseline, and primary precinct identifiers).
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+{% endwith %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  (function () {
+    function initVoteVectorMap() {
+      const mapContainer = document.getElementById('civic-balance-map');
+      const yearSelect = document.querySelector('[data-vv-year-select]');
+      const legendContainer = document.querySelector('[data-vv-legend]');
+      const statusNode = document.querySelector('[data-vv-status]');
+      const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+      if (!mapContainer) {
+        return;
+      }
+
+      if (!document.getElementById('vv-popup-style')) {
+        const popupStyle = document.createElement('style');
+        popupStyle.id = 'vv-popup-style';
+        popupStyle.textContent = `
+          .vv-popup .leaflet-popup-content-wrapper {
+            border-radius: 18px;
+            padding: 0;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+          }
+          .vv-popup .leaflet-popup-content {
+            margin: 10px 12px;
+            min-width: 240px;
+            max-width: 320px;
+          }
+        `;
+        document.head.appendChild(popupStyle);
+      }
+
+      if (typeof L === 'undefined') {
+        if (statusNode) {
+          statusNode.textContent = 'Map scripts failed to load.';
+        }
+        console.error('Leaflet.js is not available on window.L. Ensure the script loads before VoteVector logic runs.');
+        return;
+      }
+
+      const API_ENDPOINT = '/api/civic-balance-map/';
+      const quartileStyles = {
+        4: {
+          fillColor: '#14532d',
+          label: 'Highest participation density',
+          strength: 'Highest density',
+          description: '(Many ballots per residential parcel)',
+        },
+        3: {
+          fillColor: '#4ade80',
+          label: 'Above-average participation',
+          strength: 'Above-average',
+          description: '',
+        },
+        2: {
+          fillColor: '#fde047',
+          label: 'Below-average participation',
+          strength: 'Below-average',
+          description: '',
+        },
+        1: {
+          fillColor: '#fb923c',
+          label: 'Lowest participation density',
+          strength: 'Lowest density',
+          description: '(Fewer ballots per residential parcel)',
+        },
+      };
+
+      let map;
+      let neighborhoodLayer;
+      let lockedLayer = null;
+
+      function setStatus(message) {
+        if (statusNode) {
+          statusNode.textContent = message;
+        }
+      }
+
+      function initMap() {
+        map = L.map(mapContainer, {
+          zoomControl: true,
+          preferCanvas: true,
+          attributionControl: true,
+        });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(map);
+        map.setView([48.5, -122.3], 9);
+      }
+
+      function getStyle(quartile) {
+        const details = quartileStyles[quartile] || { fillColor: '#94a3b8' };
+        return {
+          color: '#ffffff',
+          weight: 1,
+          fillOpacity: 0.75,
+          fillColor: details.fillColor,
+          opacity: 1,
+        };
+      }
+
+      function buildLegend() {
+        if (!legendContainer) {
+          return;
+        }
+        const entries = [4, 3, 2, 1].map(function (q) {
+          const entry = quartileStyles[q];
+          return (
+            '<div class="flex items-center gap-3">' +
+            '<span class="h-4 w-4 rounded-sm border border-white" style="background:' +
+            entry.fillColor +
+            '"></span>' +
+            '<span class="flex-1">' +
+            '<span class="font-semibold">' +
+            entry.label +
+            '</span>' +
+            (entry.description
+              ? '<br><span class="text-xs text-slate-300">' + entry.description + '</span>'
+              : '') +
+            '</span>' +
+            '</div>'
+          );
+        });
+        legendContainer.innerHTML = entries.join('');
+      }
+
+      function populateYearOptions(years, activeYear) {
+        if (!yearSelect || !Array.isArray(years)) {
+          return;
+        }
+        const previousValue = yearSelect.value;
+        yearSelect.innerHTML = '';
+        years.forEach(function (year) {
+          const option = document.createElement('option');
+          option.value = String(year);
+          option.textContent = 'Election Year ' + year;
+          yearSelect.appendChild(option);
+        });
+        yearSelect.disabled = years.length === 0;
+        const desired = activeYear || previousValue;
+        if (desired) {
+          yearSelect.value = String(desired);
+        }
+      }
+
+      function formatNumber(value) {
+        if (value === null || value === undefined || Number.isNaN(value)) {
+          return '—';
+        }
+        return Number(value).toLocaleString();
+      }
+
+      function formatNpi(value) {
+        if (value === null || value === undefined || Number.isNaN(value)) {
+          return '—';
+        }
+        return Number(value).toFixed(2);
+      }
+
+      function formatPercent(value, decimals = 1) {
+        if (value === null || value === undefined || Number.isNaN(value)) {
+          return '—';
+        }
+        return (Number(value) * 100).toFixed(decimals) + '%';
+      }
+
+      function isFiniteNumber(value) {
+        return typeof value === 'number' && Number.isFinite(value);
+      }
+
+      function buildCoverageBlock(value, variant) {
+        const textClass = variant === 'popup' ? 'text-sm text-slate-700' : 'text-xs text-slate-200';
+        const hintClass = variant === 'popup' ? 'text-[11px] text-slate-500' : 'text-[10px] text-slate-300';
+        return (
+          '<div class="' +
+          textClass +
+          '"><span class="font-semibold">Neighborhood assignment coverage:</span> ' +
+          formatPercent(value, 1) +
+          '<br><span class="' +
+          hintClass +
+          '">(Assigned ÷ precinct ballots)</span></div>'
+        );
+      }
+
+      function buildAmbiguityBlock(value, variant) {
+        const textClass = variant === 'popup' ? 'text-sm text-slate-700' : 'text-xs text-slate-200';
+        const hintClass = variant === 'popup' ? 'text-[11px] text-slate-500' : 'text-[10px] text-slate-300';
+        const safeValue = isFiniteNumber(value) ? value : 0;
+        const hint =
+          variant === 'popup'
+            ? '<br><span class="' + hintClass + '">Flagged duplicates are omitted from NPI.</span>'
+            : '';
+        return (
+          '<div class="' +
+          textClass +
+          '"><span class="font-semibold">Excluded (ambiguous matches):</span> ' +
+          formatNumber(safeValue) +
+          hint +
+          '</div>'
+        );
+      }
+
+      function buildPrecinctContext(properties, variant) {
+        const headerClass =
+          variant === 'popup'
+            ? 'text-xs font-semibold uppercase tracking-wide text-slate-500 pt-3 mt-3 border-t border-slate-200'
+            : 'text-[11px] font-semibold uppercase tracking-wide text-slate-300 pt-2 mt-2 border-t border-white/20';
+        const textClass = variant === 'popup' ? 'text-sm text-slate-700' : 'text-xs text-slate-200';
+        const hintClass = variant === 'popup' ? 'text-[11px] text-slate-500' : 'text-[10px] text-slate-300';
+        const poCountsText =
+          isFiniteNumber(properties.precinct_po_box_ballots) && isFiniteNumber(properties.precinct_ballots_cast)
+            ? ' <span class="' +
+              hintClass +
+              '">(n=' +
+              formatNumber(properties.precinct_po_box_ballots) +
+              ' / ' +
+              formatNumber(properties.precinct_ballots_cast) +
+              ')</span>'
+            : '';
+        return (
+          '<div class="' +
+          headerClass +
+          '">Precinct context</div>' +
+          '<div class="' +
+          textClass +
+          '"><span class="font-semibold">Precinct participation (PPI):</span> ' +
+          formatNpi(properties.precinct_ppi) +
+          '<br><span class="' +
+          hintClass +
+          '">(Precinct ballots ÷ residential parcels)</span></div>' +
+          '<div class="' +
+          textClass +
+          '"><span class="font-semibold">Precinct PO Box rate:</span> ' +
+          formatPercent(properties.precinct_po_box_pct, 1) +
+          poCountsText +
+          '</div>'
+        );
+      }
+
+      const EXPLANATION =
+        'Neighborhood NPI uses property (situs) parcels. Precinct participation (PPI) counts precinct ballots ÷ residential parcels and includes PO Box voters. Assignment coverage plus the ambiguous line highlight ballots we could not map (PO boxes or other non-locatable records).';
+
+      function attachFeatureInteractions(feature, layer) {
+        if (!feature || !layer) {
+          return;
+        }
+        const properties = feature.properties || {};
+        const quartileConfig = quartileStyles[properties.quartile] || {};
+        const densityLabel = quartileConfig.label || 'Unclassified';
+        const coverageTooltip = buildCoverageBlock(properties.assignment_coverage_precinct, 'tooltip');
+        const ambiguousTooltip = buildAmbiguityBlock(properties.ambiguous_ballots, 'tooltip');
+        const precinctTooltip = buildPrecinctContext(properties, 'tooltip');
+
+        if (supportsHover) {
+          const tooltipContent =
+            '<div class="space-y-1">' +
+            '<div class="text-sm font-semibold">' +
+            (properties.neighborhood_name || properties.neighborhood_code || 'Neighborhood') +
+            '</div>' +
+            '<div class="text-xs text-slate-200"><span class="font-semibold">Code:</span> ' +
+            (properties.neighborhood_code || '—') +
+            '</div>' +
+            '<div class="text-xs text-slate-200"><span class="font-semibold">Classification:</span> ' +
+            densityLabel +
+            '</div>' +
+            '<div class="text-xs text-slate-200"><span class="font-semibold">Assigned ballots:</span> ' +
+            formatNumber(properties.ballots_cast) +
+            '</div>' +
+            '<div class="text-xs text-slate-200"><span class="font-semibold">Residential parcels:</span> ' +
+            formatNumber(properties.residential_parcels) +
+            '</div>' +
+            '<div class="text-xs text-slate-200"><span class="font-semibold">NPI:</span> ' +
+            formatNpi(properties.npi) +
+            '<br><span class="text-[10px] text-slate-300">(Assigned ÷ residential parcels)</span></div>' +
+            coverageTooltip +
+            ambiguousTooltip +
+            precinctTooltip +
+            '<div class="text-[10px] text-slate-400 pt-1">' +
+            EXPLANATION +
+            '</div>' +
+            '</div>';
+          layer.bindTooltip(tooltipContent, {
+            sticky: true,
+            direction: 'auto',
+            offset: [0, -10],
+            opacity: 1,
+            className: 'voice-tooltip'
+          });
+        }
+
+        layer.on({
+          mouseover: function (event) {
+            const target = event.target;
+            if (lockedLayer && target === lockedLayer) {
+              return;
+            }
+            target.setStyle({ weight: 2, color: '#0f172a', fillOpacity: 0.85 });
+            target.bringToFront();
+          },
+          mouseout: function (event) {
+            const target = event.target;
+            if (lockedLayer && target === lockedLayer) {
+              return;
+            }
+            neighborhoodLayer.resetStyle(target);
+          },
+          click: function (event) {
+            if (lockedLayer) {
+              neighborhoodLayer.resetStyle(lockedLayer);
+            }
+            lockedLayer = event.target;
+            lockedLayer.setStyle({ weight: 3, color: '#0f172a', fillOpacity: 0.9 });
+            if (supportsHover && lockedLayer.closeTooltip) {
+              lockedLayer.closeTooltip();
+            }
+            const popupHtml = [
+              '<div class="text-base font-semibold mb-1">' +
+                (properties.neighborhood_name || properties.neighborhood_code || 'Neighborhood') +
+                '</div>',
+              '<div class="text-sm text-slate-600 mb-2">Election Year ' + (properties.election_year || '—') + '</div>',
+              '<div class="text-sm"><span class="font-semibold">Classification:</span> ' + densityLabel + '</div>',
+              '<div class="text-sm"><span class="font-semibold">Assigned ballots:</span> ' +
+                formatNumber(properties.ballots_cast) +
+                '</div>',
+              '<div class="text-sm"><span class="font-semibold">Residential parcels:</span> ' +
+                formatNumber(properties.residential_parcels) +
+                '</div>',
+              '<div class="text-sm"><span class="font-semibold">NPI:</span> ' +
+                formatNpi(properties.npi) +
+                '<br><span class="text-[11px] text-slate-500">(Assigned ÷ residential parcels)</span></div>',
+              buildCoverageBlock(properties.assignment_coverage_precinct, 'popup'),
+              buildAmbiguityBlock(properties.ambiguous_ballots, 'popup'),
+              '<div class="text-sm"><span class="font-semibold">Primary precinct:</span> ' +
+                (properties.primary_precinct_code || '—') +
+                '</div>',
+              '<div class="text-sm"><span class="font-semibold">Precinct ballots:</span> ' +
+                formatNumber(properties.precinct_ballots_cast) +
+                '</div>',
+              '<div class="text-sm"><span class="font-semibold">Precinct residential parcels:</span> ' +
+                formatNumber(properties.precinct_residential_parcels) +
+                '</div>',
+              buildPrecinctContext(properties, 'popup'),
+              '<div class="text-[10px] text-slate-500 mt-2">' + EXPLANATION + '</div>',
+            ].join('');
+            lockedLayer
+              .bindPopup(popupHtml, {
+                closeButton: true,
+                maxWidth: 360,
+                className: 'vv-popup',
+                autoPanPadding: [30, 30],
+              })
+              .openPopup();
+          },
+        });
+      }
+
+      function drawNeighborhoods(collection) {
+        if (!collection || !Array.isArray(collection.features)) {
+          setStatus('No neighborhood geometries available.');
+          return;
+        }
+
+        if (neighborhoodLayer) {
+          neighborhoodLayer.remove();
+        }
+        lockedLayer = null;
+
+        neighborhoodLayer = L.geoJSON(collection.features, {
+          style: function (feature) {
+            const quartile =
+              feature && feature.properties ? feature.properties.quartile : undefined;
+            return getStyle(quartile);
+          },
+          onEachFeature: attachFeatureInteractions,
+        }).addTo(map);
+
+        const bounds = neighborhoodLayer.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [24, 24] });
+        }
+      }
+
+      async function fetchYearData(year) {
+        try {
+          setStatus('Loading neighborhoods…');
+          const url = year ? API_ENDPOINT + '?year=' + year : API_ENDPOINT;
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error('Unable to load neighborhood participation data.');
+          }
+          const payload = await response.json();
+          populateYearOptions(payload.available_years || [], payload.year);
+          drawNeighborhoods(payload);
+          buildLegend();
+          setStatus(payload.year ? 'Showing election year ' + payload.year : 'No election year selected.');
+        } catch (error) {
+          console.error(error);
+          setStatus('There was a problem loading neighborhood participation data.');
+        }
+      }
+
+      if (yearSelect) {
+        yearSelect.addEventListener('change', function (event) {
+          const value = event.target.value;
+          if (value) {
+            fetchYearData(value);
+          }
+        });
+      }
+
+      initMap();
+      buildLegend();
+      fetchYearData();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initVoteVectorMap);
+    } else {
+      initVoteVectorMap();
+    }
+  })();
+</script>
+<script>
+  function animateCounter(element, target, duration = 1600) {
+    const start = 0;
+    const startTime = performance.now();
+    const animate = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+      const value = start + (target - start) * eased;
+      if (value >= 1000) {
+        element.textContent = Math.floor(value).toLocaleString();
+      } else {
+        element.textContent = (Math.round(value * 100) / 100).toString();
+      }
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-animate-number]').forEach((element) => {
+      const targetAttr = element.getAttribute('data-target');
+      const value = Number(targetAttr);
+      if (!Number.isFinite(value)) {
+        return;
+      }
+      animateCounter(element, value);
+    });
+  });
+</script>
+{% endblock %}

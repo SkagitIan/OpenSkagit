@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 import logging
 import functools
 import operator
 import re
+import time
 from datetime import date, datetime
 from decimal import Decimal
 from functools import lru_cache
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+import requests
 from django.conf import settings
 from django.db import connection
 from django.db.models import Q
@@ -19,10 +22,31 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-logger = logging.getLogger(__name__)
 from openskagit import adjustment_engine, appeals, cma
-from openskagit.models import Assessor
+from openskagit.tax import (
+    TAX_AI_FAILURE_RETRY_SECONDS,
+    _coerce_history_rows,
+    _extract_history_tax,
+    _extract_history_value,
+    _extract_history_year,
+    _tax_value_for_year,
+    county_etr_insights,
+    enqueue_parcel_tax_ai_summary,
+    get_cached_parcel_tax_ai_summary,
+)
+from openskagit.models import (
+    AgencyFinancialSnapshot,
+    Assessor,
+    MasterParcel,
+    ParcelGeometry,
+    ParcelHistory,
+    TaxingDistrictLevy,
+)
 from openskagit.neighborhood import get_neighborhood_snapshot
+from gastronet.flavor_signals import fetch_flavor_signal_ai_messages
+
+
+logger = logging.getLogger(__name__)
 
 
 def _dictfetchall(cursor) -> List[Dict[str, Any]]:
@@ -74,6 +98,59 @@ def _parse_iso_datetime(value: Optional[str], field_name: str) -> Optional[datet
         raise ValidationError({field_name: "Must be an ISO 8601 date or datetime."})
 
 
+SAO_GISDATA_BASE = "https://portal.sao.wa.gov/gisdata/api/v2"
+SAO_BOUNDARY_YEAR_FALLBACK = 2017
+SAO_BOUNDARY_YEAR_TTL_SECONDS = 60 * 60 * 12
+_SAO_BOUNDARY_YEAR_CACHE: Dict[str, Any] = {"year": None, "fetched_at": None}
+
+
+def _get_latest_sao_property_tax_year() -> int:
+    now = time.time()
+    cached_year = _SAO_BOUNDARY_YEAR_CACHE.get("year")
+    fetched_at = _SAO_BOUNDARY_YEAR_CACHE.get("fetched_at")
+    if cached_year and fetched_at and (now - fetched_at) < SAO_BOUNDARY_YEAR_TTL_SECONDS:
+        return cached_year
+
+    url = f"{SAO_GISDATA_BASE}/PropertyTaxBoundaries"
+    try:
+        resp = requests.get(
+            url,
+            params={"$select": "year", "$orderby": "year desc", "$top": 5},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        years = [row.get("year") for row in data.get("value", []) if row.get("year")]
+        if years:
+            year = max(years)
+            _SAO_BOUNDARY_YEAR_CACHE.update({"year": year, "fetched_at": now})
+            return year
+    except Exception:  # pragma: no cover - defensive network fallback
+        logger.warning("Failed to fetch SAO property tax boundary year; using fallback.", exc_info=True)
+
+    _SAO_BOUNDARY_YEAR_CACHE.update({"year": SAO_BOUNDARY_YEAR_FALLBACK, "fetched_at": now})
+    return SAO_BOUNDARY_YEAR_FALLBACK
+
+
+def _fetch_sao_mcags_for_point(lat: float, lon: float, year: int) -> List[Dict[str, Any]]:
+    url = (
+        f"{SAO_GISDATA_BASE}/PropertyTaxBoundaries({year})/boundaries/"
+        f"Default.Contains(Latitude={lat},Longitude={lon})"
+    )
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+    payload = resp.json()
+    return payload.get("value", []) or []
+
+
+CIVIC_BALANCE_QUARTILE_LABELS = {
+    4: "Highest participation density",
+    3: "Above-average participation",
+    2: "Below-average participation",
+    1: "Lowest participation density",
+}
+
+
 class NeighborhoodStatsView(APIView):
     permission_classes = [AllowAny]
 
@@ -97,6 +174,23 @@ class NeighborhoodStatsView(APIView):
             raise Http404("Neighborhood metrics not found.")
 
         return Response(_normalize(snapshot), status=status.HTTP_200_OK)
+
+
+class FlavorSignalAiView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        limit_param = request.query_params.get("limit")
+        limit = 3
+        if limit_param:
+            try:
+                limit = int(limit_param)
+            except (TypeError, ValueError):
+                pass
+        limit = max(1, min(limit, 3))
+
+        payload = fetch_flavor_signal_ai_messages(limit=limit)
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
@@ -194,6 +288,1065 @@ def _build_base_search_filters(params) -> Tuple[List[str], List[Any]]:
         args.append(parsed)
 
     return clauses, args
+
+
+class ParcelTaxDistrictAgenciesView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        parcel_id = (request.query_params.get("parcel_id") or request.query_params.get("parcel_number") or "").strip()
+        if not parcel_id:
+            raise ValidationError({"parcel_id": "Required"})
+
+        geometry = (
+            ParcelGeometry.objects.filter(parcel__parcel_number=parcel_id)
+            .only("centroid_geog", "latitude", "longitude", "centroid_2926", "geom_2926", "geom")
+            .first()
+        )
+        if not geometry:
+            raise Http404("Parcel geometry not found.")
+
+        lon = None
+        lat = None
+        if geometry.centroid_geog:
+            lon = geometry.centroid_geog.x
+            lat = geometry.centroid_geog.y
+        elif geometry.latitude is not None and geometry.longitude is not None:
+            lat = geometry.latitude
+            lon = geometry.longitude
+        elif geometry.centroid_2926:
+            centroid = geometry.centroid_2926.clone()
+            centroid.transform(4326)
+            lon = centroid.x
+            lat = centroid.y
+        elif geometry.geom_2926:
+            centroid = geometry.geom_2926.centroid
+            centroid.transform(4326)
+            lon = centroid.x
+            lat = centroid.y
+        elif geometry.geom:
+            centroid = geometry.geom.centroid
+            centroid.transform(4326)
+            lon = centroid.x
+            lat = centroid.y
+
+        if lat is None or lon is None:
+            raise Http404("Parcel centroid not available.")
+
+        boundary_year = _get_latest_sao_property_tax_year()
+        try:
+            boundary_rows = _fetch_sao_mcags_for_point(lat, lon, boundary_year)
+        except Exception as exc:
+            logger.exception("Failed to fetch SAO boundary data.")
+            raise APIException("Unable to load SAO boundary data at this time.") from exc
+
+        mcag_rows = []
+        seen_mcags: Set[str] = set()
+        for entry in boundary_rows:
+            mcag = (entry.get("mcag") or "").strip()
+            county_id = entry.get("countyId")
+            if county_id not in (None, 29):
+                continue
+            if not mcag or mcag in seen_mcags:
+                continue
+            seen_mcags.add(mcag)
+            mcag_rows.append(
+                {
+                    "mcag": mcag,
+                    "gov_type_code": entry.get("govTypeCode"),
+                    "county_id": county_id,
+                }
+            )
+
+        snapshot_map: Dict[str, AgencyFinancialSnapshot] = {}
+        if seen_mcags:
+            snapshots = (
+                AgencyFinancialSnapshot.objects.filter(mcag__in=seen_mcags)
+                .order_by("mcag", "-year")
+                .distinct("mcag")
+                .only("mcag", "name", "year", "website", "gov_type_desc", "is_school", "dataset_source")
+            )
+            snapshot_map = {snapshot.mcag: snapshot for snapshot in snapshots}
+
+        rows = []
+        for row in mcag_rows:
+            mcag = row["mcag"]
+            snapshot = snapshot_map.get(mcag)
+            if snapshot:
+                row.update(
+                    {
+                        "snapshot_name": snapshot.name,
+                        "snapshot_year": snapshot.year,
+                        "snapshot_website": snapshot.website,
+                        "snapshot_type": snapshot.gov_type_desc,
+                        "snapshot_is_school": snapshot.is_school,
+                        "snapshot_dataset": snapshot.dataset_source,
+                    }
+                )
+            else:
+                row.update(
+                    {
+                        "snapshot_name": None,
+                        "snapshot_year": None,
+                        "snapshot_website": None,
+                        "snapshot_type": None,
+                        "snapshot_is_school": None,
+                        "snapshot_dataset": None,
+                    }
+                )
+            rows.append(row)
+
+        rows.sort(key=lambda record: record.get("snapshot_name") or record.get("mcag") or "")
+
+        rows.append(
+            {
+                "mcag": "",
+                "gov_type_code": "countywide",
+                "snapshot_name": "Countywide fund",
+                "snapshot_year": boundary_year,
+                "snapshot_type": "Countywide services",
+                "snapshot_dataset": "Shared county / state levies",
+                "snapshot_website": None,
+            }
+        )
+
+        payload = {
+            "parcel_id": parcel_id,
+            "boundary_year": boundary_year,
+            "rows": rows,
+        }
+        return Response(_normalize(payload), status=status.HTTP_200_OK)
+
+
+class ParcelTaxDistrictMembershipView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        parcel_id = (request.query_params.get("parcel_id") or request.query_params.get("parcel_number") or "").strip()
+        if not parcel_id:
+            raise ValidationError({"parcel_id": "Required"})
+
+        year_param = request.query_params.get("tax_year") or request.query_params.get("year")
+        target_year: Optional[int] = None
+        if year_param:
+            try:
+                target_year = int(year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"tax_year": "Must be an integer year."})
+
+        assessment_year = _resolve_assessment_year(target_year)
+        if assessment_year is None:
+            raise Http404("No tax district data available for this parcel.")
+
+        master = (
+            MasterParcel.objects.filter(parcel_number=parcel_id)
+            .only("taxable_value", "assessed_value", "total_market_value")
+            .first()
+        )
+        if not master:
+            raise Http404("Parcel not found.")
+
+        value_source = None
+        taxable_value = None
+        for source, raw_value in (
+            ("taxable_value", master.taxable_value),
+            ("assessed_value", master.assessed_value),
+            ("total_market_value", master.total_market_value),
+        ):
+            if raw_value is None:
+                continue
+            try:
+                taxable_value = float(raw_value)
+            except (TypeError, ValueError):
+                taxable_value = None
+            if taxable_value is not None:
+                value_source = source
+                break
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT ON (p.district_type, p.district_code)
+                    p.district_type,
+                    p.district_code,
+                    COALESCE(
+                        NULLIF(d.district_name, ''),
+                        NULLIF(tl.district_name, ''),
+                        CASE
+                            WHEN p.district_type IS NOT NULL AND p.district_code IS NOT NULL THEN UPPER(p.district_type) || ' ' || p.district_code
+                            WHEN p.district_type IS NOT NULL THEN UPPER(p.district_type)
+                            WHEN p.district_code IS NOT NULL THEN p.district_code
+                            ELSE 'District'
+                        END
+                    ) AS district_name,
+                    d.county_name AS county_name,
+                    dt.tdcode,
+                    COALESCE(tl.district_name, '') AS levy_name,
+                    tl.levy_rate AS levy_rate,
+                    alm.mcag,
+                    alm.agency_name,
+                    alm.agency_type,
+                    alm.is_primary,
+                    afs.name AS snapshot_name,
+                    afs.year AS snapshot_year,
+                    afs.website AS snapshot_website,
+                    afs.dataset_source AS snapshot_dataset,
+                    afs.gov_type_desc AS snapshot_type
+                FROM parcel_tax_district p
+                LEFT JOIN reference_tax_district d
+                    ON d.district_type = p.district_type
+                   AND d.district_code = p.district_code
+                LEFT JOIN district_tdcode dt
+                    ON dt.district_type = p.district_type
+                   AND dt.district_code = p.district_code
+                   AND dt.assessment_year = %s
+                LEFT JOIN taxing_district_levy tl
+                    ON tl.tdcode = dt.tdcode
+                   AND tl.assessment_year = %s
+                LEFT JOIN agency_levy_map alm
+                    ON alm.tdcode = dt.tdcode
+                   AND alm.is_primary = true
+                LEFT JOIN LATERAL (
+                    SELECT name, year, website, dataset_source, gov_type_desc
+                    FROM openskagit_agencyfinancialsnapshot
+                    WHERE mcag = alm.mcag
+                    ORDER BY year DESC
+                    LIMIT 1
+                ) afs ON true
+                WHERE p.parcel_id = %s
+                ORDER BY p.district_type, p.district_code
+                """,
+                [assessment_year, assessment_year, parcel_id],
+            )
+            rows = _dictfetchall(cursor)
+
+        unique_rows: List[Dict[str, Any]] = []
+        seen: Set[Tuple[str, str]] = set()
+        for row in rows:
+            dtype = (row.get("district_type") or "").strip().lower()
+            dcode = str(row.get("district_code") or "").strip()
+            key = (dtype, dcode)
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_rows.append(row)
+        rows = unique_rows
+
+        if not rows:
+            raise Http404("No parcel tax district coverage could be determined.")
+
+        total_levy_rate = 0.0
+        for row in rows:
+            levy_rate = row.get("levy_rate")
+            if levy_rate is None:
+                continue
+            try:
+                total_levy_rate += float(levy_rate)
+            except (TypeError, ValueError):
+                continue
+
+        normalized_total = 0.0
+        for row in rows:
+            levy_rate = row.get("levy_rate")
+            levy_rate_value = None
+            if levy_rate is not None:
+                try:
+                    levy_rate_value = float(levy_rate)
+                except (TypeError, ValueError):
+                    levy_rate_value = None
+            allocated_tax = None
+            if levy_rate_value is not None and taxable_value is not None:
+                allocated_tax = (taxable_value / 1000.0) * levy_rate_value
+                normalized_total += allocated_tax
+            levy_share = (levy_rate_value / total_levy_rate) if levy_rate_value and total_levy_rate else None
+            row.update(
+                {
+                    "levy_rate": levy_rate_value,
+                    "allocated_tax": allocated_tax,
+                    "levy_share": levy_share,
+                }
+            )
+
+        has_countywide = any((row.get("district_type") or "").strip().lower() == "countywide" for row in rows)
+        if not has_countywide:
+            rows.append(
+                {
+                    "district_type": "countywide",
+                    "district_code": "",
+                    "district_name": "Countywide fund",
+                    "county_name": "Skagit County",
+                    "tdcode": "290000000",
+                    "levy_name": "Countywide services",
+                    "allocated_tax": None,
+                    "levy_share": None,
+                    "levy_rate": None,
+                    "mcag": "",
+                    "agency_name": "Countywide fund",
+                    "agency_type": "fund",
+                    "snapshot_name": "Countywide fund",
+                    "snapshot_year": assessment_year,
+                    "snapshot_type": "Countywide services",
+                    "snapshot_dataset": "Shared county / state levies",
+                    "snapshot_website": None,
+                }
+            )
+
+        payload = {
+            "parcel_id": parcel_id,
+            "tax_year": assessment_year,
+            "assessment_year": assessment_year,
+            "total_allocated": normalized_total if taxable_value is not None else None,
+            "value_used": taxable_value,
+            "value_source": value_source,
+            "source": "parcel_tax_district",
+            "rows": rows,
+        }
+        return Response(_normalize(payload), status=status.HTTP_200_OK)
+
+
+class AgencyExpenseBreakdownView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        mcag = (request.query_params.get("mcag") or "").strip()
+        if not mcag:
+            raise ValidationError({"mcag": "Required"})
+
+        year_param = request.query_params.get("year")
+        target_year: Optional[int] = None
+        if year_param:
+            try:
+                target_year = int(year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"year": "Must be an integer year."})
+
+        qs = AgencyFinancialSnapshot.objects.filter(mcag=mcag)
+        if target_year:
+            qs = qs.filter(year=target_year)
+        snapshot = qs.order_by("-year").first()
+        if not snapshot:
+            raise Http404("Agency financials not found.")
+
+        year_used = snapshot.year
+
+        categories = []
+        for entry in snapshot.expenditures or []:
+            values = entry.get("values") or {}
+            amount = None
+            if target_year is not None:
+                amount = values.get(str(target_year))
+            if amount is None:
+                amount = values.get(str(year_used))
+            if amount is None and values:
+                try:
+                    latest_key = max(values.keys(), key=lambda k: int(k))
+                    amount = values.get(latest_key)
+                except Exception:
+                    amount = None
+            if amount is None:
+                continue
+            label = entry.get("label") or entry.get("code") or "Unlabeled"
+            categories.append(
+                {
+                    "label": label,
+                    "amount": amount,
+                    "code": entry.get("code"),
+                }
+            )
+
+        categories.sort(key=lambda c: c["amount"] or 0, reverse=True)
+        total = sum((c["amount"] or 0) for c in categories)
+
+        payload = {
+            "mcag": mcag,
+            "agency_name": snapshot.name,
+            "year": year_used,
+            "total_expenditures": total,
+            "categories": categories,
+        }
+
+        return Response(_normalize(payload), status=status.HTTP_200_OK)
+
+
+def _build_snapshot_label_map(snapshot: AgencyFinancialSnapshot) -> Dict[str, str]:
+    label_map: Dict[str, str] = {}
+    for key in ("revenues", "expenditures"):
+        payload = (snapshot.raw_payloads or {}).get(key) or {}
+        for entry in payload.get("value", []) or []:
+            basic_id = entry.get("basicAccountId") or entry.get("id")
+            if basic_id is None:
+                continue
+            label = (
+                entry.get("label")
+                or entry.get("accountTitle")
+                or entry.get("accountName")
+                or entry.get("name")
+                or entry.get("description")
+            )
+            if label:
+                label_map[str(basic_id)] = label
+    return label_map
+
+
+class AgencyFinancialBreakdownView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        mcag = (request.query_params.get("mcag") or "").strip()
+        if not mcag:
+            raise ValidationError({"mcag": "Required"})
+
+        year_param = request.query_params.get("year")
+        target_year: Optional[int] = None
+        if year_param:
+            try:
+                target_year = int(year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"year": "Must be an integer year."})
+
+        qs = AgencyFinancialSnapshot.objects.filter(mcag=mcag)
+        if target_year:
+            qs = qs.filter(year=target_year)
+        snapshot = qs.order_by("-year").first()
+        if not snapshot:
+            raise Http404("Agency financials not found.")
+
+        year_used = snapshot.year
+
+        def build_categories(entries: Optional[List[Dict[str, Any]]]):
+            categories = []
+            for entry in entries or []:
+                values = entry.get("values") or {}
+                amount = None
+                if target_year is not None:
+                    amount = values.get(str(target_year))
+                if amount is None:
+                    amount = values.get(str(year_used))
+                if amount is None and values:
+                    try:
+                        latest_key = max(values.keys(), key=lambda k: int(k))
+                        amount = values.get(latest_key)
+                    except Exception:
+                        amount = None
+                if amount is None:
+                    continue
+                label = entry.get("label") or entry.get("code") or "Unlabeled"
+                categories.append(
+                    {
+                        "label": label,
+                        "amount": amount,
+                        "code": entry.get("code"),
+                    }
+                )
+
+            categories.sort(key=lambda c: c["amount"] or 0, reverse=True)
+            total = sum((c["amount"] or 0) for c in categories)
+            return categories, total
+
+        revenues, total_revenues = build_categories(snapshot.revenues)
+        expenditures, total_expenditures = build_categories(snapshot.expenditures)
+
+        label_map = _build_snapshot_label_map(snapshot)
+        for row in revenues + expenditures:
+            if not row.get("label"):
+                label = label_map.get(str(row.get("code")))
+                if label:
+                    row["label"] = label
+
+        payload = {
+            "mcag": mcag,
+            "agency_name": snapshot.name,
+            "year": year_used,
+            "total_revenues": total_revenues,
+            "total_expenditures": total_expenditures,
+            "revenues": revenues,
+            "expenditures": expenditures,
+        }
+
+        return Response(_normalize(payload), status=status.HTTP_200_OK)
+
+
+def _resolve_assessment_year(requested_year: Optional[int]) -> Optional[int]:
+    latest_assessment_year = None
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT MAX(assessment_year) FROM district_tdcode")
+        row = cursor.fetchone()
+        latest_assessment_year = row[0] if row else None
+
+    if latest_assessment_year is None:
+        latest_assessment_year = (
+            TaxingDistrictLevy.objects.order_by("-assessment_year")
+            .values_list("assessment_year", flat=True)
+            .first()
+        )
+
+    if requested_year is None:
+        return latest_assessment_year
+
+    has_assessment_year = False
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT 1 FROM district_tdcode WHERE assessment_year = %s LIMIT 1",
+            [requested_year],
+        )
+        has_assessment_year = cursor.fetchone() is not None
+
+    if latest_assessment_year and (not has_assessment_year or requested_year > latest_assessment_year):
+        return latest_assessment_year
+
+    return requested_year
+
+
+class ParcelTaxLevyEstimateView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        parcel_id = (request.query_params.get("parcel_id") or request.query_params.get("parcel_number") or "").strip()
+        if not parcel_id:
+            raise ValidationError({"parcel_id": "Required"})
+
+        year_param = request.query_params.get("tax_year") or request.query_params.get("year")
+        requested_year: Optional[int] = None
+        if year_param:
+            try:
+                requested_year = int(year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"tax_year": "Must be an integer."})
+
+        assessment_year = _resolve_assessment_year(requested_year)
+        if assessment_year is None:
+            raise Http404("No levy data available.")
+
+        master = (
+            MasterParcel.objects.filter(parcel_number=parcel_id)
+            .only("taxable_value", "assessed_value", "total_market_value")
+            .first()
+        )
+        if not master:
+            raise Http404("Parcel not found.")
+
+        value_source = None
+        taxable_value = None
+        for source, raw_value in (
+            ("taxable_value", master.taxable_value),
+            ("assessed_value", master.assessed_value),
+            ("total_market_value", master.total_market_value),
+        ):
+            if raw_value is None:
+                continue
+            try:
+                taxable_value = float(raw_value)
+            except (TypeError, ValueError):
+                taxable_value = None
+            if taxable_value is not None:
+                value_source = source
+                break
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT ON (p.district_type, p.district_code)
+                    p.district_type,
+                    p.district_code,
+                    COALESCE(
+                        NULLIF(d.district_name, ''),
+                        NULLIF(tl.district_name, ''),
+                        CASE
+                            WHEN p.district_type IS NOT NULL AND p.district_code IS NOT NULL THEN UPPER(p.district_type) || ' ' || p.district_code
+                            WHEN p.district_type IS NOT NULL THEN UPPER(p.district_type)
+                            WHEN p.district_code IS NOT NULL THEN p.district_code
+                            ELSE 'District'
+                        END
+                    ) AS district_name,
+                    dt.tdcode,
+                    tl.levy_rate
+                FROM parcel_tax_district p
+                LEFT JOIN reference_tax_district d
+                    ON d.district_type = p.district_type
+                   AND d.district_code = p.district_code
+                LEFT JOIN district_tdcode dt
+                    ON dt.district_type = p.district_type
+                   AND dt.district_code = p.district_code
+                   AND dt.assessment_year = %s
+                LEFT JOIN taxing_district_levy tl
+                    ON tl.tdcode = dt.tdcode
+                   AND tl.assessment_year = %s
+                WHERE p.parcel_id = %s
+                ORDER BY p.district_type, p.district_code
+                """,
+                [assessment_year, assessment_year, parcel_id],
+            )
+            rows = _dictfetchall(cursor)
+
+        if not rows:
+            raise Http404("No tax district data available for this parcel.")
+
+        total_levy_rate = 0.0
+        for row in rows:
+            levy_rate = row.get("levy_rate")
+            if levy_rate is None:
+                continue
+            try:
+                total_levy_rate += float(levy_rate)
+            except (TypeError, ValueError):
+                continue
+
+        total_estimated = 0.0
+        for row in rows:
+            district_name = row.get("district_name") or "District"
+            levy_rate = row.get("levy_rate")
+            levy_rate_value = None
+            if levy_rate is not None:
+                try:
+                    levy_rate_value = float(levy_rate)
+                except (TypeError, ValueError):
+                    levy_rate_value = None
+            amount = None
+            if levy_rate_value is not None and taxable_value is not None:
+                amount = (taxable_value / 1000.0) * levy_rate_value
+                total_estimated += amount
+            share = (levy_rate_value / total_levy_rate) if levy_rate_value and total_levy_rate else None
+            row.update(
+                {
+                    "tax_district": district_name,
+                    "rate": levy_rate_value,
+                    "amount": amount,
+                    "share": share,
+                    "category": _classify_tax_district(district_name),
+                }
+            )
+
+        rows.sort(key=lambda r: r.get("amount") or 0, reverse=True)
+
+        payload = {
+            "parcel_id": parcel_id,
+            "tax_year": assessment_year,
+            "assessment_year": assessment_year,
+            "total_amount": total_estimated if taxable_value is not None else None,
+            "total_levy_rate": total_levy_rate if total_levy_rate else None,
+            "value_used": taxable_value,
+            "value_source": value_source,
+            "rows": rows,
+            "source": "levy_estimate",
+        }
+
+        return Response(_normalize(payload), status=status.HTTP_200_OK)
+
+
+def _tax_value_for_year(rows: Any, target_year: int) -> Optional[Tuple[float, float]]:
+    rows = _coerce_history_rows(rows)
+    if not rows:
+        return None
+    for row in rows:
+        year = _extract_history_year(row)
+        if year != target_year:
+            continue
+        tax = _extract_history_tax(row)
+        value = _extract_history_value(row)
+        if tax is None or value is None:
+            continue
+        if value <= 0 or tax <= 0:
+            continue
+        return float(tax), float(value)
+    return None
+
+
+class ParcelTaxFairnessView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        parcel_id = (request.query_params.get("parcel_id") or request.query_params.get("parcel_number") or "").strip()
+        if not parcel_id:
+            raise ValidationError({"parcel_id": "Required"})
+
+        tax_year_param = request.query_params.get("tax_year") or request.query_params.get("year")
+        requested_year: Optional[int] = None
+        if tax_year_param:
+            try:
+                requested_year = int(tax_year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"tax_year": "Must be an integer."})
+
+        history = (
+            ParcelHistory.objects.filter(parcel_number=parcel_id)
+            .only("rows")
+            .first()
+        )
+        if not history:
+            raise Http404("Parcel history not available.")
+
+        allowed_years = {2025, 2026}
+        candidate_year = None
+        rows = _coerce_history_rows(history.rows)
+        row_years = {year for row in rows if (year := _extract_history_year(row)) in allowed_years}
+        if requested_year in allowed_years and requested_year in row_years:
+            candidate_year = requested_year
+        elif row_years:
+            candidate_year = max(row_years)
+
+        if candidate_year is None:
+            raise Http404("No 2025/2026 parcel history available.")
+
+        subject_pair = _tax_value_for_year(history.rows, candidate_year)
+        if not subject_pair:
+            raise Http404("Parcel tax/value not available for 2025/2026.")
+        subject_tax, subject_value = subject_pair
+        subject_etr = subject_tax / subject_value if subject_value else None
+        if subject_etr is None:
+            raise Http404("Parcel ETR not available for 2025/2026.")
+
+        master = (
+            MasterParcel.objects.filter(parcel_number=parcel_id)
+            .only("parcel_number", "hood_code", "hood_description")
+            .first()
+        )
+        hood_code = master.hood_code if master else None
+        if not hood_code:
+            raise Http404("Parcel neighborhood not found.")
+        hood_description = master.hood_description or ""
+
+        peer_parcels = MasterParcel.objects.filter(hood_code=hood_code).values_list("parcel_number", flat=True)
+        peer_qs = ParcelHistory.objects.filter(parcel_number__in=peer_parcels).only("parcel_number", "rows")
+        etrs: List[float] = []
+        for record in peer_qs.iterator():
+            pair = _tax_value_for_year(record.rows, candidate_year)
+            if not pair:
+                continue
+            tax_value, assessed_value = pair
+            etr = tax_value / assessed_value if assessed_value else None
+            if etr is None or etr <= 0:
+                continue
+            etrs.append(etr)
+
+        if not etrs:
+            raise Http404("No peer ETR data available for 2025/2026.")
+
+        sorted_etrs = sorted(etrs)
+        count = len(sorted_etrs)
+        mid = count // 2
+        if count % 2:
+            median_etr = sorted_etrs[mid]
+        else:
+            median_etr = (sorted_etrs[mid - 1] + sorted_etrs[mid]) / 2.0
+        mean_etr = sum(sorted_etrs) / count
+        cod = None
+        prd = None
+        if median_etr:
+            cod = (sum(abs(etr - median_etr) for etr in sorted_etrs) / (count * median_etr)) * 100
+            prd = mean_etr / median_etr
+
+        percentile = sum(1 for etr in sorted_etrs if etr <= subject_etr) / count
+
+        payload = {
+            "parcel_id": parcel_id,
+            "tax_year": candidate_year,
+            "hood_code": hood_code,
+            "hood_description": hood_description,
+            "sample_count": count,
+            "subject_etr": subject_etr,
+            "hood_min": sorted_etrs[0],
+            "hood_max": sorted_etrs[-1],
+            "hood_median": median_etr,
+            "hood_mean": mean_etr,
+            "cod": cod,
+            "prd": prd,
+            "neighbor_count": count,
+            "subject_etr_percentile": percentile,
+            "subject_etr_percentile_rank": round(percentile * 100, 1),
+            "source": "parcel_history",
+        }
+
+        return Response(_normalize(payload), status=status.HTTP_200_OK)
+
+
+REFERENCE_INFLATION_RATES = {
+    2018: 0.020,
+    2019: 0.018,
+    2020: 0.014,
+    2021: 0.071,
+    2022: 0.065,
+    2023: 0.032,
+    2024: 0.034,
+    2025: 0.032,
+}
+DEFAULT_INFLATION_RATE = 0.03
+
+
+def _average_inflation_rate(start_year: int, end_year: int) -> float:
+    if end_year <= start_year:
+        return DEFAULT_INFLATION_RATE
+    span = end_year - start_year
+    factors = [
+        1 + REFERENCE_INFLATION_RATES.get(year, DEFAULT_INFLATION_RATE)
+        for year in range(start_year + 1, end_year + 1)
+    ]
+    if not factors:
+        return DEFAULT_INFLATION_RATE
+    total = 1.0
+    for factor in factors:
+        total *= factor
+    return float(total ** (1 / span) - 1)
+
+
+class ParcelTaxStoryView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        parcel_id = (request.query_params.get("parcel_id") or request.query_params.get("parcel_number") or "").strip()
+        if not parcel_id:
+            raise ValidationError({"parcel_id": "Required"})
+
+        master = (
+            MasterParcel.objects.filter(parcel_number=parcel_id)
+            .only("total_market_value")
+            .first()
+        )
+
+        record = ParcelHistory.objects.only("rows").filter(parcel_number=parcel_id).first()
+        rows = _coerce_history_rows(record.rows) if record else None
+        if not rows:
+            raise Http404("Parcel history not available.")
+
+        tax_history: List[Dict[str, Any]] = []
+        for row in rows:
+            year = _extract_history_year(row)
+            tax_value = _extract_history_tax(row)
+            if year is None or tax_value is None:
+                continue
+            tax_history.append(
+                {
+                    "year": year,
+                    "tax": tax_value,
+                    "value": _extract_history_value(row),
+                }
+            )
+        tax_history.sort(key=lambda entry: entry["year"])
+
+        cumulative_taxes = sum(entry["tax"] for entry in tax_history)
+        tax_trend_cagr = None
+        inflation_avg = None
+        tax_vs_inflation = None
+        history_years = None
+        if len(tax_history) >= 2:
+            first = tax_history[0]
+            last = tax_history[-1]
+            span = last["year"] - first["year"]
+            history_years = {"start": first["year"], "end": last["year"], "span": span}
+            if span > 0 and first["tax"] > 0 and last["tax"] > 0:
+                tax_trend_cagr = (last["tax"] / first["tax"]) ** (1 / span) - 1
+                inflation_avg = _average_inflation_rate(first["year"], last["year"])
+                tax_vs_inflation = tax_trend_cagr - inflation_avg
+
+        total_market_value = None
+        if tax_history:
+            total_market_value = tax_history[-1].get("value")
+        if total_market_value is None and master and master.total_market_value:
+            try:
+                total_market_value = float(master.total_market_value)
+            except (TypeError, ValueError):
+                total_market_value = None
+
+        value_history_points = [
+            {
+                "year": entry["year"],
+                "value": entry["value"],
+            }
+            for entry in tax_history
+            if entry.get("year") is not None and entry.get("value") is not None
+        ]
+        value_history_points.sort(key=lambda item: item["year"])
+        value_history_5y = value_history_points[-5:]
+
+        annual_tax_points = []
+        cumulative_total = 0.0
+        for entry in tax_history:
+            year = entry.get("year")
+            tax_value = entry.get("tax")
+            if year is None or tax_value is None:
+                continue
+            cumulative_total += tax_value
+            annual_tax_points.append(
+                {
+                    "year": year,
+                    "annual_tax": tax_value,
+                    "cumulative": cumulative_total,
+                }
+            )
+
+        payload = {
+            "parcel_id": parcel_id,
+            "total_market_value": total_market_value,
+            "cumulative_taxes_paid": cumulative_taxes,
+            "tax_trend_cagr": tax_trend_cagr,
+            "inflation_avg": inflation_avg,
+            "tax_vs_inflation": tax_vs_inflation,
+            "history_years": history_years,
+            "value_history_5y": value_history_5y,
+            "annual_tax_points": annual_tax_points,
+            "source": "parcel_history_rows",
+        }
+
+        return Response(_normalize(payload), status=status.HTTP_200_OK)
+
+
+class ParcelTaxAiSummaryView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        parcel_id = (request.query_params.get("parcel_id") or request.query_params.get("parcel_number") or "").strip()
+        if not parcel_id:
+            raise ValidationError({"parcel_id": "Required"})
+
+        payload = get_cached_parcel_tax_ai_summary(parcel_id)
+        if payload:
+            if payload.get("status") == "failed":
+                failed_at = payload.get("failed_at_ts")
+                if failed_at and (time.time() - float(failed_at)) > TAX_AI_FAILURE_RETRY_SECONDS:
+                    enqueue_parcel_tax_ai_summary(parcel_id)
+                    return Response({"parcel_id": parcel_id, "status": "pending"}, status=status.HTTP_202_ACCEPTED)
+            return Response(payload, status=status.HTTP_200_OK)
+
+        history = (
+            ParcelHistory.objects.filter(parcel_number=parcel_id)
+            .only("rows")
+            .first()
+        )
+        rows = _coerce_history_rows(history.rows) if history else None
+        if not rows:
+            raise Http404("Parcel history not available.")
+
+        enqueue_parcel_tax_ai_summary(parcel_id)
+        return Response({"parcel_id": parcel_id, "status": "pending"}, status=status.HTTP_202_ACCEPTED)
+
+
+class CountyEtrView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        year_param = request.query_params.get("year")
+        if not year_param:
+            raise ValidationError({"year": "Required"})
+        try:
+            year = int(year_param)
+        except (TypeError, ValueError):
+            raise ValidationError({"year": "Must be an integer."})
+
+        insights = county_etr_insights(year)
+        if not insights:
+            raise Http404("County ETR data unavailable.")
+
+        return Response(_normalize(insights), status=status.HTTP_200_OK)
+
+
+def _classify_tax_district(name: str) -> str:
+    upper = name.upper()
+    if "STATE" in upper or "COUNTY" in upper or "CONSERVATION" in upper or "ROAD" in upper:
+        return "fund"
+    if "SCHOOL" in upper:
+        return "school"
+    if "HOSPITAL" in upper:
+        return "hospital"
+    if "PORT" in upper:
+        return "port"
+    if "FIRE" in upper:
+        return "fire"
+    if "EMS" in upper or "MEDIC" in upper:
+        return "ems"
+    if "PARK" in upper or "RECREATION" in upper:
+        return "park"
+    if "CEMETERY" in upper:
+        return "cemetery"
+    if "CITY" in upper or "TOWN" in upper:
+        return "city"
+    return "district"
+
+
+class NeighborhoodTaxMapView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        hood_code = (request.query_params.get("hood_code") or "").strip()
+        with connection.cursor() as cursor:
+            if hood_code:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT tax_year
+                    FROM hood_tax_totals
+                    WHERE hood_code = %s
+                    ORDER BY tax_year DESC
+                    """,
+                    [hood_code],
+                )
+            else:
+                cursor.execute("SELECT DISTINCT tax_year FROM hood_tax_totals ORDER BY tax_year DESC")
+            available_years = [row[0] for row in cursor.fetchall()]
+
+        if not available_years:
+            raise Http404("No neighborhood tax totals available.")
+
+        year_param = request.query_params.get("year")
+        if year_param in (None, ""):
+            year = available_years[0]
+        else:
+            try:
+                year = int(year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"year": "Must be an integer year."})
+
+        clauses = ["h.tax_year = %s"]
+        params: List[Any] = [year]
+        if hood_code:
+            clauses.append("h.hood_code = %s")
+            params.append(hood_code)
+        where_clause = "WHERE " + " AND ".join(clauses)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT
+                    h.hood_code,
+                    h.tax_year,
+                    h.total_tax,
+                    h.total_market_value,
+                    h.total_taxable_value,
+                    h.parcel_count,
+                    COALESCE(ng.name, h.hood_code) AS neighborhood_name,
+                    ST_AsGeoJSON(ng.geom_4326, 6) AS geom_geojson
+                FROM hood_tax_totals h
+                LEFT JOIN public.openskagit_neighborhoodgeom ng
+                  ON ng.code = h.hood_code
+                {where_clause}
+                ORDER BY h.total_tax DESC NULLS LAST
+                """,
+                params,
+            )
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+        features: List[Dict[str, Any]] = []
+        for row in rows:
+            geometry = row.pop("geom_geojson")
+            try:
+                geometry_payload = json.loads(geometry) if geometry else None
+            except json.JSONDecodeError:
+                geometry_payload = None
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": geometry_payload,
+                    "properties": row,
+                }
+            )
+
+        return Response(
+            {
+                "type": "FeatureCollection",
+                "year": year,
+                "available_years": available_years,
+                "features": features,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 def _coalesce_list(value: Optional[Iterable[Any]]) -> List[Any]:
@@ -1478,3 +2631,105 @@ class CoAppraiserAdjustmentView(APIView):
             raise ValidationError(str(exc))
 
         return Response(payload, status=status.HTTP_200_OK)
+
+
+class CivicBalanceMapView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request) -> Response:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT DISTINCT election_year FROM public.fact_neighborhood_participation ORDER BY election_year DESC"
+            )
+            available_years = [row[0] for row in cursor.fetchall()]
+
+        if not available_years:
+            return Response(
+                {
+                    "type": "FeatureCollection",
+                    "features": [],
+                    "available_years": [],
+                    "year": None,
+                    "quartile_labels": CIVIC_BALANCE_QUARTILE_LABELS,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        year_param = request.query_params.get("year")
+        if year_param in (None, ""):
+            year = available_years[0]
+        else:
+            try:
+                year = int(year_param)
+            except (TypeError, ValueError):
+                raise ValidationError({"year": "Must be an integer tax year."})
+
+            if year not in available_years:
+                raise ValidationError({"year": f"Year must be one of {available_years}."})
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    f.neighborhood_code,
+                    COALESCE(ng.name, f.neighborhood_code) AS neighborhood_name,
+                    f.election_year,
+                    f.ballots_cast,
+                    f.residential_parcels,
+                    f.npi,
+                    f.primary_precinct_code,
+                    f.precinct_ballots_cast,
+                    f.precinct_residential_parcels,
+                    f.precinct_ppi,
+                    f.precinct_po_box_pct,
+                    f.precinct_po_box_ballots,
+                    f.assignment_coverage_precinct,
+                    f.ambiguous_ballots,
+                    c.quartile,
+                    c.quartile_label,
+                    ST_AsGeoJSON(ST_Transform(f.geom_2926, 4326), 6) AS geom_geojson
+                FROM public.fact_neighborhood_participation f
+                LEFT JOIN public.neighborhood_participation_classification c
+                  ON c.neighborhood_code = f.neighborhood_code
+                 AND c.election_year = f.election_year
+                LEFT JOIN public.openskagit_neighborhoodgeom ng
+                  ON ng.code = f.neighborhood_code
+                WHERE f.election_year = %s
+                  AND ST_Intersects(f.geom_2926, (SELECT geom_2926 FROM public.skagit_county_boundary LIMIT 1))
+                ORDER BY c.quartile DESC NULLS LAST, f.npi DESC NULLS LAST, f.neighborhood_code
+                """,
+                [year],
+            )
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+        features: List[Dict[str, Any]] = []
+        for row in rows:
+            geometry = row.pop("geom_geojson")
+            try:
+                geometry_payload = json.loads(geometry) if geometry else None
+            except json.JSONDecodeError:
+                geometry_payload = None
+
+            quartile = row.get("quartile")
+            if row.get("quartile_label") is None:
+                row["quartile_label"] = CIVIC_BALANCE_QUARTILE_LABELS.get(quartile, "Unclassified")
+
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": geometry_payload,
+                    "properties": row,
+                }
+            )
+
+        return Response(
+            {
+                "type": "FeatureCollection",
+                "year": year,
+                "available_years": available_years,
+                "features": features,
+                "quartile_labels": CIVIC_BALANCE_QUARTILE_LABELS,
+            },
+            status=status.HTTP_200_OK,
+        )

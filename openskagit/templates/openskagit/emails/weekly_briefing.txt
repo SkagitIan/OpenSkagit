@@ -1,0 +1,14 @@
+{{ template.subject }}
+
+{{ template.hero_title }}
+{{ template.hero_lede }}
+
+Highlights:
+{% for section in sections %}
+- {{ section.title }} — {{ section.summary }} {% if section.highlight %}({{ section.highlight }}){% endif %}
+{% endfor %}
+
+Read more: {{ template.cta_url }}
+
+{{ template.footer_note }}
+Unsubscribe: {{ unsubscribe_url }}

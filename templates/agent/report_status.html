@@ -1,0 +1,127 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Report status</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="{% static "openskagit/portal.css" %}" rel="stylesheet" />
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <main class="max-w-3xl mx-auto py-12 px-4 space-y-6">
+      <header>
+        <h1 class="text-3xl font-semibold">{{ job.place_name }}</h1>
+        <p class="text-sm text-gray-500">{{ job.address }}</p>
+      </header>
+
+      <section class="bg-white p-6 rounded shadow space-y-3">
+        <div class="flex justify-between">
+          <span class="font-medium">Current status</span>
+          <span id="status-text" class="text-blue-600">{{ job.status }}</span>
+        </div>
+        <div class="flex justify-between text-sm text-gray-500">
+          <span>Progress</span>
+          <span id="progress-value">{{ job.progress_percent }}%</span>
+        </div>
+        <div>
+          <button
+            id="start-payment"
+            class="w-full bg-green-600 text-white py-2 rounded font-semibold hover:bg-green-700 transition"
+          >
+            Record payment & start report
+          </button>
+        </div>
+        <p id="payment-feedback" class="text-xs text-gray-600"></p>
+        <div id="report-link" class="text-sm"></div>
+      </section>
+
+      <section class="bg-white p-6 rounded shadow">
+        <h2 class="text-lg font-semibold">Timeline</h2>
+        <p id="status-message" class="text-sm text-gray-500 mt-2">
+          Querying status every 4 seconds.
+        </p>
+      </section>
+    </main>
+
+    <script>
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+      }
+
+      const jobId = "{{ job.id }}";
+      const statusEndpoint = "{% url 'agent-report-status' job.id %}";
+      const checkoutEndpoint = "{% url 'agent-report-checkout' %}";
+
+      const statusText = document.getElementById('status-text');
+      const progressValue = document.getElementById('progress-value');
+      const message = document.getElementById('status-message');
+      const linkNode = document.getElementById('report-link');
+      const feedback = document.getElementById('payment-feedback');
+
+      async function refreshStatus() {
+        try {
+          const response = await fetch(statusEndpoint);
+          const data = await response.json();
+          statusText.textContent = data.status;
+          progressValue.textContent = `${data.progress_percent}%`;
+          message.textContent = data.current_step
+            ? `Last step: ${data.current_step}`
+            : 'Awaiting pipeline progress...';
+
+          if (data.report_url) {
+            linkNode.innerHTML = `<a href="${data.report_url}" class="text-blue-600 underline">View final report</a>`;
+          }
+
+          if (data.error_message) {
+            feedback.textContent = data.error_message;
+            feedback.classList.add('text-red-600');
+          }
+        } catch (error) {
+          console.error('Status fetch failed', error);
+        }
+      }
+
+      async function startCheckout() {
+        feedback.textContent = 'Preparing payment...';
+        feedback.className = 'text-xs text-gray-600';
+        const payload = { job_id: jobId };
+
+        let response;
+        try {
+          response = await fetch(checkoutEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken') || '',
+            },
+            body: JSON.stringify(payload),
+          });
+        } catch (error) {
+          feedback.textContent = 'Unable to reach the payment service.';
+          feedback.className = 'text-red-600 text-xs';
+          return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          feedback.textContent = data.error || 'Payment service unavailable.';
+          feedback.className = 'text-red-600 text-xs';
+          return;
+        }
+
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url;
+        } else {
+          feedback.textContent = 'Payment session could not be created.';
+          feedback.className = 'text-red-600 text-xs';
+        }
+      }
+
+      document.getElementById('start-payment').addEventListener('click', startCheckout);
+      refreshStatus();
+      setInterval(refreshStatus, 4000);
+    </script>
+  </body>
+</html>

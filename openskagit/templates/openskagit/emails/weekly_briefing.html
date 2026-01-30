@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ template.subject }}</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+      background: #f5f5f5;
+      color: #0f172a;
+    }
+
+    .wrapper {
+      width: 100%;
+      background: linear-gradient(180deg, #ffffff 0%, #f6fff8 100%);
+      padding: 40px 16px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 25px 50px rgba(15, 23, 42, 0.12);
+      border: 1px solid rgba(107, 144, 128, 0.2);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 48px 40px 32px;
+      text-align: left;
+    }
+
+    .hero-title {
+      color: #0f172a;
+      font-size: 32px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .hero-lede {
+      margin-top: 12px;
+      color: #475569;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .hero-stat {
+      margin-top: 28px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+    }
+
+    .hero-stat-value {
+      font-size: 42px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1;
+    }
+
+    .hero-stat-label {
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #6b9080;
+    }
+
+    .cta-button {
+      display: inline-flex;
+      padding: 16px 28px;
+      border-radius: 999px;
+      font-weight: 600;
+      color: #fff;
+      background-image: linear-gradient(120deg, #6b9080, #7fa693);
+      text-decoration: none;
+      margin-top: 24px;
+      letter-spacing: 0.03em;
+    }
+
+    .sections {
+      padding: 0 40px 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .section-card {
+      background: #f6fff8;
+      border: 1px solid rgba(107, 144, 128, 0.15);
+      border-radius: 18px;
+      padding: 20px;
+      min-height: 200px;
+    }
+
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      background: rgba(127, 166, 147, 0.15);
+      color: #6b9080;
+      font-weight: 600;
+    }
+
+    .section-title {
+      margin-top: 14px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .section-summary {
+      margin-top: 10px;
+      color: #475569;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .section-highlight {
+      margin-top: 16px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    .footer {
+      padding: 30px 40px;
+      background: #eef4f3;
+      border-top: 1px solid rgba(107, 144, 128, 0.25);
+      font-size: 13px;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    .unsubscribe {
+      margin-top: 8px;
+      font-weight: 600;
+      color: #8fa3d1;
+      text-decoration: none;
+    }
+
+    .preheader {
+      display: none;
+      font-size: 1px;
+      color: #f5f5f5;
+      line-height: 1px;
+      max-height: 0;
+      max-width: 0;
+      opacity: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <span class="preheader">{{ template.preheader }}</span>
+  <div class="wrapper">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%">
+      <tr>
+        <td align="center">
+          <div class="card">
+            <div class="hero">
+              <p class="hero-title">{{ template.hero_title }}</p>
+              <p class="hero-lede">{{ template.hero_lede }}</p>
+              {% if template.hero_stat_value %}
+                <div class="hero-stat">
+                  <span class="hero-stat-label">{{ template.hero_stat_label }}</span>
+                  <span class="hero-stat-value">{{ template.hero_stat_value }}</span>
+                </div>
+              {% endif %}
+              <a class="cta-button" href="{{ template.cta_url }}">{{ template.cta_label }}</a>
+            </div>
+            <div class="sections">
+              {% for section in sections %}
+                <div class="section-card">
+                  {% if section.badge %}
+                    <div class="section-badge">{{ section.badge }}</div>
+                  {% endif %}
+                  <div class="section-title">{{ section.title }}</div>
+                  <p class="section-summary">{{ section.summary }}</p>
+                  {% if section.highlight %}
+                    <div class="section-highlight">{{ section.highlight }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+            <div class="footer">
+              <p>{{ template.footer_note }}</p>
+              <a class="unsubscribe" href="{{ unsubscribe_url }}">Unsubscribe or update preferences</a>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

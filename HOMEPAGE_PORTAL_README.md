@@ -43,7 +43,7 @@ These colors create a civic-minded, approachable feel that avoids corporate blue
 
 ### Tool Cards Grid
 1. **Property Tax Appeal Helper** (Active)
-   - Links to `/appeal/`
+   - Links to `/parcel/`
    - Green "Available Now" badge
    - Brief description of functionality
 

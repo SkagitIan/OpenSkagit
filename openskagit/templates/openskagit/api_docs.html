@@ -4,6 +4,19 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Reference every OpenSkagit endpoint, payload, and schema so you can wire local civic data into your own tools.">
+    <meta property="og:title" content="API Documentation · OpenSkagit">
+    <meta name="twitter:title" content="API Documentation · OpenSkagit">
+    <meta property="og:description" content="Reference every OpenSkagit endpoint, payload, and schema so you can wire local civic data into your own tools.">
+    <meta name="twitter:description" content="Reference every OpenSkagit endpoint, payload, and schema so you can wire local civic data into your own tools.">
+    <meta property="og:type" content="website">
+    {% if canonical_url %}
+    <link rel="canonical" href="{{ canonical_url }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    {% endif %}
+    <meta property="og:image" content="https://res.cloudinary.com/dfz4bhlzs/image/upload/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png">
+    <meta name="twitter:image" content="https://res.cloudinary.com/dfz4bhlzs/image/upload/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png">
+    <meta name="twitter:card" content="summary_large_image">
     <title>API Documentation | OpenSkagit</title>
     <link rel="stylesheet" href="{% static 'openskagit/home.css' %}">
     <script src="https://unpkg.com/alpinejs@3.13.8/dist/cdn.min.js" defer></script>
