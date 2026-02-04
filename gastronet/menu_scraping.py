@@ -16,44 +16,6 @@ logger = logging.getLogger(__name__)
 
 LLM_MODEL = "gpt-4o-mini"
 MAX_LLM_INPUT_CHARS = 24000
-MENU_EXTRACTION_SYSTEM_PROMPT = (
-    "You are a precision extractor of restaurant menu data. "
-    "Parse the user-provided scraped text and return only valid JSON in this exact form:\n"
-    "{\n"
-    '  "items": [\n'
-    "    {\n"
-    '      "name": "...",\n'
-    '      "description": "...",\n'
-    '      "price": 12.50\n'
-    "    },\n"
-    "    ...\n"
-    "  ]\n"
-    "}\n"
-    "Each item must include the keys \"name\", \"description\", and \"price\". "
-    "\"price\" must be a number or null, never a string, and descriptions may be empty strings. "
-    "Do not return markdown, prose, or metadata—only the JSON object above."
-)
-MENU_EXTRACTION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "items": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "description": {"type": "string"},
-                    "price": {"type": ["number", "null"]},
-                },
-                "required": ["name", "description", "price"],
-                "additionalProperties": False,
-            },
-        }
-    },
-    "required": ["items"],
-    "additionalProperties": False,
-}
-
 
 def _coerce_price(raw_price, idx, label="menu_data"):
     if raw_price in (None, ""):

@@ -18,29 +18,12 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
-from agent import views as agent_views
 from openskagit import survey as survey_views
 from openskagit import views as openskagit_views
 from openskagit.neighborhood import neighborhood_snapshot_view
 
 urlpatterns = [
     path('', openskagit_views.home, name='home'),
-    path('agent/competition-analysis/', agent_views.competition_analysis_dashboard, name='competition-analysis'),
-    path('agent/competition-analysis/search/', agent_views.competition_analysis_search, name='competition-analysis-search'),
-    path('agent/competition-analysis/subject/', agent_views.competition_analysis_select_subject, name='competition-analysis-subject'),
-    path('agent/competition-analysis/start/', agent_views.competition_analysis_start, name='competition-analysis-start'),
-    path('agent/competition-analysis/status/<uuid:job_id>/', agent_views.competition_analysis_status, name='competition-analysis-status'),
-    path("agent/report/start/", agent_views.report_start, name="agent-report-start"),
-    path("agent/report/create/", agent_views.report_create, name="agent-report-create"),
-    path("agent/report/checkout/", agent_views.report_checkout, name="agent-report-checkout"),
-    path(
-        "agent/report/<str:job_id>/status/",
-        agent_views.report_status_page,
-        name="agent-report-status-page",
-    ),
-    path("agent/report/webhook/", agent_views.report_webhook, name="agent-report-webhook"),
-    path("agent/report/status/<str:job_id>/", agent_views.report_status, name="agent-report-status"),
-    path("agent/report/view/<slug:slug>/", agent_views.report_view, name="agent-report-view"),
     path('kids/', include('openskagit.kidslab.urls')),
     path('flavor/', openskagit_views.flavor_index, name='flavor-index'),
     path('flavor/build/', openskagit_views.build_skagit_dish, name='flavor-build-skagit-dish'),
@@ -87,6 +70,7 @@ urlpatterns = [
     path("cma/<str:parcel_number>/", openskagit_views.cma_dashboard_view, name="cma-detail"),
     path("api/", include("openskagit.api.urls")),
     path("api/gastronet/", include("gastronet.urls")),
+    path("agent/", include("agent.urls")),
     path("gastronet/", include("gastronet.urls")),
     path("planning/", include("planning.urls")),
     path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
