@@ -70,6 +70,7 @@ urlpatterns = [
     path("cma/<str:parcel_number>/", openskagit_views.cma_dashboard_view, name="cma-detail"),
     path("api/", include("openskagit.api.urls")),
     path("api/gastronet/", include("gastronet.urls")),
+    path("agent/", include("mcp_agent.urls")),
     path("agent/", include("agent.urls")),
     path("gastronet/", include("gastronet.urls")),
     path("planning/", include("planning.urls")),

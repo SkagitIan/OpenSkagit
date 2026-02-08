@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'planning',
     'openskagit',
     'openskagit.kidslab',
+    'mcp_agent',
     'rest_framework',
     "django.contrib.gis",
     "leaflet",

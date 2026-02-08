@@ -3,7 +3,7 @@
 Authoritative database schema exported directly from Postgres.
 Use this file as the **single source of truth** for LLM-assisted coding.
 
-## `census.acs_bg_skagit`
+## `census.acs_bg_skagit` (t)
 
 ### Columns
 
@@ -41,7 +41,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 
 ---
 
-## `census.bg_skagit`
+## `census.bg_skagit` (t)
 
 **Geometry Columns:**
 - `geom_2926` (MULTIPOLYGON, SRID 2926)
@@ -52,31 +52,31 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `ogc_fid` | integer (int4) | YES |  |
-| `statefp` | character varying (varchar) | YES |  |
-| `countyfp` | character varying (varchar) | YES |  |
-| `tractce` | character varying (varchar) | YES |  |
-| `blkgrpce` | character varying (varchar) | YES |  |
-| `geoid` | character varying (varchar) | YES |  |
-| `geoidfq` | character varying (varchar) | YES |  |
-| `namelsad` | character varying (varchar) | YES |  |
-| `mtfcc` | character varying (varchar) | YES |  |
-| `funcstat` | character varying (varchar) | YES |  |
-| `aland` | numeric (numeric) | YES |  |
-| `awater` | numeric (numeric) | YES |  |
-| `intptlat` | character varying (varchar) | YES |  |
-| `intptlon` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `statefp` | character varying(2) (varchar) | YES |  |
+| `countyfp` | character varying(3) (varchar) | YES |  |
+| `tractce` | character varying(6) (varchar) | YES |  |
+| `blkgrpce` | character varying(1) (varchar) | YES |  |
+| `geoid` | character varying(12) (varchar) | YES |  |
+| `geoidfq` | character varying(21) (varchar) | YES |  |
+| `namelsad` | character varying(13) (varchar) | YES |  |
+| `mtfcc` | character varying(5) (varchar) | YES |  |
+| `funcstat` | character varying(1) (varchar) | YES |  |
+| `aland` | numeric(14,0) (numeric) | YES |  |
+| `awater` | numeric(14,0) (numeric) | YES |  |
+| `intptlat` | character varying(11) (varchar) | YES |  |
+| `intptlon` | character varying(12) (varchar) | YES |  |
+| `geom` | geometry(MultiPolygon,2285) (geometry) | YES |  |
+| `geom_2926` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `bg_skagit_geom_2926_idx`
-  ```sql
-  CREATE INDEX bg_skagit_geom_2926_idx ON census.bg_skagit USING gist (geom_2926)
-  ```
 - `idx_bg_skagit_geom`
   ```sql
   CREATE INDEX idx_bg_skagit_geom ON census.bg_skagit USING gist (geom)
+  ```
+- `bg_skagit_geom_2926_idx`
+  ```sql
+  CREATE INDEX bg_skagit_geom_2926_idx ON census.bg_skagit USING gist (geom_2926)
   ```
 
 ### Sample Row
@@ -102,7 +102,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 
 ---
 
-## `census.bg_wa_raw`
+## `census.bg_wa_raw` (t)
 
 **Primary Key:** ogc_fid
 
@@ -115,35 +115,35 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `ogc_fid` | integer (int4) | NO | nextval('census.bg_wa_raw_ogc_fid_seq'::regclass) |
-| `statefp` | character varying (varchar) | YES |  |
-| `countyfp` | character varying (varchar) | YES |  |
-| `tractce` | character varying (varchar) | YES |  |
-| `blkgrpce` | character varying (varchar) | YES |  |
-| `geoid` | character varying (varchar) | YES |  |
-| `geoidfq` | character varying (varchar) | YES |  |
-| `namelsad` | character varying (varchar) | YES |  |
-| `mtfcc` | character varying (varchar) | YES |  |
-| `funcstat` | character varying (varchar) | YES |  |
-| `aland` | numeric (numeric) | YES |  |
-| `awater` | numeric (numeric) | YES |  |
-| `intptlat` | character varying (varchar) | YES |  |
-| `intptlon` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `statefp` | character varying(2) (varchar) | YES |  |
+| `countyfp` | character varying(3) (varchar) | YES |  |
+| `tractce` | character varying(6) (varchar) | YES |  |
+| `blkgrpce` | character varying(1) (varchar) | YES |  |
+| `geoid` | character varying(12) (varchar) | YES |  |
+| `geoidfq` | character varying(21) (varchar) | YES |  |
+| `namelsad` | character varying(13) (varchar) | YES |  |
+| `mtfcc` | character varying(5) (varchar) | YES |  |
+| `funcstat` | character varying(1) (varchar) | YES |  |
+| `aland` | numeric(14,0) (numeric) | YES |  |
+| `awater` | numeric(14,0) (numeric) | YES |  |
+| `intptlat` | character varying(11) (varchar) | YES |  |
+| `intptlon` | character varying(12) (varchar) | YES |  |
+| `geom` | geometry(MultiPolygon,4269) (geometry) | YES |  |
+| `geom_2926` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `bg_wa_raw_pkey`
+- `bg_wa_raw_geom_2926_idx`
   ```sql
-  CREATE UNIQUE INDEX bg_wa_raw_pkey ON census.bg_wa_raw USING btree (ogc_fid)
+  CREATE INDEX bg_wa_raw_geom_2926_idx ON census.bg_wa_raw USING gist (geom_2926)
   ```
 - `bg_wa_raw_geom_geom_idx`
   ```sql
   CREATE INDEX bg_wa_raw_geom_geom_idx ON census.bg_wa_raw USING gist (geom)
   ```
-- `bg_wa_raw_geom_2926_idx`
+- `bg_wa_raw_pkey`
   ```sql
-  CREATE INDEX bg_wa_raw_geom_2926_idx ON census.bg_wa_raw USING gist (geom_2926)
+  CREATE UNIQUE INDEX bg_wa_raw_pkey ON census.bg_wa_raw USING btree (ogc_fid)
   ```
 
 ### Sample Row
@@ -169,7 +169,291 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 
 ---
 
-## `public.assessor`
+## `public.agency_levy_map` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `tdcode` | character varying(9) (varchar) | NO |  |
+| `mcag` | character varying(10) (varchar) | NO |  |
+| `agency_name` | character varying(255) (varchar) | NO |  |
+| `agency_type` | character varying(100) (varchar) | NO |  |
+| `notes` | text (text) | NO |  |
+| `is_primary` | boolean (bool) | NO |  |
+| `created_at` | timestamp with time zone (timestamptz) | NO |  |
+
+### Indexes
+
+- `agency_levy_map_pkey`
+  ```sql
+  CREATE UNIQUE INDEX agency_levy_map_pkey ON public.agency_levy_map USING btree (id)
+  ```
+- `uniq_agency_levy_map`
+  ```sql
+  CREATE UNIQUE INDEX uniq_agency_levy_map ON public.agency_levy_map USING btree (tdcode, mcag)
+  ```
+- `openskagit_agencylevymap_mcag_idx`
+  ```sql
+  CREATE INDEX openskagit_agencylevymap_mcag_idx ON public.agency_levy_map USING btree (mcag)
+  ```
+- `openskagit_agencylevymap_tdcode_idx`
+  ```sql
+  CREATE INDEX openskagit_agencylevymap_tdcode_idx ON public.agency_levy_map USING btree (tdcode)
+  ```
+- `agency_levy_map_tdcode_677c8f8d`
+  ```sql
+  CREATE INDEX agency_levy_map_tdcode_677c8f8d ON public.agency_levy_map USING btree (tdcode)
+  ```
+- `agency_levy_map_tdcode_677c8f8d_like`
+  ```sql
+  CREATE INDEX agency_levy_map_tdcode_677c8f8d_like ON public.agency_levy_map USING btree (tdcode varchar_pattern_ops)
+  ```
+- `agency_levy_map_mcag_3ed72c85_like`
+  ```sql
+  CREATE INDEX agency_levy_map_mcag_3ed72c85_like ON public.agency_levy_map USING btree (mcag varchar_pattern_ops)
+  ```
+- `agency_levy_map_mcag_3ed72c85`
+  ```sql
+  CREATE INDEX agency_levy_map_mcag_3ed72c85 ON public.agency_levy_map USING btree (mcag)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 84 |
+| `tdcode` | 290000200 |
+| `mcag` |  |
+| `agency_name` | State School Part 2 |
+| `agency_type` | countywide |
+| `notes` | levy_name=State School Part 2; score=0.25 |
+| `is_primary` | True |
+| `created_at` | 2026-01-23 20:55:27.763542+00:00 |
+
+---
+
+## `public.agent_paymentrecord` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `stripe_session_id` | character varying(255) (varchar) | NO |  |
+| `status` | character varying(16) (varchar) | NO |  |
+| `amount_usd` | numeric(10,2) (numeric) | YES |  |
+| `paid_at` | timestamp with time zone (timestamptz) | YES |  |
+| `note` | text (text) | NO |  |
+| `created_at` | timestamp with time zone (timestamptz) | NO |  |
+| `updated_at` | timestamp with time zone (timestamptz) | NO |  |
+| `job_id` | character varying(32) (varchar) | NO |  |
+
+### Foreign Keys
+
+- `job_id` → `public.agent_restaurantreportjob.id`
+
+### Indexes
+
+- `agent_paymentrecord_stripe_session_id_key`
+  ```sql
+  CREATE UNIQUE INDEX agent_paymentrecord_stripe_session_id_key ON public.agent_paymentrecord USING btree (stripe_session_id)
+  ```
+- `agent_paymentrecord_stripe_session_id_f454095f_like`
+  ```sql
+  CREATE INDEX agent_paymentrecord_stripe_session_id_f454095f_like ON public.agent_paymentrecord USING btree (stripe_session_id varchar_pattern_ops)
+  ```
+- `agent_paymentrecord_job_id_key`
+  ```sql
+  CREATE UNIQUE INDEX agent_paymentrecord_job_id_key ON public.agent_paymentrecord USING btree (job_id)
+  ```
+- `agent_paymentrecord_job_id_23f1ef72_like`
+  ```sql
+  CREATE INDEX agent_paymentrecord_job_id_23f1ef72_like ON public.agent_paymentrecord USING btree (job_id varchar_pattern_ops)
+  ```
+- `agent_paymentrecord_pkey`
+  ```sql
+  CREATE UNIQUE INDEX agent_paymentrecord_pkey ON public.agent_paymentrecord USING btree (id)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 1 |
+| `stripe_session_id` | dev-64ebedd7de584941969d6439bb8cdcdc |
+| `status` | PAID |
+| `amount_usd` | 49.00 |
+| `paid_at` | 2026-01-30 00:12:14.944382+00:00 |
+| `note` |  |
+| `created_at` | 2026-01-30 00:12:14.957282+00:00 |
+| `updated_at` | 2026-01-30 00:12:14.957302+00:00 |
+| `job_id` | 64ebedd7de584941969d6439bb8cdcdc |
+
+---
+
+## `public.agent_restaurantreport` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `slug` | character varying(64) (varchar) | NO |  |
+| `payload` | text (text) | NO |  |
+| `generated_at` | timestamp with time zone (timestamptz) | NO |  |
+| `updated_at` | timestamp with time zone (timestamptz) | NO |  |
+| `job_id` | character varying(32) (varchar) | NO |  |
+
+### Foreign Keys
+
+- `job_id` → `public.agent_restaurantreportjob.id`
+
+### Indexes
+
+- `agent_restaurantreport_slug_key`
+  ```sql
+  CREATE UNIQUE INDEX agent_restaurantreport_slug_key ON public.agent_restaurantreport USING btree (slug)
+  ```
+- `agent_restaurantreport_slug_caa58600_like`
+  ```sql
+  CREATE INDEX agent_restaurantreport_slug_caa58600_like ON public.agent_restaurantreport USING btree (slug varchar_pattern_ops)
+  ```
+- `agent_restaurantreport_job_id_key`
+  ```sql
+  CREATE UNIQUE INDEX agent_restaurantreport_job_id_key ON public.agent_restaurantreport USING btree (job_id)
+  ```
+- `agent_restaurantreport_pkey`
+  ```sql
+  CREATE UNIQUE INDEX agent_restaurantreport_pkey ON public.agent_restaurantreport USING btree (id)
+  ```
+- `agent_restaurantreport_job_id_55fb34cf_like`
+  ```sql
+  CREATE INDEX agent_restaurantreport_job_id_55fb34cf_like ON public.agent_restaurantreport USING btree (job_id varchar_pattern_ops)
+  ```
+
+### Sample Row
+
+_No sample data available (table is empty or unreadable)._
+
+---
+
+## `public.agent_restaurantreportcheckpoint` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `step` | character varying(64) (varchar) | NO |  |
+| `payload` | text (text) | NO |  |
+| `schema_version` | character varying(16) (varchar) | NO |  |
+| `checksum` | character varying(64) (varchar) | NO |  |
+| `created_at` | timestamp with time zone (timestamptz) | NO |  |
+| `job_id` | character varying(32) (varchar) | NO |  |
+
+### Foreign Keys
+
+- `job_id` → `public.agent_restaurantreportjob.id`
+
+### Indexes
+
+- `agent_restaurantreportcheckpoint_pkey`
+  ```sql
+  CREATE UNIQUE INDEX agent_restaurantreportcheckpoint_pkey ON public.agent_restaurantreportcheckpoint USING btree (id)
+  ```
+- `agent_restaurantreportcheckpoint_job_id_99b52168_like`
+  ```sql
+  CREATE INDEX agent_restaurantreportcheckpoint_job_id_99b52168_like ON public.agent_restaurantreportcheckpoint USING btree (job_id varchar_pattern_ops)
+  ```
+- `agent_restaurantreportcheckpoint_job_id_99b52168`
+  ```sql
+  CREATE INDEX agent_restaurantreportcheckpoint_job_id_99b52168 ON public.agent_restaurantreportcheckpoint USING btree (job_id)
+  ```
+- `agent_restaurantreportcheckpoint_job_id_step_9ef64d0a_uniq`
+  ```sql
+  CREATE UNIQUE INDEX agent_restaurantreportcheckpoint_job_id_step_9ef64d0a_uniq ON public.agent_restaurantreportcheckpoint USING btree (job_id, step)
+  ```
+
+### Sample Row
+
+_No sample data available (table is empty or unreadable)._
+
+---
+
+## `public.agent_restaurantreportjob` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | character varying(32) (varchar) | NO |  |
+| `place_id` | character varying(255) (varchar) | NO |  |
+| `place_name` | character varying(255) (varchar) | NO |  |
+| `address` | character varying(512) (varchar) | NO |  |
+| `status` | character varying(16) (varchar) | NO |  |
+| `progress_percent` | smallint (int2) | NO |  |
+| `current_step` | character varying(64) (varchar) | NO |  |
+| `error_code` | character varying(32) (varchar) | NO |  |
+| `error_message` | text (text) | NO |  |
+| `progress_log` | jsonb (jsonb) | NO |  |
+| `subject_payload` | jsonb (jsonb) | YES |  |
+| `vetted_competitors` | jsonb (jsonb) | YES |  |
+| `final_payload` | jsonb (jsonb) | YES |  |
+| `cost_usd` | numeric(10,2) (numeric) | YES |  |
+| `started_at` | timestamp with time zone (timestamptz) | YES |  |
+| `completed_at` | timestamp with time zone (timestamptz) | YES |  |
+| `created_at` | timestamp with time zone (timestamptz) | NO |  |
+| `updated_at` | timestamp with time zone (timestamptz) | NO |  |
+
+### Indexes
+
+- `agent_restaurantreportjob_id_f2d44073_like`
+  ```sql
+  CREATE INDEX agent_restaurantreportjob_id_f2d44073_like ON public.agent_restaurantreportjob USING btree (id varchar_pattern_ops)
+  ```
+- `agent_restaurantreportjob_pkey`
+  ```sql
+  CREATE UNIQUE INDEX agent_restaurantreportjob_pkey ON public.agent_restaurantreportjob USING btree (id)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | ef147901e4c54299963abcd146e4e255 |
+| `place_id` | ChIJQVO1ySVshVQRePZHJVd2seM |
+| `place_name` | Max Dale's Steak Chop House |
+| `address` | 2030 Riverside Dr, Mount Vernon, WA 98273, USA |
+| `status` | CREATED |
+| `progress_percent` | 0 |
+| `current_step` |  |
+| `error_code` |  |
+| `error_message` |  |
+| `progress_log` | [] |
+| `subject_payload` | NULL |
+| `vetted_competitors` | NULL |
+| `final_payload` | NULL |
+| `cost_usd` | NULL |
+| `started_at` | NULL |
+| `completed_at` | NULL |
+| `created_at` | 2026-01-30 00:07:28.309125+00:00 |
+| `updated_at` | 2026-01-30 00:07:28.311891+00:00 |
+
+---
+
+## `public.assessor` (t)
 
 **Geometry Columns:**
 - `geom_backup` (GEOMETRY, SRID 3857)
@@ -226,7 +510,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `has_septic` | text (text) | YES |  |
 | `latitude` | double precision (float8) | YES |  |
 | `longitude` | double precision (float8) | YES |  |
-| `embedding` | USER-DEFINED (vector) | YES |  |
+| `embedding` | vector(384) (vector) | YES |  |
 | `roll_id` | bigint (int8) | YES |  |
 | `id` | bigint (int8) | NO |  |
 | `land_use_description` | text (text) | YES |  |
@@ -246,14 +530,14 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `aspect` | double precision (float8) | YES |  |
 | `aspect_dir` | text (text) | YES |  |
 | `dist_major_road` | double precision (float8) | YES |  |
-| `geom_backup` | USER-DEFINED (geometry) | YES |  |
-| `centroid_geog` | USER-DEFINED (geography) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
-| `geom_4326` | USER-DEFINED (geometry) | YES |  |
-| `condition_code` | character varying (varchar) | YES |  |
+| `geom_backup` | geometry(Geometry,3857) (geometry) | YES |  |
+| `centroid_geog` | geography(Point,4326) (geography) | YES |  |
+| `geom` | geometry(MultiPolygon,3857) (geometry) | YES |  |
+| `geom_4326` | geometry(MultiPolygon,4326) (geometry) | YES | st_transform(geom, 4326) |
+| `condition_code` | character varying(10) (varchar) | YES |  |
 | `condition_score` | integer (int4) | YES |  |
 | `quality_score` | double precision (float8) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `geom_2926` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 | `elevation` | double precision (float8) | YES |  |
 | `dist_city_center` | double precision (float8) | YES |  |
 | `dist_fire_station` | double precision (float8) | YES |  |
@@ -264,7 +548,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `dist_supermarket` | double precision (float8) | YES |  |
 | `dist_trailhead` | double precision (float8) | YES |  |
 | `age` | double precision (float8) | YES |  |
-| `age_bucket` | character varying (varchar) | YES |  |
+| `age_bucket` | character varying(20) (varchar) | YES |  |
 | `age_sq` | double precision (float8) | YES |  |
 | `full_bathrooms` | integer (int4) | YES |  |
 | `half_bathrooms` | integer (int4) | YES |  |
@@ -274,8 +558,8 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `has_pool` | boolean (bool) | YES |  |
 | `has_shop` | boolean (bool) | YES |  |
 | `improvement_year_built` | bigint (int8) | YES |  |
-| `land_use_category` | character varying (varchar) | YES |  |
-| `neighborhood_id` | character varying (varchar) | YES |  |
+| `land_use_category` | character varying(100) (varchar) | YES |  |
+| `neighborhood_id` | character varying(50) (varchar) | YES |  |
 | `number_of_fireplaces` | integer (int4) | YES |  |
 | `number_of_outbuildings` | integer (int4) | YES |  |
 | `number_of_sheds` | integer (int4) | YES |  |
@@ -303,17 +587,25 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 
 ### Indexes
 
-- `assessor_centroid_geog_gix`
+- `assessor_address_trgm_idx`
   ```sql
-  CREATE INDEX assessor_centroid_geog_gix ON public.assessor USING gist (centroid_geog)
+  CREATE INDEX assessor_address_trgm_idx ON public.assessor USING gin (address gin_trgm_ops)
   ```
 - `assessor_property_type_idx`
   ```sql
   CREATE INDEX assessor_property_type_idx ON public.assessor USING btree (property_type)
   ```
-- `assessor_address_trgm_idx`
+- `idx_assessor_address_trgm`
   ```sql
-  CREATE INDEX assessor_address_trgm_idx ON public.assessor USING gin (address gin_trgm_ops)
+  CREATE INDEX idx_assessor_address_trgm ON public.assessor USING gin (address gin_trgm_ops)
+  ```
+- `idx_assessor_parcel_upper`
+  ```sql
+  CREATE INDEX idx_assessor_parcel_upper ON public.assessor USING btree (upper(parcel_number))
+  ```
+- `assessor_centroid_geog_gix`
+  ```sql
+  CREATE INDEX assessor_centroid_geog_gix ON public.assessor USING gist (centroid_geog)
   ```
 - `assessor_parcel_number_idx`
   ```sql
@@ -327,41 +619,33 @@ Use this file as the **single source of truth** for LLM-assisted coding.
   ```sql
   CREATE INDEX assessor_geom_2926_idx ON public.assessor USING gist (geom_2926)
   ```
-- `idx_assessor_parcel_upper`
-  ```sql
-  CREATE INDEX idx_assessor_parcel_upper ON public.assessor USING btree (upper(parcel_number))
-  ```
-- `idx_assessor_address_trgm`
-  ```sql
-  CREATE INDEX idx_assessor_address_trgm ON public.assessor USING gin (address gin_trgm_ops)
-  ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `parcel_number` | P125427 |
+| `parcel_number` | P109486 |
 | `address` | NULL |
-| `neighborhood_code` | (20MVHIGHLD) MOUNT VERNON RESIDENTIAL SKAGIT HIGHLANDS |
+| `neighborhood_code` | (20EXMPTRES) ALL COUNTY EXEMPT RESIDENTIAL |
 | `land_use_code` | NULL |
-| `building_value` | 427500.0 |
-| `impr_land_value` | 208300.0 |
+| `building_value` | 109200.0 |
+| `impr_land_value` | 168800.0 |
 | `unimpr_land_value` | 0 |
 | `timber_land_value` | 0 |
-| `assessed_value` | 635800 |
-| `taxable_value` | 635800 |
-| `total_market_value` | 635800 |
-| `acres` | 0.12 |
-| `sale_date` | 2020-12-22 00:00:00 |
-| `sale_price` | 132235.0 |
-| `sale_deed_type` | QUIT CLAIM DEED |
-| `total_taxes` | 6397.75 |
-| `year_built` | 2008 |
-| `eff_year_built` | 2014 |
-| `living_area` | 3148 |
+| `assessed_value` | 278000 |
+| `taxable_value` | 0 |
+| `total_market_value` | 278000 |
+| `acres` | 0.22 |
+| `sale_date` | NULL |
+| `sale_price` | 0.0 |
+| `sale_deed_type` | NULL |
+| `total_taxes` | 0.0 |
+| `year_built` | 1998 |
+| `eff_year_built` | 2003 |
+| `living_area` | 960 |
 | `building_style` | NULL |
 | `foundation` | CONCRETE |
-| `exterior_walls` | METAL/VINYL SIDING |
+| `exterior_walls` | SIDING |
 | `roof_covering` | COMP |
 | `roof_style` | NULL |
 | `floor_covering` | ALLOWANCE |
@@ -370,14 +654,14 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `bathrooms` | NULL |
 | `bedrooms` | NULL |
 | `garage_sqft` | NULL |
-| `heat_air_cond` | FORCED AIR |
+| `heat_air_cond` | ELECTRIC WALL UNITS |
 | `fireplace` | DIRECT VENT |
 | `finished_basement` | NULL |
 | `unfinished_basement` | NULL |
-| `fire_district` | NULL |
-| `school_district` | SD320 |
-| `city_district` | Mount Vernon |
-| `levy_code` | 930.0 |
+| `fire_district` | F08 |
+| `school_district` | SD101 |
+| `city_district` | Skagit County |
+| `levy_code` | 1335.0 |
 | `current_use_adjustment` | 0.0 |
 | `tide_land_value` | 0 |
 | `senior_exemption_adjustment` | 0 |
@@ -387,7 +671,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `longitude` | NULL |
 | `embedding` | NULL |
 | `roll_id` | 2 |
-| `id` | 368485 |
+| `id` | 358541 |
 | `land_use_description` | NULL |
 | `neighborhood_code_description` | NULL |
 | `in_flood_zone` | NULL |
@@ -448,17 +732,17 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `total_outbuilding_area` | NULL |
 | `total_porch_area` | NULL |
 | `calculated_square_footage` | NULL |
-| `owner_name` | SILVA NICOLETTE MICHELE |
-| `owner_add_1` | NULL |
-| `owner_add_2` | NULL |
-| `owner_add_3` | 611 MONARCH BLVD |
-| `owner_city` | MOUNT VERMON |
+| `owner_name` | UNITED STATES OF AMERICA |
+| `owner_add_1` | TR FOR UPPER SKAGIT INDIAN TRIBE |
+| `owner_add_2` | 25944 COMMUNITY PLAZA WAY |
+| `owner_add_3` | NULL |
+| `owner_city` | SEDRO WOOLLEY |
 | `owner_state` | WA |
-| `owner_zip` | 98273.0 |
+| `owner_zip` | 98284.0 |
 
 ---
 
-## `public.assessor_2025_geo`
+## `public.assessor_2025_geo` (v)
 
 **Geometry Columns:**
 - `geom_backup` (GEOMETRY, SRID 3857)
@@ -515,7 +799,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `has_septic` | text (text) | YES |  |
 | `latitude` | double precision (float8) | YES |  |
 | `longitude` | double precision (float8) | YES |  |
-| `embedding` | USER-DEFINED (vector) | YES |  |
+| `embedding` | vector(384) (vector) | YES |  |
 | `roll_id` | bigint (int8) | YES |  |
 | `id` | bigint (int8) | YES |  |
 | `land_use_description` | text (text) | YES |  |
@@ -535,41 +819,41 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `aspect` | double precision (float8) | YES |  |
 | `aspect_dir` | text (text) | YES |  |
 | `dist_major_road` | double precision (float8) | YES |  |
-| `geom_backup` | USER-DEFINED (geometry) | YES |  |
-| `centroid_geog` | USER-DEFINED (geography) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
-| `geom_4326` | USER-DEFINED (geometry) | YES |  |
-| `condition_code` | character varying (varchar) | YES |  |
+| `geom_backup` | geometry(Geometry,3857) (geometry) | YES |  |
+| `centroid_geog` | geography(Point,4326) (geography) | YES |  |
+| `geom` | geometry(MultiPolygon,3857) (geometry) | YES |  |
+| `geom_4326` | geometry(MultiPolygon,4326) (geometry) | YES |  |
+| `condition_code` | character varying(10) (varchar) | YES |  |
 | `condition_score` | integer (int4) | YES |  |
 | `quality_score` | double precision (float8) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `geom_2926` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `parcel_number` | P125427 |
+| `parcel_number` | P109486 |
 | `address` | NULL |
-| `neighborhood_code` | (20MVHIGHLD) MOUNT VERNON RESIDENTIAL SKAGIT HIGHLANDS |
+| `neighborhood_code` | (20EXMPTRES) ALL COUNTY EXEMPT RESIDENTIAL |
 | `land_use_code` | NULL |
-| `building_value` | 427500.0 |
-| `impr_land_value` | 208300.0 |
+| `building_value` | 109200.0 |
+| `impr_land_value` | 168800.0 |
 | `unimpr_land_value` | 0 |
 | `timber_land_value` | 0 |
-| `assessed_value` | 635800 |
-| `taxable_value` | 635800 |
-| `total_market_value` | 635800 |
-| `acres` | 0.12 |
-| `sale_date` | 2020-12-22 00:00:00 |
-| `sale_price` | 132235.0 |
-| `sale_deed_type` | QUIT CLAIM DEED |
-| `total_taxes` | 6397.75 |
-| `year_built` | 2008 |
-| `eff_year_built` | 2014 |
-| `living_area` | 3148 |
+| `assessed_value` | 278000 |
+| `taxable_value` | 0 |
+| `total_market_value` | 278000 |
+| `acres` | 0.22 |
+| `sale_date` | NULL |
+| `sale_price` | 0.0 |
+| `sale_deed_type` | NULL |
+| `total_taxes` | 0.0 |
+| `year_built` | 1998 |
+| `eff_year_built` | 2003 |
+| `living_area` | 960 |
 | `building_style` | NULL |
 | `foundation` | CONCRETE |
-| `exterior_walls` | METAL/VINYL SIDING |
+| `exterior_walls` | SIDING |
 | `roof_covering` | COMP |
 | `roof_style` | NULL |
 | `floor_covering` | ALLOWANCE |
@@ -578,14 +862,14 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `bathrooms` | NULL |
 | `bedrooms` | NULL |
 | `garage_sqft` | NULL |
-| `heat_air_cond` | FORCED AIR |
+| `heat_air_cond` | ELECTRIC WALL UNITS |
 | `fireplace` | DIRECT VENT |
 | `finished_basement` | NULL |
 | `unfinished_basement` | NULL |
-| `fire_district` | NULL |
-| `school_district` | SD320 |
-| `city_district` | Mount Vernon |
-| `levy_code` | 930.0 |
+| `fire_district` | F08 |
+| `school_district` | SD101 |
+| `city_district` | Skagit County |
+| `levy_code` | 1335.0 |
 | `current_use_adjustment` | 0.0 |
 | `tide_land_value` | 0 |
 | `senior_exemption_adjustment` | 0 |
@@ -595,7 +879,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 | `longitude` | NULL |
 | `embedding` | NULL |
 | `roll_id` | 2 |
-| `id` | 368485 |
+| `id` | 358541 |
 | `land_use_description` | NULL |
 | `neighborhood_code_description` | NULL |
 | `in_flood_zone` | NULL |
@@ -624,7 +908,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 
 ---
 
-## `public.assessor_distances`
+## `public.assessor_distances` (t)
 
 **Primary Key:** parcel_number
 
@@ -667,7 +951,7 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 
 ---
 
-## `public.assessor_geom4326_nonnull`
+## `public.assessor_geom4326_nonnull` (v)
 
 **Geometry Columns:**
 - `geom_4326` (MULTIPOLYGON, SRID 4326)
@@ -678,19 +962,19 @@ Use this file as the **single source of truth** for LLM-assisted coding.
 |-------|------|----------|---------|
 | `id` | bigint (int8) | YES |  |
 | `parcel_number` | text (text) | YES |  |
-| `geom_4326` | USER-DEFINED (geometry) | YES |  |
+| `geom_4326` | geometry(MultiPolygon,4326) (geometry) | YES |  |
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `id` | 65116 |
-| `parcel_number` | P60227 |
-| `geom_4326` | 0106000020E610000001000000010300000001000000210000000B73425193AB5EC0EE9E222AEC3E48407DA2425193AB5EC06A20202AEC3E4840002F435193AB5EC070BA1D2AEC3E48402F1344519... |
+| `id` | 68268 |
+| `parcel_number` | P70317 |
+| `geom_4326` | 0106000020E61000000100000001030000000100000021000000C98AD6023A655EC0BA3C02F4C53848403CBAD6023A655EC09CBDFFF3C5384840BF46D7023A655EC00D57FDF3C5384840EE2AD8023... |
 
 ---
 
-## `public.assessor_geom_update_log`
+## `public.assessor_geom_update_log` (t)
 
 ### Columns
 
@@ -707,7 +991,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.assessor_geom_utm10`
+## `public.assessor_geom_utm10` (v)
 
 **Geometry Columns:**
 - `geom_utm10` (GEOMETRY, SRID 0)
@@ -718,19 +1002,19 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `id` | bigint (int8) | YES |  |
 | `parcel_number` | text (text) | YES |  |
-| `geom_utm10` | USER-DEFINED (geometry) | YES |  |
+| `geom_utm10` | geometry (geometry) | YES |  |
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `id` | 65116 |
-| `parcel_number` | P60227 |
-| `geom_utm10` | 01060000201E6900000100000001030000000100000021000000ED6F4878EBF41F41E65E17441B7D5441313C4578EBF41F41304115441B7D544161783B78EBF41F41D83713441B7D54416C842B78E... |
+| `id` | 68268 |
+| `parcel_number` | P70317 |
+| `geom_utm10` | 01060000201E69000001000000010300000001000000210000002E86D503B4752241E89F9EDDCA785441302AD403B4752241F1809CDDCA7854410083CF03B4752241D9749ADDCA78544154BEC703B... |
 
 ---
 
-## `public.assessor_owner_stage`
+## `public.assessor_owner_stage` (t)
 
 ### Columns
 
@@ -812,81 +1096,81 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Value |
 |--------|-------|
-| `aid` | 52993 |
-| `parcel_number` | P131367 |
-| `account_number` | 350519-4-002-1067 |
-| `legal_description` | MANUFACTURED HOME ONLY 1998 PALM HARBOR 27X64 S/N PH202436; VAN FLEET MOBILE PARK, SPACE NUMBER 67 ON P39908 |
-| `situs_street_number` | 24919 |
-| `situs_street_name` | HOEHN RD |
-| `situs_city_state_zip` | SEDRO WOOLLEY, WA 98284 |
+| `aid` | 21773 |
+| `parcel_number` | P100003 |
+| `account_number` | 70798 |
+| `legal_description` | EQUIPMENT AND SUPPLIES  LC 0900 |
+| `situs_street_number` | 702 |
+| `situs_street_name` | R AVENUE |
+| `situs_city_state_zip` | ANACORTES, WA 98221 |
 | `old_street_number` | NULL |
 | `old_street_name` | NULL |
 | `old_city_state_zip` | NULL |
-| `owner_name` | COGGINS JOHN |
-| `owner_add_1` | COGGINS JACQUELINE |
-| `owner_add_2` | 24919 HOEHN RD UNIT 67 |
+| `owner_name` | TRANSPAC MARINAS INC |
+| `owner_add_1` | C/O RYTAND DAVID H |
+| `owner_add_2` | PO BOX 1169 |
 | `owner_add_3` | NULL |
-| `owner_city` | SEDRO WOOLLEY |
+| `owner_city` | ANACORTES |
 | `owner_state` | WA |
-| `owner_zip` | 98284 |
+| `owner_zip` | 98221 |
 | `exemptions` | NULL |
-| `neighborhood_code` | (44SWPARKMH) SEDRO WOOLLEY RESIDENTIAL MOBILE HOME ONLY INSIDE OF PARKS |
-| `building_value` | 132100 |
-| `land_use` | (181) MH LEASED PROPERTY |
+| `neighborhood_code` | NULL |
+| `building_value` | 0 |
+| `land_use` | (0) Personal Property |
 | `impr_land_value` | 0 |
 | `unimpr_land_value` | 0 |
 | `timber_land_value` | 0 |
-| `assessed_value` | 132100 |
-| `taxable_value` | 132100 |
-| `total_market_value` | 132100 |
+| `assessed_value` | 698900 |
+| `taxable_value` | 698900 |
+| `total_market_value` | 698900 |
 | `acres` | 0 |
-| `sale_date` | 2013-11-25 00:00:00 |
-| `sale_price` | 40000 |
-| `sale_deed_type` | MOBILE HOME DATA |
-| `total_taxes` | 1220.13 |
-| `year_built` | 1998 |
-| `living_area` | 1728 |
-| `tot_special_assessments` | 173.00 |
+| `sale_date` | NULL |
+| `sale_price` | 0 |
+| `sale_deed_type` | NULL |
+| `total_taxes` | 5947.11 |
+| `year_built` | NULL |
+| `living_area` | 0 |
+| `tot_special_assessments` | NULL |
 | `general_taxes` | NULL |
 | `inactive_date` | NULL |
-| `buildingstyle` | DOUBLE WIDE |
-| `foundation` | SKIRTING - WOOD |
-| `exterior_walls` | VINYL |
-| `roof_covering` | COMP |
+| `buildingstyle` | COMMERICAL PERSONAL PROPERTY |
+| `foundation` | NULL |
+| `exterior_walls` | NULL |
+| `roof_covering` | NULL |
 | `roof_style` | NULL |
-| `floor_covering` | ALLOWANCE |
+| `floor_covering` | NULL |
 | `floor_construction` | NULL |
-| `interior_finish` | MH-DRYWALL |
-| `plumbing` | 2 FULL BATHS |
+| `interior_finish` | NULL |
+| `plumbing` | NULL |
 | `garagesqft` | 0 |
-| `heat_air_cond` | FORCED AIR |
+| `heat_air_cond` | NULL |
 | `fireplace` | NULL |
 | `finishedbasement` | 0 |
 | `number_of_bedrooms` | NULL |
-| `eff_year_built` | 2007 |
+| `eff_year_built` | 0 |
 | `unfinishedbasement` | 0 |
-| `fire_district` | F08 |
-| `school_district` | SD101 |
-| `city_district` | Skagit County |
-| `unit` | SP 67 |
-| `levy_code` | 1335 |
-| `current_use_adjustment` | 0 |
+| `fire_district` | NULL |
+| `school_district` | SD103 |
+| `city_district` | Anacortes |
+| `unit` | NULL |
+| `levy_code` | 0900 |
+| `current_use_adjustment` | NULL |
 | `tide_land_value` | 0 |
 | `senior_exemption_adjustment` | 0 |
-| `township` | 35 |
-| `range` | 05 |
-| `section` | 19 |
+| `township` | NULL |
+| `range` | NULL |
+| `section` | NULL |
 | `quarter_section` | NULL |
 | `tax_year` | 2025 |
 | `appraisal_year` | 2026 |
-| `utilities` | *SEP, PWR, WTR-P |
-| `tax_statement_taxable_value` | 132100 |
-| `proptype` | M |
+| `utilities` | NULL |
+| `tax_statement_taxable_value` | 698900 |
+| `proptype` | P |
 | `hasseptic` | False |
 
 ---
 
-## `public.auth_group`
+## `public.auth_group` (t)
 
 **Primary Key:** id
 
@@ -895,17 +1179,17 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
-| `name` | character varying (varchar) | NO |  |
+| `name` | character varying(150) (varchar) | NO |  |
 
 ### Indexes
 
-- `auth_group_pkey`
-  ```sql
-  CREATE UNIQUE INDEX auth_group_pkey ON public.auth_group USING btree (id)
-  ```
 - `auth_group_name_a6ea08ec_like`
   ```sql
   CREATE INDEX auth_group_name_a6ea08ec_like ON public.auth_group USING btree (name varchar_pattern_ops)
+  ```
+- `auth_group_pkey`
+  ```sql
+  CREATE UNIQUE INDEX auth_group_pkey ON public.auth_group USING btree (id)
   ```
 - `auth_group_name_key`
   ```sql
@@ -918,7 +1202,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.auth_group_permissions`
+## `public.auth_group_permissions` (t)
 
 **Primary Key:** id
 
@@ -937,21 +1221,21 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `auth_group_permissions_pkey`
-  ```sql
-  CREATE UNIQUE INDEX auth_group_permissions_pkey ON public.auth_group_permissions USING btree (id)
-  ```
 - `auth_group_permissions_group_id_b120cbf9`
   ```sql
   CREATE INDEX auth_group_permissions_group_id_b120cbf9 ON public.auth_group_permissions USING btree (group_id)
   ```
-- `auth_group_permissions_permission_id_84c5c92e`
+- `auth_group_permissions_pkey`
   ```sql
-  CREATE INDEX auth_group_permissions_permission_id_84c5c92e ON public.auth_group_permissions USING btree (permission_id)
+  CREATE UNIQUE INDEX auth_group_permissions_pkey ON public.auth_group_permissions USING btree (id)
   ```
 - `auth_group_permissions_group_id_permission_id_0cd325b0_uniq`
   ```sql
   CREATE UNIQUE INDEX auth_group_permissions_group_id_permission_id_0cd325b0_uniq ON public.auth_group_permissions USING btree (group_id, permission_id)
+  ```
+- `auth_group_permissions_permission_id_84c5c92e`
+  ```sql
+  CREATE INDEX auth_group_permissions_permission_id_84c5c92e ON public.auth_group_permissions USING btree (permission_id)
   ```
 
 ### Sample Row
@@ -960,7 +1244,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.auth_permission`
+## `public.auth_permission` (t)
 
 **Primary Key:** id
 
@@ -969,9 +1253,9 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
-| `name` | character varying (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
 | `content_type_id` | integer (int4) | NO |  |
-| `codename` | character varying (varchar) | NO |  |
+| `codename` | character varying(100) (varchar) | NO |  |
 
 ### Foreign Keys
 
@@ -983,13 +1267,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX auth_permission_content_type_id_2f476e4b ON public.auth_permission USING btree (content_type_id)
   ```
-- `auth_permission_pkey`
-  ```sql
-  CREATE UNIQUE INDEX auth_permission_pkey ON public.auth_permission USING btree (id)
-  ```
 - `auth_permission_content_type_id_codename_01ab375a_uniq`
   ```sql
   CREATE UNIQUE INDEX auth_permission_content_type_id_codename_01ab375a_uniq ON public.auth_permission USING btree (content_type_id, codename)
+  ```
+- `auth_permission_pkey`
+  ```sql
+  CREATE UNIQUE INDEX auth_permission_pkey ON public.auth_permission USING btree (id)
   ```
 
 ### Sample Row
@@ -1003,7 +1287,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.auth_user`
+## `public.auth_user` (t)
 
 **Primary Key:** id
 
@@ -1012,13 +1296,13 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
-| `password` | character varying (varchar) | NO |  |
+| `password` | character varying(128) (varchar) | NO |  |
 | `last_login` | timestamp with time zone (timestamptz) | YES |  |
 | `is_superuser` | boolean (bool) | NO |  |
-| `username` | character varying (varchar) | NO |  |
-| `first_name` | character varying (varchar) | NO |  |
-| `last_name` | character varying (varchar) | NO |  |
-| `email` | character varying (varchar) | NO |  |
+| `username` | character varying(150) (varchar) | NO |  |
+| `first_name` | character varying(150) (varchar) | NO |  |
+| `last_name` | character varying(150) (varchar) | NO |  |
+| `email` | character varying(254) (varchar) | NO |  |
 | `is_staff` | boolean (bool) | NO |  |
 | `is_active` | boolean (bool) | NO |  |
 | `date_joined` | timestamp with time zone (timestamptz) | NO |  |
@@ -1029,13 +1313,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE UNIQUE INDEX auth_user_pkey ON public.auth_user USING btree (id)
   ```
-- `auth_user_username_6821ab7c_like`
-  ```sql
-  CREATE INDEX auth_user_username_6821ab7c_like ON public.auth_user USING btree (username varchar_pattern_ops)
-  ```
 - `auth_user_username_key`
   ```sql
   CREATE UNIQUE INDEX auth_user_username_key ON public.auth_user USING btree (username)
+  ```
+- `auth_user_username_6821ab7c_like`
+  ```sql
+  CREATE INDEX auth_user_username_6821ab7c_like ON public.auth_user USING btree (username varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -1056,7 +1340,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.auth_user_groups`
+## `public.auth_user_groups` (t)
 
 **Primary Key:** id
 
@@ -1075,17 +1359,17 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `auth_user_groups_group_id_97559544`
+- `auth_user_groups_user_id_group_id_94350c0c_uniq`
   ```sql
-  CREATE INDEX auth_user_groups_group_id_97559544 ON public.auth_user_groups USING btree (group_id)
+  CREATE UNIQUE INDEX auth_user_groups_user_id_group_id_94350c0c_uniq ON public.auth_user_groups USING btree (user_id, group_id)
   ```
 - `auth_user_groups_pkey`
   ```sql
   CREATE UNIQUE INDEX auth_user_groups_pkey ON public.auth_user_groups USING btree (id)
   ```
-- `auth_user_groups_user_id_group_id_94350c0c_uniq`
+- `auth_user_groups_group_id_97559544`
   ```sql
-  CREATE UNIQUE INDEX auth_user_groups_user_id_group_id_94350c0c_uniq ON public.auth_user_groups USING btree (user_id, group_id)
+  CREATE INDEX auth_user_groups_group_id_97559544 ON public.auth_user_groups USING btree (group_id)
   ```
 - `auth_user_groups_user_id_6a12ed8b`
   ```sql
@@ -1098,7 +1382,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.auth_user_user_permissions`
+## `public.auth_user_user_permissions` (t)
 
 **Primary Key:** id
 
@@ -1117,6 +1401,10 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
+- `auth_user_user_permissions_user_id_a95ead1b`
+  ```sql
+  CREATE INDEX auth_user_user_permissions_user_id_a95ead1b ON public.auth_user_user_permissions USING btree (user_id)
+  ```
 - `auth_user_user_permissions_user_id_permission_id_14a6b632_uniq`
   ```sql
   CREATE UNIQUE INDEX auth_user_user_permissions_user_id_permission_id_14a6b632_uniq ON public.auth_user_user_permissions USING btree (user_id, permission_id)
@@ -1124,10 +1412,6 @@ _No sample data available (table is empty or unreadable)._
 - `auth_user_user_permissions_pkey`
   ```sql
   CREATE UNIQUE INDEX auth_user_user_permissions_pkey ON public.auth_user_user_permissions USING btree (id)
-  ```
-- `auth_user_user_permissions_user_id_a95ead1b`
-  ```sql
-  CREATE INDEX auth_user_user_permissions_user_id_a95ead1b ON public.auth_user_user_permissions USING btree (user_id)
   ```
 - `auth_user_user_permissions_permission_id_1fbb5f2c`
   ```sql
@@ -1140,30 +1424,36 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.ballot_to_parcel`
+## `public.ballot_to_parcel` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `ballot_id` | character varying(50) (varchar) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `is_ambiguous` | boolean (bool) | YES |  |
+| `match_source` | text (text) | YES |  |
 
 ### Indexes
 
-- `ballot_to_parcel_parcel_idx`
+- `ballot_to_parcel_ballot_idx`
   ```sql
-  CREATE INDEX ballot_to_parcel_parcel_idx ON public.ballot_to_parcel USING btree (parcel_number)
-  ```
-- `ballot_to_parcel_ballot_only_idx`
-  ```sql
-  CREATE INDEX ballot_to_parcel_ballot_only_idx ON public.ballot_to_parcel USING btree (ballot_id)
+  CREATE UNIQUE INDEX ballot_to_parcel_ballot_idx ON public.ballot_to_parcel USING btree (ballot_id, election_year)
   ```
 - `ballot_to_parcel_election_neighborhood_idx`
   ```sql
   CREATE INDEX ballot_to_parcel_election_neighborhood_idx ON public.ballot_to_parcel USING btree (election_year, neighborhood_code)
   ```
-- `ballot_to_parcel_ballot_idx`
+- `ballot_to_parcel_ballot_only_idx`
   ```sql
-  CREATE UNIQUE INDEX ballot_to_parcel_ballot_idx ON public.ballot_to_parcel USING btree (ballot_id, election_year)
+  CREATE INDEX ballot_to_parcel_ballot_only_idx ON public.ballot_to_parcel USING btree (ballot_id)
+  ```
+- `ballot_to_parcel_parcel_idx`
+  ```sql
+  CREATE INDEX ballot_to_parcel_parcel_idx ON public.ballot_to_parcel USING btree (parcel_number)
   ```
 
 ### Sample Row
@@ -1179,7 +1469,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.civic_balance_map`
+## `public.civic_balance_map` (m)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 0)
@@ -1188,6 +1478,13 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `tax_year` | integer (int4) | YES |  |
+| `total_tax_paid` | numeric (numeric) | YES |  |
+| `ballots_cast` | bigint (int8) | YES |  |
+| `tax_per_ballot` | numeric (numeric) | YES |  |
+| `tax_burden_quartile` | integer (int4) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
 
 ### Indexes
 
@@ -1214,7 +1511,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.comparable_cache`
+## `public.code_set_activation_rule` (t)
 
 **Primary Key:** id
 
@@ -1223,7 +1520,40 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `parcel_number` | character varying (varchar) | NO |  |
+| `code_set` | character varying(100) (varchar) | NO |  |
+| `parcel_intent` | character varying(100) (varchar) | YES |  |
+| `zoning_use_class` | character varying(50) (varchar) | YES |  |
+| `requires_overlay` | character varying(50) (varchar) | YES |  |
+
+### Indexes
+
+- `code_set_activation_rule_pkey`
+  ```sql
+  CREATE UNIQUE INDEX code_set_activation_rule_pkey ON public.code_set_activation_rule USING btree (id)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 1 |
+| `code_set` | energy_code_residential |
+| `parcel_intent` | new_residential_dwelling |
+| `zoning_use_class` | residential_low |
+| `requires_overlay` | NULL |
+
+---
+
+## `public.comparable_cache` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `parcel_number` | character varying(20) (varchar) | NO |  |
 | `roll_year` | integer (int4) | NO |  |
 | `radius_meters` | integer (int4) | NO |  |
 | `limit` | integer (int4) | NO |  |
@@ -1233,29 +1563,29 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `comparable__parcel__84e718_idx`
+- `comparable_cache_pkey`
   ```sql
-  CREATE INDEX comparable__parcel__84e718_idx ON public.comparable_cache USING btree (parcel_number, roll_year)
-  ```
-- `comparable_cache_roll_year_8b7a3f12`
-  ```sql
-  CREATE INDEX comparable_cache_roll_year_8b7a3f12 ON public.comparable_cache USING btree (roll_year)
+  CREATE UNIQUE INDEX comparable_cache_pkey ON public.comparable_cache USING btree (id)
   ```
 - `comparable_cache_parcel_number_dc3fdb64_like`
   ```sql
   CREATE INDEX comparable_cache_parcel_number_dc3fdb64_like ON public.comparable_cache USING btree (parcel_number varchar_pattern_ops)
   ```
-- `comparable_cache_parcel_number_dc3fdb64`
+- `comparable_cache_roll_year_8b7a3f12`
   ```sql
-  CREATE INDEX comparable_cache_parcel_number_dc3fdb64 ON public.comparable_cache USING btree (parcel_number)
-  ```
-- `comparable_cache_pkey`
-  ```sql
-  CREATE UNIQUE INDEX comparable_cache_pkey ON public.comparable_cache USING btree (id)
+  CREATE INDEX comparable_cache_roll_year_8b7a3f12 ON public.comparable_cache USING btree (roll_year)
   ```
 - `comparable_cache_parcel_number_roll_year__3f1a1a63_uniq`
   ```sql
   CREATE UNIQUE INDEX comparable_cache_parcel_number_roll_year__3f1a1a63_uniq ON public.comparable_cache USING btree (parcel_number, roll_year, radius_meters, "limit")
+  ```
+- `comparable_cache_parcel_number_dc3fdb64`
+  ```sql
+  CREATE INDEX comparable_cache_parcel_number_dc3fdb64 ON public.comparable_cache USING btree (parcel_number)
+  ```
+- `comparable__parcel__84e718_idx`
+  ```sql
+  CREATE INDEX comparable__parcel__84e718_idx ON public.comparable_cache USING btree (parcel_number, roll_year)
   ```
 
 ### Sample Row
@@ -1273,7 +1603,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.conversation_messages`
+## `public.conversation_messages` (t)
 
 **Primary Key:** id
 
@@ -1282,10 +1612,10 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `role` | character varying (varchar) | NO |  |
+| `role` | character varying(20) (varchar) | NO |  |
 | `content` | text (text) | NO |  |
 | `sources` | jsonb (jsonb) | NO |  |
-| `model` | character varying (varchar) | YES |  |
+| `model` | character varying(100) (varchar) | YES |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `conversation_id` | uuid (uuid) | NO |  |
 
@@ -1295,10 +1625,6 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `conversatio_convers_01af31_idx`
-  ```sql
-  CREATE INDEX conversatio_convers_01af31_idx ON public.conversation_messages USING btree (conversation_id, created_at)
-  ```
 - `conversation_messages_pkey`
   ```sql
   CREATE UNIQUE INDEX conversation_messages_pkey ON public.conversation_messages USING btree (id)
@@ -1306,6 +1632,10 @@ _No sample data available (table is empty or unreadable)._
 - `conversation_messages_conversation_id_52b02ddd`
   ```sql
   CREATE INDEX conversation_messages_conversation_id_52b02ddd ON public.conversation_messages USING btree (conversation_id)
+  ```
+- `conversatio_convers_01af31_idx`
+  ```sql
+  CREATE INDEX conversatio_convers_01af31_idx ON public.conversation_messages USING btree (conversation_id, created_at)
   ```
 
 ### Sample Row
@@ -1322,7 +1652,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.conversations`
+## `public.conversations` (t)
 
 **Primary Key:** id
 
@@ -1331,18 +1661,14 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | uuid (uuid) | NO |  |
-| `session_key` | character varying (varchar) | YES |  |
-| `title` | character varying (varchar) | NO |  |
+| `session_key` | character varying(255) (varchar) | YES |  |
+| `title` | character varying(255) (varchar) | NO |  |
 | `context_data` | jsonb (jsonb) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `conversations_session_key_4a43491d`
-  ```sql
-  CREATE INDEX conversations_session_key_4a43491d ON public.conversations USING btree (session_key)
-  ```
 - `conversatio_updated_c163ba_idx`
   ```sql
   CREATE INDEX conversatio_updated_c163ba_idx ON public.conversations USING btree (updated_at DESC)
@@ -1351,13 +1677,17 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX conversatio_session_69f832_idx ON public.conversations USING btree (session_key, updated_at DESC)
   ```
+- `conversations_session_key_4a43491d_like`
+  ```sql
+  CREATE INDEX conversations_session_key_4a43491d_like ON public.conversations USING btree (session_key varchar_pattern_ops)
+  ```
 - `conversations_pkey`
   ```sql
   CREATE UNIQUE INDEX conversations_pkey ON public.conversations USING btree (id)
   ```
-- `conversations_session_key_4a43491d_like`
+- `conversations_session_key_4a43491d`
   ```sql
-  CREATE INDEX conversations_session_key_4a43491d_like ON public.conversations USING btree (session_key varchar_pattern_ops)
+  CREATE INDEX conversations_session_key_4a43491d ON public.conversations USING btree (session_key)
   ```
 
 ### Sample Row
@@ -1373,7 +1703,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.core_analytics_pageview`
+## `public.core_analytics_pageview` (t)
 
 **Primary Key:** id
 
@@ -1382,21 +1712,21 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
-| `url` | character varying (varchar) | NO |  |
+| `url` | character varying(2048) (varchar) | NO |  |
 | `timestamp` | timestamp with time zone (timestamptz) | NO |  |
 | `ip_address` | inet (inet) | YES |  |
-| `user_agent` | character varying (varchar) | NO |  |
+| `user_agent` | character varying(512) (varchar) | NO |  |
 | `user_id` | integer (int4) | YES |  |
-| `browser` | character varying (varchar) | NO |  |
-| `device_type` | character varying (varchar) | NO |  |
+| `browser` | character varying(30) (varchar) | NO |  |
+| `device_type` | character varying(20) (varchar) | NO |  |
 | `is_new_session` | boolean (bool) | NO |  |
 | `processing_time` | double precision (float8) | YES |  |
-| `referrer` | character varying (varchar) | YES |  |
-| `session_key` | character varying (varchar) | NO |  |
+| `referrer` | character varying(2048) (varchar) | YES |  |
+| `session_key` | character varying(40) (varchar) | NO |  |
 | `db_queries` | integer (int4) | YES |  |
 | `status_code` | integer (int4) | YES |  |
 | `is_error` | boolean (bool) | NO |  |
-| `previous_url` | character varying (varchar) | YES |  |
+| `previous_url` | character varying(2048) (varchar) | YES |  |
 
 ### Foreign Keys
 
@@ -1404,37 +1734,37 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `pageview_ts_url_idx`
+- `core_analytics_pageview_timestamp_ee86fd47`
   ```sql
-  CREATE INDEX pageview_ts_url_idx ON public.core_analytics_pageview USING btree ("timestamp", url)
+  CREATE INDEX core_analytics_pageview_timestamp_ee86fd47 ON public.core_analytics_pageview USING btree ("timestamp")
   ```
 - `core_analytics_pageview_user_id_7d7a817e`
   ```sql
   CREATE INDEX core_analytics_pageview_user_id_7d7a817e ON public.core_analytics_pageview USING btree (user_id)
   ```
-- `core_analytics_pageview_timestamp_ee86fd47`
+- `pageview_ts_url_idx`
   ```sql
-  CREATE INDEX core_analytics_pageview_timestamp_ee86fd47 ON public.core_analytics_pageview USING btree ("timestamp")
+  CREATE INDEX pageview_ts_url_idx ON public.core_analytics_pageview USING btree ("timestamp", url)
   ```
 - `core_analytics_pageview_url_531e608d_like`
   ```sql
   CREATE INDEX core_analytics_pageview_url_531e608d_like ON public.core_analytics_pageview USING btree (url varchar_pattern_ops)
   ```
-- `core_analytics_pageview_url_531e608d`
+- `core_analytics_pageview_session_key_9b77df36`
   ```sql
-  CREATE INDEX core_analytics_pageview_url_531e608d ON public.core_analytics_pageview USING btree (url)
+  CREATE INDEX core_analytics_pageview_session_key_9b77df36 ON public.core_analytics_pageview USING btree (session_key)
   ```
 - `core_analytics_pageview_pkey`
   ```sql
   CREATE UNIQUE INDEX core_analytics_pageview_pkey ON public.core_analytics_pageview USING btree (id)
   ```
+- `core_analytics_pageview_url_531e608d`
+  ```sql
+  CREATE INDEX core_analytics_pageview_url_531e608d ON public.core_analytics_pageview USING btree (url)
+  ```
 - `core_analytics_pageview_session_key_9b77df36_like`
   ```sql
   CREATE INDEX core_analytics_pageview_session_key_9b77df36_like ON public.core_analytics_pageview USING btree (session_key varchar_pattern_ops)
-  ```
-- `core_analytics_pageview_session_key_9b77df36`
-  ```sql
-  CREATE INDEX core_analytics_pageview_session_key_9b77df36 ON public.core_analytics_pageview USING btree (session_key)
   ```
 
 ### Sample Row
@@ -1460,7 +1790,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.derived_parcel_centroid`
+## `public.derived_parcel_centroid` (t)
 
 **Primary Key:** parcel_id
 
@@ -1471,8 +1801,8 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `parcel_id` | character varying (varchar) | NO |  |
-| `centroid_2926` | USER-DEFINED (geometry) | NO |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
+| `centroid_2926` | geometry(Point,2926) (geometry) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Foreign Keys
@@ -1481,21 +1811,21 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `derived_par_centroi_3213ac_gist`
-  ```sql
-  CREATE INDEX derived_par_centroi_3213ac_gist ON public.derived_parcel_centroid USING gist (centroid_2926)
-  ```
-- `derived_parcel_centroid_pkey`
-  ```sql
-  CREATE UNIQUE INDEX derived_parcel_centroid_pkey ON public.derived_parcel_centroid USING btree (parcel_id)
-  ```
 - `derived_parcel_centroid_parcel_id_b52121f6_like`
   ```sql
   CREATE INDEX derived_parcel_centroid_parcel_id_b52121f6_like ON public.derived_parcel_centroid USING btree (parcel_id varchar_pattern_ops)
   ```
+- `derived_par_centroi_3213ac_gist`
+  ```sql
+  CREATE INDEX derived_par_centroi_3213ac_gist ON public.derived_parcel_centroid USING gist (centroid_2926)
+  ```
 - `derived_parcel_centroid_centroid_2926_250fc013_id`
   ```sql
   CREATE INDEX derived_parcel_centroid_centroid_2926_250fc013_id ON public.derived_parcel_centroid USING gist (centroid_2926)
+  ```
+- `derived_parcel_centroid_pkey`
+  ```sql
+  CREATE UNIQUE INDEX derived_parcel_centroid_pkey ON public.derived_parcel_centroid USING btree (parcel_id)
   ```
 
 ### Sample Row
@@ -1504,7 +1834,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.derived_parcel_distances`
+## `public.derived_parcel_distances` (t)
 
 **Primary Key:** parcel_id
 
@@ -1545,11 +1875,11 @@ _No sample data available (table is empty or unreadable)._
 | `dist_supermarket` | NULL |
 | `dist_hospital` | NULL |
 | `dist_fire_station` | NULL |
-| `updated_at` | 2026-01-17 15:21:07.489302 |
+| `updated_at` | 2026-01-19 20:41:36.388663 |
 
 ---
 
-## `public.district_tdcode`
+## `public.district_tdcode` (t)
 
 ### Columns
 
@@ -1562,13 +1892,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `district_tdcode_tdcode_idx`
-  ```sql
-  CREATE INDEX district_tdcode_tdcode_idx ON public.district_tdcode USING btree (tdcode)
-  ```
 - `district_tdcode_district_type_district_code_idx`
   ```sql
   CREATE INDEX district_tdcode_district_type_district_code_idx ON public.district_tdcode USING btree (district_type, district_code)
+  ```
+- `district_tdcode_tdcode_idx`
+  ```sql
+  CREATE INDEX district_tdcode_tdcode_idx ON public.district_tdcode USING btree (tdcode)
   ```
 
 ### Sample Row
@@ -1576,13 +1906,13 @@ _No sample data available (table is empty or unreadable)._
 | Column | Value |
 |--------|-------|
 | `district_type` | countywide |
-| `district_code` | NULL |
+| `district_code` | 290000000 |
 | `tdcode` | 290000000 |
 | `assessment_year` | 2024 |
 
 ---
 
-## `public.django_admin_log`
+## `public.django_admin_log` (t)
 
 **Primary Key:** id
 
@@ -1593,7 +1923,7 @@ _No sample data available (table is empty or unreadable)._
 | `id` | integer (int4) | NO |  |
 | `action_time` | timestamp with time zone (timestamptz) | NO |  |
 | `object_id` | text (text) | YES |  |
-| `object_repr` | character varying (varchar) | NO |  |
+| `object_repr` | character varying(200) (varchar) | NO |  |
 | `action_flag` | smallint (int2) | NO |  |
 | `change_message` | text (text) | NO |  |
 | `content_type_id` | integer (int4) | YES |  |
@@ -1606,17 +1936,17 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `django_admin_log_content_type_id_c4bce8eb`
+- `django_admin_log_user_id_c564eba6`
   ```sql
-  CREATE INDEX django_admin_log_content_type_id_c4bce8eb ON public.django_admin_log USING btree (content_type_id)
+  CREATE INDEX django_admin_log_user_id_c564eba6 ON public.django_admin_log USING btree (user_id)
   ```
 - `django_admin_log_pkey`
   ```sql
   CREATE UNIQUE INDEX django_admin_log_pkey ON public.django_admin_log USING btree (id)
   ```
-- `django_admin_log_user_id_c564eba6`
+- `django_admin_log_content_type_id_c4bce8eb`
   ```sql
-  CREATE INDEX django_admin_log_user_id_c564eba6 ON public.django_admin_log USING btree (user_id)
+  CREATE INDEX django_admin_log_content_type_id_c4bce8eb ON public.django_admin_log USING btree (content_type_id)
   ```
 
 ### Sample Row
@@ -1634,7 +1964,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.django_content_type`
+## `public.django_content_type` (t)
 
 **Primary Key:** id
 
@@ -1643,18 +1973,18 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
-| `app_label` | character varying (varchar) | NO |  |
-| `model` | character varying (varchar) | NO |  |
+| `app_label` | character varying(100) (varchar) | NO |  |
+| `model` | character varying(100) (varchar) | NO |  |
 
 ### Indexes
 
-- `django_content_type_pkey`
-  ```sql
-  CREATE UNIQUE INDEX django_content_type_pkey ON public.django_content_type USING btree (id)
-  ```
 - `django_content_type_app_label_model_76bd3d3b_uniq`
   ```sql
   CREATE UNIQUE INDEX django_content_type_app_label_model_76bd3d3b_uniq ON public.django_content_type USING btree (app_label, model)
+  ```
+- `django_content_type_pkey`
+  ```sql
+  CREATE UNIQUE INDEX django_content_type_pkey ON public.django_content_type USING btree (id)
   ```
 
 ### Sample Row
@@ -1667,7 +1997,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.django_migrations`
+## `public.django_migrations` (t)
 
 **Primary Key:** id
 
@@ -1676,8 +2006,8 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
-| `app` | character varying (varchar) | NO |  |
-| `name` | character varying (varchar) | NO |  |
+| `app` | character varying(255) (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
 | `applied` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
@@ -1698,7 +2028,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.django_session`
+## `public.django_session` (t)
 
 **Primary Key:** session_key
 
@@ -1706,23 +2036,23 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `session_key` | character varying (varchar) | NO |  |
+| `session_key` | character varying(40) (varchar) | NO |  |
 | `session_data` | text (text) | NO |  |
 | `expire_date` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `django_session_expire_date_a5c62663`
+- `django_session_pkey`
   ```sql
-  CREATE INDEX django_session_expire_date_a5c62663 ON public.django_session USING btree (expire_date)
+  CREATE UNIQUE INDEX django_session_pkey ON public.django_session USING btree (session_key)
   ```
 - `django_session_session_key_c0390e0f_like`
   ```sql
   CREATE INDEX django_session_session_key_c0390e0f_like ON public.django_session USING btree (session_key varchar_pattern_ops)
   ```
-- `django_session_pkey`
+- `django_session_expire_date_a5c62663`
   ```sql
-  CREATE UNIQUE INDEX django_session_pkey ON public.django_session USING btree (session_key)
+  CREATE INDEX django_session_expire_date_a5c62663 ON public.django_session USING btree (expire_date)
   ```
 
 ### Sample Row
@@ -1735,7 +2065,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.fact_neighborhood_participation`
+## `public.fact_neighborhood_participation` (m)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 0)
@@ -1744,9 +2074,27 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `ballots_cast` | bigint (int8) | YES |  |
+| `residential_parcels` | bigint (int8) | YES |  |
+| `npi` | double precision (float8) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
+| `primary_precinct_code` | bigint (int8) | YES |  |
+| `precinct_ballots_cast` | bigint (int8) | YES |  |
+| `precinct_residential_parcels` | bigint (int8) | YES |  |
+| `precinct_ppi` | double precision (float8) | YES |  |
+| `precinct_po_box_pct` | double precision (float8) | YES |  |
+| `precinct_po_box_ballots` | bigint (int8) | YES |  |
+| `assignment_coverage_precinct` | double precision (float8) | YES |  |
+| `ambiguous_ballots` | bigint (int8) | YES |  |
 
 ### Indexes
 
+- `fact_neighborhood_participation_geom_idx`
+  ```sql
+  CREATE INDEX fact_neighborhood_participation_geom_idx ON public.fact_neighborhood_participation USING gist (geom_2926)
+  ```
 - `fact_neighborhood_participation_year_idx`
   ```sql
   CREATE INDEX fact_neighborhood_participation_year_idx ON public.fact_neighborhood_participation USING btree (election_year)
@@ -1754,10 +2102,6 @@ _No sample data available (table is empty or unreadable)._
 - `fact_neighborhood_participation_code_year_idx`
   ```sql
   CREATE UNIQUE INDEX fact_neighborhood_participation_code_year_idx ON public.fact_neighborhood_participation USING btree (neighborhood_code, election_year)
-  ```
-- `fact_neighborhood_participation_geom_idx`
-  ```sql
-  CREATE INDEX fact_neighborhood_participation_geom_idx ON public.fact_neighborhood_participation USING gist (geom_2926)
   ```
 
 ### Sample Row
@@ -1781,7 +2125,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.fact_precinct_civic_balance`
+## `public.fact_precinct_civic_balance` (t)
 
 ### Columns
 
@@ -1818,7 +2162,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.fact_precinct_tax_burden`
+## `public.fact_precinct_tax_burden` (t)
 
 ### Columns
 
@@ -1851,7 +2195,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.fact_precinct_turnout`
+## `public.fact_precinct_turnout` (t)
 
 ### Columns
 
@@ -1864,13 +2208,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_fact_turnout_election`
-  ```sql
-  CREATE INDEX idx_fact_turnout_election ON public.fact_precinct_turnout USING btree (election_id)
-  ```
 - `idx_fact_turnout_prec_year`
   ```sql
   CREATE INDEX idx_fact_turnout_prec_year ON public.fact_precinct_turnout USING btree (prec_code, election_year)
+  ```
+- `idx_fact_turnout_election`
+  ```sql
+  CREATE INDEX idx_fact_turnout_election ON public.fact_precinct_turnout USING btree (election_id)
   ```
 
 ### Sample Row
@@ -1884,7 +2228,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_crawllog`
+## `public.gastronet_crawllog` (t)
 
 **Primary Key:** id
 
@@ -1893,8 +2237,8 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `task` | character varying (varchar) | NO |  |
-| `scope` | character varying (varchar) | YES |  |
+| `task` | character varying(100) (varchar) | NO |  |
+| `scope` | character varying(200) (varchar) | YES |  |
 | `started_at` | timestamp with time zone (timestamptz) | NO |  |
 | `ended_at` | timestamp with time zone (timestamptz) | YES |  |
 | `success_count` | integer (int4) | NO |  |
@@ -1931,7 +2275,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_menuattempt`
+## `public.gastronet_menuattempt` (t)
 
 **Primary Key:** id
 
@@ -1940,11 +2284,11 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `tried_url` | character varying (varchar) | YES |  |
-| `source` | character varying (varchar) | YES |  |
+| `tried_url` | character varying(200) (varchar) | YES |  |
+| `source` | character varying(50) (varchar) | YES |  |
 | `found` | boolean (bool) | NO |  |
 | `parsed` | boolean (bool) | NO |  |
-| `status` | character varying (varchar) | YES |  |
+| `status` | character varying(200) (varchar) | YES |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `finished_at` | timestamp with time zone (timestamptz) | YES |  |
 | `restaurant_id` | bigint (int8) | NO |  |
@@ -1984,7 +2328,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_menuitem`
+## `public.gastronet_menuitem` (t)
 
 **Primary Key:** id
 
@@ -1993,13 +2337,13 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `source_url` | character varying (varchar) | NO |  |
-| `name` | character varying (varchar) | NO |  |
+| `source_url` | character varying(500) (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
 | `description` | text (text) | NO |  |
-| `price` | numeric (numeric) | YES |  |
-| `section` | character varying (varchar) | NO |  |
+| `price` | numeric(8,2) (numeric) | YES |  |
+| `section` | character varying(255) (varchar) | NO |  |
 | `dietary_tags` | jsonb (jsonb) | NO |  |
-| `currency` | character varying (varchar) | NO |  |
+| `currency` | character varying(8) (varchar) | NO |  |
 | `scraped_at` | timestamp with time zone (timestamptz) | NO |  |
 | `restaurant_id` | bigint (int8) | NO |  |
 | `enrichment_v1` | jsonb (jsonb) | YES |  |
@@ -2010,10 +2354,6 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `gastronet_menuitem_restaurant_id_fc457c0e`
-  ```sql
-  CREATE INDEX gastronet_menuitem_restaurant_id_fc457c0e ON public.gastronet_menuitem USING btree (restaurant_id)
-  ```
 - `gastronet_menuitem_pkey`
   ```sql
   CREATE UNIQUE INDEX gastronet_menuitem_pkey ON public.gastronet_menuitem USING btree (id)
@@ -2021,6 +2361,10 @@ _No sample data available (table is empty or unreadable)._
 - `gastronet_menuitem_restaurant_id_source_url_name_bb938c2c_uniq`
   ```sql
   CREATE UNIQUE INDEX gastronet_menuitem_restaurant_id_source_url_name_bb938c2c_uniq ON public.gastronet_menuitem USING btree (restaurant_id, source_url, name)
+  ```
+- `gastronet_menuitem_restaurant_id_fc457c0e`
+  ```sql
+  CREATE INDEX gastronet_menuitem_restaurant_id_fc457c0e ON public.gastronet_menuitem USING btree (restaurant_id)
   ```
 
 ### Sample Row
@@ -2041,7 +2385,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_menusnapshot`
+## `public.gastronet_menusnapshot` (t)
 
 **Primary Key:** id
 
@@ -2051,12 +2395,12 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
 | `fetched_at` | timestamp with time zone (timestamptz) | NO |  |
-| `source_url` | character varying (varchar) | NO |  |
+| `source_url` | character varying(200) (varchar) | NO |  |
 | `text` | text (text) | NO |  |
-| `hash` | character varying (varchar) | NO |  |
+| `hash` | character varying(64) (varchar) | NO |  |
 | `parsed_json` | jsonb (jsonb) | YES |  |
 | `summary` | text (text) | YES |  |
-| `render_method` | character varying (varchar) | YES |  |
+| `render_method` | character varying(50) (varchar) | YES |  |
 | `restaurant_id` | bigint (int8) | NO |  |
 
 ### Foreign Keys
@@ -2065,13 +2409,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `gastronet_menusnapshot_restaurant_id_9bf77db9`
-  ```sql
-  CREATE INDEX gastronet_menusnapshot_restaurant_id_9bf77db9 ON public.gastronet_menusnapshot USING btree (restaurant_id)
-  ```
 - `gastronet_m_restaur_ca5a20_idx`
   ```sql
   CREATE INDEX gastronet_m_restaur_ca5a20_idx ON public.gastronet_menusnapshot USING btree (restaurant_id, fetched_at)
+  ```
+- `gastronet_menusnapshot_restaurant_id_9bf77db9`
+  ```sql
+  CREATE INDEX gastronet_menusnapshot_restaurant_id_9bf77db9 ON public.gastronet_menusnapshot USING btree (restaurant_id)
   ```
 - `gastronet_menusnapshot_pkey`
   ```sql
@@ -2094,7 +2438,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_restaurant`
+## `public.gastronet_restaurant` (t)
 
 **Primary Key:** id
 
@@ -2103,28 +2447,28 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `place_id` | character varying (varchar) | NO |  |
-| `name` | character varying (varchar) | NO |  |
+| `place_id` | character varying(400) (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
 | `address` | text (text) | YES |  |
-| `city` | character varying (varchar) | YES |  |
-| `website` | character varying (varchar) | YES |  |
-| `phone` | character varying (varchar) | YES |  |
-| `menu_url` | character varying (varchar) | YES |  |
+| `city` | character varying(100) (varchar) | YES |  |
+| `website` | character varying(2000) (varchar) | YES |  |
+| `phone` | character varying(50) (varchar) | YES |  |
+| `menu_url` | character varying(2000) (varchar) | YES |  |
 | `url_checked_at` | timestamp with time zone (timestamptz) | YES |  |
-| `url_source` | character varying (varchar) | YES |  |
+| `url_source` | character varying(100) (varchar) | YES |  |
 | `description` | text (text) | YES |  |
-| `category` | character varying (varchar) | YES |  |
-| `cuisine` | character varying (varchar) | YES |  |
+| `category` | character varying(500) (varchar) | YES |  |
+| `cuisine` | character varying(100) (varchar) | YES |  |
 | `rating` | double precision (float8) | YES |  |
 | `review_count` | integer (int4) | NO |  |
 | `sentiment_score` | double precision (float8) | YES |  |
 | `latitude` | double precision (float8) | YES |  |
 | `longitude` | double precision (float8) | YES |  |
-| `location` | USER-DEFINED (geography) | YES |  |
-| `embedding` | USER-DEFINED (vector) | YES |  |
+| `location` | geography(Point,4326) (geography) | YES |  |
+| `embedding` | vector(1536) (vector) | YES |  |
 | `summary` | text (text) | YES |  |
 | `keywords` | jsonb (jsonb) | YES |  |
-| `source` | character varying (varchar) | NO |  |
+| `source` | character varying(50) (varchar) | NO |  |
 | `last_review_date` | timestamp with time zone (timestamptz) | YES |  |
 | `avg_review_gap_days` | double precision (float8) | YES |  |
 | `next_fetch_at` | timestamp with time zone (timestamptz) | YES |  |
@@ -2135,14 +2479,14 @@ _No sample data available (table is empty or unreadable)._
 | `last_seen` | timestamp with time zone (timestamptz) | NO |  |
 | `hours` | jsonb (jsonb) | YES |  |
 | `about` | jsonb (jsonb) | YES |  |
-| `price_range` | character varying (varchar) | YES |  |
-| `logo_url` | character varying (varchar) | YES |  |
-| `photo_url` | character varying (varchar) | YES |  |
-| `street_view` | character varying (varchar) | YES |  |
-| `location_link` | character varying (varchar) | YES |  |
-| `booking_appointment_link` | character varying (varchar) | YES |  |
-| `owner_link` | character varying (varchar) | YES |  |
-| `reviews_url` | character varying (varchar) | YES |  |
+| `price_range` | character varying(20) (varchar) | YES |  |
+| `logo_url` | character varying(2000) (varchar) | YES |  |
+| `photo_url` | character varying(2000) (varchar) | YES |  |
+| `street_view` | character varying(2000) (varchar) | YES |  |
+| `location_link` | character varying(2000) (varchar) | YES |  |
+| `booking_appointment_link` | character varying(2000) (varchar) | YES |  |
+| `owner_link` | character varying(2000) (varchar) | YES |  |
+| `reviews_url` | character varying(2000) (varchar) | YES |  |
 | `reservation_links` | jsonb (jsonb) | YES |  |
 | `order_links` | jsonb (jsonb) | YES |  |
 | `last_crawled_at` | timestamp with time zone (timestamptz) | YES |  |
@@ -2150,7 +2494,7 @@ _No sample data available (table is empty or unreadable)._
 | `is_chain` | boolean (bool) | NO |  |
 | `google_accessibility_options` | jsonb (jsonb) | YES |  |
 | `google_allows_dogs` | boolean (bool) | YES |  |
-| `google_business_status` | character varying (varchar) | YES |  |
+| `google_business_status` | character varying(100) (varchar) | YES |  |
 | `google_curbside_pickup` | boolean (bool) | YES |  |
 | `google_delivery` | boolean (bool) | YES |  |
 | `google_dine_in` | boolean (bool) | YES |  |
@@ -2169,7 +2513,7 @@ _No sample data available (table is empty or unreadable)._
 | `google_outdoor_seating` | boolean (bool) | YES |  |
 | `google_parking_options` | jsonb (jsonb) | YES |  |
 | `google_payment_options` | jsonb (jsonb) | YES |  |
-| `google_primary_type` | character varying (varchar) | YES |  |
+| `google_primary_type` | character varying(200) (varchar) | YES |  |
 | `google_raw_place` | jsonb (jsonb) | YES |  |
 | `google_reservable` | boolean (bool) | YES |  |
 | `google_restroom` | boolean (bool) | YES |  |
@@ -2186,7 +2530,7 @@ _No sample data available (table is empty or unreadable)._
 | `google_serves_vegetarian_food` | boolean (bool) | YES |  |
 | `google_serves_wine` | boolean (bool) | YES |  |
 | `google_takeout` | boolean (bool) | YES |  |
-| `google_types` | ARRAY (_varchar) | NO |  |
+| `google_types` | character varying(100)[] (_varchar) | NO |  |
 | `google_viewport` | jsonb (jsonb) | YES |  |
 | `profiles` | jsonb (jsonb) | YES |  |
 | `menu_profile_v1` | jsonb (jsonb) | YES |  |
@@ -2198,41 +2542,41 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX gastronet_r_city_ee9961_idx ON public.gastronet_restaurant USING btree (city, category)
   ```
-- `gastronet_restaurant_pkey`
+- `gastronet_restaurant_location_dc46f15c_id`
   ```sql
-  CREATE UNIQUE INDEX gastronet_restaurant_pkey ON public.gastronet_restaurant USING btree (id)
-  ```
-- `gastronet_restaurant_place_id_key`
-  ```sql
-  CREATE UNIQUE INDEX gastronet_restaurant_place_id_key ON public.gastronet_restaurant USING btree (place_id)
+  CREATE INDEX gastronet_restaurant_location_dc46f15c_id ON public.gastronet_restaurant USING gist (location)
   ```
 - `gastronet_restaurant_place_id_6a30946a_like`
   ```sql
   CREATE INDEX gastronet_restaurant_place_id_6a30946a_like ON public.gastronet_restaurant USING btree (place_id varchar_pattern_ops)
   ```
-- `gastronet_restaurant_is_chain_33d2771b`
-  ```sql
-  CREATE INDEX gastronet_restaurant_is_chain_33d2771b ON public.gastronet_restaurant USING btree (is_chain)
-  ```
-- `gastronet_restaurant_name_eb4e9f10`
-  ```sql
-  CREATE INDEX gastronet_restaurant_name_eb4e9f10 ON public.gastronet_restaurant USING btree (name)
-  ```
 - `gastronet_r_next_fe_eb2f1f_idx`
   ```sql
   CREATE INDEX gastronet_r_next_fe_eb2f1f_idx ON public.gastronet_restaurant USING btree (next_fetch_at)
   ```
-- `gastronet_r_city_8e1d35_idx`
+- `gastronet_restaurant_place_id_key`
   ```sql
-  CREATE INDEX gastronet_r_city_8e1d35_idx ON public.gastronet_restaurant USING btree (city, active)
+  CREATE UNIQUE INDEX gastronet_restaurant_place_id_key ON public.gastronet_restaurant USING btree (place_id)
+  ```
+- `gastronet_restaurant_pkey`
+  ```sql
+  CREATE UNIQUE INDEX gastronet_restaurant_pkey ON public.gastronet_restaurant USING btree (id)
   ```
 - `gastronet_restaurant_name_eb4e9f10_like`
   ```sql
   CREATE INDEX gastronet_restaurant_name_eb4e9f10_like ON public.gastronet_restaurant USING btree (name varchar_pattern_ops)
   ```
-- `gastronet_restaurant_location_dc46f15c_id`
+- `gastronet_restaurant_is_chain_33d2771b`
   ```sql
-  CREATE INDEX gastronet_restaurant_location_dc46f15c_id ON public.gastronet_restaurant USING gist (location)
+  CREATE INDEX gastronet_restaurant_is_chain_33d2771b ON public.gastronet_restaurant USING btree (is_chain)
+  ```
+- `gastronet_r_city_8e1d35_idx`
+  ```sql
+  CREATE INDEX gastronet_r_city_8e1d35_idx ON public.gastronet_restaurant USING btree (city, active)
+  ```
+- `gastronet_restaurant_name_eb4e9f10`
+  ```sql
+  CREATE INDEX gastronet_restaurant_name_eb4e9f10 ON public.gastronet_restaurant USING btree (name)
   ```
 
 ### Sample Row
@@ -2331,7 +2675,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_restaurantcrawllog`
+## `public.gastronet_restaurantcrawllog` (t)
 
 **Primary Key:** id
 
@@ -2340,7 +2684,7 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `task` | character varying (varchar) | NO |  |
+| `task` | character varying(100) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `restaurant_id` | bigint (int8) | NO |  |
 
@@ -2350,10 +2694,6 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `gastronet_restaurantcrawllog_restaurant_id_task_9bdc541b_uniq`
-  ```sql
-  CREATE UNIQUE INDEX gastronet_restaurantcrawllog_restaurant_id_task_9bdc541b_uniq ON public.gastronet_restaurantcrawllog USING btree (restaurant_id, task)
-  ```
 - `gastronet_restaurantcrawllog_pkey`
   ```sql
   CREATE UNIQUE INDEX gastronet_restaurantcrawllog_pkey ON public.gastronet_restaurantcrawllog USING btree (id)
@@ -2361,6 +2701,10 @@ _No sample data available (table is empty or unreadable)._
 - `gastronet_restaurantcrawllog_restaurant_id_c3e2ec5a`
   ```sql
   CREATE INDEX gastronet_restaurantcrawllog_restaurant_id_c3e2ec5a ON public.gastronet_restaurantcrawllog USING btree (restaurant_id)
+  ```
+- `gastronet_restaurantcrawllog_restaurant_id_task_9bdc541b_uniq`
+  ```sql
+  CREATE UNIQUE INDEX gastronet_restaurantcrawllog_restaurant_id_task_9bdc541b_uniq ON public.gastronet_restaurantcrawllog USING btree (restaurant_id, task)
   ```
 
 ### Sample Row
@@ -2374,7 +2718,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_review`
+## `public.gastronet_review` (t)
 
 **Primary Key:** id
 
@@ -2383,8 +2727,8 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `source` | character varying (varchar) | NO |  |
-| `review_id` | character varying (varchar) | NO |  |
+| `source` | character varying(50) (varchar) | NO |  |
+| `review_id` | character varying(200) (varchar) | NO |  |
 | `rating` | double precision (float8) | YES |  |
 | `text` | text (text) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
@@ -2402,14 +2746,6 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE UNIQUE INDEX gastronet_review_restaurant_id_source_review_id_4c325e6b_uniq ON public.gastronet_review USING btree (restaurant_id, source, review_id)
   ```
-- `gastronet_review_review_id_16f1ac18_like`
-  ```sql
-  CREATE INDEX gastronet_review_review_id_16f1ac18_like ON public.gastronet_review USING btree (review_id varchar_pattern_ops)
-  ```
-- `gastronet_review_restaurant_id_61031e6b`
-  ```sql
-  CREATE INDEX gastronet_review_restaurant_id_61031e6b ON public.gastronet_review USING btree (restaurant_id)
-  ```
 - `gastronet_review_pkey`
   ```sql
   CREATE UNIQUE INDEX gastronet_review_pkey ON public.gastronet_review USING btree (id)
@@ -2417,6 +2753,14 @@ _No sample data available (table is empty or unreadable)._
 - `gastronet_review_review_id_16f1ac18`
   ```sql
   CREATE INDEX gastronet_review_review_id_16f1ac18 ON public.gastronet_review USING btree (review_id)
+  ```
+- `gastronet_review_review_id_16f1ac18_like`
+  ```sql
+  CREATE INDEX gastronet_review_review_id_16f1ac18_like ON public.gastronet_review USING btree (review_id varchar_pattern_ops)
+  ```
+- `gastronet_review_restaurant_id_61031e6b`
+  ```sql
+  CREATE INDEX gastronet_review_restaurant_id_61031e6b ON public.gastronet_review USING btree (restaurant_id)
   ```
 - `gastronet_r_restaur_d01639_idx`
   ```sql
@@ -2439,7 +2783,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_reviewenrichment`
+## `public.gastronet_reviewenrichment` (t)
 
 **Primary Key:** id
 
@@ -2448,24 +2792,24 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `sentiment_overall` | character varying (varchar) | YES |  |
+| `sentiment_overall` | character varying(10) (varchar) | YES |  |
 | `sentiment_score` | double precision (float8) | YES |  |
-| `menu_items` | ARRAY (_varchar) | NO |  |
-| `menu_item_sentiments` | ARRAY (_varchar) | NO |  |
-| `staff_names` | ARRAY (_varchar) | NO |  |
-| `staff_roles` | ARRAY (_varchar) | NO |  |
-| `staff_sentiments` | ARRAY (_varchar) | NO |  |
-| `value_for_money` | character varying (varchar) | YES |  |
-| `ambience` | character varying (varchar) | YES |  |
-| `service_speed` | character varying (varchar) | YES |  |
-| `service_attitude` | character varying (varchar) | YES |  |
-| `wait_time_description` | character varying (varchar) | YES |  |
-| `intents` | ARRAY (_varchar) | NO |  |
-| `highlights` | ARRAY (_varchar) | NO |  |
-| `issue_categories` | ARRAY (_varchar) | NO |  |
-| `issue_descriptions` | ARRAY (_varchar) | NO |  |
+| `menu_items` | character varying(255)[] (_varchar) | NO |  |
+| `menu_item_sentiments` | character varying(10)[] (_varchar) | NO |  |
+| `staff_names` | character varying(255)[] (_varchar) | NO |  |
+| `staff_roles` | character varying(100)[] (_varchar) | NO |  |
+| `staff_sentiments` | character varying(10)[] (_varchar) | NO |  |
+| `value_for_money` | character varying(10) (varchar) | YES |  |
+| `ambience` | character varying(10) (varchar) | YES |  |
+| `service_speed` | character varying(20) (varchar) | YES |  |
+| `service_attitude` | character varying(20) (varchar) | YES |  |
+| `wait_time_description` | character varying(255) (varchar) | YES |  |
+| `intents` | character varying(50)[] (_varchar) | NO |  |
+| `highlights` | character varying(500)[] (_varchar) | NO |  |
+| `issue_categories` | character varying(100)[] (_varchar) | NO |  |
+| `issue_descriptions` | character varying(500)[] (_varchar) | NO |  |
 | `entities` | jsonb (jsonb) | NO |  |
-| `key_phrases` | ARRAY (_varchar) | NO |  |
+| `key_phrases` | character varying(255)[] (_varchar) | NO |  |
 | `review_id` | bigint (int8) | NO |  |
 
 ### Foreign Keys
@@ -2489,7 +2833,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_skagitdishidea`
+## `public.gastronet_skagitdishidea` (t)
 
 **Primary Key:** id
 
@@ -2498,11 +2842,11 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | uuid (uuid) | NO |  |
-| `direction` | character varying (varchar) | NO |  |
-| `identity_version` | character varying (varchar) | NO |  |
+| `direction` | character varying(40) (varchar) | NO |  |
+| `identity_version` | character varying(20) (varchar) | NO |  |
 | `payload` | jsonb (jsonb) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
-| `image` | character varying (varchar) | YES |  |
+| `image` | character varying(100) (varchar) | YES |  |
 | `image_prompt` | text (text) | NO |  |
 
 ### Indexes
@@ -2530,7 +2874,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.gastronet_urldiscovery`
+## `public.gastronet_urldiscovery` (t)
 
 **Primary Key:** id
 
@@ -2539,8 +2883,8 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `query` | character varying (varchar) | NO |  |
-| `result_url` | character varying (varchar) | YES |  |
+| `query` | character varying(255) (varchar) | NO |  |
+| `result_url` | character varying(200) (varchar) | YES |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `hit_count` | integer (int4) | NO |  |
 
@@ -2565,7 +2909,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.geography_columns`
+## `public.geography_columns` (v)
 
 ### Columns
 
@@ -2593,19 +2937,19 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.geometry_columns`
+## `public.geometry_columns` (v)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `f_table_catalog` | character varying (varchar) | YES |  |
+| `f_table_catalog` | character varying(256) (varchar) | YES |  |
 | `f_table_schema` | name (name) | YES |  |
 | `f_table_name` | name (name) | YES |  |
 | `f_geometry_column` | name (name) | YES |  |
 | `coord_dimension` | integer (int4) | YES |  |
 | `srid` | integer (int4) | YES |  |
-| `type` | character varying (varchar) | YES |  |
+| `type` | character varying(30) (varchar) | YES |  |
 
 ### Sample Row
 
@@ -2621,7 +2965,40 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.improvement_map_temp`
+## `public.hood_tax_totals` (t)
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `hood_code` | text (text) | NO |  |
+| `tax_year` | integer (int4) | NO |  |
+| `total_tax` | numeric (numeric) | NO |  |
+| `parcel_count` | integer (int4) | NO |  |
+
+### Indexes
+
+- `hood_tax_totals_tax_year_idx`
+  ```sql
+  CREATE INDEX hood_tax_totals_tax_year_idx ON public.hood_tax_totals USING btree (tax_year)
+  ```
+- `hood_tax_totals_hood_code_idx`
+  ```sql
+  CREATE INDEX hood_tax_totals_hood_code_idx ON public.hood_tax_totals USING btree (hood_code)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `hood_code` | 23ACONDO |
+| `tax_year` | 2026 |
+| `total_tax` | 2474599.37 |
+| `parcel_count` | 552 |
+
+---
+
+## `public.improvement_map_temp` (t)
 
 ### Columns
 
@@ -2639,7 +3016,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.improvements`
+## `public.improvements` (t)
 
 ### Columns
 
@@ -2688,52 +3065,52 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `improvement_roll_id_0d3ef8_idx`
-  ```sql
-  CREATE INDEX improvement_roll_id_0d3ef8_idx ON public.improvements USING btree (roll_id)
-  ```
-- `improvement_effecti_0e3ddc_idx`
-  ```sql
-  CREATE INDEX improvement_effecti_0e3ddc_idx ON public.improvements USING btree (effective_year_built)
-  ```
 - `improvement_improve_50b038_idx`
   ```sql
   CREATE INDEX improvement_improve_50b038_idx ON public.improvements USING btree (improvement_detail_value)
-  ```
-- `improvement_conditi_3ee3cc_idx`
-  ```sql
-  CREATE INDEX improvement_conditi_3ee3cc_idx ON public.improvements USING btree (condition_code)
   ```
 - `improvement_improve_ad487d_idx`
   ```sql
   CREATE INDEX improvement_improve_ad487d_idx ON public.improvements USING btree (improvement_detail_type_code)
   ```
+- `improvement_roll_id_0d3ef8_idx`
+  ```sql
+  CREATE INDEX improvement_roll_id_0d3ef8_idx ON public.improvements USING btree (roll_id)
+  ```
 - `improvement_parcel__57e9d4_idx`
   ```sql
   CREATE INDEX improvement_parcel__57e9d4_idx ON public.improvements USING btree (parcel_number)
+  ```
+- `improvement_effecti_0e3ddc_idx`
+  ```sql
+  CREATE INDEX improvement_effecti_0e3ddc_idx ON public.improvements USING btree (effective_year_built)
+  ```
+- `improvement_conditi_3ee3cc_idx`
+  ```sql
+  CREATE INDEX improvement_conditi_3ee3cc_idx ON public.improvements USING btree (condition_code)
   ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `parcel_number` | P21119 |
-| `improvement_id` | 4952 |
+| `parcel_number` | P135514 |
+| `improvement_id` | 1954278 |
 | `description` | NULL |
-| `building_style` | 1     |
-| `comment` | 9/15/21: NOH, AV Sid/Rf/VinWin, Previous Updates Noted, JT; 2016 REVAL. UPPER FLOOR <25% OF LIVING AREA. RAN AT 1STY RATE WITH UPPER FLOOR.  NEW COMP ROOF |
-| `improvement_value` | 360900 |
-| `new_construction_year` | 1991.0 |
-| `total_living_area` | 2965.0 |
-| `segment_id` | 16669 |
-| `improvement_detail_type_code` | UF1.5F     |
+| `building_style` | TH    |
+| `comment` | 9-16-22 LI, NC 100% COMPLETE A/0 7/31.TL.   |
+| `improvement_value` | 293300 |
+| `new_construction_year` | 2022.0 |
+| `total_living_area` | 1542.6 |
+| `segment_id` | 329508 |
+| `improvement_detail_type_code` | CCP        |
 | `improvement_detail_class_code` | MSA        |
 | `improvement_detail_method_code` | NULL |
-| `condition_code` | A     |
-| `calculated_area` | 573.0 |
-| `unit_price` | 89.08 |
-| `depreciation_pct` | 65.0 |
-| `improvement_detail_value` | 33200 |
+| `condition_code` | E     |
+| `calculated_area` | 36.0 |
+| `unit_price` | 23.33 |
+| `depreciation_pct` | 100.0 |
+| `improvement_detail_value` | 800 |
 | `construction_style` | NULL |
 | `foundation` | NULL |
 | `exterior_wall` | NULL |
@@ -2748,15 +3125,15 @@ _No sample data available (table is empty or unreadable)._
 | `fireplace` | NULL |
 | `rooms` | NULL |
 | `bedrooms` | NULL |
-| `effective_year_built` | 1991.0 |
-| `actual_year_built` | 1901 |
-| `sketch_path` | http://skagitcounty.net/Assessor/Images/Photos/4332/3331144.jpg |
+| `effective_year_built` | 2022.0 |
+| `actual_year_built` | 2021 |
+| `sketch_path` | http://skagitcounty.net/Assessor/Images/Photos/4456/3455324.jpg |
 | `roll_id` | 1 |
-| `id` | 389162 |
+| `id` | 369238 |
 
 ---
 
-## `public.kidslab_card`
+## `public.jurisdiction_code_set` (t)
 
 **Primary Key:** id
 
@@ -2765,22 +3142,61 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `title` | character varying (varchar) | NO |  |
-| `slug` | character varying (varchar) | NO |  |
-| `card_type` | character varying (varchar) | NO |  |
-| `direction` | character varying (varchar) | NO |  |
+| `jurisdiction_key` | character varying(50) (varchar) | NO |  |
+| `code_set` | character varying(100) (varchar) | NO |  |
+| `source` | character varying(200) (varchar) | NO |  |
+
+### Indexes
+
+- `jurisdiction_code_set_jurisdiction_key_code_set_35078e1d_uniq`
+  ```sql
+  CREATE UNIQUE INDEX jurisdiction_code_set_jurisdiction_key_code_set_35078e1d_uniq ON public.jurisdiction_code_set USING btree (jurisdiction_key, code_set)
+  ```
+- `jurisdiction_code_set_pkey`
+  ```sql
+  CREATE UNIQUE INDEX jurisdiction_code_set_pkey ON public.jurisdiction_code_set USING btree (id)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 1 |
+| `jurisdiction_key` | unincorporated_skagit |
+| `code_set` | skagit_county_code |
+| `source` | compiled_research |
+
+---
+
+## `public.kidslab_card` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `title` | character varying(120) (varchar) | NO |  |
+| `slug` | character varying(80) (varchar) | NO |  |
+| `card_type` | character varying(20) (varchar) | NO |  |
+| `direction` | character varying(20) (varchar) | NO |  |
 | `order` | integer (int4) | NO |  |
 | `is_active` | boolean (bool) | NO |  |
-| `image` | character varying (varchar) | YES |  |
-| `photo` | character varying (varchar) | YES |  |
-| `audio` | character varying (varchar) | YES |  |
-| `youtube_url` | character varying (varchar) | YES |  |
+| `image` | character varying(100) (varchar) | YES |  |
+| `photo` | character varying(100) (varchar) | YES |  |
+| `audio` | character varying(100) (varchar) | YES |  |
+| `youtube_url` | character varying(200) (varchar) | YES |  |
 | `config` | jsonb (jsonb) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
+- `kidslab_card_pkey`
+  ```sql
+  CREATE UNIQUE INDEX kidslab_card_pkey ON public.kidslab_card USING btree (id)
+  ```
 - `kidslab_card_slug_8cbba573_like`
   ```sql
   CREATE INDEX kidslab_card_slug_8cbba573_like ON public.kidslab_card USING btree (slug varchar_pattern_ops)
@@ -2788,10 +3204,6 @@ _No sample data available (table is empty or unreadable)._
 - `kidslab_card_slug_8cbba573`
   ```sql
   CREATE INDEX kidslab_card_slug_8cbba573 ON public.kidslab_card USING btree (slug)
-  ```
-- `kidslab_card_pkey`
-  ```sql
-  CREATE UNIQUE INDEX kidslab_card_pkey ON public.kidslab_card USING btree (id)
   ```
 
 ### Sample Row
@@ -2815,7 +3227,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.land`
+## `public.land` (t)
 
 ### Columns
 
@@ -2863,7 +3275,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.legal_code_jurisdiction`
+## `public.legal_code_jurisdiction` (t)
 
 **Primary Key:** id
 
@@ -2872,22 +3284,22 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `name` | character varying (varchar) | NO |  |
-| `state` | character varying (varchar) | NO |  |
+| `name` | character varying(200) (varchar) | NO |  |
+| `state` | character varying(2) (varchar) | NO |  |
 
 ### Indexes
 
-- `legal_code_jurisdiction_name_e27afbe0_like`
+- `legal_code_jurisdiction_name_key`
   ```sql
-  CREATE INDEX legal_code_jurisdiction_name_e27afbe0_like ON public.legal_code_jurisdiction USING btree (name varchar_pattern_ops)
+  CREATE UNIQUE INDEX legal_code_jurisdiction_name_key ON public.legal_code_jurisdiction USING btree (name)
   ```
 - `legal_code_jurisdiction_pkey`
   ```sql
   CREATE UNIQUE INDEX legal_code_jurisdiction_pkey ON public.legal_code_jurisdiction USING btree (id)
   ```
-- `legal_code_jurisdiction_name_key`
+- `legal_code_jurisdiction_name_e27afbe0_like`
   ```sql
-  CREATE UNIQUE INDEX legal_code_jurisdiction_name_key ON public.legal_code_jurisdiction USING btree (name)
+  CREATE INDEX legal_code_jurisdiction_name_e27afbe0_like ON public.legal_code_jurisdiction USING btree (name varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -2900,7 +3312,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.legal_code_lawchapter`
+## `public.legal_code_jurisdictionalias` (t)
 
 **Primary Key:** id
 
@@ -2909,9 +3321,61 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `chapter_number` | character varying (varchar) | NO |  |
-| `chapter_name` | character varying (varchar) | NO |  |
+| `alias` | character varying(200) (varchar) | NO |  |
+| `alias_normalized` | character varying(200) (varchar) | NO |  |
+| `source` | character varying(50) (varchar) | NO |  |
+| `created_at` | timestamp with time zone (timestamptz) | NO |  |
+| `jurisdiction_id` | bigint (int8) | NO |  |
+
+### Foreign Keys
+
+- `jurisdiction_id` → `public.legal_code_jurisdiction.id`
+
+### Indexes
+
+- `legal_code_jurisdictionalias_pkey`
+  ```sql
+  CREATE UNIQUE INDEX legal_code_jurisdictionalias_pkey ON public.legal_code_jurisdictionalias USING btree (id)
+  ```
+- `legal_code_jurisdictionalias_jurisdiction_id_4646e9b7`
+  ```sql
+  CREATE INDEX legal_code_jurisdictionalias_jurisdiction_id_4646e9b7 ON public.legal_code_jurisdictionalias USING btree (jurisdiction_id)
+  ```
+- `legal_code_jurisdictionalias_alias_normalized_8616d6bf_like`
+  ```sql
+  CREATE INDEX legal_code_jurisdictionalias_alias_normalized_8616d6bf_like ON public.legal_code_jurisdictionalias USING btree (alias_normalized varchar_pattern_ops)
+  ```
+- `legal_code_jurisdictionalias_alias_normalized_key`
+  ```sql
+  CREATE UNIQUE INDEX legal_code_jurisdictionalias_alias_normalized_key ON public.legal_code_jurisdictionalias USING btree (alias_normalized)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 1 |
+| `alias` | Concrete |
+| `alias_normalized` | concrete |
+| `source` | jurisdiction_name |
+| `created_at` | 2026-01-20 13:00:52.389022+00:00 |
+| `jurisdiction_id` | 1 |
+
+---
+
+## `public.legal_code_lawchapter` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `chapter_number` | character varying(20) (varchar) | NO |  |
+| `chapter_name` | character varying(255) (varchar) | NO |  |
 | `document_id` | bigint (int8) | NO |  |
+| `code_set` | character varying(100) (varchar) | YES |  |
 
 ### Foreign Keys
 
@@ -2919,6 +3383,10 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
+- `legal_code_lawchapter_document_id_chapter_number_c4904d38_uniq`
+  ```sql
+  CREATE UNIQUE INDEX legal_code_lawchapter_document_id_chapter_number_c4904d38_uniq ON public.legal_code_lawchapter USING btree (document_id, chapter_number)
+  ```
 - `legal_code_lawchapter_document_id_2b2e872a`
   ```sql
   CREATE INDEX legal_code_lawchapter_document_id_2b2e872a ON public.legal_code_lawchapter USING btree (document_id)
@@ -2926,10 +3394,6 @@ _No sample data available (table is empty or unreadable)._
 - `legal_code_lawchapter_pkey`
   ```sql
   CREATE UNIQUE INDEX legal_code_lawchapter_pkey ON public.legal_code_lawchapter USING btree (id)
-  ```
-- `legal_code_lawchapter_document_id_chapter_number_c4904d38_uniq`
-  ```sql
-  CREATE UNIQUE INDEX legal_code_lawchapter_document_id_chapter_number_c4904d38_uniq ON public.legal_code_lawchapter USING btree (document_id, chapter_number)
   ```
 
 ### Sample Row
@@ -2940,10 +3404,11 @@ _No sample data available (table is empty or unreadable)._
 | `chapter_number` | 15.04 |
 | `chapter_name` | BUILDING CODE |
 | `document_id` | 1 |
+| `code_set` | concrete_municipal_code |
 
 ---
 
-## `public.legal_code_lawdocument`
+## `public.legal_code_lawdocument` (t)
 
 **Primary Key:** id
 
@@ -2952,9 +3417,9 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `title_number` | character varying (varchar) | NO |  |
-| `title_name` | character varying (varchar) | NO |  |
-| `source_vendor` | character varying (varchar) | NO |  |
+| `title_number` | character varying(20) (varchar) | NO |  |
+| `title_name` | character varying(255) (varchar) | NO |  |
+| `source_vendor` | character varying(100) (varchar) | NO |  |
 | `effective_note` | text (text) | YES |  |
 | `jurisdiction_id` | bigint (int8) | NO |  |
 
@@ -2990,7 +3455,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.legal_code_lawsection`
+## `public.legal_code_lawsection` (t)
 
 **Primary Key:** id
 
@@ -2999,13 +3464,13 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `section_id` | character varying (varchar) | NO |  |
-| `heading` | character varying (varchar) | NO |  |
+| `section_id` | character varying(50) (varchar) | NO |  |
+| `heading` | character varying(500) (varchar) | NO |  |
 | `content` | text (text) | NO |  |
 | `history` | jsonb (jsonb) | NO |  |
 | `tables` | jsonb (jsonb) | NO |  |
-| `content_hash` | character varying (varchar) | NO |  |
-| `source_url` | character varying (varchar) | NO |  |
+| `content_hash` | character varying(64) (varchar) | NO |  |
+| `source_url` | character varying(200) (varchar) | NO |  |
 | `scraped_at` | timestamp with time zone (timestamptz) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `chapter_id` | bigint (int8) | NO |  |
@@ -3020,6 +3485,14 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX legal_code_lawsection_content_hash_096ee213_like ON public.legal_code_lawsection USING btree (content_hash varchar_pattern_ops)
   ```
+- `legal_code__content_7871cd_idx`
+  ```sql
+  CREATE INDEX legal_code__content_7871cd_idx ON public.legal_code_lawsection USING btree (content_hash)
+  ```
+- `legal_code_lawsection_pkey`
+  ```sql
+  CREATE UNIQUE INDEX legal_code_lawsection_pkey ON public.legal_code_lawsection USING btree (id)
+  ```
 - `legal_code_lawsection_chapter_id_c8205d70`
   ```sql
   CREATE INDEX legal_code_lawsection_chapter_id_c8205d70 ON public.legal_code_lawsection USING btree (chapter_id)
@@ -3028,17 +3501,9 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX legal_code__section_232be6_idx ON public.legal_code_lawsection USING btree (section_id)
   ```
-- `legal_code_lawsection_pkey`
-  ```sql
-  CREATE UNIQUE INDEX legal_code_lawsection_pkey ON public.legal_code_lawsection USING btree (id)
-  ```
 - `legal_code_lawsection_content_hash_096ee213`
   ```sql
   CREATE INDEX legal_code_lawsection_content_hash_096ee213 ON public.legal_code_lawsection USING btree (content_hash)
-  ```
-- `legal_code__content_7871cd_idx`
-  ```sql
-  CREATE INDEX legal_code__content_7871cd_idx ON public.legal_code_lawsection USING btree (content_hash)
   ```
 
 ### Sample Row
@@ -3059,7 +3524,99 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.master_parcel`
+## `public.legal_code_lawsectionchunk` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `law_section_ref` | character varying(50) (varchar) | NO |  |
+| `heading` | character varying(500) (varchar) | NO |  |
+| `source_url` | character varying(200) (varchar) | NO |  |
+| `chunk_index` | integer (int4) | NO |  |
+| `content` | text (text) | NO |  |
+| `content_hash` | character varying(64) (varchar) | NO |  |
+| `embedding_model` | character varying(100) (varchar) | NO |  |
+| `embedding` | vector(1536) (vector) | YES |  |
+| `embedded_at` | timestamp with time zone (timestamptz) | YES |  |
+| `jurisdiction_id` | bigint (int8) | NO |  |
+| `section_id` | bigint (int8) | NO |  |
+| `lane_scores` | jsonb (jsonb) | YES |  |
+| `lanes_classified_at` | timestamp with time zone (timestamptz) | YES |  |
+
+### Foreign Keys
+
+- `jurisdiction_id` → `public.legal_code_jurisdiction.id`
+- `section_id` → `public.legal_code_lawsection.id`
+
+### Indexes
+
+- `legal_code_lawsectionchunk_jurisdiction_id_f7494e7d`
+  ```sql
+  CREATE INDEX legal_code_lawsectionchunk_jurisdiction_id_f7494e7d ON public.legal_code_lawsectionchunk USING btree (jurisdiction_id)
+  ```
+- `legal_code_lawsectionchu_section_id_chunk_index_e_18d51984_uniq`
+  ```sql
+  CREATE UNIQUE INDEX legal_code_lawsectionchu_section_id_chunk_index_e_18d51984_uniq ON public.legal_code_lawsectionchunk USING btree (section_id, chunk_index, embedding_model)
+  ```
+- `legal_code__content_31e13e_idx`
+  ```sql
+  CREATE INDEX legal_code__content_31e13e_idx ON public.legal_code_lawsectionchunk USING btree (content_hash)
+  ```
+- `legal_code_lawsectionchunk_pkey`
+  ```sql
+  CREATE UNIQUE INDEX legal_code_lawsectionchunk_pkey ON public.legal_code_lawsectionchunk USING btree (id)
+  ```
+- `legal_code_lawsectionchunk_law_section_ref_bc8eac77`
+  ```sql
+  CREATE INDEX legal_code_lawsectionchunk_law_section_ref_bc8eac77 ON public.legal_code_lawsectionchunk USING btree (law_section_ref)
+  ```
+- `legal_code__jurisdi_91b4b0_idx`
+  ```sql
+  CREATE INDEX legal_code__jurisdi_91b4b0_idx ON public.legal_code_lawsectionchunk USING btree (jurisdiction_id, section_id)
+  ```
+- `legal_code_lawsectionchunk_law_section_ref_bc8eac77_like`
+  ```sql
+  CREATE INDEX legal_code_lawsectionchunk_law_section_ref_bc8eac77_like ON public.legal_code_lawsectionchunk USING btree (law_section_ref varchar_pattern_ops)
+  ```
+- `legal_code_lawsectionchunk_content_hash_d2e9a0e2`
+  ```sql
+  CREATE INDEX legal_code_lawsectionchunk_content_hash_d2e9a0e2 ON public.legal_code_lawsectionchunk USING btree (content_hash)
+  ```
+- `legal_code_lawsectionchunk_content_hash_d2e9a0e2_like`
+  ```sql
+  CREATE INDEX legal_code_lawsectionchunk_content_hash_d2e9a0e2_like ON public.legal_code_lawsectionchunk USING btree (content_hash varchar_pattern_ops)
+  ```
+- `legal_code_lawsectionchunk_section_id_58ba13ee`
+  ```sql
+  CREATE INDEX legal_code_lawsectionchunk_section_id_58ba13ee ON public.legal_code_lawsectionchunk USING btree (section_id)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 2564 |
+| `law_section_ref` | 17.200.100 |
+| `heading` | CUP city council authority – Final decision. |
+| `source_url` | https://www.codepublishing.com/WA/MountVernon/ |
+| `chunk_index` | 0 |
+| `content` | A. The designated hearing body, giving substantial weight to the recommendations of the staff report, shall review the application under the following criter... |
+| `content_hash` | b652b959e35aeb443dba206113a079f678ec84bdc88e1b5e04fbf3fb780f498f |
+| `embedding_model` | text-embedding-3-small |
+| `embedding` | [0.005402766,0.005245709,0.05875194,0.036613166,-0.02530505,0.036035195,-0.008832894,-0.018532744,-0.012866123,0.04872541,0.051213197,-0.0051012165,-0.032969... |
+| `embedded_at` | 2026-01-20 16:12:28.252781+00:00 |
+| `jurisdiction_id` | 3 |
+| `section_id` | 2703 |
+| `lane_scores` | NULL |
+| `lanes_classified_at` | NULL |
+
+---
+
+## `public.master_parcel` (t)
 
 **Primary Key:** parcel_number
 
@@ -3067,7 +3624,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `parcel_number` | character varying (varchar) | NO |  |
+| `parcel_number` | character varying(20) (varchar) | NO |  |
 | `aid` | integer (int4) | YES |  |
 | `building_value` | double precision (float8) | YES |  |
 | `impr_land_value` | double precision (float8) | YES |  |
@@ -3081,27 +3638,27 @@ _No sample data available (table is empty or unreadable)._
 | `price_per_sqft` | double precision (float8) | YES |  |
 | `year_built` | integer (int4) | YES |  |
 | `living_area` | integer (int4) | YES |  |
-| `buildingstyle` | character varying (varchar) | YES |  |
-| `plumbing` | character varying (varchar) | YES |  |
+| `buildingstyle` | character varying(100) (varchar) | YES |  |
+| `plumbing` | character varying(100) (varchar) | YES |  |
 | `garagesqft` | integer (int4) | YES |  |
-| `heat_air_cond` | character varying (varchar) | YES |  |
-| `fireplace` | character varying (varchar) | YES |  |
+| `heat_air_cond` | character varying(100) (varchar) | YES |  |
+| `fireplace` | character varying(100) (varchar) | YES |  |
 | `finishedbasement` | integer (int4) | YES |  |
 | `number_of_bedrooms` | integer (int4) | YES |  |
 | `eff_year_built` | integer (int4) | YES |  |
 | `unfinishedbasement` | integer (int4) | YES |  |
-| `fire_district` | character varying (varchar) | YES |  |
-| `school_district` | character varying (varchar) | YES |  |
-| `city_district` | character varying (varchar) | YES |  |
-| `levy_code` | character varying (varchar) | YES |  |
-| `proptype` | character varying (varchar) | YES |  |
+| `fire_district` | character varying(50) (varchar) | YES |  |
+| `school_district` | character varying(50) (varchar) | YES |  |
+| `city_district` | character varying(50) (varchar) | YES |  |
+| `levy_code` | character varying(20) (varchar) | YES |  |
+| `proptype` | character varying(10) (varchar) | YES |  |
 | `hasseptic` | boolean (bool) | NO |  |
-| `land_use_code` | character varying (varchar) | YES |  |
-| `land_use_description` | character varying (varchar) | YES |  |
-| `hood_code` | character varying (varchar) | YES |  |
-| `hood_description` | character varying (varchar) | YES |  |
+| `land_use_code` | character varying(10) (varchar) | YES |  |
+| `land_use_description` | character varying(200) (varchar) | YES |  |
+| `hood_code` | character varying(20) (varchar) | YES |  |
+| `hood_description` | character varying(200) (varchar) | YES |  |
 | `has_unit` | boolean (bool) | NO |  |
-| `situs_address` | character varying (varchar) | YES |  |
+| `situs_address` | character varying(300) (varchar) | YES |  |
 | `total_baths` | double precision (float8) | YES |  |
 | `year_built_max` | integer (int4) | YES |  |
 | `year_built_min` | integer (int4) | YES |  |
@@ -3115,7 +3672,7 @@ _No sample data available (table is empty or unreadable)._
 | `has_pool` | boolean (bool) | NO |  |
 | `quality_score` | double precision (float8) | YES |  |
 | `condition_score` | double precision (float8) | YES |  |
-| `building_style` | character varying (varchar) | YES |  |
+| `building_style` | character varying(50) (varchar) | YES |  |
 | `effective_yr_blt` | integer (int4) | YES |  |
 | `main_structure_count` | integer (int4) | YES |  |
 | `flag_multi_structure` | boolean (bool) | NO |  |
@@ -3129,25 +3686,25 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `master_parc_hood_co_cdede5_idx`
+- `master_parc_parcel__04e153_idx`
   ```sql
-  CREATE INDEX master_parc_hood_co_cdede5_idx ON public.master_parcel USING btree (hood_code)
-  ```
-- `master_parc_land_us_cc8eeb_idx`
-  ```sql
-  CREATE INDEX master_parc_land_us_cc8eeb_idx ON public.master_parcel USING btree (land_use_code)
+  CREATE INDEX master_parc_parcel__04e153_idx ON public.master_parcel USING btree (parcel_number)
   ```
 - `master_parcel_pkey`
   ```sql
   CREATE UNIQUE INDEX master_parcel_pkey ON public.master_parcel USING btree (parcel_number)
   ```
+- `master_parc_land_us_cc8eeb_idx`
+  ```sql
+  CREATE INDEX master_parc_land_us_cc8eeb_idx ON public.master_parcel USING btree (land_use_code)
+  ```
+- `master_parc_hood_co_cdede5_idx`
+  ```sql
+  CREATE INDEX master_parc_hood_co_cdede5_idx ON public.master_parcel USING btree (hood_code)
+  ```
 - `master_parcel_parcel_number_e176375e_like`
   ```sql
   CREATE INDEX master_parcel_parcel_number_e176375e_like ON public.master_parcel USING btree (parcel_number varchar_pattern_ops)
-  ```
-- `master_parc_parcel__04e153_idx`
-  ```sql
-  CREATE INDEX master_parc_parcel__04e153_idx ON public.master_parcel USING btree (parcel_number)
   ```
 
 ### Sample Row
@@ -3216,12 +3773,15 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.neighborhood_ballots_by_year`
+## `public.neighborhood_ballots_by_year` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `ballots_cast` | bigint (int8) | YES |  |
 
 ### Indexes
 
@@ -3248,12 +3808,17 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.neighborhood_participation_classification`
+## `public.neighborhood_participation_classification` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `npi` | double precision (float8) | YES |  |
+| `quartile` | integer (int4) | YES |  |
+| `quartile_label` | text (text) | YES |  |
 
 ### Indexes
 
@@ -3278,7 +3843,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.neighborhood_participation_geometry`
+## `public.neighborhood_participation_geometry` (m)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 0)
@@ -3287,16 +3852,18 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `neighborhood_code` | character varying(20) (varchar) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
 
 ### Indexes
 
-- `neighborhood_participation_geometry_idx`
-  ```sql
-  CREATE UNIQUE INDEX neighborhood_participation_geometry_idx ON public.neighborhood_participation_geometry USING btree (neighborhood_code)
-  ```
 - `neighborhood_participation_geometry_geom_gix`
   ```sql
   CREATE INDEX neighborhood_participation_geometry_geom_gix ON public.neighborhood_participation_geometry USING gist (geom_2926)
+  ```
+- `neighborhood_participation_geometry_idx`
+  ```sql
+  CREATE UNIQUE INDEX neighborhood_participation_geometry_idx ON public.neighborhood_participation_geometry USING btree (neighborhood_code)
   ```
 
 ### Sample Row
@@ -3308,12 +3875,15 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.neighborhood_primary_precinct`
+## `public.neighborhood_primary_precinct` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `primary_precinct_code` | bigint (int8) | YES |  |
+| `precinct_residential_parcels` | bigint (int8) | YES |  |
 
 ### Indexes
 
@@ -3332,22 +3902,25 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.neighborhood_residential_parcels`
+## `public.neighborhood_residential_parcels` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `residential_parcels` | bigint (int8) | YES |  |
 
 ### Indexes
 
-- `neighborhood_residential_year_idx`
-  ```sql
-  CREATE INDEX neighborhood_residential_year_idx ON public.neighborhood_residential_parcels USING btree (election_year)
-  ```
 - `neighborhood_residential_code_idx`
   ```sql
   CREATE INDEX neighborhood_residential_code_idx ON public.neighborhood_residential_parcels USING btree (neighborhood_code)
+  ```
+- `neighborhood_residential_year_idx`
+  ```sql
+  CREATE INDEX neighborhood_residential_year_idx ON public.neighborhood_residential_parcels USING btree (election_year)
   ```
 - `neighborhood_residential_idx`
   ```sql
@@ -3364,7 +3937,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_adjustmentcoefficient`
+## `public.openskagit_adjustmentcoefficient` (t)
 
 **Primary Key:** id
 
@@ -3373,19 +3946,15 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `market_group` | character varying (varchar) | NO |  |
-| `term` | character varying (varchar) | NO |  |
+| `market_group` | character varying(100) (varchar) | NO |  |
+| `term` | character varying(200) (varchar) | NO |  |
 | `beta` | double precision (float8) | NO |  |
 | `beta_se` | double precision (float8) | YES |  |
-| `run_id` | character varying (varchar) | NO |  |
+| `run_id` | character varying(20) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `openskagit_adjustmentcoefficient_run_id_2a7c2094_like`
-  ```sql
-  CREATE INDEX openskagit_adjustmentcoefficient_run_id_2a7c2094_like ON public.openskagit_adjustmentcoefficient USING btree (run_id varchar_pattern_ops)
-  ```
 - `openskagit_adjustmentcoefficient_run_id_2a7c2094`
   ```sql
   CREATE INDEX openskagit_adjustmentcoefficient_run_id_2a7c2094 ON public.openskagit_adjustmentcoefficient USING btree (run_id)
@@ -3394,13 +3963,17 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX openskagit_adjustmentcoefficient_market_group_8c5e2c21 ON public.openskagit_adjustmentcoefficient USING btree (market_group)
   ```
-- `openskagit_adjustmentcoefficient_market_group_8c5e2c21_like`
-  ```sql
-  CREATE INDEX openskagit_adjustmentcoefficient_market_group_8c5e2c21_like ON public.openskagit_adjustmentcoefficient USING btree (market_group varchar_pattern_ops)
-  ```
 - `openskagit_adjustmentcoefficient_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_adjustmentcoefficient_pkey ON public.openskagit_adjustmentcoefficient USING btree (id)
+  ```
+- `openskagit_adjustmentcoefficient_run_id_2a7c2094_like`
+  ```sql
+  CREATE INDEX openskagit_adjustmentcoefficient_run_id_2a7c2094_like ON public.openskagit_adjustmentcoefficient USING btree (run_id varchar_pattern_ops)
+  ```
+- `openskagit_adjustmentcoefficient_term_4161326c_like`
+  ```sql
+  CREATE INDEX openskagit_adjustmentcoefficient_term_4161326c_like ON public.openskagit_adjustmentcoefficient USING btree (term varchar_pattern_ops)
   ```
 - `openskagit_adjustmentcoe_market_group_term_run_id_affaf948_uniq`
   ```sql
@@ -3410,9 +3983,9 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX openskagit_adjustmentcoefficient_term_4161326c ON public.openskagit_adjustmentcoefficient USING btree (term)
   ```
-- `openskagit_adjustmentcoefficient_term_4161326c_like`
+- `openskagit_adjustmentcoefficient_market_group_8c5e2c21_like`
   ```sql
-  CREATE INDEX openskagit_adjustmentcoefficient_term_4161326c_like ON public.openskagit_adjustmentcoefficient USING btree (term varchar_pattern_ops)
+  CREATE INDEX openskagit_adjustmentcoefficient_market_group_8c5e2c21_like ON public.openskagit_adjustmentcoefficient USING btree (market_group varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -3429,7 +4002,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_adjustmentmodelsegment`
+## `public.openskagit_adjustmentmodelsegment` (t)
 
 **Primary Key:** id
 
@@ -3438,8 +4011,8 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `market_group` | character varying (varchar) | NO |  |
-| `value_tier` | character varying (varchar) | NO |  |
+| `market_group` | character varying(100) (varchar) | NO |  |
+| `value_tier` | character varying(20) (varchar) | NO |  |
 | `price_min` | double precision (float8) | NO |  |
 | `price_max` | double precision (float8) | NO |  |
 | `n_obs` | integer (int4) | NO |  |
@@ -3456,13 +4029,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_adjustmentmod_run_id_market_group_valu_54592b6f_uniq`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_adjustmentmod_run_id_market_group_valu_54592b6f_uniq ON public.openskagit_adjustmentmodelsegment USING btree (run_id, market_group, value_tier)
-  ```
 - `openskagit_adjustmentmodelsegment_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_adjustmentmodelsegment_pkey ON public.openskagit_adjustmentmodelsegment USING btree (id)
+  ```
+- `openskagit_adjustmentmod_run_id_market_group_valu_54592b6f_uniq`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_adjustmentmod_run_id_market_group_valu_54592b6f_uniq ON public.openskagit_adjustmentmodelsegment USING btree (run_id, market_group, value_tier)
   ```
 - `openskagit_adjustmentmodelsegment_run_id_f1959065`
   ```sql
@@ -3475,7 +4048,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_adjustmentrunsummary`
+## `public.openskagit_adjustmentrunsummary` (t)
 
 **Primary Key:** id
 
@@ -3484,17 +4057,13 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `run_id` | character varying (varchar) | NO |  |
+| `run_id` | character varying(20) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `stats` | jsonb (jsonb) | NO |  |
 | `content` | jsonb (jsonb) | NO |  |
 
 ### Indexes
 
-- `openskagit_adjustmentrunsummary_run_id_c3fff42e_like`
-  ```sql
-  CREATE INDEX openskagit_adjustmentrunsummary_run_id_c3fff42e_like ON public.openskagit_adjustmentrunsummary USING btree (run_id varchar_pattern_ops)
-  ```
 - `openskagit_adjustmentrunsummary_run_id_key`
   ```sql
   CREATE UNIQUE INDEX openskagit_adjustmentrunsummary_run_id_key ON public.openskagit_adjustmentrunsummary USING btree (run_id)
@@ -3502,6 +4071,10 @@ _No sample data available (table is empty or unreadable)._
 - `openskagit_adjustmentrunsummary_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_adjustmentrunsummary_pkey ON public.openskagit_adjustmentrunsummary USING btree (id)
+  ```
+- `openskagit_adjustmentrunsummary_run_id_c3fff42e_like`
+  ```sql
+  CREATE INDEX openskagit_adjustmentrunsummary_run_id_c3fff42e_like ON public.openskagit_adjustmentrunsummary USING btree (run_id varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -3516,7 +4089,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_agencyfinancialsnapshot`
+## `public.openskagit_agencyfinancialsnapshot` (t)
 
 **Primary Key:** id
 
@@ -3525,24 +4098,24 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `mcag` | character varying (varchar) | NO |  |
+| `mcag` | character varying(10) (varchar) | NO |  |
 | `year` | integer (int4) | NO |  |
-| `name` | character varying (varchar) | NO |  |
-| `legal_name` | character varying (varchar) | NO |  |
-| `gov_type_code` | character varying (varchar) | NO |  |
-| `gov_type_desc` | character varying (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
+| `legal_name` | character varying(255) (varchar) | NO |  |
+| `gov_type_code` | character varying(4) (varchar) | NO |  |
+| `gov_type_desc` | character varying(100) (varchar) | NO |  |
 | `county_code` | integer (int4) | YES |  |
-| `county_name` | character varying (varchar) | NO |  |
+| `county_name` | character varying(100) (varchar) | NO |  |
 | `is_school` | boolean (bool) | NO |  |
-| `dataset_source` | character varying (varchar) | NO |  |
-| `website` | character varying (varchar) | NO |  |
-| `street_address` | character varying (varchar) | NO |  |
-| `city` | character varying (varchar) | NO |  |
-| `state` | character varying (varchar) | NO |  |
-| `postal_code` | character varying (varchar) | NO |  |
+| `dataset_source` | character varying(32) (varchar) | NO |  |
+| `website` | character varying(255) (varchar) | NO |  |
+| `street_address` | character varying(255) (varchar) | NO |  |
+| `city` | character varying(120) (varchar) | NO |  |
+| `state` | character varying(2) (varchar) | NO |  |
+| `postal_code` | character varying(10) (varchar) | NO |  |
 | `latitude` | double precision (float8) | YES |  |
 | `longitude` | double precision (float8) | YES |  |
-| `fiscal_year_end` | character varying (varchar) | NO |  |
+| `fiscal_year_end` | character varying(20) (varchar) | NO |  |
 | `financial_summary` | jsonb (jsonb) | NO |  |
 | `revenues` | jsonb (jsonb) | NO |  |
 | `expenditures` | jsonb (jsonb) | NO |  |
@@ -3557,18 +4130,6 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `uniq_agency_financial_snapshot`
-  ```sql
-  CREATE UNIQUE INDEX uniq_agency_financial_snapshot ON public.openskagit_agencyfinancialsnapshot USING btree (mcag, year)
-  ```
-- `openskagit_agencyfinancialsnapshot_mcag_d0f25ad0`
-  ```sql
-  CREATE INDEX openskagit_agencyfinancialsnapshot_mcag_d0f25ad0 ON public.openskagit_agencyfinancialsnapshot USING btree (mcag)
-  ```
-- `openskagit_agencyfinancialsnapshot_mcag_d0f25ad0_like`
-  ```sql
-  CREATE INDEX openskagit_agencyfinancialsnapshot_mcag_d0f25ad0_like ON public.openskagit_agencyfinancialsnapshot USING btree (mcag varchar_pattern_ops)
-  ```
 - `openskagit_agencyfinancialsnapshot_year_a202283c`
   ```sql
   CREATE INDEX openskagit_agencyfinancialsnapshot_year_a202283c ON public.openskagit_agencyfinancialsnapshot USING btree (year)
@@ -3576,6 +4137,18 @@ _No sample data available (table is empty or unreadable)._
 - `openskagit_agencyfinancialsnapshot_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_agencyfinancialsnapshot_pkey ON public.openskagit_agencyfinancialsnapshot USING btree (id)
+  ```
+- `openskagit_agencyfinancialsnapshot_mcag_d0f25ad0_like`
+  ```sql
+  CREATE INDEX openskagit_agencyfinancialsnapshot_mcag_d0f25ad0_like ON public.openskagit_agencyfinancialsnapshot USING btree (mcag varchar_pattern_ops)
+  ```
+- `openskagit_agencyfinancialsnapshot_mcag_d0f25ad0`
+  ```sql
+  CREATE INDEX openskagit_agencyfinancialsnapshot_mcag_d0f25ad0 ON public.openskagit_agencyfinancialsnapshot USING btree (mcag)
+  ```
+- `uniq_agency_financial_snapshot`
+  ```sql
+  CREATE UNIQUE INDEX uniq_agency_financial_snapshot ON public.openskagit_agencyfinancialsnapshot USING btree (mcag, year)
   ```
 
 ### Sample Row
@@ -3615,7 +4188,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_assessmentroll`
+## `public.openskagit_assessmentroll` (t)
 
 **Primary Key:** id
 
@@ -3630,13 +4203,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_assessmentroll_year_a9872180`
-  ```sql
-  CREATE INDEX openskagit_assessmentroll_year_a9872180 ON public.openskagit_assessmentroll USING btree (year)
-  ```
 - `openskagit_assessmentroll_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_assessmentroll_pkey ON public.openskagit_assessmentroll USING btree (id)
+  ```
+- `openskagit_assessmentroll_year_a9872180`
+  ```sql
+  CREATE INDEX openskagit_assessmentroll_year_a9872180 ON public.openskagit_assessmentroll USING btree (year)
   ```
 
 ### Sample Row
@@ -3650,7 +4223,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_cmaanalysis`
+## `public.openskagit_cmaanalysis` (t)
 
 **Primary Key:** id
 
@@ -3660,7 +4233,7 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
 | `share_uuid` | uuid (uuid) | NO |  |
-| `subject_parcel` | character varying (varchar) | NO |  |
+| `subject_parcel` | character varying(32) (varchar) | NO |  |
 | `subject_snapshot` | jsonb (jsonb) | NO |  |
 | `filters` | jsonb (jsonb) | NO |  |
 | `manual_adjustments` | jsonb (jsonb) | NO |  |
@@ -3674,17 +4247,17 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_cmaanalysis_share_uuid_key`
+- `openskagit_cmaanalysis_pkey`
   ```sql
-  CREATE UNIQUE INDEX openskagit_cmaanalysis_share_uuid_key ON public.openskagit_cmaanalysis USING btree (share_uuid)
+  CREATE UNIQUE INDEX openskagit_cmaanalysis_pkey ON public.openskagit_cmaanalysis USING btree (id)
   ```
 - `openskagit_cmaanalysis_user_id_529d6313`
   ```sql
   CREATE INDEX openskagit_cmaanalysis_user_id_529d6313 ON public.openskagit_cmaanalysis USING btree (user_id)
   ```
-- `openskagit_cmaanalysis_pkey`
+- `openskagit_cmaanalysis_share_uuid_key`
   ```sql
-  CREATE UNIQUE INDEX openskagit_cmaanalysis_pkey ON public.openskagit_cmaanalysis USING btree (id)
+  CREATE UNIQUE INDEX openskagit_cmaanalysis_share_uuid_key ON public.openskagit_cmaanalysis USING btree (share_uuid)
   ```
 
 ### Sample Row
@@ -3693,7 +4266,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_cmacomparableselection`
+## `public.openskagit_cmacomparableselection` (t)
 
 **Primary Key:** id
 
@@ -3702,12 +4275,12 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `parcel_number` | character varying (varchar) | NO |  |
+| `parcel_number` | character varying(32) (varchar) | NO |  |
 | `included` | boolean (bool) | NO |  |
 | `rank` | integer (int4) | NO |  |
-| `raw_sale_price` | numeric (numeric) | NO |  |
-| `adjusted_sale_price` | numeric (numeric) | NO |  |
-| `gross_percentage_adjustment` | numeric (numeric) | NO |  |
+| `raw_sale_price` | numeric(15,2) (numeric) | NO |  |
+| `adjusted_sale_price` | numeric(15,2) (numeric) | NO |  |
+| `gross_percentage_adjustment` | numeric(6,2) (numeric) | NO |  |
 | `auto_adjustments` | jsonb (jsonb) | NO |  |
 | `manual_adjustments` | jsonb (jsonb) | NO |  |
 | `metadata` | jsonb (jsonb) | NO |  |
@@ -3721,13 +4294,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_cmacomparable_analysis_id_parcel_numbe_e53a799e_uniq`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_cmacomparable_analysis_id_parcel_numbe_e53a799e_uniq ON public.openskagit_cmacomparableselection USING btree (analysis_id, parcel_number)
-  ```
 - `openskagit_cmacomparableselection_analysis_id_a2451625`
   ```sql
   CREATE INDEX openskagit_cmacomparableselection_analysis_id_a2451625 ON public.openskagit_cmacomparableselection USING btree (analysis_id)
+  ```
+- `openskagit_cmacomparable_analysis_id_parcel_numbe_e53a799e_uniq`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_cmacomparable_analysis_id_parcel_numbe_e53a799e_uniq ON public.openskagit_cmacomparableselection USING btree (analysis_id, parcel_number)
   ```
 - `openskagit_cmacomparableselection_pkey`
   ```sql
@@ -3740,7 +4313,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_contactsubmission`
+## `public.openskagit_contactsubmission` (t)
 
 **Primary Key:** id
 
@@ -3749,8 +4322,8 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `email` | character varying (varchar) | NO |  |
-| `topic` | character varying (varchar) | NO |  |
+| `email` | character varying(254) (varchar) | NO |  |
+| `topic` | character varying(32) (varchar) | NO |  |
 | `message` | text (text) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
@@ -3763,11 +4336,17 @@ _No sample data available (table is empty or unreadable)._
 
 ### Sample Row
 
-_No sample data available (table is empty or unreadable)._
+| Column | Value |
+|--------|-------|
+| `id` | 1 |
+| `email` | no.reply.LucasLarsson@gmail.com |
+| `topic` | support |
+| `message` | Howdy! openskagit.com    Did you know that it is possible to send proposals absolutely legally?  When such business proposals are sent, no personal data i... |
+| `created_at` | 2026-01-28 05:04:11.069679+00:00 |
 
 ---
 
-## `public.openskagit_dorlocation`
+## `public.openskagit_dorlocation` (t)
 
 **Primary Key:** id
 
@@ -3777,18 +4356,18 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
 | `location_code` | integer (int4) | NO |  |
-| `name` | character varying (varchar) | NO |  |
-| `location_type` | character varying (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
+| `location_type` | character varying(20) (varchar) | NO |  |
 
 ### Indexes
 
-- `openskagit_dorlocation_location_code_key`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_dorlocation_location_code_key ON public.openskagit_dorlocation USING btree (location_code)
-  ```
 - `openskagit_dorlocation_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_dorlocation_pkey ON public.openskagit_dorlocation USING btree (id)
+  ```
+- `openskagit_dorlocation_location_code_key`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_dorlocation_location_code_key ON public.openskagit_dorlocation USING btree (location_code)
   ```
 
 ### Sample Row
@@ -3802,7 +4381,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_dornaicsrecord`
+## `public.openskagit_dornaicsrecord` (t)
 
 **Primary Key:** id
 
@@ -3811,14 +4390,14 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `sector_code` | character varying (varchar) | NO |  |
-| `sector_name` | character varying (varchar) | NO |  |
-| `naics_code` | character varying (varchar) | YES |  |
-| `naics_label` | character varying (varchar) | NO |  |
+| `sector_code` | character varying(10) (varchar) | NO |  |
+| `sector_name` | character varying(255) (varchar) | NO |  |
+| `naics_code` | character varying(10) (varchar) | YES |  |
+| `naics_label` | character varying(255) (varchar) | NO |  |
 | `units` | integer (int4) | YES |  |
 | `taxable_sales` | bigint (int8) | YES |  |
 | `is_total_row` | boolean (bool) | NO |  |
-| `source_url` | character varying (varchar) | NO |  |
+| `source_url` | character varying(500) (varchar) | NO |  |
 | `scraped_at` | timestamp with time zone (timestamptz) | NO |  |
 | `location_id` | bigint (int8) | NO |  |
 | `quarter_id` | bigint (int8) | NO |  |
@@ -3830,33 +4409,33 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `unique_dor_naics_record`
+- `openskagit__locatio_6e09f1_idx`
   ```sql
-  CREATE UNIQUE INDEX unique_dor_naics_record ON public.openskagit_dornaicsrecord USING btree (quarter_id, location_id, sector_code, naics_code)
-  ```
-- `openskagit__naics_c_823cf2_idx`
-  ```sql
-  CREATE INDEX openskagit__naics_c_823cf2_idx ON public.openskagit_dornaicsrecord USING btree (naics_code)
-  ```
-- `openskagit_dornaicsrecord_quarter_id_5c599f63`
-  ```sql
-  CREATE INDEX openskagit_dornaicsrecord_quarter_id_5c599f63 ON public.openskagit_dornaicsrecord USING btree (quarter_id)
+  CREATE INDEX openskagit__locatio_6e09f1_idx ON public.openskagit_dornaicsrecord USING btree (location_id, quarter_id)
   ```
 - `openskagit_dornaicsrecord_location_id_75fbb737`
   ```sql
   CREATE INDEX openskagit_dornaicsrecord_location_id_75fbb737 ON public.openskagit_dornaicsrecord USING btree (location_id)
   ```
-- `openskagit__locatio_6e09f1_idx`
+- `openskagit__naics_c_823cf2_idx`
   ```sql
-  CREATE INDEX openskagit__locatio_6e09f1_idx ON public.openskagit_dornaicsrecord USING btree (location_id, quarter_id)
-  ```
-- `openskagit_dornaicsrecord_pkey`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_dornaicsrecord_pkey ON public.openskagit_dornaicsrecord USING btree (id)
+  CREATE INDEX openskagit__naics_c_823cf2_idx ON public.openskagit_dornaicsrecord USING btree (naics_code)
   ```
 - `openskagit__sector__827051_idx`
   ```sql
   CREATE INDEX openskagit__sector__827051_idx ON public.openskagit_dornaicsrecord USING btree (sector_code)
+  ```
+- `openskagit_dornaicsrecord_quarter_id_5c599f63`
+  ```sql
+  CREATE INDEX openskagit_dornaicsrecord_quarter_id_5c599f63 ON public.openskagit_dornaicsrecord USING btree (quarter_id)
+  ```
+- `unique_dor_naics_record`
+  ```sql
+  CREATE UNIQUE INDEX unique_dor_naics_record ON public.openskagit_dornaicsrecord USING btree (quarter_id, location_id, sector_code, naics_code)
+  ```
+- `openskagit_dornaicsrecord_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_dornaicsrecord_pkey ON public.openskagit_dornaicsrecord USING btree (id)
   ```
 
 ### Sample Row
@@ -3878,7 +4457,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_dorquarter`
+## `public.openskagit_dorquarter` (t)
 
 **Primary Key:** id
 
@@ -3887,7 +4466,7 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `period` | character varying (varchar) | NO |  |
+| `period` | character varying(6) (varchar) | NO |  |
 | `year` | smallint (int2) | NO |  |
 | `quarter` | smallint (int2) | NO |  |
 
@@ -3897,13 +4476,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE UNIQUE INDEX openskagit_dorquarter_pkey ON public.openskagit_dorquarter USING btree (id)
   ```
-- `openskagit_dorquarter_period_b201285f_like`
-  ```sql
-  CREATE INDEX openskagit_dorquarter_period_b201285f_like ON public.openskagit_dorquarter USING btree (period varchar_pattern_ops)
-  ```
 - `openskagit_dorquarter_period_key`
   ```sql
   CREATE UNIQUE INDEX openskagit_dorquarter_period_key ON public.openskagit_dorquarter USING btree (period)
+  ```
+- `openskagit_dorquarter_period_b201285f_like`
+  ```sql
+  CREATE INDEX openskagit_dorquarter_period_b201285f_like ON public.openskagit_dorquarter USING btree (period varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -3917,7 +4496,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_experimentrun`
+## `public.openskagit_experimentrun` (t)
 
 **Primary Key:** id
 
@@ -3926,17 +4505,17 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | uuid (uuid) | NO |  |
-| `name` | character varying (varchar) | NO |  |
+| `name` | character varying(200) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `started_at` | timestamp with time zone (timestamptz) | YES |  |
 | `completed_at` | timestamp with time zone (timestamptz) | YES |  |
-| `status` | character varying (varchar) | NO |  |
+| `status` | character varying(20) (varchar) | NO |  |
 | `error_message` | text (text) | NO |  |
-| `mode` | character varying (varchar) | NO |  |
-| `market_group_col` | character varying (varchar) | NO |  |
+| `mode` | character varying(50) (varchar) | NO |  |
+| `market_group_col` | character varying(100) (varchar) | NO |  |
 | `countywide` | boolean (bool) | NO |  |
-| `predictor_profile` | character varying (varchar) | NO |  |
-| `interaction_bundle` | character varying (varchar) | NO |  |
+| `predictor_profile` | character varying(100) (varchar) | NO |  |
+| `interaction_bundle` | character varying(100) (varchar) | NO |  |
 | `full_config` | jsonb (jsonb) | NO |  |
 | `total_observations` | integer (int4) | YES |  |
 | `segment_count` | integer (int4) | YES |  |
@@ -3945,8 +4524,8 @@ _No sample data available (table is empty or unreadable)._
 | `global_prb` | double precision (float8) | YES |  |
 | `global_r2` | double precision (float8) | YES |  |
 | `global_rmse` | double precision (float8) | YES |  |
-| `diagnostics_path` | character varying (varchar) | NO |  |
-| `run_id` | character varying (varchar) | NO |  |
+| `diagnostics_path` | character varying(500) (varchar) | NO |  |
+| `run_id` | character varying(100) (varchar) | NO |  |
 | `notes` | text (text) | NO |  |
 | `starred` | boolean (bool) | NO |  |
 | `tags` | jsonb (jsonb) | NO |  |
@@ -3958,21 +4537,21 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit__status_10a108_idx`
-  ```sql
-  CREATE INDEX openskagit__status_10a108_idx ON public.openskagit_experimentrun USING btree (status, created_at DESC)
-  ```
 - `openskagit_experimentrun_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_experimentrun_pkey ON public.openskagit_experimentrun USING btree (id)
   ```
-- `openskagit_experimentrun_baseline_run_id_a88efe6b`
-  ```sql
-  CREATE INDEX openskagit_experimentrun_baseline_run_id_a88efe6b ON public.openskagit_experimentrun USING btree (baseline_run_id)
-  ```
 - `openskagit__starred_d942b3_idx`
   ```sql
   CREATE INDEX openskagit__starred_d942b3_idx ON public.openskagit_experimentrun USING btree (starred, created_at DESC)
+  ```
+- `openskagit__status_10a108_idx`
+  ```sql
+  CREATE INDEX openskagit__status_10a108_idx ON public.openskagit_experimentrun USING btree (status, created_at DESC)
+  ```
+- `openskagit_experimentrun_baseline_run_id_a88efe6b`
+  ```sql
+  CREATE INDEX openskagit_experimentrun_baseline_run_id_a88efe6b ON public.openskagit_experimentrun USING btree (baseline_run_id)
   ```
 
 ### Sample Row
@@ -3981,7 +4560,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_lidartile`
+## `public.openskagit_lidartile` (t)
 
 **Primary Key:** id
 
@@ -3993,19 +4572,19 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
-| `geom` | USER-DEFINED (geometry) | NO |  |
+| `geom` | geometry(Polygon,2926) (geometry) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `last_processed` | timestamp with time zone (timestamptz) | YES |  |
 
 ### Indexes
 
-- `openskagit_lidartile_pkey`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_lidartile_pkey ON public.openskagit_lidartile USING btree (id)
-  ```
 - `openskagit_lidartile_geom_8d07f8d1_id`
   ```sql
   CREATE INDEX openskagit_lidartile_geom_8d07f8d1_id ON public.openskagit_lidartile USING gist (geom)
+  ```
+- `openskagit_lidartile_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_lidartile_pkey ON public.openskagit_lidartile USING btree (id)
   ```
 - `openskagit__geom_d2e88a_gist`
   ```sql
@@ -4023,7 +4602,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_lidartile_parcels`
+## `public.openskagit_lidartile_parcels` (t)
 
 **Primary Key:** id
 
@@ -4033,7 +4612,7 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `id` | integer (int4) | NO |  |
 | `lidartile_id` | integer (int4) | NO |  |
-| `masterparcel_id` | character varying (varchar) | NO |  |
+| `masterparcel_id` | character varying(20) (varchar) | NO |  |
 
 ### Foreign Keys
 
@@ -4042,6 +4621,10 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
+- `openskagit_lidartile_parcels_masterparcel_id_50d67b80`
+  ```sql
+  CREATE INDEX openskagit_lidartile_parcels_masterparcel_id_50d67b80 ON public.openskagit_lidartile_parcels USING btree (masterparcel_id)
+  ```
 - `openskagit_lidartile_parcels_lidartile_id_2f91b6b9`
   ```sql
   CREATE INDEX openskagit_lidartile_parcels_lidartile_id_2f91b6b9 ON public.openskagit_lidartile_parcels USING btree (lidartile_id)
@@ -4058,10 +4641,6 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX openskagit_lidartile_parcels_masterparcel_id_50d67b80_like ON public.openskagit_lidartile_parcels USING btree (masterparcel_id varchar_pattern_ops)
   ```
-- `openskagit_lidartile_parcels_masterparcel_id_50d67b80`
-  ```sql
-  CREATE INDEX openskagit_lidartile_parcels_masterparcel_id_50d67b80 ON public.openskagit_lidartile_parcels USING btree (masterparcel_id)
-  ```
 
 ### Sample Row
 
@@ -4069,7 +4648,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_neighborhoodgeom`
+## `public.openskagit_neighborhoodgeom` (t)
 
 **Primary Key:** id
 
@@ -4082,13 +4661,21 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `code` | character varying (varchar) | NO |  |
-| `name` | character varying (varchar) | NO |  |
-| `geom_3857` | USER-DEFINED (geometry) | NO |  |
-| `geom_4326` | USER-DEFINED (geometry) | NO |  |
+| `code` | character varying(20) (varchar) | NO |  |
+| `name` | character varying(100) (varchar) | NO |  |
+| `geom_3857` | geometry(MultiPolygon,3857) (geometry) | NO |  |
+| `geom_4326` | geometry(MultiPolygon,4326) (geometry) | NO |  |
 
 ### Indexes
 
+- `openskagit_neighborhoodgeom_code_6ec6533f_like`
+  ```sql
+  CREATE INDEX openskagit_neighborhoodgeom_code_6ec6533f_like ON public.openskagit_neighborhoodgeom USING btree (code varchar_pattern_ops)
+  ```
+- `openskagit_neighborhoodgeom_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_neighborhoodgeom_pkey ON public.openskagit_neighborhoodgeom USING btree (id)
+  ```
 - `openskagit_neighborhoodgeom_code_key`
   ```sql
   CREATE UNIQUE INDEX openskagit_neighborhoodgeom_code_key ON public.openskagit_neighborhoodgeom USING btree (code)
@@ -4100,14 +4687,6 @@ _No sample data available (table is empty or unreadable)._
 - `openskagit_neighborhoodgeom_geom_3857_ccca74e2_id`
   ```sql
   CREATE INDEX openskagit_neighborhoodgeom_geom_3857_ccca74e2_id ON public.openskagit_neighborhoodgeom USING gist (geom_3857)
-  ```
-- `openskagit_neighborhoodgeom_code_6ec6533f_like`
-  ```sql
-  CREATE INDEX openskagit_neighborhoodgeom_code_6ec6533f_like ON public.openskagit_neighborhoodgeom USING btree (code varchar_pattern_ops)
-  ```
-- `openskagit_neighborhoodgeom_pkey`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_neighborhoodgeom_pkey ON public.openskagit_neighborhoodgeom USING btree (id)
   ```
 
 ### Sample Row
@@ -4122,7 +4701,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_neighborhoodmetrics`
+## `public.openskagit_neighborhoodmetrics` (t)
 
 **Primary Key:** id
 
@@ -4131,14 +4710,14 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `neighborhood_code` | character varying (varchar) | NO |  |
+| `neighborhood_code` | character varying(20) (varchar) | NO |  |
 | `year` | integer (int4) | NO |  |
 | `sales_ratio` | double precision (float8) | YES |  |
 | `median_ratio` | double precision (float8) | YES |  |
 | `cod` | double precision (float8) | YES |  |
 | `prd` | double precision (float8) | YES |  |
 | `sample_size` | integer (int4) | NO |  |
-| `reliability` | character varying (varchar) | NO |  |
+| `reliability` | character varying(20) (varchar) | NO |  |
 | `computed_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
@@ -4173,7 +4752,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_neighborhoodprofile`
+## `public.openskagit_neighborhoodprofile` (t)
 
 **Primary Key:** id
 
@@ -4182,19 +4761,15 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `hood_id` | character varying (varchar) | NO |  |
-| `name` | character varying (varchar) | YES |  |
-| `city` | character varying (varchar) | YES |  |
+| `hood_id` | character varying(20) (varchar) | NO |  |
+| `name` | character varying(200) (varchar) | YES |  |
+| `city` | character varying(50) (varchar) | YES |  |
 | `json_data` | jsonb (jsonb) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 | `ai_summary` | text (text) | YES |  |
 
 ### Indexes
 
-- `openskagit_neighborhoodprofile_hood_id_5ad1cc14_like`
-  ```sql
-  CREATE INDEX openskagit_neighborhoodprofile_hood_id_5ad1cc14_like ON public.openskagit_neighborhoodprofile USING btree (hood_id varchar_pattern_ops)
-  ```
 - `openskagit_neighborhoodprofile_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_neighborhoodprofile_pkey ON public.openskagit_neighborhoodprofile USING btree (id)
@@ -4202,6 +4777,10 @@ _No sample data available (table is empty or unreadable)._
 - `openskagit_neighborhoodprofile_hood_id_key`
   ```sql
   CREATE UNIQUE INDEX openskagit_neighborhoodprofile_hood_id_key ON public.openskagit_neighborhoodprofile USING btree (hood_id)
+  ```
+- `openskagit_neighborhoodprofile_hood_id_5ad1cc14_like`
+  ```sql
+  CREATE INDEX openskagit_neighborhoodprofile_hood_id_5ad1cc14_like ON public.openskagit_neighborhoodprofile USING btree (hood_id varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -4218,7 +4797,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_neighborhoodtrend`
+## `public.openskagit_neighborhoodtrend` (t)
 
 **Primary Key:** id
 
@@ -4227,7 +4806,7 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `hood_id` | character varying (varchar) | NO |  |
+| `hood_id` | character varying(20) (varchar) | NO |  |
 | `value_year` | integer (int4) | NO |  |
 | `median_land_market` | integer (int4) | YES |  |
 | `median_building` | integer (int4) | YES |  |
@@ -4238,35 +4817,35 @@ _No sample data available (table is empty or unreadable)._
 | `yoy_change_total` | double precision (float8) | YES |  |
 | `yoy_change_tax` | double precision (float8) | YES |  |
 | `stability_score` | double precision (float8) | YES |  |
-| `boom_bust_flag` | character varying (varchar) | NO |  |
+| `boom_bust_flag` | character varying(20) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `openskagit_neighborhoodtrend_hood_id_value_year_b17e368b_uniq`
+- `openskagit_neighborhoodtrend_pkey`
   ```sql
-  CREATE UNIQUE INDEX openskagit_neighborhoodtrend_hood_id_value_year_b17e368b_uniq ON public.openskagit_neighborhoodtrend USING btree (hood_id, value_year)
-  ```
-- `openskagit__hood_id_52cf7e_idx`
-  ```sql
-  CREATE INDEX openskagit__hood_id_52cf7e_idx ON public.openskagit_neighborhoodtrend USING btree (hood_id, value_year)
-  ```
-- `openskagit_neighborhoodtrend_value_year_3e21099c`
-  ```sql
-  CREATE INDEX openskagit_neighborhoodtrend_value_year_3e21099c ON public.openskagit_neighborhoodtrend USING btree (value_year)
+  CREATE UNIQUE INDEX openskagit_neighborhoodtrend_pkey ON public.openskagit_neighborhoodtrend USING btree (id)
   ```
 - `openskagit_neighborhoodtrend_hood_id_a81d2a29_like`
   ```sql
   CREATE INDEX openskagit_neighborhoodtrend_hood_id_a81d2a29_like ON public.openskagit_neighborhoodtrend USING btree (hood_id varchar_pattern_ops)
   ```
-- `openskagit_neighborhoodtrend_pkey`
+- `openskagit__hood_id_52cf7e_idx`
   ```sql
-  CREATE UNIQUE INDEX openskagit_neighborhoodtrend_pkey ON public.openskagit_neighborhoodtrend USING btree (id)
+  CREATE INDEX openskagit__hood_id_52cf7e_idx ON public.openskagit_neighborhoodtrend USING btree (hood_id, value_year)
   ```
 - `openskagit_neighborhoodtrend_hood_id_a81d2a29`
   ```sql
   CREATE INDEX openskagit_neighborhoodtrend_hood_id_a81d2a29 ON public.openskagit_neighborhoodtrend USING btree (hood_id)
+  ```
+- `openskagit_neighborhoodtrend_value_year_3e21099c`
+  ```sql
+  CREATE INDEX openskagit_neighborhoodtrend_value_year_3e21099c ON public.openskagit_neighborhoodtrend USING btree (value_year)
+  ```
+- `openskagit_neighborhoodtrend_hood_id_value_year_b17e368b_uniq`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_neighborhoodtrend_hood_id_value_year_b17e368b_uniq ON public.openskagit_neighborhoodtrend USING btree (hood_id, value_year)
   ```
 
 ### Sample Row
@@ -4291,7 +4870,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_parcelgeometry`
+## `public.openskagit_parcelgeometry` (t)
 
 **Primary Key:** id
 
@@ -4310,9 +4889,9 @@ _No sample data available (table is empty or unreadable)._
 | `id` | bigint (int8) | NO |  |
 | `latitude` | double precision (float8) | YES |  |
 | `longitude` | double precision (float8) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
-| `embedding` | USER-DEFINED (vector) | YES |  |
-| `centroid_geog` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,3857) (geometry) | YES |  |
+| `embedding` | vector(384) (vector) | YES |  |
+| `centroid_geog` | geometry(Point,4326) (geometry) | YES |  |
 | `elev` | double precision (float8) | YES |  |
 | `slope` | double precision (float8) | YES |  |
 | `aspect` | double precision (float8) | YES |  |
@@ -4327,11 +4906,11 @@ _No sample data available (table is empty or unreadable)._
 | `dist_hospital` | double precision (float8) | YES |  |
 | `dist_fire_station` | double precision (float8) | YES |  |
 | `dist_trailhead` | double precision (float8) | YES |  |
-| `geom_backup` | USER-DEFINED (geometry) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
-| `parcel_id` | character varying (varchar) | NO |  |
-| `centroid_2926` | USER-DEFINED (geometry) | YES |  |
-| `geom_2926_valid` | USER-DEFINED (geometry) | YES |  |
+| `geom_backup` | geometry(Geometry,3857) (geometry) | YES |  |
+| `geom_2926` | geometry(MultiPolygon,2926) (geometry) | YES |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
+| `centroid_2926` | geometry(Point,2926) (geometry) | YES |  |
+| `geom_2926_valid` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -4339,61 +4918,61 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX openskagit_parcelgeometry_geom_backup_81aaabed_id ON public.openskagit_parcelgeometry USING gist (geom_backup)
   ```
-- `openskagit__geom_05e325_gist`
+- `idx_pg_geom_valid`
   ```sql
-  CREATE INDEX openskagit__geom_05e325_gist ON public.openskagit_parcelgeometry USING gist (geom)
-  ```
-- `openskagit__geom_29_277639_gist`
-  ```sql
-  CREATE INDEX openskagit__geom_29_277639_gist ON public.openskagit_parcelgeometry USING gist (geom_2926)
-  ```
-- `openskagit_parcelgeometry_pkey`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_parcelgeometry_pkey ON public.openskagit_parcelgeometry USING btree (id)
-  ```
-- `idx_parcel_geom_2926`
-  ```sql
-  CREATE INDEX idx_parcel_geom_2926 ON public.openskagit_parcelgeometry USING gist (geom_2926)
-  ```
-- `openskagit_parcelgeometry_centroid_2926_gix`
-  ```sql
-  CREATE INDEX openskagit_parcelgeometry_centroid_2926_gix ON public.openskagit_parcelgeometry USING gist (centroid_2926)
-  ```
-- `openskagit_parcelgeometry_geom_2926_gix`
-  ```sql
-  CREATE INDEX openskagit_parcelgeometry_geom_2926_gix ON public.openskagit_parcelgeometry USING gist (geom_2926)
+  CREATE INDEX idx_pg_geom_valid ON public.openskagit_parcelgeometry USING gist (geom_2926_valid)
   ```
 - `idx_parcelgeometry_centroid`
   ```sql
   CREATE INDEX idx_parcelgeometry_centroid ON public.openskagit_parcelgeometry USING gist (centroid_2926)
   ```
-- `openskagit_parcelgeometry_centroid_2926_gist`
+- `openskagit_parcelgeometry_geom_2926_gix`
   ```sql
-  CREATE INDEX openskagit_parcelgeometry_centroid_2926_gist ON public.openskagit_parcelgeometry USING gist (centroid_2926)
-  ```
-- `idx_pg_geom_valid`
-  ```sql
-  CREATE INDEX idx_pg_geom_valid ON public.openskagit_parcelgeometry USING gist (geom_2926_valid)
-  ```
-- `idx_parcel_geom_valid`
-  ```sql
-  CREATE INDEX idx_parcel_geom_valid ON public.openskagit_parcelgeometry USING gist (geom_2926_valid)
-  ```
-- `openskagit_parcelgeometry_centroid_geog_5726480f_id`
-  ```sql
-  CREATE INDEX openskagit_parcelgeometry_centroid_geog_5726480f_id ON public.openskagit_parcelgeometry USING gist (centroid_geog)
+  CREATE INDEX openskagit_parcelgeometry_geom_2926_gix ON public.openskagit_parcelgeometry USING gist (geom_2926)
   ```
 - `openskagit__centroi_0c7376_gist`
   ```sql
   CREATE INDEX openskagit__centroi_0c7376_gist ON public.openskagit_parcelgeometry USING gist (centroid_geog)
   ```
-- `openskagit_parcelgeometry_geom_368295ec_id`
+- `openskagit_parcelgeometry_centroid_geog_5726480f_id`
   ```sql
-  CREATE INDEX openskagit_parcelgeometry_geom_368295ec_id ON public.openskagit_parcelgeometry USING gist (geom)
+  CREATE INDEX openskagit_parcelgeometry_centroid_geog_5726480f_id ON public.openskagit_parcelgeometry USING gist (centroid_geog)
+  ```
+- `openskagit__geom_29_277639_gist`
+  ```sql
+  CREATE INDEX openskagit__geom_29_277639_gist ON public.openskagit_parcelgeometry USING gist (geom_2926)
   ```
 - `openskagit_parcelgeometry_geom_2926_ed9b9dd9_id`
   ```sql
   CREATE INDEX openskagit_parcelgeometry_geom_2926_ed9b9dd9_id ON public.openskagit_parcelgeometry USING gist (geom_2926)
+  ```
+- `openskagit__geom_05e325_gist`
+  ```sql
+  CREATE INDEX openskagit__geom_05e325_gist ON public.openskagit_parcelgeometry USING gist (geom)
+  ```
+- `openskagit_parcelgeometry_centroid_2926_gix`
+  ```sql
+  CREATE INDEX openskagit_parcelgeometry_centroid_2926_gix ON public.openskagit_parcelgeometry USING gist (centroid_2926)
+  ```
+- `idx_parcel_geom_valid`
+  ```sql
+  CREATE INDEX idx_parcel_geom_valid ON public.openskagit_parcelgeometry USING gist (geom_2926_valid)
+  ```
+- `idx_parcel_geom_2926`
+  ```sql
+  CREATE INDEX idx_parcel_geom_2926 ON public.openskagit_parcelgeometry USING gist (geom_2926)
+  ```
+- `openskagit_parcelgeometry_centroid_2926_gist`
+  ```sql
+  CREATE INDEX openskagit_parcelgeometry_centroid_2926_gist ON public.openskagit_parcelgeometry USING gist (centroid_2926)
+  ```
+- `openskagit_parcelgeometry_geom_368295ec_id`
+  ```sql
+  CREATE INDEX openskagit_parcelgeometry_geom_368295ec_id ON public.openskagit_parcelgeometry USING gist (geom)
+  ```
+- `openskagit_parcelgeometry_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_parcelgeometry_pkey ON public.openskagit_parcelgeometry USING btree (id)
   ```
 
 ### Sample Row
@@ -4428,7 +5007,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_parcelhistory`
+## `public.openskagit_parcelhistory` (t)
 
 **Primary Key:** id
 
@@ -4437,29 +5016,22 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `parcel_number` | character varying (varchar) | NO |  |
+| `parcel_number` | character varying(20) (varchar) | NO |  |
 | `rows` | jsonb (jsonb) | NO |  |
 | `scraped_at` | timestamp with time zone (timestamptz) | NO |  |
-| `neighborhood_code` | character varying (varchar) | YES |  |
+| `neighborhood_code` | character varying(20) (varchar) | YES |  |
 | `roll_year` | integer (int4) | YES |  |
+| `taxes` | jsonb (jsonb) | NO |  |
 
 ### Indexes
 
-- `openskagit_parcelhistory_neighborhood_code_91a11ba2_like`
+- `openskagit_parcelhistory_neighborhood_code_91a11ba2`
   ```sql
-  CREATE INDEX openskagit_parcelhistory_neighborhood_code_91a11ba2_like ON public.openskagit_parcelhistory USING btree (neighborhood_code varchar_pattern_ops)
+  CREATE INDEX openskagit_parcelhistory_neighborhood_code_91a11ba2 ON public.openskagit_parcelhistory USING btree (neighborhood_code)
   ```
 - `openskagit_parcelhistory_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_parcelhistory_pkey ON public.openskagit_parcelhistory USING btree (id)
-  ```
-- `openskagit_parcelhistory_roll_year_d9004019`
-  ```sql
-  CREATE INDEX openskagit_parcelhistory_roll_year_d9004019 ON public.openskagit_parcelhistory USING btree (roll_year)
-  ```
-- `openskagit_parcelhistory_neighborhood_code_91a11ba2`
-  ```sql
-  CREATE INDEX openskagit_parcelhistory_neighborhood_code_91a11ba2 ON public.openskagit_parcelhistory USING btree (neighborhood_code)
   ```
 - `openskagit_parcelhistory_parcel_number_key`
   ```sql
@@ -4469,21 +5041,69 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX openskagit_parcelhistory_parcel_number_c4377126_like ON public.openskagit_parcelhistory USING btree (parcel_number varchar_pattern_ops)
   ```
+- `openskagit_parcelhistory_roll_year_d9004019`
+  ```sql
+  CREATE INDEX openskagit_parcelhistory_roll_year_d9004019 ON public.openskagit_parcelhistory USING btree (roll_year)
+  ```
+- `openskagit_parcelhistory_neighborhood_code_91a11ba2_like`
+  ```sql
+  CREATE INDEX openskagit_parcelhistory_neighborhood_code_91a11ba2_like ON public.openskagit_parcelhistory USING btree (neighborhood_code varchar_pattern_ops)
+  ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `id` | 19789 |
-| `parcel_number` | P131388 |
-| `rows` | [{"TAX": "$18,319.55", "BUILDING": "$1,281,900.00", "ParcelID": "P131388", "TAX YEAR": "2025", "VALUE YEAR": "2024", "LAND MARKET": "$1,144,800.00", "MARKET ... |
-| `scraped_at` | 2025-11-21 00:42:14.233471+00:00 |
+| `id` | 60270 |
+| `parcel_number` | P59315 |
+| `rows` | [{"TAX": "$9,857.73", "BUILDING": "$920,500.00", "ParcelID": "P59315", "TAX YEAR": "2025", "VALUE YEAR": "2024", "LAND MARKET": "$385,000.00", "MARKET TOTAL"... |
+| `scraped_at` | 2026-01-24 11:16:49.955304+00:00 |
 | `neighborhood_code` | NULL |
 | `roll_year` | NULL |
+| `taxes` | {"summary": {"Levy Code": "0900", "Levy Rate": "7.8254", "General Tax": "$10,451.63", "Taxable Value": "$1,335,600.00", "2026 Total Due": "$10,456.63", "2026... |
 
 ---
 
-## `public.openskagit_parcellidarstats`
+## `public.openskagit_parcelintent` (t)
+
+**Primary Key:** key
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `key` | character varying(64) (varchar) | NO |  |
+| `label` | character varying(255) (varchar) | NO |  |
+| `description` | text (text) | NO |  |
+| `triggers_law_classes` | jsonb (jsonb) | NO |  |
+| `external_authorities` | jsonb (jsonb) | NO |  |
+| `created_at` | timestamp with time zone (timestamptz) | NO |  |
+
+### Indexes
+
+- `openskagit_parcelintent_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_parcelintent_pkey ON public.openskagit_parcelintent USING btree (key)
+  ```
+- `openskagit_parcelintent_key_53711169_like`
+  ```sql
+  CREATE INDEX openskagit_parcelintent_key_53711169_like ON public.openskagit_parcelintent USING btree (key varchar_pattern_ops)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `key` | new_residential_dwelling |
+| `label` | New Residential Dwelling |
+| `description` | Construct a new residential dwelling unit. |
+| `triggers_law_classes` | ["use_permission", "dimensional_standard", "overlay_constraint", "procedural_requirement"] |
+| `external_authorities` | ["building", "health", "fire"] |
+| `created_at` | 2026-01-21 17:04:28.655804+00:00 |
+
+---
+
+## `public.openskagit_parcellidarstats` (t)
 
 **Primary Key:** id
 
@@ -4512,13 +5132,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_parcellidarstats_parcel_id_key`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_parcellidarstats_parcel_id_key ON public.openskagit_parcellidarstats USING btree (parcel_id)
-  ```
 - `openskagit_parcellidarstats_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_parcellidarstats_pkey ON public.openskagit_parcellidarstats USING btree (id)
+  ```
+- `openskagit_parcellidarstats_parcel_id_key`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_parcellidarstats_parcel_id_key ON public.openskagit_parcellidarstats USING btree (parcel_id)
   ```
 
 ### Sample Row
@@ -4527,7 +5147,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_parcelwaterfacts`
+## `public.openskagit_parcelwaterfacts` (t)
 
 **Primary Key:** parcel_id
 
@@ -4535,7 +5155,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `parcel_id` | character varying (varchar) | NO |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
 | `public_water_available` | boolean (bool) | YES |  |
 | `public_water_system_id` | text (text) | YES |  |
 | `in_instream_flow_rule_area` | boolean (bool) | YES |  |
@@ -4549,7 +5169,7 @@ _No sample data available (table is empty or unreadable)._
 | `nearest_well_depth` | double precision (float8) | YES |  |
 | `nearest_well_yield` | double precision (float8) | YES |  |
 | `has_pou_water_right` | boolean (bool) | YES |  |
-| `pou_right_numbers` | ARRAY (_text) | YES |  |
+| `pou_right_numbers` | text[] (_text) | YES |  |
 | `nearest_diversion_right` | text (text) | YES |  |
 | `nearest_diversion_distance_m` | double precision (float8) | YES |  |
 | `nearest_right_priority_date` | date (date) | YES |  |
@@ -4564,10 +5184,6 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_parcelwaterfacts_has_pou_water_right_idx`
-  ```sql
-  CREATE INDEX openskagit_parcelwaterfacts_has_pou_water_right_idx ON public.openskagit_parcelwaterfacts USING btree (has_pou_water_right)
-  ```
 - `openskagit_parcelwaterfacts_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_parcelwaterfacts_pkey ON public.openskagit_parcelwaterfacts USING btree (parcel_id)
@@ -4575,6 +5191,10 @@ _No sample data available (table is empty or unreadable)._
 - `openskagit_parcelwaterfacts_public_water_available_idx`
   ```sql
   CREATE INDEX openskagit_parcelwaterfacts_public_water_available_idx ON public.openskagit_parcelwaterfacts USING btree (public_water_available)
+  ```
+- `openskagit_parcelwaterfacts_has_pou_water_right_idx`
+  ```sql
+  CREATE INDEX openskagit_parcelwaterfacts_has_pou_water_right_idx ON public.openskagit_parcelwaterfacts USING btree (has_pou_water_right)
   ```
 
 ### Sample Row
@@ -4606,7 +5226,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_referencedataimportlog`
+## `public.openskagit_permittype` (t)
 
 **Primary Key:** id
 
@@ -4615,9 +5235,98 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `dataset_name` | character varying (varchar) | NO |  |
-| `source_path` | character varying (varchar) | NO |  |
-| `table_name` | character varying (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
+| `category` | character varying(255) (varchar) | NO |  |
+| `description` | text (text) | NO |  |
+
+### Indexes
+
+- `openskagit_permittype_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_permittype_pkey ON public.openskagit_permittype USING btree (id)
+  ```
+- `openskagit_permittype_name_key`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_permittype_name_key ON public.openskagit_permittype USING btree (name)
+  ```
+- `openskagit_permittype_name_8c1b5da2_like`
+  ```sql
+  CREATE INDEX openskagit_permittype_name_8c1b5da2_like ON public.openskagit_permittype USING btree (name varchar_pattern_ops)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 1 |
+| `name` | Single Family Residence |
+| `category` | unknown |
+| `description` |  |
+
+---
+
+## `public.openskagit_permittypeintentmap` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `intent_id` | character varying(64) (varchar) | NO |  |
+| `permit_type_id` | bigint (int8) | NO |  |
+
+### Foreign Keys
+
+- `intent_id` → `public.openskagit_parcelintent.key`
+- `permit_type_id` → `public.openskagit_permittype.id`
+
+### Indexes
+
+- `openskagit_permittypeintentmap_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_permittypeintentmap_pkey ON public.openskagit_permittypeintentmap USING btree (id)
+  ```
+- `openskagit_permittypeintentmap_intent_id_f19a444d_like`
+  ```sql
+  CREATE INDEX openskagit_permittypeintentmap_intent_id_f19a444d_like ON public.openskagit_permittypeintentmap USING btree (intent_id varchar_pattern_ops)
+  ```
+- `openskagit_permittypeintentmap_intent_id_f19a444d`
+  ```sql
+  CREATE INDEX openskagit_permittypeintentmap_intent_id_f19a444d ON public.openskagit_permittypeintentmap USING btree (intent_id)
+  ```
+- `openskagit_permittypeint_permit_type_id_intent_id_7db2e8b4_uniq`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_permittypeint_permit_type_id_intent_id_7db2e8b4_uniq ON public.openskagit_permittypeintentmap USING btree (permit_type_id, intent_id)
+  ```
+- `openskagit_permittypeintentmap_permit_type_id_ecdb023a`
+  ```sql
+  CREATE INDEX openskagit_permittypeintentmap_permit_type_id_ecdb023a ON public.openskagit_permittypeintentmap USING btree (permit_type_id)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `id` | 1 |
+| `intent_id` | new_residential_dwelling |
+| `permit_type_id` | 1 |
+
+---
+
+## `public.openskagit_referencedataimportlog` (t)
+
+**Primary Key:** id
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `id` | bigint (int8) | NO |  |
+| `dataset_name` | character varying(100) (varchar) | NO |  |
+| `source_path` | character varying(500) (varchar) | NO |  |
+| `table_name` | character varying(100) (varchar) | NO |  |
 | `success` | boolean (bool) | NO |  |
 | `error_message` | text (text) | YES |  |
 | `row_count` | integer (int4) | NO |  |
@@ -4637,7 +5346,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_regressionadjustment`
+## `public.openskagit_regressionadjustment` (t)
 
 **Primary Key:** id
 
@@ -4646,9 +5355,9 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `variable` | character varying (varchar) | NO |  |
+| `variable` | character varying(100) (varchar) | NO |  |
 | `adjustment_pct` | double precision (float8) | NO |  |
-| `model_version` | character varying (varchar) | NO |  |
+| `model_version` | character varying(50) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
@@ -4670,7 +5379,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_surveyconversation`
+## `public.openskagit_surveyconversation` (t)
 
 **Primary Key:** id
 
@@ -4680,7 +5389,7 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
 | `conversation_id` | uuid (uuid) | NO |  |
-| `status` | character varying (varchar) | NO |  |
+| `status` | character varying(16) (varchar) | NO |  |
 | `question_count` | integer (int4) | NO |  |
 | `implicit_insights` | jsonb (jsonb) | NO |  |
 | `metadata` | jsonb (jsonb) | NO |  |
@@ -4713,7 +5422,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_surveyinteraction`
+## `public.openskagit_surveyinteraction` (t)
 
 **Primary Key:** id
 
@@ -4722,10 +5431,10 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `role` | character varying (varchar) | NO |  |
-| `question_id` | character varying (varchar) | YES |  |
+| `role` | character varying(8) (varchar) | NO |  |
+| `question_id` | character varying(64) (varchar) | YES |  |
 | `question_label` | text (text) | NO |  |
-| `topic` | character varying (varchar) | NO |  |
+| `topic` | character varying(64) (varchar) | NO |  |
 | `content` | text (text) | NO |  |
 | `metadata` | jsonb (jsonb) | YES |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
@@ -4737,13 +5446,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_surveyinteraction_pkey`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_surveyinteraction_pkey ON public.openskagit_surveyinteraction USING btree (id)
-  ```
 - `openskagit_surveyinteraction_conversation_id_bfaddf47`
   ```sql
   CREATE INDEX openskagit_surveyinteraction_conversation_id_bfaddf47 ON public.openskagit_surveyinteraction USING btree (conversation_id)
+  ```
+- `openskagit_surveyinteraction_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_surveyinteraction_pkey ON public.openskagit_surveyinteraction USING btree (id)
   ```
 
 ### Sample Row
@@ -4762,7 +5471,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_taxationwithoutrepresentation`
+## `public.openskagit_taxationwithoutrepresentation` (t)
 
 **Primary Key:** id
 
@@ -4774,10 +5483,10 @@ _No sample data available (table is empty or unreadable)._
 | `tax_year` | integer (int4) | YES |  |
 | `tax_amount` | bigint (int8) | YES |  |
 | `ballots_cast` | integer (int4) | NO |  |
-| `flag_reason` | character varying (varchar) | NO |  |
+| `flag_reason` | character varying(255) (varchar) | NO |  |
 | `metadata` | jsonb (jsonb) | NO |  |
 | `generated_at` | timestamp with time zone (timestamptz) | NO |  |
-| `parcel_id` | character varying (varchar) | NO |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
 | `election_id` | bigint (int8) | NO |  |
 
 ### Foreign Keys
@@ -4787,17 +5496,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `unique_taxation_report_per_parcel_election`
-  ```sql
-  CREATE UNIQUE INDEX unique_taxation_report_per_parcel_election ON public.openskagit_taxationwithoutrepresentation USING btree (parcel_id, election_id)
-  ```
 - `openskagit_taxationwithoutrepresentation_parcel_id_f53431af`
   ```sql
   CREATE INDEX openskagit_taxationwithoutrepresentation_parcel_id_f53431af ON public.openskagit_taxationwithoutrepresentation USING btree (parcel_id)
   ```
-- `openskagit_taxationwitho_parcel_id_f53431af_like`
+- `unique_taxation_report_per_parcel_election`
   ```sql
-  CREATE INDEX openskagit_taxationwitho_parcel_id_f53431af_like ON public.openskagit_taxationwithoutrepresentation USING btree (parcel_id varchar_pattern_ops)
+  CREATE UNIQUE INDEX unique_taxation_report_per_parcel_election ON public.openskagit_taxationwithoutrepresentation USING btree (parcel_id, election_id)
   ```
 - `openskagit_taxationwithoutrepresentation_pkey`
   ```sql
@@ -4807,6 +5512,10 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX openskagit_taxationwithoutrepresentation_election_id_6b1ab0c7 ON public.openskagit_taxationwithoutrepresentation USING btree (election_id)
   ```
+- `openskagit_taxationwitho_parcel_id_f53431af_like`
+  ```sql
+  CREATE INDEX openskagit_taxationwitho_parcel_id_f53431af_like ON public.openskagit_taxationwithoutrepresentation USING btree (parcel_id varchar_pattern_ops)
+  ```
 
 ### Sample Row
 
@@ -4814,7 +5523,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_taxcodearea`
+## `public.openskagit_taxcodearea` (t)
 
 **Primary Key:** code
 
@@ -4825,28 +5534,28 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `code` | character varying (varchar) | NO |  |
-| `county_name` | character varying (varchar) | YES |  |
+| `code` | character varying(64) (varchar) | NO |  |
+| `county_name` | character varying(64) (varchar) | YES |  |
 | `levy_rate_total` | double precision (float8) | YES |  |
-| `geom` | USER-DEFINED (geometry) | NO |  |
+| `geom` | geometry(Geometry,4326) (geometry) | NO |  |
 
 ### Indexes
 
-- `openskagit_taxcodearea_pkey`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_taxcodearea_pkey ON public.openskagit_taxcodearea USING btree (code)
-  ```
 - `openskagit_taxcodearea_code_5a337982_like`
   ```sql
   CREATE INDEX openskagit_taxcodearea_code_5a337982_like ON public.openskagit_taxcodearea USING btree (code varchar_pattern_ops)
+  ```
+- `openskagit_taxcodearea_geom_96e8622c_id`
+  ```sql
+  CREATE INDEX openskagit_taxcodearea_geom_96e8622c_id ON public.openskagit_taxcodearea USING gist (geom)
   ```
 - `openskagit__code_b65b0a_idx`
   ```sql
   CREATE INDEX openskagit__code_b65b0a_idx ON public.openskagit_taxcodearea USING btree (code)
   ```
-- `openskagit_taxcodearea_geom_96e8622c_id`
+- `openskagit_taxcodearea_pkey`
   ```sql
-  CREATE INDEX openskagit_taxcodearea_geom_96e8622c_id ON public.openskagit_taxcodearea USING gist (geom)
+  CREATE UNIQUE INDEX openskagit_taxcodearea_pkey ON public.openskagit_taxcodearea USING btree (code)
   ```
 
 ### Sample Row
@@ -4855,7 +5564,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_taxingdistrict`
+## `public.openskagit_taxingdistrict` (t)
 
 **Primary Key:** district_code
 
@@ -4866,29 +5575,29 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `district_type` | character varying (varchar) | NO |  |
-| `district_code` | character varying (varchar) | NO |  |
-| `name` | character varying (varchar) | NO |  |
+| `district_type` | character varying(32) (varchar) | NO |  |
+| `district_code` | character varying(64) (varchar) | NO |  |
+| `name` | character varying(128) (varchar) | NO |  |
 | `levy_rate` | double precision (float8) | YES |  |
-| `geom` | USER-DEFINED (geometry) | NO |  |
+| `geom` | geometry(Geometry,4326) (geometry) | NO |  |
 
 ### Indexes
 
-- `openskagit__distric_cdc703_idx`
+- `openskagit_taxingdistrict_geom_ecd781bd_id`
   ```sql
-  CREATE INDEX openskagit__distric_cdc703_idx ON public.openskagit_taxingdistrict USING btree (district_type, district_code)
+  CREATE INDEX openskagit_taxingdistrict_geom_ecd781bd_id ON public.openskagit_taxingdistrict USING gist (geom)
   ```
 - `openskagit_taxingdistrict_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_taxingdistrict_pkey ON public.openskagit_taxingdistrict USING btree (district_code)
   ```
-- `openskagit_taxingdistrict_geom_ecd781bd_id`
-  ```sql
-  CREATE INDEX openskagit_taxingdistrict_geom_ecd781bd_id ON public.openskagit_taxingdistrict USING gist (geom)
-  ```
 - `openskagit_taxingdistrict_district_code_2b0395e3_like`
   ```sql
   CREATE INDEX openskagit_taxingdistrict_district_code_2b0395e3_like ON public.openskagit_taxingdistrict USING btree (district_code varchar_pattern_ops)
+  ```
+- `openskagit__distric_cdc703_idx`
+  ```sql
+  CREATE INDEX openskagit__distric_cdc703_idx ON public.openskagit_taxingdistrict USING btree (district_type, district_code)
   ```
 
 ### Sample Row
@@ -4903,7 +5612,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_voterelection`
+## `public.openskagit_voterelection` (t)
 
 **Primary Key:** id
 
@@ -4912,26 +5621,26 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `name` | character varying (varchar) | NO |  |
-| `category` | character varying (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
+| `category` | character varying(50) (varchar) | NO |  |
 | `election_date` | date (date) | NO |  |
-| `slug` | character varying (varchar) | NO |  |
+| `slug` | character varying(255) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `openskagit_voterelection_pkey`
+- `unique_voter_election_name_date`
   ```sql
-  CREATE UNIQUE INDEX openskagit_voterelection_pkey ON public.openskagit_voterelection USING btree (id)
+  CREATE UNIQUE INDEX unique_voter_election_name_date ON public.openskagit_voterelection USING btree (name, election_date)
   ```
 - `openskagit_voterelection_slug_2b9c1458_like`
   ```sql
   CREATE INDEX openskagit_voterelection_slug_2b9c1458_like ON public.openskagit_voterelection USING btree (slug varchar_pattern_ops)
   ```
-- `unique_voter_election_name_date`
+- `openskagit_voterelection_pkey`
   ```sql
-  CREATE UNIQUE INDEX unique_voter_election_name_date ON public.openskagit_voterelection USING btree (name, election_date)
+  CREATE UNIQUE INDEX openskagit_voterelection_pkey ON public.openskagit_voterelection USING btree (id)
   ```
 - `openskagit_voterelection_slug_key`
   ```sql
@@ -4952,7 +5661,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_voterparcelmatch`
+## `public.openskagit_voterparcelmatch` (t)
 
 **Primary Key:** id
 
@@ -4961,11 +5670,11 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `match_type` | character varying (varchar) | NO |  |
+| `match_type` | character varying(50) (varchar) | NO |  |
 | `confidence` | double precision (float8) | YES |  |
 | `matched_at` | timestamp with time zone (timestamptz) | NO |  |
 | `metadata` | jsonb (jsonb) | NO |  |
-| `parcel_id` | character varying (varchar) | NO |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
 | `turnout_id` | bigint (int8) | NO |  |
 
 ### Foreign Keys
@@ -4975,29 +5684,29 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
+- `openskagit_voterparcelmatch_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_voterparcelmatch_pkey ON public.openskagit_voterparcelmatch USING btree (id)
+  ```
 - `openskagit_voterparcelmatch_parcel_id_69b6b440_like`
   ```sql
   CREATE INDEX openskagit_voterparcelmatch_parcel_id_69b6b440_like ON public.openskagit_voterparcelmatch USING btree (parcel_id varchar_pattern_ops)
-  ```
-- `openskagit__parcel__00186f_idx`
-  ```sql
-  CREATE INDEX openskagit__parcel__00186f_idx ON public.openskagit_voterparcelmatch USING btree (parcel_id)
-  ```
-- `openskagit_voterparcelmatch_turnout_id_key`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_voterparcelmatch_turnout_id_key ON public.openskagit_voterparcelmatch USING btree (turnout_id)
   ```
 - `openskagit_voterparcelmatch_parcel_id_69b6b440`
   ```sql
   CREATE INDEX openskagit_voterparcelmatch_parcel_id_69b6b440 ON public.openskagit_voterparcelmatch USING btree (parcel_id)
   ```
+- `openskagit__parcel__00186f_idx`
+  ```sql
+  CREATE INDEX openskagit__parcel__00186f_idx ON public.openskagit_voterparcelmatch USING btree (parcel_id)
+  ```
 - `openskagit__match_t_8fa212_idx`
   ```sql
   CREATE INDEX openskagit__match_t_8fa212_idx ON public.openskagit_voterparcelmatch USING btree (match_type)
   ```
-- `openskagit_voterparcelmatch_pkey`
+- `openskagit_voterparcelmatch_turnout_id_key`
   ```sql
-  CREATE UNIQUE INDEX openskagit_voterparcelmatch_pkey ON public.openskagit_voterparcelmatch USING btree (id)
+  CREATE UNIQUE INDEX openskagit_voterparcelmatch_turnout_id_key ON public.openskagit_voterparcelmatch USING btree (turnout_id)
   ```
 
 ### Sample Row
@@ -5006,7 +5715,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_voterreturnlocation`
+## `public.openskagit_voterreturnlocation` (t)
 
 **Primary Key:** id
 
@@ -5015,10 +5724,10 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `name` | character varying (varchar) | NO |  |
-| `method` | character varying (varchar) | NO |  |
-| `normalized_name` | character varying (varchar) | NO |  |
-| `normalized_method` | character varying (varchar) | NO |  |
+| `name` | character varying(255) (varchar) | NO |  |
+| `method` | character varying(100) (varchar) | NO |  |
+| `normalized_name` | character varying(255) (varchar) | NO |  |
+| `normalized_method` | character varying(100) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
@@ -5027,17 +5736,17 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE UNIQUE INDEX openskagit_voterreturnlocation_pkey ON public.openskagit_voterreturnlocation USING btree (id)
   ```
-- `openskagit_voterreturnlocation_normalized_name_dcf5b95b`
+- `openskagit_voterreturnlocation_normalized_name_dcf5b95b_like`
   ```sql
-  CREATE INDEX openskagit_voterreturnlocation_normalized_name_dcf5b95b ON public.openskagit_voterreturnlocation USING btree (normalized_name)
+  CREATE INDEX openskagit_voterreturnlocation_normalized_name_dcf5b95b_like ON public.openskagit_voterreturnlocation USING btree (normalized_name varchar_pattern_ops)
   ```
 - `unique_voter_return_location`
   ```sql
   CREATE UNIQUE INDEX unique_voter_return_location ON public.openskagit_voterreturnlocation USING btree (normalized_name, normalized_method)
   ```
-- `openskagit_voterreturnlocation_normalized_name_dcf5b95b_like`
+- `openskagit_voterreturnlocation_normalized_name_dcf5b95b`
   ```sql
-  CREATE INDEX openskagit_voterreturnlocation_normalized_name_dcf5b95b_like ON public.openskagit_voterreturnlocation USING btree (normalized_name varchar_pattern_ops)
+  CREATE INDEX openskagit_voterreturnlocation_normalized_name_dcf5b95b ON public.openskagit_voterreturnlocation USING btree (normalized_name)
   ```
 
 ### Sample Row
@@ -5053,7 +5762,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_voterturnoutraw`
+## `public.openskagit_voterturnoutraw` (t)
 
 **Primary Key:** id
 
@@ -5062,31 +5771,31 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `ballot_id` | character varying (varchar) | NO |  |
-| `voter_id` | character varying (varchar) | NO |  |
-| `county` | character varying (varchar) | NO |  |
-| `first_name` | character varying (varchar) | NO |  |
-| `last_name` | character varying (varchar) | NO |  |
-| `gender` | character varying (varchar) | NO |  |
-| `ballot_status` | character varying (varchar) | NO |  |
-| `challenge_reason` | character varying (varchar) | NO |  |
+| `ballot_id` | character varying(50) (varchar) | NO |  |
+| `voter_id` | character varying(50) (varchar) | NO |  |
+| `county` | character varying(50) (varchar) | NO |  |
+| `first_name` | character varying(100) (varchar) | NO |  |
+| `last_name` | character varying(100) (varchar) | NO |  |
+| `gender` | character varying(10) (varchar) | NO |  |
+| `ballot_status` | character varying(50) (varchar) | NO |  |
+| `challenge_reason` | character varying(255) (varchar) | NO |  |
 | `sent_date` | timestamp with time zone (timestamptz) | YES |  |
 | `received_date` | timestamp with time zone (timestamptz) | YES |  |
-| `address` | character varying (varchar) | NO |  |
-| `normalized_address` | character varying (varchar) | NO |  |
+| `address` | character varying(255) (varchar) | NO |  |
+| `normalized_address` | character varying(255) (varchar) | NO |  |
 | `is_po_box` | boolean (bool) | NO |  |
-| `city` | character varying (varchar) | NO |  |
-| `state` | character varying (varchar) | NO |  |
-| `zip5` | character varying (varchar) | NO |  |
-| `zip4` | character varying (varchar) | NO |  |
-| `country` | character varying (varchar) | NO |  |
-| `split` | character varying (varchar) | NO |  |
-| `precinct` | character varying (varchar) | NO |  |
-| `normalized_precinct` | character varying (varchar) | NO |  |
-| `return_method` | character varying (varchar) | NO |  |
-| `return_location_name` | character varying (varchar) | NO |  |
-| `party` | character varying (varchar) | NO |  |
-| `source_file` | character varying (varchar) | NO |  |
+| `city` | character varying(100) (varchar) | NO |  |
+| `state` | character varying(10) (varchar) | NO |  |
+| `zip5` | character varying(5) (varchar) | NO |  |
+| `zip4` | character varying(4) (varchar) | NO |  |
+| `country` | character varying(50) (varchar) | NO |  |
+| `split` | character varying(50) (varchar) | NO |  |
+| `precinct` | character varying(100) (varchar) | NO |  |
+| `normalized_precinct` | character varying(100) (varchar) | NO |  |
+| `return_method` | character varying(100) (varchar) | NO |  |
+| `return_location_name` | character varying(255) (varchar) | NO |  |
+| `party` | character varying(20) (varchar) | NO |  |
+| `source_file` | character varying(255) (varchar) | NO |  |
 | `source_row` | integer (int4) | YES |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
@@ -5100,49 +5809,49 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_voterturnoutraw_return_location_id_50b5c5fd`
-  ```sql
-  CREATE INDEX openskagit_voterturnoutraw_return_location_id_50b5c5fd ON public.openskagit_voterturnoutraw USING btree (return_location_id)
-  ```
-- `openskagit__normali_4eaf15_idx`
-  ```sql
-  CREATE INDEX openskagit__normali_4eaf15_idx ON public.openskagit_voterturnoutraw USING btree (normalized_address)
-  ```
 - `openskagit__precinc_249c8d_idx`
   ```sql
   CREATE INDEX openskagit__precinc_249c8d_idx ON public.openskagit_voterturnoutraw USING btree (precinct)
-  ```
-- `openskagit__ballot__af30c9_idx`
-  ```sql
-  CREATE INDEX openskagit__ballot__af30c9_idx ON public.openskagit_voterturnoutraw USING btree (ballot_id, election_id)
   ```
 - `openskagit_voterturnoutraw_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_voterturnoutraw_pkey ON public.openskagit_voterturnoutraw USING btree (id)
   ```
-- `openskagit_voterturnoutraw_normalized_address_4f069b05`
+- `openskagit__ballot__af30c9_idx`
   ```sql
-  CREATE INDEX openskagit_voterturnoutraw_normalized_address_4f069b05 ON public.openskagit_voterturnoutraw USING btree (normalized_address)
+  CREATE INDEX openskagit__ballot__af30c9_idx ON public.openskagit_voterturnoutraw USING btree (ballot_id, election_id)
   ```
-- `openskagit_voterturnoutraw_normalized_address_4f069b05_like`
+- `openskagit__normali_4eaf15_idx`
   ```sql
-  CREATE INDEX openskagit_voterturnoutraw_normalized_address_4f069b05_like ON public.openskagit_voterturnoutraw USING btree (normalized_address varchar_pattern_ops)
+  CREATE INDEX openskagit__normali_4eaf15_idx ON public.openskagit_voterturnoutraw USING btree (normalized_address)
   ```
 - `unique_ballot_per_election`
   ```sql
   CREATE UNIQUE INDEX unique_ballot_per_election ON public.openskagit_voterturnoutraw USING btree (ballot_id, election_id)
   ```
-- `openskagit_voterturnoutraw_normalized_precinct_e1d9dcc7`
+- `openskagit_voterturnoutraw_return_location_id_50b5c5fd`
   ```sql
-  CREATE INDEX openskagit_voterturnoutraw_normalized_precinct_e1d9dcc7 ON public.openskagit_voterturnoutraw USING btree (normalized_precinct)
+  CREATE INDEX openskagit_voterturnoutraw_return_location_id_50b5c5fd ON public.openskagit_voterturnoutraw USING btree (return_location_id)
+  ```
+- `openskagit_voterturnoutraw_election_id_40b45db1`
+  ```sql
+  CREATE INDEX openskagit_voterturnoutraw_election_id_40b45db1 ON public.openskagit_voterturnoutraw USING btree (election_id)
   ```
 - `openskagit_voterturnoutraw_normalized_precinct_e1d9dcc7_like`
   ```sql
   CREATE INDEX openskagit_voterturnoutraw_normalized_precinct_e1d9dcc7_like ON public.openskagit_voterturnoutraw USING btree (normalized_precinct varchar_pattern_ops)
   ```
-- `openskagit_voterturnoutraw_election_id_40b45db1`
+- `openskagit_voterturnoutraw_normalized_precinct_e1d9dcc7`
   ```sql
-  CREATE INDEX openskagit_voterturnoutraw_election_id_40b45db1 ON public.openskagit_voterturnoutraw USING btree (election_id)
+  CREATE INDEX openskagit_voterturnoutraw_normalized_precinct_e1d9dcc7 ON public.openskagit_voterturnoutraw USING btree (normalized_precinct)
+  ```
+- `openskagit_voterturnoutraw_normalized_address_4f069b05_like`
+  ```sql
+  CREATE INDEX openskagit_voterturnoutraw_normalized_address_4f069b05_like ON public.openskagit_voterturnoutraw USING btree (normalized_address varchar_pattern_ops)
+  ```
+- `openskagit_voterturnoutraw_normalized_address_4f069b05`
+  ```sql
+  CREATE INDEX openskagit_voterturnoutraw_normalized_address_4f069b05 ON public.openskagit_voterturnoutraw USING btree (normalized_address)
   ```
 
 ### Sample Row
@@ -5183,7 +5892,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_weeklybriefingsection`
+## `public.openskagit_weeklybriefingsection` (t)
 
 **Primary Key:** id
 
@@ -5192,10 +5901,10 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `title` | character varying (varchar) | NO |  |
+| `title` | character varying(120) (varchar) | NO |  |
 | `summary` | text (text) | NO |  |
-| `badge` | character varying (varchar) | NO |  |
-| `highlight` | character varying (varchar) | NO |  |
+| `badge` | character varying(80) (varchar) | NO |  |
+| `highlight` | character varying(80) (varchar) | NO |  |
 | `order` | integer (int4) | NO |  |
 | `template_id` | bigint (int8) | NO |  |
 
@@ -5205,13 +5914,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `openskagit_weeklybriefingsection_pkey`
-  ```sql
-  CREATE UNIQUE INDEX openskagit_weeklybriefingsection_pkey ON public.openskagit_weeklybriefingsection USING btree (id)
-  ```
 - `openskagit_weeklybriefingsection_template_id_a8120762`
   ```sql
   CREATE INDEX openskagit_weeklybriefingsection_template_id_a8120762 ON public.openskagit_weeklybriefingsection USING btree (template_id)
+  ```
+- `openskagit_weeklybriefingsection_pkey`
+  ```sql
+  CREATE UNIQUE INDEX openskagit_weeklybriefingsection_pkey ON public.openskagit_weeklybriefingsection USING btree (id)
   ```
 
 ### Sample Row
@@ -5228,7 +5937,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_weeklybriefingsendlog`
+## `public.openskagit_weeklybriefingsendlog` (t)
 
 **Primary Key:** id
 
@@ -5237,7 +5946,7 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `subject` | character varying (varchar) | NO |  |
+| `subject` | character varying(200) (varchar) | NO |  |
 | `sent_count` | integer (int4) | NO |  |
 | `error_count` | integer (int4) | NO |  |
 | `error_snapshot` | text (text) | NO |  |
@@ -5256,7 +5965,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_weeklybriefingsubscriber`
+## `public.openskagit_weeklybriefingsubscriber` (t)
 
 **Primary Key:** id
 
@@ -5265,15 +5974,11 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `email` | character varying (varchar) | NO |  |
+| `email` | character varying(254) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `openskagit_weeklybriefingsubscriber_email_9ade2d40_like`
-  ```sql
-  CREATE INDEX openskagit_weeklybriefingsubscriber_email_9ade2d40_like ON public.openskagit_weeklybriefingsubscriber USING btree (email varchar_pattern_ops)
-  ```
 - `openskagit_weeklybriefingsubscriber_pkey`
   ```sql
   CREATE UNIQUE INDEX openskagit_weeklybriefingsubscriber_pkey ON public.openskagit_weeklybriefingsubscriber USING btree (id)
@@ -5281,6 +5986,10 @@ _No sample data available (table is empty or unreadable)._
 - `openskagit_weeklybriefingsubscriber_email_key`
   ```sql
   CREATE UNIQUE INDEX openskagit_weeklybriefingsubscriber_email_key ON public.openskagit_weeklybriefingsubscriber USING btree (email)
+  ```
+- `openskagit_weeklybriefingsubscriber_email_9ade2d40_like`
+  ```sql
+  CREATE INDEX openskagit_weeklybriefingsubscriber_email_9ade2d40_like ON public.openskagit_weeklybriefingsubscriber USING btree (email varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -5293,7 +6002,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.openskagit_weeklybriefingtemplate`
+## `public.openskagit_weeklybriefingtemplate` (t)
 
 **Primary Key:** id
 
@@ -5302,14 +6011,14 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `subject` | character varying (varchar) | NO |  |
-| `preheader` | character varying (varchar) | NO |  |
-| `hero_title` | character varying (varchar) | NO |  |
+| `subject` | character varying(200) (varchar) | NO |  |
+| `preheader` | character varying(255) (varchar) | NO |  |
+| `hero_title` | character varying(200) (varchar) | NO |  |
 | `hero_lede` | text (text) | NO |  |
-| `hero_stat_label` | character varying (varchar) | NO |  |
-| `hero_stat_value` | character varying (varchar) | NO |  |
-| `cta_label` | character varying (varchar) | NO |  |
-| `cta_url` | character varying (varchar) | NO |  |
+| `hero_stat_label` | character varying(100) (varchar) | NO |  |
+| `hero_stat_value` | character varying(50) (varchar) | NO |  |
+| `cta_label` | character varying(100) (varchar) | NO |  |
+| `cta_url` | character varying(200) (varchar) | NO |  |
 | `footer_note` | text (text) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 
@@ -5338,7 +6047,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.osm2pgsql_properties`
+## `public.osm2pgsql_properties` (t)
 
 **Primary Key:** property
 
@@ -5365,12 +6074,20 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.owner_residency_by_neighborhood`
+## `public.owner_residency_by_neighborhood` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `residential_parcels` | bigint (int8) | YES |  |
+| `owner_mailing_count` | bigint (int8) | YES |  |
+| `owner_within_neighborhood_count` | bigint (int8) | YES |  |
+| `owner_outside_neighborhood_count` | bigint (int8) | YES |  |
+| `owner_outside_skagit_count` | bigint (int8) | YES |  |
+| `owner_po_box_count` | bigint (int8) | YES |  |
+| `owner_po_box_pct` | double precision (float8) | YES |  |
 
 ### Indexes
 
@@ -5394,7 +6111,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel`
+## `public.parcel` (t)
 
 **Primary Key:** id
 
@@ -5403,28 +6120,24 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `parcel_number` | character varying (varchar) | NO |  |
-| `address` | character varying (varchar) | YES |  |
-| `neighborhood_code` | character varying (varchar) | YES |  |
-| `land_use_code` | character varying (varchar) | YES |  |
-| `property_type` | character varying (varchar) | NO |  |
+| `parcel_number` | character varying(20) (varchar) | NO |  |
+| `address` | character varying(255) (varchar) | YES |  |
+| `neighborhood_code` | character varying(100) (varchar) | YES |  |
+| `land_use_code` | character varying(100) (varchar) | YES |  |
+| `property_type` | character varying(1) (varchar) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
-| `neighborhood_description` | character varying (varchar) | YES |  |
+| `neighborhood_description` | character varying(255) (varchar) | YES |  |
 
 ### Indexes
 
-- `parcel_neighborhood_code_fa50805d`
+- `idx_parcel_address_upper_trgm`
   ```sql
-  CREATE INDEX parcel_neighborhood_code_fa50805d ON public.parcel USING btree (neighborhood_code)
+  CREATE INDEX idx_parcel_address_upper_trgm ON public.parcel USING gin (upper((address)::text) gin_trgm_ops)
   ```
-- `parcel_land_use_code_35c86882_like`
+- `idx_parcel_upper_parcel_number`
   ```sql
-  CREATE INDEX parcel_land_use_code_35c86882_like ON public.parcel USING btree (land_use_code varchar_pattern_ops)
-  ```
-- `parcel_land_use_code_35c86882`
-  ```sql
-  CREATE INDEX parcel_land_use_code_35c86882 ON public.parcel USING btree (land_use_code)
+  CREATE INDEX idx_parcel_upper_parcel_number ON public.parcel USING btree (upper((parcel_number)::text))
   ```
 - `parcel_property_type_a160f34f_like`
   ```sql
@@ -5438,10 +6151,6 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX parcel_parcel_number_23494c57_like ON public.parcel USING btree (parcel_number varchar_pattern_ops)
   ```
-- `idx_parcel_upper_parcel_number`
-  ```sql
-  CREATE INDEX idx_parcel_upper_parcel_number ON public.parcel USING btree (upper((parcel_number)::text))
-  ```
 - `parcel_parcel_number_key`
   ```sql
   CREATE UNIQUE INDEX parcel_parcel_number_key ON public.parcel USING btree (parcel_number)
@@ -5450,21 +6159,29 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE UNIQUE INDEX parcel_pkey ON public.parcel USING btree (id)
   ```
-- `idx_parcel_address_upper_trgm`
+- `parcel_land_use_code_35c86882_like`
   ```sql
-  CREATE INDEX idx_parcel_address_upper_trgm ON public.parcel USING gin (upper((address)::text) gin_trgm_ops)
+  CREATE INDEX parcel_land_use_code_35c86882_like ON public.parcel USING btree (land_use_code varchar_pattern_ops)
   ```
-- `idx_parcel_number_trgm`
+- `parcel_neighborhood_code_fa50805d`
   ```sql
-  CREATE INDEX idx_parcel_number_trgm ON public.parcel USING gin (parcel_number gin_trgm_ops)
+  CREATE INDEX parcel_neighborhood_code_fa50805d ON public.parcel USING btree (neighborhood_code)
+  ```
+- `parcel_neighborhood_code_fa50805d_like`
+  ```sql
+  CREATE INDEX parcel_neighborhood_code_fa50805d_like ON public.parcel USING btree (neighborhood_code varchar_pattern_ops)
+  ```
+- `parcel_land_use_code_35c86882`
+  ```sql
+  CREATE INDEX parcel_land_use_code_35c86882 ON public.parcel USING btree (land_use_code)
   ```
 - `idx_parcel_address_trgm`
   ```sql
   CREATE INDEX idx_parcel_address_trgm ON public.parcel USING gin (address gin_trgm_ops)
   ```
-- `parcel_neighborhood_code_fa50805d_like`
+- `idx_parcel_number_trgm`
   ```sql
-  CREATE INDEX parcel_neighborhood_code_fa50805d_like ON public.parcel USING btree (neighborhood_code varchar_pattern_ops)
+  CREATE INDEX idx_parcel_number_trgm ON public.parcel USING gin (parcel_number gin_trgm_ops)
   ```
 
 ### Sample Row
@@ -5483,22 +6200,33 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_address_norm`
+## `public.parcel_address_norm` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `normalized_address` | text (text) | YES |  |
+| `neighborhood_code` | character varying (varchar) | YES |  |
+| `is_residential` | boolean (bool) | YES |  |
+| `roll_year` | integer (int4) | YES |  |
+| `situs_city` | text (text) | YES |  |
+| `zip5` | text (text) | YES |  |
 
 ### Indexes
 
-- `parcel_address_norm_is_residential_idx`
-  ```sql
-  CREATE INDEX parcel_address_norm_is_residential_idx ON public.parcel_address_norm USING btree (is_residential)
-  ```
 - `parcel_address_norm_parcel_number_key`
   ```sql
   CREATE UNIQUE INDEX parcel_address_norm_parcel_number_key ON public.parcel_address_norm USING btree (parcel_number)
+  ```
+- `parcel_address_norm_neighborhood_idx`
+  ```sql
+  CREATE INDEX parcel_address_norm_neighborhood_idx ON public.parcel_address_norm USING btree (neighborhood_code)
+  ```
+- `parcel_address_norm_is_residential_idx`
+  ```sql
+  CREATE INDEX parcel_address_norm_is_residential_idx ON public.parcel_address_norm USING btree (is_residential)
   ```
 - `parcel_address_norm_address_idx`
   ```sql
@@ -5507,10 +6235,6 @@ _No sample data available (table is empty or unreadable)._
 - `parcel_address_norm_roll_year_idx`
   ```sql
   CREATE INDEX parcel_address_norm_roll_year_idx ON public.parcel_address_norm USING btree (roll_year)
-  ```
-- `parcel_address_norm_neighborhood_idx`
-  ```sql
-  CREATE INDEX parcel_address_norm_neighborhood_idx ON public.parcel_address_norm USING btree (neighborhood_code)
   ```
 
 ### Sample Row
@@ -5527,13 +6251,39 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_coverage`
+## `public.parcel_authority` (v)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `parcel_number` | character varying (varchar) | YES |  |
+| `parcel_id` | character varying(20) (varchar) | YES |  |
+| `jurisdiction` | character varying(50) (varchar) | YES |  |
+| `zone_code` | character varying(50) (varchar) | YES |  |
+| `zoning_general_class` | character varying(30) (varchar) | YES |  |
+| `zoning_specific_class` | character varying(100) (varchar) | YES |  |
+| `reference_url` | character varying(500) (varchar) | YES |  |
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `parcel_id` | P100005 |
+| `jurisdiction` | Anacortes |
+| `zone_code` | R3 |
+| `zoning_general_class` | LIR |
+| `zoning_specific_class` | SR5-12 |
+| `reference_url` | https://anacortes.municipal.codes/AMC/19.42.020 |
+
+---
+
+## `public.parcel_coverage` (v)
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
 | `has_geometry` | boolean (bool) | YES |  |
 | `has_planning` | boolean (bool) | YES |  |
 | `has_water` | boolean (bool) | YES |  |
@@ -5551,7 +6301,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_development_profile`
+## `public.parcel_development_profile` (t)
 
 **Primary Key:** parcel_id
 
@@ -5559,13 +6309,13 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `parcel_id` | character varying (varchar) | NO |  |
-| `primary_development_form` | character varying (varchar) | NO |  |
-| `confidence` | character varying (varchar) | NO |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
+| `primary_development_form` | character varying(32) (varchar) | NO |  |
+| `confidence` | character varying(16) (varchar) | NO |  |
 | `reasons` | jsonb (jsonb) | NO |  |
 | `generated_at` | timestamp with time zone (timestamptz) | NO |  |
 | `development_constraints` | jsonb (jsonb) | NO |  |
-| `development_context` | character varying (varchar) | NO |  |
+| `development_context` | character varying(16) (varchar) | NO |  |
 
 ### Foreign Keys
 
@@ -5573,13 +6323,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `parcel_development_profile_parcel_id_cfc608e4_like`
-  ```sql
-  CREATE INDEX parcel_development_profile_parcel_id_cfc608e4_like ON public.parcel_development_profile USING btree (parcel_id varchar_pattern_ops)
-  ```
 - `parcel_development_profile_pkey`
   ```sql
   CREATE UNIQUE INDEX parcel_development_profile_pkey ON public.parcel_development_profile USING btree (parcel_id)
+  ```
+- `parcel_development_profile_parcel_id_cfc608e4_like`
+  ```sql
+  CREATE INDEX parcel_development_profile_parcel_id_cfc608e4_like ON public.parcel_development_profile USING btree (parcel_id varchar_pattern_ops)
   ```
 
 ### Sample Row
@@ -5588,7 +6338,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_geo_diagnostics`
+## `public.parcel_geo_diagnostics` (t)
 
 ### Columns
 
@@ -5608,15 +6358,46 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_owner_address_norm`
+## `public.parcel_jurisdiction` (v)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `parcel_id` | character varying(20) (varchar) | YES |  |
+| `jurisdiction_id` | bigint (int8) | YES |  |
+| `jurisdiction_name` | character varying(200) (varchar) | YES |  |
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `parcel_id` | P53559 |
+| `jurisdiction_id` | 3 |
+| `jurisdiction_name` | MountVernon |
+
+---
+
+## `public.parcel_owner_address_norm` (m)
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `normalized_address` | text (text) | YES |  |
+| `neighborhood_code` | text (text) | YES |  |
+| `neighborhood_description` | text (text) | YES |  |
+| `owner_state` | text (text) | YES |  |
+| `owner_zip` | text (text) | YES |  |
+| `source` | text (text) | YES |  |
 
 ### Indexes
 
+- `parcel_owner_address_parcel_idx`
+  ```sql
+  CREATE UNIQUE INDEX parcel_owner_address_parcel_idx ON public.parcel_owner_address_norm USING btree (parcel_number)
+  ```
 - `parcel_owner_address_neighborhood_idx`
   ```sql
   CREATE INDEX parcel_owner_address_neighborhood_idx ON public.parcel_owner_address_norm USING btree (neighborhood_code)
@@ -5624,10 +6405,6 @@ _No sample data available (table is empty or unreadable)._
 - `parcel_owner_address_norm_idx`
   ```sql
   CREATE INDEX parcel_owner_address_norm_idx ON public.parcel_owner_address_norm USING btree (normalized_address)
-  ```
-- `parcel_owner_address_parcel_idx`
-  ```sql
-  CREATE UNIQUE INDEX parcel_owner_address_parcel_idx ON public.parcel_owner_address_norm USING btree (parcel_number)
   ```
 
 ### Sample Row
@@ -5644,7 +6421,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_planning_facts`
+## `public.parcel_planning_facts` (t)
 
 **Primary Key:** id
 
@@ -5653,47 +6430,47 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `zone_code` | character varying (varchar) | YES |  |
-| `zoning_jurisdiction` | character varying (varchar) | YES |  |
+| `zone_code` | character varying(50) (varchar) | YES |  |
+| `zoning_jurisdiction` | character varying(50) (varchar) | YES |  |
 | `in_wetland` | boolean (bool) | YES |  |
 | `pct_area_in_wetland` | double precision (float8) | YES |  |
 | `in_stream_buffer` | boolean (bool) | YES |  |
 | `pct_area_in_stream_buffer` | double precision (float8) | YES |  |
 | `dist_to_nearest_stream_ft` | double precision (float8) | YES |  |
-| `stream_type` | character varying (varchar) | YES |  |
+| `stream_type` | character varying(20) (varchar) | YES |  |
 | `stream_buffer_required_ft` | double precision (float8) | YES |  |
 | `in_sfha` | boolean (bool) | YES |  |
 | `pct_area_in_sfha` | double precision (float8) | YES |  |
 | `in_floodway` | boolean (bool) | YES |  |
 | `pct_area_in_floodway` | double precision (float8) | YES |  |
 | `in_shoreline_jurisdiction` | boolean (bool) | YES |  |
-| `shoreline_env_designation` | character varying (varchar) | YES |  |
+| `shoreline_env_designation` | character varying(50) (varchar) | YES |  |
 | `dist_to_shoreline_ft` | double precision (float8) | YES |  |
 | `buildable_area_sqft` | double precision (float8) | YES |  |
 | `dist_to_water_main_ft` | double precision (float8) | YES |  |
 | `public_sewer_available` | boolean (bool) | YES |  |
-| `sewer_district_id` | character varying (varchar) | YES |  |
+| `sewer_district_id` | character varying(100) (varchar) | YES |  |
 | `dist_to_sewer_main_ft` | double precision (float8) | YES |  |
 | `nearest_well_distance_ft` | double precision (float8) | YES |  |
 | `well_density_per_acre` | double precision (float8) | YES |  |
 | `in_wellhead_protection_zone` | boolean (bool) | YES |  |
-| `wellhead_zone_category` | character varying (varchar) | YES |  |
-| `primary_access_type` | character varying (varchar) | YES |  |
+| `wellhead_zone_category` | character varying(20) (varchar) | YES |  |
+| `primary_access_type` | character varying(50) (varchar) | YES |  |
 | `dist_to_public_road_ft` | double precision (float8) | YES |  |
 | `dist_to_driveable_access_ft` | double precision (float8) | YES |  |
-| `fire_district_id` | character varying (varchar) | YES |  |
-| `school_district_id` | character varying (varchar) | YES |  |
-| `city_jurisdiction` | character varying (varchar) | YES |  |
-| `legislative_district_id` | character varying (varchar) | YES |  |
-| `voting_district_id` | character varying (varchar) | YES |  |
+| `fire_district_id` | character varying(50) (varchar) | YES |  |
+| `school_district_id` | character varying(50) (varchar) | YES |  |
+| `city_jurisdiction` | character varying(50) (varchar) | YES |  |
+| `legislative_district_id` | character varying(50) (varchar) | YES |  |
+| `voting_district_id` | character varying(50) (varchar) | YES |  |
 | `in_npdes_area` | boolean (bool) | YES |  |
 | `in_historic_register` | boolean (bool) | YES |  |
 | `in_historic_district` | boolean (bool) | YES |  |
 | `in_airport_environs` | boolean (bool) | YES |  |
-| `airport_environs_zone` | character varying (varchar) | YES |  |
+| `airport_environs_zone` | character varying(255) (varchar) | YES |  |
 | `has_recent_permits_5yr` | boolean (bool) | YES |  |
 | `last_updated` | timestamp with time zone (timestamptz) | NO |  |
-| `parcel_id` | character varying (varchar) | NO |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
 | `in_big_lake_mitigation_area` | boolean (bool) | YES |  |
 | `pct_area_in_shoreline` | double precision (float8) | YES |  |
 | `dist_to_wetland_ft` | double precision (float8) | YES |  |
@@ -5701,13 +6478,13 @@ _No sample data available (table is empty or unreadable)._
 | `wetland_buffer_intersect_area` | double precision (float8) | YES |  |
 | `wetland_intersect_area` | double precision (float8) | YES |  |
 | `in_skagit_mitigation_area` | boolean (bool) | YES |  |
-| `skagit_mitigation_class` | character varying (varchar) | YES |  |
-| `census_block_group_geoid` | character varying (varchar) | YES |  |
-| `zoning_general_class` | character varying (varchar) | YES |  |
+| `skagit_mitigation_class` | character varying(20) (varchar) | YES |  |
+| `census_block_group_geoid` | character varying(12) (varchar) | YES |  |
+| `zoning_general_class` | character varying(30) (varchar) | YES |  |
 | `zoning_last_verified` | date (date) | YES |  |
-| `zoning_reference_url` | character varying (varchar) | YES |  |
-| `zoning_source` | character varying (varchar) | YES |  |
-| `zoning_specific_class` | character varying (varchar) | YES |  |
+| `zoning_reference_url` | character varying(500) (varchar) | YES |  |
+| `zoning_source` | character varying(50) (varchar) | YES |  |
+| `zoning_specific_class` | character varying(100) (varchar) | YES |  |
 | `zone_id` | text (text) | YES |  |
 | `flood_depth` | double precision (float8) | YES |  |
 | `flood_distance` | double precision (float8) | YES |  |
@@ -5725,6 +6502,30 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
+- `parcel_plan_in_shor_184cb2_idx`
+  ```sql
+  CREATE INDEX parcel_plan_in_shor_184cb2_idx ON public.parcel_planning_facts USING btree (in_shoreline_jurisdiction)
+  ```
+- `parcel_planning_facts_pkey`
+  ```sql
+  CREATE UNIQUE INDEX parcel_planning_facts_pkey ON public.parcel_planning_facts USING btree (id)
+  ```
+- `parcel_planning_facts_parcel_id_c5aa5bf1_like`
+  ```sql
+  CREATE INDEX parcel_planning_facts_parcel_id_c5aa5bf1_like ON public.parcel_planning_facts USING btree (parcel_id varchar_pattern_ops)
+  ```
+- `parcel_plan_zone_co_94ed8b_idx`
+  ```sql
+  CREATE INDEX parcel_plan_zone_co_94ed8b_idx ON public.parcel_planning_facts USING btree (zone_code)
+  ```
+- `parcel_plan_in_sfha_795780_idx`
+  ```sql
+  CREATE INDEX parcel_plan_in_sfha_795780_idx ON public.parcel_planning_facts USING btree (in_sfha)
+  ```
+- `idx_ppf_parcel_id`
+  ```sql
+  CREATE INDEX idx_ppf_parcel_id ON public.parcel_planning_facts USING btree (parcel_id)
+  ```
 - `parcel_plan_in_floo_def35d_idx`
   ```sql
   CREATE INDEX parcel_plan_in_floo_def35d_idx ON public.parcel_planning_facts USING btree (in_floodway)
@@ -5733,33 +6534,9 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX parcel_plan_public__324ec8_idx ON public.parcel_planning_facts USING btree (public_sewer_available)
   ```
-- `idx_ppf_parcel_id`
-  ```sql
-  CREATE INDEX idx_ppf_parcel_id ON public.parcel_planning_facts USING btree (parcel_id)
-  ```
-- `parcel_plan_in_shor_184cb2_idx`
-  ```sql
-  CREATE INDEX parcel_plan_in_shor_184cb2_idx ON public.parcel_planning_facts USING btree (in_shoreline_jurisdiction)
-  ```
-- `parcel_plan_zone_co_94ed8b_idx`
-  ```sql
-  CREATE INDEX parcel_plan_zone_co_94ed8b_idx ON public.parcel_planning_facts USING btree (zone_code)
-  ```
-- `parcel_planning_facts_parcel_id_c5aa5bf1_like`
-  ```sql
-  CREATE INDEX parcel_planning_facts_parcel_id_c5aa5bf1_like ON public.parcel_planning_facts USING btree (parcel_id varchar_pattern_ops)
-  ```
 - `parcel_planning_facts_parcel_id_key`
   ```sql
   CREATE UNIQUE INDEX parcel_planning_facts_parcel_id_key ON public.parcel_planning_facts USING btree (parcel_id)
-  ```
-- `parcel_planning_facts_pkey`
-  ```sql
-  CREATE UNIQUE INDEX parcel_planning_facts_pkey ON public.parcel_planning_facts USING btree (id)
-  ```
-- `parcel_plan_in_sfha_795780_idx`
-  ```sql
-  CREATE INDEX parcel_plan_in_sfha_795780_idx ON public.parcel_planning_facts USING btree (in_sfha)
   ```
 
 ### Sample Row
@@ -5835,7 +6612,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_precinct`
+## `public.parcel_precinct` (t)
 
 **Geometry Columns:**
 - `geometry` (MULTIPOLYGON, SRID 2285)
@@ -5845,7 +6622,7 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `parcel_number` | text (text) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(MultiPolygon,2285) (geometry) | YES |  |
 | `PREC_NO` | double precision (float8) | YES |  |
 | `PRECINCT` | text (text) | YES |  |
 | `multi_precinct_count` | bigint (int8) | YES |  |
@@ -5853,13 +6630,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_parcel_precinct_multi`
-  ```sql
-  CREATE INDEX idx_parcel_precinct_multi ON public.parcel_precinct USING btree (parcel_number) WHERE (has_multi_precincts = true)
-  ```
 - `idx_parcel_precinct_geometry`
   ```sql
   CREATE INDEX idx_parcel_precinct_geometry ON public.parcel_precinct USING gist (geometry)
+  ```
+- `idx_parcel_precinct_multi`
+  ```sql
+  CREATE INDEX idx_parcel_precinct_multi ON public.parcel_precinct USING btree (parcel_number) WHERE (has_multi_precincts = true)
   ```
 - `idx_parcel_precinct_parcel`
   ```sql
@@ -5870,16 +6647,16 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Value |
 |--------|-------|
-| `parcel_number` | P72252 |
-| `geometry` | 0106000020ED0800000100000001030000000100000006000000FE234A0CFF8C33413F203BAD578620414C7A5859FB8C3341094BC2C33F8520412AC8BA292A8C3341575B1AFD4A8520419F8E06A12... |
-| `PREC_NO` | 502.0 |
-| `PRECINCT` | 2 |
+| `parcel_number` | P60695 |
+| `geometry` | 0106000020ED0800000100000001030000000100000008000000EE422130378732410D19BA574D842041269D856B3B8732416ACB57074D84204116454C17CD873241E941166742842041D99604F6C... |
+| `PREC_NO` | 164.0 |
+| `PRECINCT` | FIDALGO |
 | `multi_precinct_count` | 1 |
 | `has_multi_precincts` | False |
 
 ---
 
-## `public.parcel_tax_district`
+## `public.parcel_tax_district` (t)
 
 ### Columns
 
@@ -5910,50 +6687,108 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_tax_history`
+## `public.parcel_tax_history` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `tax_year` | integer (int4) | YES |  |
+| `tax_paid` | numeric (numeric) | YES |  |
 
 ### Indexes
 
-- `idx_pth_year`
-  ```sql
-  CREATE INDEX idx_pth_year ON public.parcel_tax_history USING btree (tax_year)
-  ```
 - `idx_pth_parcel`
   ```sql
   CREATE INDEX idx_pth_parcel ON public.parcel_tax_history USING btree (parcel_number)
+  ```
+- `idx_pth_year`
+  ```sql
+  CREATE INDEX idx_pth_year ON public.parcel_tax_history USING btree (tax_year)
   ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `parcel_number` | P100812 |
-| `tax_year` | 2007 |
-| `tax_paid` | 2319.24 |
+| `parcel_number` | P100003 |
+| `tax_year` | 2025 |
+| `tax_paid` | 5947.11 |
 
 ---
 
-## `public.parcel_to_precinct`
+## `public.parcel_tax_levy_breakdown` (t)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `parcel_id` | text (text) | NO |  |
+| `tax_year` | integer (int4) | NO |  |
+| `tdcode` | text (text) | NO |  |
+| `district_type` | text (text) | NO |  |
+| `district_code` | text (text) | NO |  |
+| `levy_rate` | numeric (numeric) | YES |  |
+| `tax_paid` | numeric (numeric) | YES |  |
+| `total_levy_rate` | numeric (numeric) | YES |  |
+| `levy_share` | numeric (numeric) | YES |  |
+| `allocated_tax` | numeric (numeric) | YES |  |
 
 ### Indexes
 
-- `idx_ptp_parcel`
+- `parcel_tax_levy_breakdown_tdcode_idx`
   ```sql
-  CREATE INDEX idx_ptp_parcel ON public.parcel_to_precinct USING btree (parcel_number)
+  CREATE INDEX parcel_tax_levy_breakdown_tdcode_idx ON public.parcel_tax_levy_breakdown USING btree (tdcode)
   ```
+- `parcel_tax_levy_breakdown_parcel_id_idx`
+  ```sql
+  CREATE INDEX parcel_tax_levy_breakdown_parcel_id_idx ON public.parcel_tax_levy_breakdown USING btree (parcel_id)
+  ```
+- `parcel_tax_levy_breakdown_tax_year_idx`
+  ```sql
+  CREATE INDEX parcel_tax_levy_breakdown_tax_year_idx ON public.parcel_tax_levy_breakdown USING btree (tax_year)
+  ```
+- `parcel_tax_levy_breakdown_district_type_district_code_idx`
+  ```sql
+  CREATE INDEX parcel_tax_levy_breakdown_district_type_district_code_idx ON public.parcel_tax_levy_breakdown USING btree (district_type, district_code)
+  ```
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `parcel_id` | P100496 |
+| `tax_year` | 2024 |
+| `tdcode` | 290600140 |
+| `district_type` | hospital |
+| `district_code` | 1 |
+| `levy_rate` | 0.56612 |
+| `tax_paid` | 5306.26 |
+| `total_levy_rate` | 9.73845 |
+| `levy_share` | 0.05813245434335032782 |
+| `allocated_tax` | 308.4659171839461104981532 |
+
+---
+
+## `public.parcel_to_precinct` (m)
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `parcel_number` | text (text) | YES |  |
+| `prec_code` | bigint (int8) | YES |  |
+
+### Indexes
+
 - `idx_ptp_prec`
   ```sql
   CREATE INDEX idx_ptp_prec ON public.parcel_to_precinct USING btree (prec_code)
+  ```
+- `idx_ptp_parcel`
+  ```sql
+  CREATE INDEX idx_ptp_parcel ON public.parcel_to_precinct USING btree (parcel_number)
   ```
 
 ### Sample Row
@@ -5965,7 +6800,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcel_zoning`
+## `public.parcel_zoning` (t)
 
 **Primary Key:** id
 
@@ -5977,7 +6812,7 @@ _No sample data available (table is empty or unreadable)._
 | `intersect_area_sqft` | double precision (float8) | NO |  |
 | `pct_of_parcel` | double precision (float8) | NO |  |
 | `is_primary` | boolean (bool) | NO |  |
-| `parcel_id` | character varying (varchar) | NO |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
 | `zone_id` | bigint (int8) | NO |  |
 
 ### Foreign Keys
@@ -5987,13 +6822,29 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
+- `parcel_zoning_parcel_id_b2f7a3f3_like`
+  ```sql
+  CREATE INDEX parcel_zoning_parcel_id_b2f7a3f3_like ON public.parcel_zoning USING btree (parcel_id varchar_pattern_ops)
+  ```
+- `parcel_zoni_parcel__79d248_idx`
+  ```sql
+  CREATE INDEX parcel_zoni_parcel__79d248_idx ON public.parcel_zoning USING btree (parcel_id)
+  ```
 - `parcel_zoning_zone_id_9ec7d862`
   ```sql
   CREATE INDEX parcel_zoning_zone_id_9ec7d862 ON public.parcel_zoning USING btree (zone_id)
   ```
-- `idx_parcel_zoning_primary`
+- `parcel_zoning_parcel_id_b2f7a3f3`
   ```sql
-  CREATE INDEX idx_parcel_zoning_primary ON public.parcel_zoning USING btree (parcel_id) WHERE (is_primary = true)
+  CREATE INDEX parcel_zoning_parcel_id_b2f7a3f3 ON public.parcel_zoning USING btree (parcel_id)
+  ```
+- `parcel_zoning_parcel_id_zone_id_a0df6ba2_uniq`
+  ```sql
+  CREATE UNIQUE INDEX parcel_zoning_parcel_id_zone_id_a0df6ba2_uniq ON public.parcel_zoning USING btree (parcel_id, zone_id)
+  ```
+- `parcel_zoning_pkey`
+  ```sql
+  CREATE UNIQUE INDEX parcel_zoning_pkey ON public.parcel_zoning USING btree (id)
   ```
 - `parcel_zoni_is_prim_85ac67_idx`
   ```sql
@@ -6003,32 +6854,16 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX parcel_zoni_zone_id_c4520e_idx ON public.parcel_zoning USING btree (zone_id)
   ```
-- `parcel_zoning_pkey`
+- `idx_parcel_zoning_primary`
   ```sql
-  CREATE UNIQUE INDEX parcel_zoning_pkey ON public.parcel_zoning USING btree (id)
-  ```
-- `parcel_zoning_parcel_id_zone_id_a0df6ba2_uniq`
-  ```sql
-  CREATE UNIQUE INDEX parcel_zoning_parcel_id_zone_id_a0df6ba2_uniq ON public.parcel_zoning USING btree (parcel_id, zone_id)
-  ```
-- `parcel_zoning_parcel_id_b2f7a3f3`
-  ```sql
-  CREATE INDEX parcel_zoning_parcel_id_b2f7a3f3 ON public.parcel_zoning USING btree (parcel_id)
-  ```
-- `parcel_zoni_parcel__79d248_idx`
-  ```sql
-  CREATE INDEX parcel_zoni_parcel__79d248_idx ON public.parcel_zoning USING btree (parcel_id)
-  ```
-- `parcel_zoning_parcel_id_b2f7a3f3_like`
-  ```sql
-  CREATE INDEX parcel_zoning_parcel_id_b2f7a3f3_like ON public.parcel_zoning USING btree (parcel_id varchar_pattern_ops)
+  CREATE INDEX idx_parcel_zoning_primary ON public.parcel_zoning USING btree (parcel_id) WHERE (is_primary = true)
   ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `id` | 646096 |
+| `id` | 646107 |
 | `intersect_area_sqft` | 0.009600587429149935 |
 | `pct_of_parcel` | 1.5482574202547289e-09 |
 | `is_primary` | False |
@@ -6037,7 +6872,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.parcels`
+## `public.parcels` (t)
 
 **Primary Key:** gid
 
@@ -6049,22 +6884,22 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `gid` | integer (int4) | NO |  |
-| `parcelid` | character varying (varchar) | YES |  |
+| `parcelid` | character varying(10) (varchar) | YES |  |
 | `parceltype` | numeric (numeric) | YES |  |
-| `globalid` | character varying (varchar) | YES |  |
+| `globalid` | character varying(38) (varchar) | YES |  |
 | `shape_star` | numeric (numeric) | YES |  |
 | `shape_stle` | numeric (numeric) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,4326) (geometry) | YES |  |
 
 ### Indexes
 
-- `parcels_geom_idx`
-  ```sql
-  CREATE INDEX parcels_geom_idx ON public.parcels USING gist (geom)
-  ```
 - `parcels_pkey`
   ```sql
   CREATE UNIQUE INDEX parcels_pkey ON public.parcels USING btree (gid)
+  ```
+- `parcels_geom_idx`
+  ```sql
+  CREATE INDEX parcels_geom_idx ON public.parcels USING gist (geom)
   ```
 
 ### Sample Row
@@ -6081,7 +6916,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.planet_osm_line`
+## `public.planet_osm_line` (t)
 
 **Geometry Columns:**
 - `way` (LINESTRING, SRID 2926)
@@ -6158,8 +6993,8 @@ _No sample data available (table is empty or unreadable)._
 | `wood` | text (text) | YES |  |
 | `z_order` | integer (int4) | YES |  |
 | `way_area` | real (float4) | YES |  |
-| `tags` | USER-DEFINED (hstore) | YES |  |
-| `way` | USER-DEFINED (geometry) | YES |  |
+| `tags` | hstore (hstore) | YES |  |
+| `way` | geometry(LineString,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -6178,7 +7013,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.planet_osm_nodes`
+## `public.planet_osm_nodes` (t)
 
 **Primary Key:** id
 
@@ -6203,7 +7038,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.planet_osm_point`
+## `public.planet_osm_point` (t)
 
 **Geometry Columns:**
 - `way` (POINT, SRID 2926)
@@ -6280,18 +7115,18 @@ _No sample data available (table is empty or unreadable)._
 | `width` | text (text) | YES |  |
 | `wood` | text (text) | YES |  |
 | `z_order` | integer (int4) | YES |  |
-| `tags` | USER-DEFINED (hstore) | YES |  |
-| `way` | USER-DEFINED (geometry) | YES |  |
+| `tags` | hstore (hstore) | YES |  |
+| `way` | geometry(Point,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `planet_osm_point_way_idx`
-  ```sql
-  CREATE INDEX planet_osm_point_way_idx ON public.planet_osm_point USING gist (way)
-  ```
 - `planet_osm_point_osm_id_idx`
   ```sql
   CREATE INDEX planet_osm_point_osm_id_idx ON public.planet_osm_point USING btree (osm_id)
+  ```
+- `planet_osm_point_way_idx`
+  ```sql
+  CREATE INDEX planet_osm_point_way_idx ON public.planet_osm_point USING gist (way)
   ```
 
 ### Sample Row
@@ -6300,7 +7135,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.planet_osm_polygon`
+## `public.planet_osm_polygon` (t)
 
 **Geometry Columns:**
 - `way` (GEOMETRY, SRID 2926)
@@ -6377,18 +7212,18 @@ _No sample data available (table is empty or unreadable)._
 | `wood` | text (text) | YES |  |
 | `z_order` | integer (int4) | YES |  |
 | `way_area` | real (float4) | YES |  |
-| `tags` | USER-DEFINED (hstore) | YES |  |
-| `way` | USER-DEFINED (geometry) | YES |  |
+| `tags` | hstore (hstore) | YES |  |
+| `way` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `planet_osm_polygon_way_idx`
-  ```sql
-  CREATE INDEX planet_osm_polygon_way_idx ON public.planet_osm_polygon USING gist (way)
-  ```
 - `planet_osm_polygon_osm_id_idx`
   ```sql
   CREATE INDEX planet_osm_polygon_osm_id_idx ON public.planet_osm_polygon USING btree (osm_id)
+  ```
+- `planet_osm_polygon_way_idx`
+  ```sql
+  CREATE INDEX planet_osm_polygon_way_idx ON public.planet_osm_polygon USING gist (way)
   ```
 
 ### Sample Row
@@ -6397,7 +7232,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.planet_osm_rels`
+## `public.planet_osm_rels` (t)
 
 **Primary Key:** id
 
@@ -6408,19 +7243,19 @@ _No sample data available (table is empty or unreadable)._
 | `id` | bigint (int8) | NO |  |
 | `way_off` | smallint (int2) | YES |  |
 | `rel_off` | smallint (int2) | YES |  |
-| `parts` | ARRAY (_int8) | YES |  |
-| `members` | ARRAY (_text) | YES |  |
-| `tags` | ARRAY (_text) | YES |  |
+| `parts` | bigint[] (_int8) | YES |  |
+| `members` | text[] (_text) | YES |  |
+| `tags` | text[] (_text) | YES |  |
 
 ### Indexes
 
-- `planet_osm_rels_parts_idx`
-  ```sql
-  CREATE INDEX planet_osm_rels_parts_idx ON public.planet_osm_rels USING gin (parts) WITH (fastupdate=off)
-  ```
 - `planet_osm_rels_pkey`
   ```sql
   CREATE UNIQUE INDEX planet_osm_rels_pkey ON public.planet_osm_rels USING btree (id)
+  ```
+- `planet_osm_rels_parts_idx`
+  ```sql
+  CREATE INDEX planet_osm_rels_parts_idx ON public.planet_osm_rels USING gin (parts) WITH (fastupdate=off)
   ```
 
 ### Sample Row
@@ -6429,7 +7264,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.planet_osm_roads`
+## `public.planet_osm_roads` (t)
 
 **Geometry Columns:**
 - `way` (LINESTRING, SRID 2926)
@@ -6506,18 +7341,18 @@ _No sample data available (table is empty or unreadable)._
 | `wood` | text (text) | YES |  |
 | `z_order` | integer (int4) | YES |  |
 | `way_area` | real (float4) | YES |  |
-| `tags` | USER-DEFINED (hstore) | YES |  |
-| `way` | USER-DEFINED (geometry) | YES |  |
+| `tags` | hstore (hstore) | YES |  |
+| `way` | geometry(LineString,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `planet_osm_roads_osm_id_idx`
-  ```sql
-  CREATE INDEX planet_osm_roads_osm_id_idx ON public.planet_osm_roads USING btree (osm_id)
-  ```
 - `planet_osm_roads_way_idx`
   ```sql
   CREATE INDEX planet_osm_roads_way_idx ON public.planet_osm_roads USING gist (way)
+  ```
+- `planet_osm_roads_osm_id_idx`
+  ```sql
+  CREATE INDEX planet_osm_roads_osm_id_idx ON public.planet_osm_roads USING btree (osm_id)
   ```
 
 ### Sample Row
@@ -6526,7 +7361,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.planet_osm_ways`
+## `public.planet_osm_ways` (t)
 
 **Primary Key:** id
 
@@ -6535,18 +7370,18 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `nodes` | ARRAY (_int8) | NO |  |
-| `tags` | ARRAY (_text) | YES |  |
+| `nodes` | bigint[] (_int8) | NO |  |
+| `tags` | text[] (_text) | YES |  |
 
 ### Indexes
 
-- `planet_osm_ways_pkey`
-  ```sql
-  CREATE UNIQUE INDEX planet_osm_ways_pkey ON public.planet_osm_ways USING btree (id)
-  ```
 - `planet_osm_ways_nodes_bucket_idx`
   ```sql
   CREATE INDEX planet_osm_ways_nodes_bucket_idx ON public.planet_osm_ways USING gin (planet_osm_index_bucket(nodes)) WITH (fastupdate=off)
+  ```
+- `planet_osm_ways_pkey`
+  ```sql
+  CREATE UNIQUE INDEX planet_osm_ways_pkey ON public.planet_osm_ways USING btree (id)
   ```
 
 ### Sample Row
@@ -6555,12 +7390,17 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.precinct_ballots_by_year`
+## `public.precinct_ballots_by_year` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `ballots_cast` | bigint (int8) | YES |  |
+| `po_box_ballots` | bigint (int8) | YES |  |
+| `po_box_pct` | double precision (float8) | YES |  |
 
 ### Indexes
 
@@ -6585,12 +7425,21 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.precinct_civic_classification`
+## `public.precinct_civic_classification` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `tax_year` | integer (int4) | YES |  |
+| `total_tax_paid` | numeric (numeric) | YES |  |
+| `parcel_count` | bigint (int8) | YES |  |
+| `ballots_cast` | bigint (int8) | YES |  |
+| `tax_per_ballot` | numeric (numeric) | YES |  |
+| `tax_per_parcel` | numeric (numeric) | YES |  |
+| `ballots_per_parcel` | bigint (int8) | YES |  |
+| `tax_burden_quartile` | integer (int4) | YES |  |
 
 ### Indexes
 
@@ -6615,12 +7464,19 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.precinct_participation_index`
+## `public.precinct_participation_index` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `ballots_cast` | bigint (int8) | YES |  |
+| `po_box_ballots` | bigint (int8) | YES |  |
+| `po_box_pct` | double precision (float8) | YES |  |
+| `residential_parcels` | bigint (int8) | YES |  |
+| `ppi` | double precision (float8) | YES |  |
 
 ### Indexes
 
@@ -6647,22 +7503,25 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.precinct_residential_parcels`
+## `public.precinct_residential_parcels` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `residential_parcels` | bigint (int8) | YES |  |
 
 ### Indexes
 
-- `precinct_residential_prec_year_idx`
-  ```sql
-  CREATE UNIQUE INDEX precinct_residential_prec_year_idx ON public.precinct_residential_parcels USING btree (prec_code, election_year)
-  ```
 - `precinct_residential_year_idx`
   ```sql
   CREATE INDEX precinct_residential_year_idx ON public.precinct_residential_parcels USING btree (election_year)
+  ```
+- `precinct_residential_prec_year_idx`
+  ```sql
+  CREATE UNIQUE INDEX precinct_residential_prec_year_idx ON public.precinct_residential_parcels USING btree (prec_code, election_year)
   ```
 
 ### Sample Row
@@ -6675,7 +7534,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.precinct_split_clipped`
+## `public.precinct_split_clipped` (m)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 0)
@@ -6684,6 +7543,8 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
 
 ### Sample Row
 
@@ -6694,7 +7555,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.precinct_split_dissolved`
+## `public.precinct_split_dissolved` (m)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 0)
@@ -6703,6 +7564,8 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
 
 ### Indexes
 
@@ -6720,7 +7583,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.precinct_split_ratio`
+## `public.precinct_split_ratio` (m)
 
 **Geometry Columns:**
 - `split_geom` (GEOMETRY, SRID 0)
@@ -6729,6 +7592,9 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `split_geom` | geometry (geometry) | YES |  |
+| `area_ratio` | double precision (float8) | YES |  |
 
 ### Sample Row
 
@@ -6740,12 +7606,19 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.property_features`
+## `public.property_features` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `address` | text (text) | YES |  |
+| `neighborhood_code` | text (text) | YES |  |
+| `land_use_code` | text (text) | YES |  |
+| `assessed_value` | bigint (int8) | YES |  |
+| `land_acres` | real (float4) | YES |  |
+| `land_market_value` | real (float4) | YES |  |
 
 ### Indexes
 
@@ -6768,12 +7641,16 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.property_improvement_features`
+## `public.property_improvement_features` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `improvement_type` | text (text) | YES |  |
+| `total_area` | real (float4) | YES |  |
+| `structure_count` | bigint (int8) | YES |  |
 
 ### Indexes
 
@@ -6793,7 +7670,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.raster_columns`
+## `public.raster_columns` (v)
 
 ### Columns
 
@@ -6811,10 +7688,10 @@ _No sample data available (table is empty or unreadable)._
 | `same_alignment` | boolean (bool) | YES |  |
 | `regular_blocking` | boolean (bool) | YES |  |
 | `num_bands` | integer (int4) | YES |  |
-| `pixel_types` | ARRAY (_text) | YES |  |
-| `nodata_values` | ARRAY (_float8) | YES |  |
-| `out_db` | ARRAY (_bool) | YES |  |
-| `extent` | USER-DEFINED (geometry) | YES |  |
+| `pixel_types` | text[] (_text) | YES |  |
+| `nodata_values` | double precision[] (_float8) | YES |  |
+| `out_db` | boolean[] (_bool) | YES |  |
+| `extent` | geometry (geometry) | YES |  |
 | `spatial_index` | boolean (bool) | YES |  |
 
 ### Sample Row
@@ -6841,7 +7718,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.raster_overviews`
+## `public.raster_overviews` (v)
 
 ### Columns
 
@@ -6863,7 +7740,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_active_permits_5yr`
+## `public.reference_active_permits_5yr` (t)
 
 **Geometry Columns:**
 - `geometry` (POINT, SRID 2926)
@@ -6872,7 +7749,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Point,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `PermitNumber` | text (text) | YES |  |
 | `ParcelNumber` | text (text) | YES |  |
@@ -6887,13 +7764,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_active_permits_5yr_geometry`
-  ```sql
-  CREATE INDEX idx_reference_active_permits_5yr_geometry ON public.reference_active_permits_5yr USING gist (geometry)
-  ```
 - `idx_reference_active_permits_5yr_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_active_permits_5yr_geometry_gist ON public.reference_active_permits_5yr USING gist (geometry)
+  ```
+- `idx_reference_active_permits_5yr_geometry`
+  ```sql
+  CREATE INDEX idx_reference_active_permits_5yr_geometry ON public.reference_active_permits_5yr USING gist (geometry)
   ```
 
 ### Sample Row
@@ -6915,7 +7792,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_airport_environs`
+## `public.reference_airport_environs` (t)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 2926)
@@ -6924,7 +7801,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `PARCELID` | text (text) | YES |  |
 | `SitusStNo` | text (text) | YES |  |
@@ -6998,13 +7875,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_airport_environs_geometry_gist`
-  ```sql
-  CREATE INDEX idx_reference_airport_environs_geometry_gist ON public.reference_airport_environs USING gist (geometry)
-  ```
 - `idx_reference_airport_environs_geometry`
   ```sql
   CREATE INDEX idx_reference_airport_environs_geometry ON public.reference_airport_environs USING gist (geometry)
+  ```
+- `idx_reference_airport_environs_geometry_gist`
+  ```sql
+  CREATE INDEX idx_reference_airport_environs_geometry_gist ON public.reference_airport_environs USING gist (geometry)
   ```
 
 ### Sample Row
@@ -7085,7 +7962,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_ana_zoning`
+## `public.reference_ana_zoning` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -7094,7 +7971,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `OBJECTID_1` | bigint (int8) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Layer` | text (text) | YES |  |
@@ -7147,7 +8024,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_big_lake_mitigation`
+## `public.reference_big_lake_mitigation` (t)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 2926)
@@ -7156,7 +8033,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Planning.SDEADM.BigLakeMitigationBoundary.AREA` | double precision (float8) | YES |  |
 | `PERIMETER` | bigint (int8) | YES |  |
@@ -7177,13 +8054,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_big_lake_mitigation_geometry`
-  ```sql
-  CREATE INDEX idx_reference_big_lake_mitigation_geometry ON public.reference_big_lake_mitigation USING gist (geometry)
-  ```
 - `idx_reference_big_lake_mitigation_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_big_lake_mitigation_geometry_gist ON public.reference_big_lake_mitigation USING gist (geometry)
+  ```
+- `idx_reference_big_lake_mitigation_geometry`
+  ```sql
+  CREATE INDEX idx_reference_big_lake_mitigation_geometry ON public.reference_big_lake_mitigation USING gist (geometry)
   ```
 
 ### Sample Row
@@ -7211,7 +8088,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_cem2025_district_raw`
+## `public.reference_cem2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -7229,17 +8106,17 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_cem2025_district_raw_geom_geom_idx`
-  ```sql
-  CREATE INDEX reference_cem2025_district_raw_geom_geom_idx ON public.reference_cem2025_district_raw USING gist (geom)
-  ```
 - `reference_cem2025_district_raw_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_cem2025_district_raw_pkey ON public.reference_cem2025_district_raw USING btree (id)
+  ```
+- `reference_cem2025_district_raw_geom_geom_idx`
+  ```sql
+  CREATE INDEX reference_cem2025_district_raw_geom_geom_idx ON public.reference_cem2025_district_raw USING gist (geom)
   ```
 
 ### Sample Row
@@ -7257,7 +8134,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_census_acs`
+## `public.reference_census_acs` (t)
 
 ### Columns
 
@@ -7308,7 +8185,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_census_block_groups`
+## `public.reference_census_block_groups` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -7330,22 +8207,22 @@ _No sample data available (table is empty or unreadable)._
 | `awater` | bigint (int8) | YES |  |
 | `intptlat` | text (text) | YES |  |
 | `intptlon` | text (text) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `census_year` | bigint (int8) | YES |  |
 
 ### Indexes
 
-- `idx_reference_census_block_groups_countyfp`
+- `idx_reference_census_block_groups_geoid`
   ```sql
-  CREATE INDEX idx_reference_census_block_groups_countyfp ON public.reference_census_block_groups USING btree (countyfp)
+  CREATE INDEX idx_reference_census_block_groups_geoid ON public.reference_census_block_groups USING btree (geoid)
   ```
 - `idx_reference_census_block_groups_geometry`
   ```sql
   CREATE INDEX idx_reference_census_block_groups_geometry ON public.reference_census_block_groups USING gist (geometry)
   ```
-- `idx_reference_census_block_groups_geoid`
+- `idx_reference_census_block_groups_countyfp`
   ```sql
-  CREATE INDEX idx_reference_census_block_groups_geoid ON public.reference_census_block_groups USING btree (geoid)
+  CREATE INDEX idx_reference_census_block_groups_countyfp ON public.reference_census_block_groups USING btree (countyfp)
   ```
 
 ### Sample Row
@@ -7370,7 +8247,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_citylimits`
+## `public.reference_citylimits` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -7387,7 +8264,7 @@ _No sample data available (table is empty or unreadable)._
 | `GlobalID` | text (text) | YES |  |
 | `Shape_STAr` | double precision (float8) | YES |  |
 | `Shape_STLe` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -7416,7 +8293,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_data_referencedataimportlog`
+## `public.reference_data_referencedataimportlog` (t)
 
 **Primary Key:** id
 
@@ -7425,9 +8302,9 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `dataset_name` | character varying (varchar) | NO |  |
-| `source_path` | character varying (varchar) | NO |  |
-| `table_name` | character varying (varchar) | NO |  |
+| `dataset_name` | character varying(100) (varchar) | NO |  |
+| `source_path` | character varying(500) (varchar) | NO |  |
+| `table_name` | character varying(100) (varchar) | NO |  |
 | `success` | boolean (bool) | NO |  |
 | `error_message` | text (text) | YES |  |
 | `row_count` | integer (int4) | NO |  |
@@ -7457,7 +8334,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_elevation`
+## `public.reference_elevation` (t)
 
 ### Columns
 
@@ -7465,17 +8342,17 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `rid` | integer (int4) | YES |  |
 | `filename` | text (text) | YES |  |
-| `rast` | USER-DEFINED (raster) | YES |  |
+| `rast` | raster (raster) | YES |  |
 
 ### Indexes
 
-- `idx_reference_elevation_rast_gist`
-  ```sql
-  CREATE INDEX idx_reference_elevation_rast_gist ON public.reference_elevation USING gist (st_convexhull(rast))
-  ```
 - `idx_reference_elevation_rast`
   ```sql
   CREATE INDEX idx_reference_elevation_rast ON public.reference_elevation USING gist (st_convexhull(rast))
+  ```
+- `idx_reference_elevation_rast_gist`
+  ```sql
+  CREATE INDEX idx_reference_elevation_rast_gist ON public.reference_elevation USING gist (st_convexhull(rast))
   ```
 
 ### Sample Row
@@ -7488,14 +8365,14 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_elevation_aspect`
+## `public.reference_elevation_aspect` (t)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `rid` | integer (int4) | YES |  |
-| `rast` | USER-DEFINED (raster) | YES |  |
+| `rast` | raster (raster) | YES |  |
 
 ### Indexes
 
@@ -7513,14 +8390,14 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_elevation_slope`
+## `public.reference_elevation_slope` (t)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `rid` | integer (int4) | YES |  |
-| `rast` | USER-DEFINED (raster) | YES |  |
+| `rast` | raster (raster) | YES |  |
 
 ### Indexes
 
@@ -7538,7 +8415,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_ems2025_district_raw`
+## `public.reference_ems2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -7556,7 +8433,7 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -7584,7 +8461,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_fema_flood_zones`
+## `public.reference_fema_flood_zones` (t)
 
 **Geometry Columns:**
 - `geom` (MULTIPOLYGON, SRID 4269)
@@ -7594,29 +8471,29 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `objectid` | integer (int4) | YES |  |
-| `dfirm_id` | character varying (varchar) | YES |  |
-| `version_id` | character varying (varchar) | YES |  |
-| `fld_ar_id` | character varying (varchar) | YES |  |
-| `study_typ` | character varying (varchar) | YES |  |
-| `fld_zone` | character varying (varchar) | YES |  |
-| `zone_subty` | character varying (varchar) | YES |  |
-| `sfha_tf` | character varying (varchar) | YES |  |
+| `dfirm_id` | character varying(6) (varchar) | YES |  |
+| `version_id` | character varying(11) (varchar) | YES |  |
+| `fld_ar_id` | character varying(32) (varchar) | YES |  |
+| `study_typ` | character varying(38) (varchar) | YES |  |
+| `fld_zone` | character varying(17) (varchar) | YES |  |
+| `zone_subty` | character varying(76) (varchar) | YES |  |
+| `sfha_tf` | character varying(1) (varchar) | YES |  |
 | `static_bfe` | double precision (float8) | YES |  |
-| `v_datum` | character varying (varchar) | YES |  |
+| `v_datum` | character varying(17) (varchar) | YES |  |
 | `depth` | double precision (float8) | YES |  |
-| `len_unit` | character varying (varchar) | YES |  |
+| `len_unit` | character varying(16) (varchar) | YES |  |
 | `velocity` | double precision (float8) | YES |  |
-| `vel_unit` | character varying (varchar) | YES |  |
-| `ar_revert` | character varying (varchar) | YES |  |
-| `ar_subtrv` | character varying (varchar) | YES |  |
+| `vel_unit` | character varying(20) (varchar) | YES |  |
+| `ar_revert` | character varying(17) (varchar) | YES |  |
+| `ar_subtrv` | character varying(57) (varchar) | YES |  |
 | `bfe_revert` | double precision (float8) | YES |  |
 | `dep_revert` | double precision (float8) | YES |  |
-| `dual_zone` | character varying (varchar) | YES |  |
-| `source_cit` | character varying (varchar) | YES |  |
-| `gfid` | character varying (varchar) | YES |  |
+| `dual_zone` | character varying(1) (varchar) | YES |  |
+| `source_cit` | character varying(21) (varchar) | YES |  |
+| `gfid` | character varying(36) (varchar) | YES |  |
 | `shape_length` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,4269) (geometry) | YES |  |
 
 ### Indexes
 
@@ -7656,7 +8533,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_fema_flood_zones_raw`
+## `public.reference_fema_flood_zones_raw` (t)
 
 **Primary Key:** objectid
 
@@ -7668,29 +8545,29 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `objectid` | integer (int4) | NO | nextval('reference_fema_flood_zones_raw_objectid_seq'::regclass) |
-| `dfirm_id` | character varying (varchar) | YES |  |
-| `version_id` | character varying (varchar) | YES |  |
-| `fld_ar_id` | character varying (varchar) | YES |  |
-| `study_typ` | character varying (varchar) | YES |  |
-| `fld_zone` | character varying (varchar) | YES |  |
-| `zone_subty` | character varying (varchar) | YES |  |
-| `sfha_tf` | character varying (varchar) | YES |  |
+| `dfirm_id` | character varying(6) (varchar) | YES |  |
+| `version_id` | character varying(11) (varchar) | YES |  |
+| `fld_ar_id` | character varying(32) (varchar) | YES |  |
+| `study_typ` | character varying(38) (varchar) | YES |  |
+| `fld_zone` | character varying(17) (varchar) | YES |  |
+| `zone_subty` | character varying(76) (varchar) | YES |  |
+| `sfha_tf` | character varying(1) (varchar) | YES |  |
 | `static_bfe` | double precision (float8) | YES |  |
-| `v_datum` | character varying (varchar) | YES |  |
+| `v_datum` | character varying(17) (varchar) | YES |  |
 | `depth` | double precision (float8) | YES |  |
-| `len_unit` | character varying (varchar) | YES |  |
+| `len_unit` | character varying(16) (varchar) | YES |  |
 | `velocity` | double precision (float8) | YES |  |
-| `vel_unit` | character varying (varchar) | YES |  |
-| `ar_revert` | character varying (varchar) | YES |  |
-| `ar_subtrv` | character varying (varchar) | YES |  |
+| `vel_unit` | character varying(20) (varchar) | YES |  |
+| `ar_revert` | character varying(17) (varchar) | YES |  |
+| `ar_subtrv` | character varying(57) (varchar) | YES |  |
 | `bfe_revert` | double precision (float8) | YES |  |
 | `dep_revert` | double precision (float8) | YES |  |
-| `dual_zone` | character varying (varchar) | YES |  |
-| `source_cit` | character varying (varchar) | YES |  |
-| `gfid` | character varying (varchar) | YES |  |
+| `dual_zone` | character varying(1) (varchar) | YES |  |
+| `source_cit` | character varying(21) (varchar) | YES |  |
+| `gfid` | character varying(36) (varchar) | YES |  |
 | `shape_length` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,4269) (geometry) | YES |  |
 
 ### Indexes
 
@@ -7707,34 +8584,34 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Value |
 |--------|-------|
-| `objectid` | 19903 |
-| `dfirm_id` | 53061C |
-| `version_id` | 2.3.2.1 |
-| `fld_ar_id` | 53061C_1389 |
-| `study_typ` | SFHAs WITH HIGH FLOOD RISK |
-| `fld_zone` | X |
-| `zone_subty` | 0.2 PCT ANNUAL CHANCE FLOOD HAZARD |
-| `sfha_tf` | F |
+| `objectid` | 1 |
+| `dfirm_id` | 53025C |
+| `version_id` | 1.1.1.0 |
+| `fld_ar_id` | 53025C_3888 |
+| `study_typ` | NP |
+| `fld_zone` | A |
+| `zone_subty` | NULL |
+| `sfha_tf` | T |
 | `static_bfe` | -9999.0 |
-| `v_datum` |  |
+| `v_datum` | NULL |
 | `depth` | -9999.0 |
-| `len_unit` |  |
+| `len_unit` | NULL |
 | `velocity` | -9999.0 |
-| `vel_unit` |  |
-| `ar_revert` |  |
-| `ar_subtrv` |  |
+| `vel_unit` | NULL |
+| `ar_revert` | NULL |
+| `ar_subtrv` | NULL |
 | `bfe_revert` | -9999.0 |
 | `dep_revert` | -9999.0 |
-| `dual_zone` |  |
-| `source_cit` | 53061C_STUDY1 |
-| `gfid` | e235871b-9bb9-4d2b-9b60-24f0d086f5f7 |
-| `shape_length` | 0.00125646225937681 |
-| `shape_area` | 5.52902626328278e-08 |
-| `geom` | 0106000020AD100000010000000103000000010000002A000000147A5092A6815EC0982AE8C81A064840B8B8535BA6815EC0686C5E2B1A0648402C839905A6815EC0208856081A064840FCC5A3BCA... |
+| `dual_zone` | NULL |
+| `source_cit` | 53025C_FIRM1 |
+| `gfid` | NULL |
+| `shape_length` | 0.0225886790216156 |
+| `shape_area` | 2.38934009231395e-05 |
+| `geom` | 0106000020AD100000010000000103000000010000006C000000C8A7108D23EC5DC030DCBAE735984740C8D3A3BD22EC5DC0C82C9BD63998474030F6673721EC5DC0F8411CAC3E984740E0BB482C1... |
 
 ---
 
-## `public.reference_fir2025_district_raw`
+## `public.reference_fir2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -7752,7 +8629,7 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -7780,7 +8657,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_fire_districts`
+## `public.reference_fire_districts` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -7789,7 +8666,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `DISTRICT` | text (text) | YES |  |
 | `GlobalID` | text (text) | YES |  |
@@ -7820,7 +8697,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_flood_zones`
+## `public.reference_flood_zones` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 0)
@@ -7830,26 +8707,26 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `ogc_fid` | integer (int4) | YES |  |
-| `dfirm_id` | character varying (varchar) | YES |  |
-| `version_id` | character varying (varchar) | YES |  |
-| `fld_ar_id` | character varying (varchar) | YES |  |
-| `study_typ` | character varying (varchar) | YES |  |
-| `fld_zone` | character varying (varchar) | YES |  |
-| `zone_subty` | character varying (varchar) | YES |  |
-| `sfha_tf` | character varying (varchar) | YES |  |
-| `static_bfe` | numeric (numeric) | YES |  |
-| `v_datum` | character varying (varchar) | YES |  |
-| `depth` | numeric (numeric) | YES |  |
-| `len_unit` | character varying (varchar) | YES |  |
-| `velocity` | numeric (numeric) | YES |  |
-| `vel_unit` | character varying (varchar) | YES |  |
-| `ar_revert` | character varying (varchar) | YES |  |
-| `ar_subtrv` | character varying (varchar) | YES |  |
-| `bfe_revert` | numeric (numeric) | YES |  |
-| `dep_revert` | numeric (numeric) | YES |  |
-| `dual_zone` | character varying (varchar) | YES |  |
-| `source_cit` | character varying (varchar) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `dfirm_id` | character varying(6) (varchar) | YES |  |
+| `version_id` | character varying(11) (varchar) | YES |  |
+| `fld_ar_id` | character varying(32) (varchar) | YES |  |
+| `study_typ` | character varying(28) (varchar) | YES |  |
+| `fld_zone` | character varying(17) (varchar) | YES |  |
+| `zone_subty` | character varying(57) (varchar) | YES |  |
+| `sfha_tf` | character varying(1) (varchar) | YES |  |
+| `static_bfe` | numeric(31,15) (numeric) | YES |  |
+| `v_datum` | character varying(17) (varchar) | YES |  |
+| `depth` | numeric(31,15) (numeric) | YES |  |
+| `len_unit` | character varying(16) (varchar) | YES |  |
+| `velocity` | numeric(31,15) (numeric) | YES |  |
+| `vel_unit` | character varying(20) (varchar) | YES |  |
+| `ar_revert` | character varying(17) (varchar) | YES |  |
+| `ar_subtrv` | character varying(57) (varchar) | YES |  |
+| `bfe_revert` | numeric(31,15) (numeric) | YES |  |
+| `dep_revert` | numeric(31,15) (numeric) | YES |  |
+| `dual_zone` | character varying(1) (varchar) | YES |  |
+| `source_cit` | character varying(21) (varchar) | YES |  |
+| `geometry` | geometry (geometry) | YES |  |
 
 ### Indexes
 
@@ -7886,7 +8763,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_floodways`
+## `public.reference_floodways` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 0)
@@ -7896,12 +8773,12 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `ogc_fid` | integer (int4) | YES |  |
-| `dfirm_id` | character varying (varchar) | YES |  |
-| `version_id` | character varying (varchar) | YES |  |
-| `fld_ln_id` | character varying (varchar) | YES |  |
-| `ln_typ` | character varying (varchar) | YES |  |
-| `source_cit` | character varying (varchar) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `dfirm_id` | character varying(6) (varchar) | YES |  |
+| `version_id` | character varying(11) (varchar) | YES |  |
+| `fld_ln_id` | character varying(32) (varchar) | YES |  |
+| `ln_typ` | character varying(26) (varchar) | YES |  |
+| `source_cit` | character varying(21) (varchar) | YES |  |
+| `geometry` | geometry (geometry) | YES |  |
 
 ### Indexes
 
@@ -7924,7 +8801,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_fzn2025_district_raw`
+## `public.reference_fzn2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -7942,17 +8819,17 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_fzn2025_district_raw_geom_geom_idx`
-  ```sql
-  CREATE INDEX reference_fzn2025_district_raw_geom_geom_idx ON public.reference_fzn2025_district_raw USING gist (geom)
-  ```
 - `reference_fzn2025_district_raw_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_fzn2025_district_raw_pkey ON public.reference_fzn2025_district_raw USING btree (id)
+  ```
+- `reference_fzn2025_district_raw_geom_geom_idx`
+  ```sql
+  CREATE INDEX reference_fzn2025_district_raw_geom_geom_idx ON public.reference_fzn2025_district_raw USING gist (geom)
   ```
 
 ### Sample Row
@@ -7970,7 +8847,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_historical`
+## `public.reference_historical` (t)
 
 **Geometry Columns:**
 - `geometry` (POINT, SRID 2926)
@@ -7984,7 +8861,7 @@ _No sample data available (table is empty or unreadable)._
 | `Name` | text (text) | YES |  |
 | `FileName` | text (text) | YES |  |
 | `HistoryID` | bigint (int8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Point,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -8010,7 +8887,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_hsp2025_district_raw`
+## `public.reference_hsp2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8028,7 +8905,7 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -8056,7 +8933,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_legislative_districts`
+## `public.reference_legislative_districts` (t)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 2926)
@@ -8065,7 +8942,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `DISTRICT` | bigint (int8) | YES |  |
 | `GlobalID` | text (text) | YES |  |
@@ -8108,7 +8985,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_lib2025_district_raw`
+## `public.reference_lib2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8126,17 +9003,17 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_lib2025_district_raw_geom_geom_idx`
-  ```sql
-  CREATE INDEX reference_lib2025_district_raw_geom_geom_idx ON public.reference_lib2025_district_raw USING gist (geom)
-  ```
 - `reference_lib2025_district_raw_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_lib2025_district_raw_pkey ON public.reference_lib2025_district_raw USING btree (id)
+  ```
+- `reference_lib2025_district_raw_geom_geom_idx`
+  ```sql
+  CREATE INDEX reference_lib2025_district_raw_geom_geom_idx ON public.reference_lib2025_district_raw USING gist (geom)
   ```
 
 ### Sample Row
@@ -8154,7 +9031,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_municipal_boundaries`
+## `public.reference_municipal_boundaries` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -8163,7 +9040,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `area` | double precision (float8) | YES |  |
 | `len` | double precision (float8) | YES |  |
 | `city` | bigint (int8) | YES |  |
@@ -8176,13 +9053,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_municipal_boundaries_geometry`
-  ```sql
-  CREATE INDEX idx_reference_municipal_boundaries_geometry ON public.reference_municipal_boundaries USING gist (geometry)
-  ```
 - `idx_reference_municipal_boundaries_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_municipal_boundaries_geometry_gist ON public.reference_municipal_boundaries USING gist (geometry)
+  ```
+- `idx_reference_municipal_boundaries_geometry`
+  ```sql
+  CREATE INDEX idx_reference_municipal_boundaries_geometry ON public.reference_municipal_boundaries USING gist (geometry)
   ```
 
 ### Sample Row
@@ -8202,7 +9079,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_npdes_area`
+## `public.reference_npdes_area` (t)
 
 **Geometry Columns:**
 - `geometry` (MULTIPOLYGON, SRID 2926)
@@ -8211,20 +9088,20 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Shape.STArea()` | double precision (float8) | YES |  |
 | `Shape.STLength()` | double precision (float8) | YES |  |
 
 ### Indexes
 
-- `idx_reference_npdes_area_geometry_gist`
-  ```sql
-  CREATE INDEX idx_reference_npdes_area_geometry_gist ON public.reference_npdes_area USING gist (geometry)
-  ```
 - `idx_reference_npdes_area_geometry`
   ```sql
   CREATE INDEX idx_reference_npdes_area_geometry ON public.reference_npdes_area USING gist (geometry)
+  ```
+- `idx_reference_npdes_area_geometry_gist`
+  ```sql
+  CREATE INDEX idx_reference_npdes_area_geometry_gist ON public.reference_npdes_area USING gist (geometry)
   ```
 
 ### Sample Row
@@ -8238,7 +9115,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_parcels`
+## `public.reference_parcels` (t)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 2926)
@@ -8252,7 +9129,7 @@ _No sample data available (table is empty or unreadable)._
 | `GlobalID` | text (text) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `shape_length` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -8274,7 +9151,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_pkr2025_district_raw`
+## `public.reference_pkr2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8292,7 +9169,7 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -8320,7 +9197,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_precinct_lookup`
+## `public.reference_precinct_lookup` (t)
 
 ### Columns
 
@@ -8347,7 +9224,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_prt2025_district_raw`
+## `public.reference_prt2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8365,7 +9242,7 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -8393,7 +9270,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_ptcty2025_district_raw`
+## `public.reference_ptcty2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8411,17 +9288,17 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_ptcty2025_district_raw_geom_geom_idx`
-  ```sql
-  CREATE INDEX reference_ptcty2025_district_raw_geom_geom_idx ON public.reference_ptcty2025_district_raw USING gist (geom)
-  ```
 - `reference_ptcty2025_district_raw_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_ptcty2025_district_raw_pkey ON public.reference_ptcty2025_district_raw USING btree (id)
+  ```
+- `reference_ptcty2025_district_raw_geom_geom_idx`
+  ```sql
+  CREATE INDEX reference_ptcty2025_district_raw_geom_geom_idx ON public.reference_ptcty2025_district_raw USING gist (geom)
   ```
 
 ### Sample Row
@@ -8439,7 +9316,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_public_water_systems`
+## `public.reference_public_water_systems` (t)
 
 **Geometry Columns:**
 - `geometry` (MULTIPOLYGON, SRID 4326)
@@ -8448,7 +9325,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(MultiPolygon,4326) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Water_System_Name` | text (text) | YES |  |
 | `PWS_ID` | text (text) | YES |  |
@@ -8479,7 +9356,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_public_water_systems_2926`
+## `public.reference_public_water_systems_2926` (v)
 
 **Geometry Columns:**
 - `geometry` (MULTIPOLYGON, SRID 4326)
@@ -8489,13 +9366,13 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(MultiPolygon,4326) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Water_System_Name` | text (text) | YES |  |
 | `PWS_ID` | text (text) | YES |  |
 | `Shape.STArea()` | double precision (float8) | YES |  |
 | `Shape.STLength()` | double precision (float8) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
 
 ### Sample Row
 
@@ -8511,7 +9388,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_pud2025_district_raw`
+## `public.reference_pud2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8529,7 +9406,7 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -8557,7 +9434,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_roads`
+## `public.reference_roads` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -8572,7 +9449,7 @@ _No sample data available (table is empty or unreadable)._
 | `TYPE` | text (text) | YES |  |
 | `GlobalID` | text (text) | YES |  |
 | `Shape_STLe` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -8580,13 +9457,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX idx_reference_roads_geometry ON public.reference_roads USING gist (geometry)
   ```
-- `idx_reference_roads_geometry_gist`
-  ```sql
-  CREATE INDEX idx_reference_roads_geometry_gist ON public.reference_roads USING gist (geometry)
-  ```
 - `reference_roads_geom_gist`
   ```sql
   CREATE INDEX reference_roads_geom_gist ON public.reference_roads USING gist (geometry)
+  ```
+- `idx_reference_roads_geometry_gist`
+  ```sql
+  CREATE INDEX idx_reference_roads_geometry_gist ON public.reference_roads USING gist (geometry)
   ```
 
 ### Sample Row
@@ -8603,7 +9480,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_roads_major`
+## `public.reference_roads_major` (v)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -8618,7 +9495,7 @@ _No sample data available (table is empty or unreadable)._
 | `TYPE` | text (text) | YES |  |
 | `GlobalID` | text (text) | YES |  |
 | `Shape_STLe` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Sample Row
 
@@ -8634,7 +9511,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_roads_minor`
+## `public.reference_roads_minor` (v)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -8649,7 +9526,7 @@ _No sample data available (table is empty or unreadable)._
 | `TYPE` | text (text) | YES |  |
 | `GlobalID` | text (text) | YES |  |
 | `Shape_STLe` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Sample Row
 
@@ -8665,7 +9542,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_sch2025_district_raw`
+## `public.reference_sch2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8683,17 +9560,17 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_sch2025_district_raw_geom_geom_idx`
-  ```sql
-  CREATE INDEX reference_sch2025_district_raw_geom_geom_idx ON public.reference_sch2025_district_raw USING gist (geom)
-  ```
 - `reference_sch2025_district_raw_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_sch2025_district_raw_pkey ON public.reference_sch2025_district_raw USING btree (id)
+  ```
+- `reference_sch2025_district_raw_geom_geom_idx`
+  ```sql
+  CREATE INDEX reference_sch2025_district_raw_geom_geom_idx ON public.reference_sch2025_district_raw USING gist (geom)
   ```
 
 ### Sample Row
@@ -8711,7 +9588,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_school_districts`
+## `public.reference_school_districts` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -8720,7 +9597,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `DIST_NUM` | bigint (int8) | YES |  |
 | `NAME` | text (text) | YES |  |
@@ -8731,13 +9608,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_school_districts_geometry`
-  ```sql
-  CREATE INDEX idx_reference_school_districts_geometry ON public.reference_school_districts USING gist (geometry)
-  ```
 - `idx_reference_school_districts_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_school_districts_geometry_gist ON public.reference_school_districts USING gist (geometry)
+  ```
+- `idx_reference_school_districts_geometry`
+  ```sql
+  CREATE INDEX idx_reference_school_districts_geometry ON public.reference_school_districts USING gist (geometry)
   ```
 
 ### Sample Row
@@ -8755,7 +9632,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_sew2025_district_raw`
+## `public.reference_sew2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -8773,17 +9650,17 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_sew2025_district_raw_pkey`
-  ```sql
-  CREATE UNIQUE INDEX reference_sew2025_district_raw_pkey ON public.reference_sew2025_district_raw USING btree (id)
-  ```
 - `reference_sew2025_district_raw_geom_geom_idx`
   ```sql
   CREATE INDEX reference_sew2025_district_raw_geom_geom_idx ON public.reference_sew2025_district_raw USING gist (geom)
+  ```
+- `reference_sew2025_district_raw_pkey`
+  ```sql
+  CREATE UNIQUE INDEX reference_sew2025_district_raw_pkey ON public.reference_sew2025_district_raw USING btree (id)
   ```
 
 ### Sample Row
@@ -8801,7 +9678,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_sewer_districts`
+## `public.reference_sewer_districts` (t)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 2926)
@@ -8810,7 +9687,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Health.SDEADM.Sewer_District_Areas.AREA` | text (text) | YES |  |
 | `PERIMETER` | text (text) | YES |  |
@@ -8827,13 +9704,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_sewer_districts_geometry_gist`
-  ```sql
-  CREATE INDEX idx_reference_sewer_districts_geometry_gist ON public.reference_sewer_districts USING gist (geometry)
-  ```
 - `idx_reference_sewer_districts_geometry`
   ```sql
   CREATE INDEX idx_reference_sewer_districts_geometry ON public.reference_sewer_districts USING gist (geometry)
+  ```
+- `idx_reference_sewer_districts_geometry_gist`
+  ```sql
+  CREATE INDEX idx_reference_sewer_districts_geometry_gist ON public.reference_sewer_districts USING gist (geometry)
   ```
 
 ### Sample Row
@@ -8857,7 +9734,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_shoreline_jurisdiction`
+## `public.reference_shoreline_jurisdiction` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -8866,7 +9743,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Magt_unit_` | bigint (int8) | YES |  |
 | `Reach_no` | bigint (int8) | YES |  |
@@ -8883,13 +9760,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_shoreline_jurisdiction_geometry_gist`
-  ```sql
-  CREATE INDEX idx_reference_shoreline_jurisdiction_geometry_gist ON public.reference_shoreline_jurisdiction USING gist (geometry)
-  ```
 - `idx_reference_shoreline_jurisdiction_geometry`
   ```sql
   CREATE INDEX idx_reference_shoreline_jurisdiction_geometry ON public.reference_shoreline_jurisdiction USING gist (geometry)
+  ```
+- `idx_reference_shoreline_jurisdiction_geometry_gist`
+  ```sql
+  CREATE INDEX idx_reference_shoreline_jurisdiction_geometry_gist ON public.reference_shoreline_jurisdiction USING gist (geometry)
   ```
 
 ### Sample Row
@@ -8913,7 +9790,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_skagit_mitigation`
+## `public.reference_skagit_mitigation` (t)
 
 **Primary Key:** id
 
@@ -8931,18 +9808,10 @@ _No sample data available (table is empty or unreadable)._
 | `source_layer` | text (text) | YES |  |
 | `attributes` | jsonb (jsonb) | YES |  |
 | `imported_at` | timestamp with time zone (timestamptz) | YES | now() |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_skagit_mitigation_geom_gix`
-  ```sql
-  CREATE INDEX reference_skagit_mitigation_geom_gix ON public.reference_skagit_mitigation USING gist (geometry)
-  ```
-- `reference_skagit_mitigation_layer_idx`
-  ```sql
-  CREATE INDEX reference_skagit_mitigation_layer_idx ON public.reference_skagit_mitigation USING btree (layer_id)
-  ```
 - `reference_skagit_mitigation_class_idx`
   ```sql
   CREATE INDEX reference_skagit_mitigation_class_idx ON public.reference_skagit_mitigation USING btree (mitigation_class)
@@ -8950,6 +9819,14 @@ _No sample data available (table is empty or unreadable)._
 - `reference_skagit_mitigation_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_skagit_mitigation_pkey ON public.reference_skagit_mitigation USING btree (id)
+  ```
+- `reference_skagit_mitigation_layer_idx`
+  ```sql
+  CREATE INDEX reference_skagit_mitigation_layer_idx ON public.reference_skagit_mitigation USING btree (layer_id)
+  ```
+- `reference_skagit_mitigation_geom_gix`
+  ```sql
+  CREATE INDEX reference_skagit_mitigation_geom_gix ON public.reference_skagit_mitigation USING gist (geometry)
   ```
 
 ### Sample Row
@@ -8967,7 +9844,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_skagit_mitigation_poly`
+## `public.reference_skagit_mitigation_poly` (v)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -8983,7 +9860,7 @@ _No sample data available (table is empty or unreadable)._
 | `source_layer` | text (text) | YES |  |
 | `attributes` | jsonb (jsonb) | YES |  |
 | `imported_at` | timestamp with time zone (timestamptz) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `mitigation_rank` | integer (int4) | YES |  |
 
 ### Sample Row
@@ -9002,7 +9879,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_skagit_mitigation_zones`
+## `public.reference_skagit_mitigation_zones` (t)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 2926)
@@ -9011,7 +9888,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `Id` | bigint (int8) | YES |  |
 | `Shape__Area` | double precision (float8) | YES |  |
@@ -9019,13 +9896,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `idx_reference_skagit_mitigation_zones_geometry`
-  ```sql
-  CREATE INDEX idx_reference_skagit_mitigation_zones_geometry ON public.reference_skagit_mitigation_zones USING gist (geometry)
-  ```
 - `idx_reference_skagit_mitigation_zones_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_skagit_mitigation_zones_geometry_gist ON public.reference_skagit_mitigation_zones USING gist (geometry)
+  ```
+- `idx_reference_skagit_mitigation_zones_geometry`
+  ```sql
+  CREATE INDEX idx_reference_skagit_mitigation_zones_geometry ON public.reference_skagit_mitigation_zones USING gist (geometry)
   ```
 
 ### Sample Row
@@ -9040,7 +9917,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_swsl_streams`
+## `public.reference_swsl_streams` (t)
 
 **Geometry Columns:**
 - `geometry` (LINESTRING, SRID 2926)
@@ -9049,7 +9926,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(LineString,2926) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `TYPE` | text (text) | YES |  |
 | `WRIA_STRM_NO` | bigint (int8) | YES |  |
@@ -9080,7 +9957,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_tax_district`
+## `public.reference_tax_district` (t)
 
 **Primary Key:** id
 
@@ -9097,17 +9974,17 @@ _No sample data available (table is empty or unreadable)._
 | `district_name` | text (text) | YES |  |
 | `county_name` | text (text) | YES |  |
 | `county_num` | integer (int4) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_tax_district_pkey`
-  ```sql
-  CREATE UNIQUE INDEX reference_tax_district_pkey ON public.reference_tax_district USING btree (id)
-  ```
 - `reference_tax_district_geom_idx`
   ```sql
   CREATE INDEX reference_tax_district_geom_idx ON public.reference_tax_district USING gist (geom)
+  ```
+- `reference_tax_district_pkey`
+  ```sql
+  CREATE UNIQUE INDEX reference_tax_district_pkey ON public.reference_tax_district USING btree (id)
   ```
 - `reference_tax_district_district_type_district_code_idx`
   ```sql
@@ -9128,7 +10005,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_tca2025_district_raw`
+## `public.reference_tca2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -9146,17 +10023,17 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `reference_tca2025_district_raw_geom_geom_idx`
-  ```sql
-  CREATE INDEX reference_tca2025_district_raw_geom_geom_idx ON public.reference_tca2025_district_raw USING gist (geom)
-  ```
 - `reference_tca2025_district_raw_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_tca2025_district_raw_pkey ON public.reference_tca2025_district_raw USING btree (id)
+  ```
+- `reference_tca2025_district_raw_geom_geom_idx`
+  ```sql
+  CREATE INDEX reference_tca2025_district_raw_geom_geom_idx ON public.reference_tca2025_district_raw USING gist (geom)
   ```
 
 ### Sample Row
@@ -9174,7 +10051,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_voting`
+## `public.reference_voting` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -9189,17 +10066,17 @@ _No sample data available (table is empty or unreadable)._
 | `GlobalID` | text (text) | YES |  |
 | `Shape_STAr` | double precision (float8) | YES |  |
 | `Shape_STLe` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `idx_reference_voting_geometry`
-  ```sql
-  CREATE INDEX idx_reference_voting_geometry ON public.reference_voting USING gist (geometry)
-  ```
 - `idx_reference_voting_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_voting_geometry_gist ON public.reference_voting USING gist (geometry)
+  ```
+- `idx_reference_voting_geometry`
+  ```sql
+  CREATE INDEX idx_reference_voting_geometry ON public.reference_voting USING gist (geometry)
   ```
 
 ### Sample Row
@@ -9216,7 +10093,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_votingprecinct`
+## `public.reference_votingprecinct` (t)
 
 **Primary Key:** ogc_fid
 
@@ -9229,12 +10106,12 @@ _No sample data available (table is empty or unreadable)._
 |-------|------|----------|---------|
 | `ogc_fid` | integer (int4) | NO | nextval('reference_votingprecinct_ogc_fid_seq'::regclass) |
 | `prec_code` | bigint (int8) | YES |  |
-| `prec_name` | character varying (varchar) | YES |  |
+| `prec_name` | character varying(50) (varchar) | YES |  |
 | `county_fips` | integer (int4) | YES |  |
-| `county_name` | character varying (varchar) | YES |  |
-| `county_code` | character varying (varchar) | YES |  |
-| `state_code` | character varying (varchar) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `county_name` | character varying(20) (varchar) | YES |  |
+| `county_code` | character varying(2) (varchar) | YES |  |
+| `state_code` | character varying(10) (varchar) | YES |  |
+| `geom_2926` | geometry(Polygon,2926) (geometry) | YES |  |
 | `area_sq_m` | double precision (float8) | YES |  |
 
 ### Indexes
@@ -9243,13 +10120,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX idx_vp_prec ON public.reference_votingprecinct USING btree (prec_code)
   ```
-- `reference_votingprecinct_pkey`
-  ```sql
-  CREATE UNIQUE INDEX reference_votingprecinct_pkey ON public.reference_votingprecinct USING btree (ogc_fid)
-  ```
 - `reference_votingprecinct_geom_2926_geom_idx`
   ```sql
   CREATE INDEX reference_votingprecinct_geom_2926_geom_idx ON public.reference_votingprecinct USING gist (geom_2926)
+  ```
+- `reference_votingprecinct_pkey`
+  ```sql
+  CREATE UNIQUE INDEX reference_votingprecinct_pkey ON public.reference_votingprecinct USING btree (ogc_fid)
   ```
 - `idx_vp_county`
   ```sql
@@ -9272,7 +10149,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_votingprecinct_base`
+## `public.reference_votingprecinct_base` (m)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 0)
@@ -9281,16 +10158,19 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
+| `area_sq_m` | double precision (float8) | YES |  |
 
 ### Indexes
 
-- `idx_vpb_geom`
-  ```sql
-  CREATE INDEX idx_vpb_geom ON public.reference_votingprecinct_base USING gist (geom_2926)
-  ```
 - `idx_vpb_prec`
   ```sql
   CREATE UNIQUE INDEX idx_vpb_prec ON public.reference_votingprecinct_base USING btree (prec_code)
+  ```
+- `idx_vpb_geom`
+  ```sql
+  CREATE INDEX idx_vpb_geom ON public.reference_votingprecinct_base USING gist (geom_2926)
   ```
 
 ### Sample Row
@@ -9303,12 +10183,15 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_votingprecinct_norm`
+## `public.reference_votingprecinct_norm` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `norm_prec_name` | text (text) | YES |  |
+| `norm_county` | text (text) | YES |  |
 
 ### Indexes
 
@@ -9327,7 +10210,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_votingprecinct_split`
+## `public.reference_votingprecinct_split` (t)
 
 **Primary Key:** ogc_fid
 
@@ -9339,28 +10222,24 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `ogc_fid` | integer (int4) | NO | nextval('reference_votingprecinct_split_ogc_fid_seq'::regclass) |
-| `prec_part_name` | character varying (varchar) | YES |  |
+| `prec_part_name` | character varying(50) (varchar) | YES |  |
 | `county_fips` | integer (int4) | YES |  |
-| `county_name` | character varying (varchar) | YES |  |
-| `county_code` | character varying (varchar) | YES |  |
+| `county_name` | character varying(20) (varchar) | YES |  |
+| `county_code` | character varying(2) (varchar) | YES |  |
 | `prec_code` | bigint (int8) | YES |  |
-| `state_code` | character varying (varchar) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `state_code` | character varying(10) (varchar) | YES |  |
+| `geom_2926` | geometry(Polygon,2926) (geometry) | YES |  |
 | `area_sq_m` | double precision (float8) | YES |  |
 
 ### Indexes
 
-- `idx_vps_prec`
-  ```sql
-  CREATE INDEX idx_vps_prec ON public.reference_votingprecinct_split USING btree (prec_code)
-  ```
 - `idx_vps_county`
   ```sql
   CREATE INDEX idx_vps_county ON public.reference_votingprecinct_split USING btree (county_fips)
   ```
-- `idx_vps_geom`
+- `idx_vps_prec`
   ```sql
-  CREATE INDEX idx_vps_geom ON public.reference_votingprecinct_split USING gist (geom_2926)
+  CREATE INDEX idx_vps_prec ON public.reference_votingprecinct_split USING btree (prec_code)
   ```
 - `reference_votingprecinct_split_geom_2926_geom_idx`
   ```sql
@@ -9369,6 +10248,10 @@ _No sample data available (table is empty or unreadable)._
 - `reference_votingprecinct_split_pkey`
   ```sql
   CREATE UNIQUE INDEX reference_votingprecinct_split_pkey ON public.reference_votingprecinct_split USING btree (ogc_fid)
+  ```
+- `idx_vps_geom`
+  ```sql
+  CREATE INDEX idx_vps_geom ON public.reference_votingprecinct_split USING gist (geom_2926)
   ```
 
 ### Sample Row
@@ -9387,7 +10270,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_votingprecinct_valid`
+## `public.reference_votingprecinct_valid` (m)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 0)
@@ -9396,6 +10279,8 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `prec_code` | bigint (int8) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
 
 ### Indexes
 
@@ -9413,7 +10298,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_wat2025_district_raw`
+## `public.reference_wat2025_district_raw` (t)
 
 **Primary Key:** id
 
@@ -9431,7 +10316,7 @@ _No sample data available (table is empty or unreadable)._
 | `shape_leng` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
 | `descriptio` | character varying (varchar) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -9459,7 +10344,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_water_diversions`
+## `public.reference_water_diversions` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -9481,7 +10366,7 @@ _No sample data available (table is empty or unreadable)._
 | `comment_ds` | text (text) | YES |  |
 | `eventdate` | timestamp without time zone (timestamp) | YES |  |
 | `created_user_id` | text (text) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 | `d_point_wr_doc_id` | double precision (float8) | YES |  |
 | `wr_doc_nr` | text (text) | YES |  |
 | `wr_doc_id` | double precision (float8) | YES |  |
@@ -9533,7 +10418,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_water_pou`
+## `public.reference_water_pou` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -9559,45 +10444,45 @@ _No sample data available (table is empty or unreadable)._
 | `created_user_id` | text (text) | YES |  |
 | `shape_length` | double precision (float8) | YES |  |
 | `shape_area` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `idx_reference_water_pou_geometry_gist`
-  ```sql
-  CREATE INDEX idx_reference_water_pou_geometry_gist ON public.reference_water_pou USING gist (geometry)
-  ```
 - `idx_reference_water_pou_geometry`
   ```sql
   CREATE INDEX idx_reference_water_pou_geometry ON public.reference_water_pou USING gist (geometry)
+  ```
+- `idx_reference_water_pou_geometry_gist`
+  ```sql
+  CREATE INDEX idx_reference_water_pou_geometry_gist ON public.reference_water_pou USING gist (geometry)
   ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `wr_doc_id` | 2141106.0 |
+| `wr_doc_id` | 2084118.0 |
 | `wr_doc_pou_id` | NULL |
-| `fill_cd` | 15.0 |
-| `wr_doc_nr` | G3-*07072CWRIS |
+| `fill_cd` | 7.0 |
+| `wr_doc_nr` | GWC01066-D |
 | `wr_doc_type_cd` | CE |
 | `quality_cd` | G |
-| `misc_cd` |   |
+| `misc_cd` | RECHECKED\WWT |
 | `position_with_cd` | S |
 | `active_dt` | NULL |
 | `inactive_dt` | NULL |
-| `update_td` | NULL |
-| `update_user_id` | NULL |
+| `update_td` | 2009-01-23 11:18:38 |
+| `update_user_id` | "ECY\DKRO461" |
 | `comment_ds` | NULL |
 | `created_td` | NULL |
 | `created_user_id` | NULL |
-| `shape_length` | 15953.852565467072 |
-| `shape_area` | 10460528.749483215 |
-| `geometry` | 01060000206E0B0000010000000103000000010000001C000000A393887120E9424116B14D9D7C630A41AE15872B29E94241C829B58FD44E0A4150E37AE531E94241AB224E822C3A0A41BC99799F3... |
+| `shape_length` | 32011.934921794436 |
+| `shape_area` | 35404849.05028143 |
+| `geometry` | 01060000206E0B0000010000000103000000010000000A0000003AB090BF723B3D41182830C9E1EF01C1AF3CD3C6AF3B3D410A3654D2E64501C118648BF20D463D4115F2BBA6944501C17DAB878CA... |
 
 ---
 
-## `public.reference_wellhead_protection`
+## `public.reference_wellhead_protection` (t)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 4326)
@@ -9606,7 +10491,7 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,4326) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `TYPE` | text (text) | YES |  |
 | `GlobalID` | text (text) | YES |  |
@@ -9637,7 +10522,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_wellhead_protection_2926`
+## `public.reference_wellhead_protection_2926` (v)
 
 **Geometry Columns:**
 - `geometry` (POLYGON, SRID 4326)
@@ -9647,13 +10532,13 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Polygon,4326) (geometry) | YES |  |
 | `OBJECTID` | bigint (int8) | YES |  |
 | `TYPE` | text (text) | YES |  |
 | `GlobalID` | text (text) | YES |  |
 | `Shape.STArea()` | double precision (float8) | YES |  |
 | `Shape.STLength()` | double precision (float8) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `geom_2926` | geometry (geometry) | YES |  |
 
 ### Sample Row
 
@@ -9669,7 +10554,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_wells`
+## `public.reference_wells` (t)
 
 **Geometry Columns:**
 - `geometry` (POINT, SRID 2926)
@@ -9719,57 +10604,57 @@ _No sample data available (table is empty or unreadable)._
 | `wria_nr` | double precision (float8) | YES |  |
 | `nad83latitude_qt` | double precision (float8) | YES |  |
 | `nad83longitude_qt` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Point,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `idx_reference_wells_use_type`
-  ```sql
-  CREATE INDEX idx_reference_wells_use_type ON public.reference_wells USING btree (use_type)
-  ```
 - `idx_reference_wells_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_wells_geometry_gist ON public.reference_wells USING gist (geometry)
   ```
-- `idx_reference_wells_well_tag_id`
-  ```sql
-  CREATE INDEX idx_reference_wells_well_tag_id ON public.reference_wells USING btree (well_tag_id)
-  ```
 - `idx_reference_wells_geometry`
   ```sql
   CREATE INDEX idx_reference_wells_geometry ON public.reference_wells USING gist (geometry)
+  ```
+- `idx_reference_wells_use_type`
+  ```sql
+  CREATE INDEX idx_reference_wells_use_type ON public.reference_wells USING btree (use_type)
+  ```
+- `idx_reference_wells_well_tag_id`
+  ```sql
+  CREATE INDEX idx_reference_wells_well_tag_id ON public.reference_wells USING btree (well_tag_id)
   ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `well_log_id` | 21799 |
+| `well_log_id` | 1 |
 | `well_tag_id` | NULL |
 | `project_tag_nr` | NULL |
-| `nit_id_nr` | 064050  |
-| `county_id` | 27.0 |
+| `nit_id_nr` | NULL |
+| `county_id` | 6.0 |
 | `region_cd` | 4.0 |
 | `well_log_recv_dt` | NULL |
-| `well_log_img_nm` | 00021799.pdf |
+| `well_log_img_nm` | 00000001.pdf |
 | `well_diameter_qt` | 6.0 |
-| `well_depth` | 88.0 |
-| `well_comp_dt` | 1991/02/24 00:00:00+00 |
-| `well_owner_nm` | ANNE WANSCH |
+| `well_depth` | 140.0 |
+| `well_comp_dt` | 1984/08/07 00:00:00+00 |
+| `well_owner_nm` | NULL |
 | `use_type` | W |
-| `well_address_ds` | PISSNER, YELM |
-| `driller_nr` | 1885  |
-| `township_nr` | 16 |
+| `well_address_ds` | 20218 NE 174TH ST, BRUSH PRAIRIE |
+| `driller_nr` | NULL |
+| `township_nr` | 03 |
 | `township_fraction_nr` | NULL |
 | `township_dir_cd` | N |
 | `range_nr` | 03 |
 | `range_fraction_nr` | NULL |
 | `range_dir_cd` | E |
-| `section_nr` | 26 |
-| `qtr_section_cd` | SE |
-| `qtr_qtr_section_cd` | NE |
-| `st_plane_xcoord_nr` | 1169099 |
-| `st_plane_ycoord_nr` | 555545 |
+| `section_nr` | 17 |
+| `qtr_section_cd` | NE |
+| `qtr_qtr_section_cd` | NW |
+| `st_plane_xcoord_nr` | 1139276 |
+| `st_plane_ycoord_nr` | 158197 |
 | `tax_parcel_nr` | NULL |
 | `horz_coll_meth_cd` | NULL |
 | `record_creation_td` | NULL |
@@ -9782,14 +10667,14 @@ _No sample data available (table is empty or unreadable)._
 | `welllog_city_nm` | NULL |
 | `welllog_zip_postl_cd` | NULL |
 | `horzcoll_ds` | NULL |
-| `wria_nr` | 11.0 |
-| `nad83latitude_qt` | 46.84133 |
-| `nad83longitude_qt` | -122.38359 |
-| `geometry` | 01010000206E0B000002D9BFA9291C3341312173208A5AEAC0 |
+| `wria_nr` | 28.0 |
+| `nad83latitude_qt` | 45.75004 |
+| `nad83longitude_qt` | -122.46322 |
+| `geometry` | 01010000206E0B00003D95409E63AD3241FA462622C2901BC1 |
 
 ---
 
-## `public.reference_wetlands`
+## `public.reference_wetlands` (t)
 
 **Geometry Columns:**
 - `geometry` (MULTIPOLYGON, SRID 2926)
@@ -9801,7 +10686,7 @@ _No sample data available (table is empty or unreadable)._
 | `RASTER` | integer (int4) | YES |  |
 | `FOOTPRINT_Length` | double precision (float8) | YES |  |
 | `FOOTPRINT_Area` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -9825,7 +10710,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_zoning`
+## `public.reference_zoning` (t)
 
 **Geometry Columns:**
 - `geometry` (GEOMETRY, SRID 2926)
@@ -9844,17 +10729,17 @@ _No sample data available (table is empty or unreadable)._
 | `ZONING_COD` | text (text) | YES |  |
 | `Shape_STAr` | double precision (float8) | YES |  |
 | `Shape_STLe` | double precision (float8) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | YES |  |
+| `geometry` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
-- `idx_reference_zoning_geometry`
-  ```sql
-  CREATE INDEX idx_reference_zoning_geometry ON public.reference_zoning USING gist (geometry)
-  ```
 - `idx_reference_zoning_geometry_gist`
   ```sql
   CREATE INDEX idx_reference_zoning_geometry_gist ON public.reference_zoning USING gist (geometry)
+  ```
+- `idx_reference_zoning_geometry`
+  ```sql
+  CREATE INDEX idx_reference_zoning_geometry ON public.reference_zoning USING gist (geometry)
   ```
 
 ### Sample Row
@@ -9875,7 +10760,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_zoning_envelope`
+## `public.reference_zoning_envelope` (t)
 
 **Primary Key:** id
 
@@ -9887,13 +10772,13 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `source` | character varying (varchar) | NO |  |
-| `jurisdiction` | character varying (varchar) | NO |  |
-| `county_name` | character varying (varchar) | YES |  |
-| `zone_code` | character varying (varchar) | NO |  |
-| `zone_name` | character varying (varchar) | YES |  |
-| `zoning_general_class` | character varying (varchar) | YES |  |
-| `zoning_specific_class` | character varying (varchar) | YES |  |
+| `source` | character varying(50) (varchar) | NO |  |
+| `jurisdiction` | character varying(100) (varchar) | NO |  |
+| `county_name` | character varying(100) (varchar) | YES |  |
+| `zone_code` | character varying(100) (varchar) | NO |  |
+| `zone_name` | character varying(255) (varchar) | YES |  |
+| `zoning_general_class` | character varying(30) (varchar) | YES |  |
+| `zoning_specific_class` | character varying(100) (varchar) | YES |  |
 | `allows_residential` | boolean (bool) | YES |  |
 | `allows_duplex` | boolean (bool) | YES |  |
 | `allows_multifamily` | boolean (bool) | YES |  |
@@ -9923,32 +10808,32 @@ _No sample data available (table is empty or unreadable)._
 | `parking_min_retail` | double precision (float8) | YES |  |
 | `parking_min_restaurant` | double precision (float8) | YES |  |
 | `parking_min_office` | double precision (float8) | YES |  |
-| `reference_url` | character varying (varchar) | YES |  |
+| `reference_url` | character varying(500) (varchar) | YES |  |
 | `source_last_verified` | date (date) | YES |  |
-| `geometry` | USER-DEFINED (geometry) | NO |  |
+| `geometry` | geometry(MultiPolygon,3857) (geometry) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `reference_zoning_envelope_pkey`
+- `reference_z_geometr_eeadcf_gist`
   ```sql
-  CREATE UNIQUE INDEX reference_zoning_envelope_pkey ON public.reference_zoning_envelope USING btree (id)
+  CREATE INDEX reference_z_geometr_eeadcf_gist ON public.reference_zoning_envelope USING gist (geometry)
   ```
 - `reference_z_jurisdi_8160de_idx`
   ```sql
   CREATE INDEX reference_z_jurisdi_8160de_idx ON public.reference_zoning_envelope USING btree (jurisdiction)
   ```
-- `reference_z_geometr_eeadcf_gist`
+- `reference_zoning_envelope_geometry_dec82255_id`
   ```sql
-  CREATE INDEX reference_z_geometr_eeadcf_gist ON public.reference_zoning_envelope USING gist (geometry)
+  CREATE INDEX reference_zoning_envelope_geometry_dec82255_id ON public.reference_zoning_envelope USING gist (geometry)
+  ```
+- `reference_zoning_envelope_pkey`
+  ```sql
+  CREATE UNIQUE INDEX reference_zoning_envelope_pkey ON public.reference_zoning_envelope USING btree (id)
   ```
 - `reference_z_zone_co_bbab36_idx`
   ```sql
   CREATE INDEX reference_z_zone_co_bbab36_idx ON public.reference_zoning_envelope USING btree (zone_code)
-  ```
-- `reference_zoning_envelope_geometry_dec82255_id`
-  ```sql
-  CREATE INDEX reference_zoning_envelope_geometry_dec82255_id ON public.reference_zoning_envelope USING gist (geometry)
   ```
 
 ### Sample Row
@@ -9957,7 +10842,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.reference_zoning_zones`
+## `public.reference_zoning_zones` (t)
 
 **Geometry Columns:**
 - `geom` (MULTIPOLYGON, SRID 2926)
@@ -10021,8 +10906,8 @@ _No sample data available (table is empty or unreadable)._
 | `minparkingresidential_deprecate` | double precision (float8) | YES |  |
 | `shape__area` | double precision (float8) | YES |  |
 | `shape__length` | double precision (float8) | YES |  |
-| `geom` | USER-DEFINED (geometry) | YES |  |
-| `geom_valid` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry(MultiPolygon,2926) (geometry) | YES |  |
+| `geom_valid` | geometry(MultiPolygon,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -10030,13 +10915,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX idx_reference_zoning_geom_valid ON public.reference_zoning_zones USING gist (geom_valid)
   ```
-- `idx_reference_zoning_zones_geom`
-  ```sql
-  CREATE INDEX idx_reference_zoning_zones_geom ON public.reference_zoning_zones USING gist (geom)
-  ```
 - `idx_rz_geom_valid`
   ```sql
   CREATE INDEX idx_rz_geom_valid ON public.reference_zoning_zones USING gist (geom_valid)
+  ```
+- `idx_reference_zoning_zones_geom`
+  ```sql
+  CREATE INDEX idx_reference_zoning_zones_geom ON public.reference_zoning_zones USING gist (geom)
   ```
 
 ### Sample Row
@@ -10102,7 +10987,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.regression_results`
+## `public.regression_results` (t)
 
 **Primary Key:** id
 
@@ -10111,7 +10996,7 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `model_type` | character varying (varchar) | NO |  |
+| `model_type` | character varying(50) (varchar) | NO |  |
 | `run_date` | timestamp with time zone (timestamptz) | NO |  |
 | `n_obs` | integer (int4) | NO |  |
 | `r_squared` | double precision (float8) | NO |  |
@@ -10126,13 +11011,13 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `regression_results_pkey`
-  ```sql
-  CREATE UNIQUE INDEX regression_results_pkey ON public.regression_results USING btree (id)
-  ```
 - `regression_results_roll_id_3939bed7`
   ```sql
   CREATE INDEX regression_results_roll_id_3939bed7 ON public.regression_results USING btree (roll_id)
+  ```
+- `regression_results_pkey`
+  ```sql
+  CREATE UNIQUE INDEX regression_results_pkey ON public.regression_results USING btree (id)
   ```
 
 ### Sample Row
@@ -10141,7 +11026,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.sales`
+## `public.sales` (t)
 
 ### Columns
 
@@ -10169,38 +11054,38 @@ _No sample data available (table is empty or unreadable)._
 
 ### Indexes
 
-- `sales_sale_date_idx`
-  ```sql
-  CREATE INDEX sales_sale_date_idx ON public.sales USING btree (sale_date)
-  ```
 - `sales_parcel_number_idx`
   ```sql
   CREATE INDEX sales_parcel_number_idx ON public.sales USING btree (parcel_number)
+  ```
+- `sales_sale_date_idx`
+  ```sql
+  CREATE INDEX sales_sale_date_idx ON public.sales USING btree (sale_date)
   ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `sale_id` | 1962342 |
-| `parcel_number` | P65171 |
-| `account_number` | 3907-008-003-0107 |
-| `seller_name` | SPEEDY FAMILY TRUST & SPEEDY ROBERT PALMER TRUSTEE |
-| `buyer_name` | GONZALEZ PEDRO GARCIA |
-| `sale_price` | 540000 |
-| `sale_date` | 2022-12-05 00:00:00 |
-| `sale_type` | ESTATE |
-| `recording_number` | 202212080021 |
+| `sale_id` | 1948294 |
+| `parcel_number` | P126344 |
+| `account_number` | 4933-000-003-0000 |
+| `seller_name` | COACH CORRAL INC |
+| `buyer_name` | ZIMMERMAN JIM E |
+| `sale_price` | 507000 |
+| `sale_date` | NULL |
+| `sale_type` | VALID SALE |
+| `recording_number` | 202008250092 |
 | `deed_type` | WARRANTY DEED |
-| `deed_date` | 2022-12-05 00:00:00 |
-| `revaluation_area` | 320.0 |
-| `excise_number` | 20224820.0 |
+| `deed_date` | 2020-08-24 00:00:00 |
+| `revaluation_area` | 100.0 |
+| `excise_number` | 20203314.0 |
 | `roll_id` | 1 |
-| `id` | 19055 |
+| `id` | 1 |
 
 ---
 
-## `public.sales_search`
+## `public.sales_search` (t)
 
 **Primary Key:** sale_id
 
@@ -10209,7 +11094,7 @@ _No sample data available (table is empty or unreadable)._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `sale_id` | bigint (int8) | NO |  |
-| `parcel_number` | character varying (varchar) | NO |  |
+| `parcel_number` | character varying(20) (varchar) | NO |  |
 | `sale_date` | date (date) | NO |  |
 | `sale_price` | double precision (float8) | NO |  |
 | `market_value` | double precision (float8) | YES |  |
@@ -10217,19 +11102,19 @@ _No sample data available (table is empty or unreadable)._
 | `sale_to_market_ratio` | double precision (float8) | YES |  |
 | `living_area` | double precision (float8) | YES |  |
 | `lot_size_acres` | double precision (float8) | YES |  |
-| `zoning_jurisdiction` | character varying (varchar) | YES |  |
-| `zone_id` | character varying (varchar) | YES |  |
+| `zoning_jurisdiction` | character varying(50) (varchar) | YES |  |
+| `zone_id` | character varying(50) (varchar) | YES |  |
 | `is_arms_length` | boolean (bool) | NO |  |
 | `exclude_from_analysis` | boolean (bool) | NO |  |
-| `ratio_trim_bucket` | character varying (varchar) | NO |  |
+| `ratio_trim_bucket` | character varying(20) (varchar) | NO |  |
 | `qa_flags` | jsonb (jsonb) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `sales_search_sale_date_4134ad60`
+- `sales_search_ratio_trim_bucket_072c2db0`
   ```sql
-  CREATE INDEX sales_search_sale_date_4134ad60 ON public.sales_search USING btree (sale_date)
+  CREATE INDEX sales_search_ratio_trim_bucket_072c2db0 ON public.sales_search USING btree (ratio_trim_bucket)
   ```
 - `sales_search_parcel_number_1358a665_like`
   ```sql
@@ -10243,9 +11128,9 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX sales_searc_parcel__84600f_idx ON public.sales_search USING btree (parcel_number, sale_date)
   ```
-- `sales_search_ratio_trim_bucket_072c2db0_like`
+- `sales_searc_exclude_7d43e8_idx`
   ```sql
-  CREATE INDEX sales_search_ratio_trim_bucket_072c2db0_like ON public.sales_search USING btree (ratio_trim_bucket varchar_pattern_ops)
+  CREATE INDEX sales_searc_exclude_7d43e8_idx ON public.sales_search USING btree (exclude_from_analysis)
   ```
 - `sales_searc_ratio_t_8fdff9_idx`
   ```sql
@@ -10263,13 +11148,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE UNIQUE INDEX sales_search_pkey ON public.sales_search USING btree (sale_id)
   ```
-- `sales_searc_exclude_7d43e8_idx`
+- `sales_search_ratio_trim_bucket_072c2db0_like`
   ```sql
-  CREATE INDEX sales_searc_exclude_7d43e8_idx ON public.sales_search USING btree (exclude_from_analysis)
+  CREATE INDEX sales_search_ratio_trim_bucket_072c2db0_like ON public.sales_search USING btree (ratio_trim_bucket varchar_pattern_ops)
   ```
-- `sales_search_ratio_trim_bucket_072c2db0`
+- `sales_search_sale_date_4134ad60`
   ```sql
-  CREATE INDEX sales_search_ratio_trim_bucket_072c2db0 ON public.sales_search USING btree (ratio_trim_bucket)
+  CREATE INDEX sales_search_sale_date_4134ad60 ON public.sales_search USING btree (sale_date)
   ```
 
 ### Sample Row
@@ -10295,7 +11180,7 @@ _No sample data available (table is empty or unreadable)._
 
 ---
 
-## `public.sales_search_mv`
+## `public.sales_search_mv` (m)
 
 **Geometry Columns:**
 - `centroid_geog` (POINT, SRID 4326)
@@ -10304,12 +11189,46 @@ _No sample data available (table is empty or unreadable)._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `sale_id` | bigint (int8) | YES |  |
+| `parcel_number` | text (text) | YES |  |
+| `sale_date` | date (date) | YES |  |
+| `sale_year` | integer (int4) | YES |  |
+| `sale_price` | numeric (numeric) | YES |  |
+| `property_type` | text (text) | YES |  |
+| `is_manufactured` | boolean (bool) | YES |  |
+| `is_vacant_land` | boolean (bool) | YES |  |
+| `living_area` | numeric (numeric) | YES |  |
+| `lot_size_acres` | numeric (numeric) | YES |  |
+| `year_built` | integer (int4) | YES |  |
+| `address_simple` | text (text) | YES |  |
+| `city` | text (text) | YES |  |
+| `city_jurisdiction` | text (text) | YES |  |
+| `zip5` | text (text) | YES |  |
+| `neighborhood_id` | character varying(20) (varchar) | YES |  |
+| `neighborhood_name` | character varying(200) (varchar) | YES |  |
+| `centroid_geog` | geometry(Point,4326) (geometry) | YES |  |
+| `price_per_sqft` | numeric (numeric) | YES |  |
+| `price_per_acre` | numeric (numeric) | YES |  |
+| `is_arms_length` | boolean (bool) | YES |  |
+| `is_warranty_deed` | boolean (bool) | YES |  |
+| `qa_flags` | text[] (_text) | YES |  |
+| `ratio_trim_bucket` | text (text) | YES |  |
+| `sale_to_market_ratio` | numeric (numeric) | YES |  |
+| `exclude_from_analysis` | boolean (bool) | YES |  |
+| `raw_sale_type` | text (text) | YES |  |
+| `raw_deed_type` | text (text) | YES |  |
+| `recording_number` | text (text) | YES |  |
+| `excise_number` | real (float4) | YES |  |
 
 ### Indexes
 
-- `idx_sales_search_mv_year_built`
+- `idx_sales_search_mv_property_partial`
   ```sql
-  CREATE INDEX idx_sales_search_mv_year_built ON public.sales_search_mv USING btree (year_built)
+  CREATE INDEX idx_sales_search_mv_property_partial ON public.sales_search_mv USING btree (sale_date, sale_price) WHERE (property_type = ANY (ARRAY['SFR'::text, 'Manufactured/Mobile'::text]))
+  ```
+- `idx_sales_search_mv_centroid`
+  ```sql
+  CREATE INDEX idx_sales_search_mv_centroid ON public.sales_search_mv USING gist (centroid_geog)
   ```
 - `idx_sales_search_mv_sale_id`
   ```sql
@@ -10335,17 +11254,13 @@ _No sample data available (table is empty or unreadable)._
   ```sql
   CREATE INDEX idx_sales_search_mv_sale_price ON public.sales_search_mv USING btree (sale_price)
   ```
+- `idx_sales_search_mv_year_built`
+  ```sql
+  CREATE INDEX idx_sales_search_mv_year_built ON public.sales_search_mv USING btree (year_built)
+  ```
 - `idx_sales_search_mv_arms_length`
   ```sql
   CREATE INDEX idx_sales_search_mv_arms_length ON public.sales_search_mv USING btree (is_arms_length, sale_date)
-  ```
-- `idx_sales_search_mv_property_partial`
-  ```sql
-  CREATE INDEX idx_sales_search_mv_property_partial ON public.sales_search_mv USING btree (sale_date, sale_price) WHERE (property_type = ANY (ARRAY['SFR'::text, 'Manufactured/Mobile'::text]))
-  ```
-- `idx_sales_search_mv_centroid`
-  ```sql
-  CREATE INDEX idx_sales_search_mv_centroid ON public.sales_search_mv USING gist (centroid_geog)
   ```
 
 ### Sample Row
@@ -10355,7 +11270,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.skagit_county_boundary`
+## `public.skagit_county_boundary` (t)
 
 **Geometry Columns:**
 - `geom_2926` (GEOMETRY, SRID 2926)
@@ -10364,7 +11279,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geom_2926` | USER-DEFINED (geometry) | YES |  |
+| `geom_2926` | geometry(Geometry,2926) (geometry) | YES |  |
 
 ### Indexes
 
@@ -10381,7 +11296,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.skagit_county_boundary_flood_srid`
+## `public.skagit_county_boundary_flood_srid` (t)
 
 **Geometry Columns:**
 - `geom` (GEOMETRY, SRID 0)
@@ -10390,7 +11305,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `geom` | USER-DEFINED (geometry) | YES |  |
+| `geom` | geometry (geometry) | YES |  |
 
 ### Indexes
 
@@ -10407,7 +11322,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.spatial_ref_sys`
+## `public.spatial_ref_sys` (t)
 
 **Primary Key:** srid
 
@@ -10416,10 +11331,10 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `srid` | integer (int4) | NO |  |
-| `auth_name` | character varying (varchar) | YES |  |
+| `auth_name` | character varying(256) (varchar) | YES |  |
 | `auth_srid` | integer (int4) | YES |  |
-| `srtext` | character varying (varchar) | YES |  |
-| `proj4text` | character varying (varchar) | YES |  |
+| `srtext` | character varying(2048) (varchar) | YES |  |
+| `proj4text` | character varying(2048) (varchar) | YES |  |
 
 ### Indexes
 
@@ -10440,7 +11355,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.stg_parcel_geometry`
+## `public.stg_parcel_geometry` (t)
 
 **Primary Key:** parcel_id
 
@@ -10452,11 +11367,11 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
-| `parcel_id` | character varying (varchar) | NO |  |
-| `geom_2926` | USER-DEFINED (geometry) | NO |  |
-| `centroid_2926` | USER-DEFINED (geometry) | YES |  |
+| `parcel_id` | character varying(20) (varchar) | NO |  |
+| `geom_2926` | geometry(MultiPolygon,2926) (geometry) | NO |  |
+| `centroid_2926` | geometry(Point,2926) (geometry) | YES |  |
 | `source_geom_count` | integer (int4) | NO |  |
-| `rule_used` | character varying (varchar) | NO |  |
+| `rule_used` | character varying(50) (varchar) | NO |  |
 | `updated_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Foreign Keys
@@ -10465,13 +11380,17 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ### Indexes
 
+- `stg_parcel_geometry_geom_2926_eec79ec8_id`
+  ```sql
+  CREATE INDEX stg_parcel_geometry_geom_2926_eec79ec8_id ON public.stg_parcel_geometry USING gist (geom_2926)
+  ```
 - `stg_parcel_geometry_parcel_id_98add608_like`
   ```sql
   CREATE INDEX stg_parcel_geometry_parcel_id_98add608_like ON public.stg_parcel_geometry USING btree (parcel_id varchar_pattern_ops)
   ```
-- `stg_parcel_geometry_pkey`
+- `stg_parcel_geometry_centroid_2926_b459e366_id`
   ```sql
-  CREATE UNIQUE INDEX stg_parcel_geometry_pkey ON public.stg_parcel_geometry USING btree (parcel_id)
+  CREATE INDEX stg_parcel_geometry_centroid_2926_b459e366_id ON public.stg_parcel_geometry USING gist (centroid_2926)
   ```
 - `stg_parcel__geom_29_0263d6_gist`
   ```sql
@@ -10481,13 +11400,9 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
   ```sql
   CREATE INDEX stg_parcel__centroi_0a3021_gist ON public.stg_parcel_geometry USING gist (centroid_2926)
   ```
-- `stg_parcel_geometry_geom_2926_eec79ec8_id`
+- `stg_parcel_geometry_pkey`
   ```sql
-  CREATE INDEX stg_parcel_geometry_geom_2926_eec79ec8_id ON public.stg_parcel_geometry USING gist (geom_2926)
-  ```
-- `stg_parcel_geometry_centroid_2926_b459e366_id`
-  ```sql
-  CREATE INDEX stg_parcel_geometry_centroid_2926_b459e366_id ON public.stg_parcel_geometry USING gist (centroid_2926)
+  CREATE UNIQUE INDEX stg_parcel_geometry_pkey ON public.stg_parcel_geometry USING btree (parcel_id)
   ```
 
 ### Sample Row
@@ -10503,7 +11418,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.taxing_district_levy`
+## `public.taxing_district_levy` (t)
 
 **Primary Key:** id
 
@@ -10512,30 +11427,30 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `tdcode` | character varying (varchar) | NO |  |
-| `district_name` | character varying (varchar) | NO |  |
+| `tdcode` | character varying(9) (varchar) | NO |  |
+| `district_name` | character varying(255) (varchar) | NO |  |
 | `locally_assessed_value` | bigint (int8) | YES |  |
-| `levy_rate` | numeric (numeric) | YES |  |
+| `levy_rate` | numeric(10,5) (numeric) | YES |  |
 | `district_levy` | bigint (int8) | YES |  |
 | `highest_prior_levy` | bigint (int8) | YES |  |
 | `new_construction_assessed_value` | bigint (int8) | YES |  |
-| `levy_rate_2024` | numeric (numeric) | YES |  |
+| `levy_rate_2024` | numeric(10,5) (numeric) | YES |  |
 | `state_assessed_property_2024` | bigint (int8) | YES |  |
 | `state_assessed_property_2023` | bigint (int8) | YES |  |
 | `annexation_assessed_value_2023` | bigint (int8) | YES |  |
 | `annex_tax_due_2023` | bigint (int8) | YES |  |
 | `refund_tax_due_2023` | bigint (int8) | YES |  |
 | `max_allowable_levy` | bigint (int8) | YES |  |
-| `statutory_max_rate` | numeric (numeric) | YES |  |
-| `levy_limit_percent_increase` | numeric (numeric) | YES |  |
+| `statutory_max_rate` | numeric(6,4) (numeric) | YES |  |
+| `levy_limit_percent_increase` | numeric(6,4) (numeric) | YES |  |
 | `assessment_year` | smallint (int2) | NO |  |
 | `created_at` | timestamp with time zone (timestamptz) | NO |  |
 
 ### Indexes
 
-- `taxing_district_levy_assessment_year_ba2ea9ff`
+- `taxing_dist_tdcode_60a920_idx`
   ```sql
-  CREATE INDEX taxing_district_levy_assessment_year_ba2ea9ff ON public.taxing_district_levy USING btree (assessment_year)
+  CREATE INDEX taxing_dist_tdcode_60a920_idx ON public.taxing_district_levy USING btree (tdcode)
   ```
 - `taxing_district_levy_tdcode_c3e23ba1`
   ```sql
@@ -10545,13 +11460,9 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
   ```sql
   CREATE INDEX taxing_district_levy_tdcode_c3e23ba1_like ON public.taxing_district_levy USING btree (tdcode varchar_pattern_ops)
   ```
-- `taxing_district_levy_tdcode_assessment_year_357e41a6_uniq`
+- `taxing_district_levy_assessment_year_ba2ea9ff`
   ```sql
-  CREATE UNIQUE INDEX taxing_district_levy_tdcode_assessment_year_357e41a6_uniq ON public.taxing_district_levy USING btree (tdcode, assessment_year)
-  ```
-- `taxing_dist_tdcode_60a920_idx`
-  ```sql
-  CREATE INDEX taxing_dist_tdcode_60a920_idx ON public.taxing_district_levy USING btree (tdcode)
+  CREATE INDEX taxing_district_levy_assessment_year_ba2ea9ff ON public.taxing_district_levy USING btree (assessment_year)
   ```
 - `taxing_dist_assessm_45e479_idx`
   ```sql
@@ -10560,6 +11471,10 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 - `taxing_district_levy_pkey`
   ```sql
   CREATE UNIQUE INDEX taxing_district_levy_pkey ON public.taxing_district_levy USING btree (id)
+  ```
+- `taxing_district_levy_tdcode_assessment_year_357e41a6_uniq`
+  ```sql
+  CREATE UNIQUE INDEX taxing_district_levy_tdcode_assessment_year_357e41a6_uniq ON public.taxing_district_levy USING btree (tdcode, assessment_year)
   ```
 
 ### Sample Row
@@ -10588,7 +11503,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.temp_slope_updates`
+## `public.temp_slope_updates` (t)
 
 ### Columns
 
@@ -10606,19 +11521,57 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.voter_ballots_skagit`
+## `public.v_parcel_active_code_sets` (v)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `code_set` | character varying(100) (varchar) | YES |  |
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `parcel_number` | P104423 |
+| `code_set` | skagit_county_code |
+
+---
+
+## `public.v_parcel_code_sets` (v)
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `parcel_number` | character varying(20) (varchar) | YES |  |
+| `jurisdiction_name` | character varying (varchar) | YES |  |
+| `code_set` | character varying(100) (varchar) | YES |  |
+
+### Sample Row
+
+| Column | Value |
+|--------|-------|
+| `parcel_number` | P100005 |
+| `jurisdiction_name` | Anacortes |
+| `code_set` | anacortes_municipal_code |
+
+---
+
+## `public.voter_ballots_skagit` (m)
+
+### Columns
+
+| Column | Type | Nullable | Default |
+|-------|------|----------|---------|
+| `ballot_id` | character varying(50) (varchar) | YES |  |
+| `election_id` | bigint (int8) | YES |  |
+| `election_year` | integer (int4) | YES |  |
+| `normalized_address` | character varying(255) (varchar) | YES |  |
 
 ### Indexes
 
-- `voter_ballots_skagit_ballot_idx`
-  ```sql
-  CREATE UNIQUE INDEX voter_ballots_skagit_ballot_idx ON public.voter_ballots_skagit USING btree (ballot_id, election_id)
-  ```
 - `voter_ballots_skagit_year_idx`
   ```sql
   CREATE INDEX voter_ballots_skagit_year_idx ON public.voter_ballots_skagit USING btree (election_year)
@@ -10626,6 +11579,10 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 - `voter_ballots_skagit_addr_year_idx`
   ```sql
   CREATE INDEX voter_ballots_skagit_addr_year_idx ON public.voter_ballots_skagit USING btree (normalized_address, election_year)
+  ```
+- `voter_ballots_skagit_ballot_idx`
+  ```sql
+  CREATE UNIQUE INDEX voter_ballots_skagit_ballot_idx ON public.voter_ballots_skagit USING btree (ballot_id, election_id)
   ```
 
 ### Sample Row
@@ -10639,12 +11596,14 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.voter_precinct_norm`
+## `public.voter_precinct_norm` (m)
 
 ### Columns
 
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
+| `norm_prec_name` | text (text) | YES |  |
+| `norm_county` | text (text) | YES |  |
 
 ### Indexes
 
@@ -10662,7 +11621,7 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 
 ---
 
-## `public.zoning_zone`
+## `public.zoning_zone` (t)
 
 **Primary Key:** id
 
@@ -10674,31 +11633,21 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
 | Column | Type | Nullable | Default |
 |-------|------|----------|---------|
 | `id` | bigint (int8) | NO |  |
-| `jurisdiction` | character varying (varchar) | NO |  |
-| `zone_code` | character varying (varchar) | NO |  |
-| `zoning_general_class` | character varying (varchar) | YES |  |
-| `zoning_specific_class` | character varying (varchar) | YES |  |
-| `source` | character varying (varchar) | NO |  |
-| `reference_url` | character varying (varchar) | YES |  |
-| `geom_2926` | USER-DEFINED (geometry) | NO |  |
+| `jurisdiction` | character varying(50) (varchar) | NO |  |
+| `zone_code` | character varying(50) (varchar) | NO |  |
+| `zoning_general_class` | character varying(30) (varchar) | YES |  |
+| `zoning_specific_class` | character varying(100) (varchar) | YES |  |
+| `source` | character varying(50) (varchar) | NO |  |
+| `reference_url` | character varying(500) (varchar) | YES |  |
+| `geom_2926` | geometry(MultiPolygon,2926) (geometry) | NO |  |
+| `zoning_use_class` | character varying(30) (varchar) | YES |  |
+| `jurisdiction_key` | character varying(50) (varchar) | YES |  |
 
 ### Indexes
 
-- `zoning_zone_geom_29_928713_gist`
-  ```sql
-  CREATE INDEX zoning_zone_geom_29_928713_gist ON public.zoning_zone USING gist (geom_2926)
-  ```
 - `zoning_zone_pkey`
   ```sql
   CREATE UNIQUE INDEX zoning_zone_pkey ON public.zoning_zone USING btree (id)
-  ```
-- `idx_zoning_geom_2926`
-  ```sql
-  CREATE INDEX idx_zoning_geom_2926 ON public.zoning_zone USING gist (geom_2926)
-  ```
-- `zoning_zone_geom_2926_199212dd_id`
-  ```sql
-  CREATE INDEX zoning_zone_geom_2926_199212dd_id ON public.zoning_zone USING gist (geom_2926)
   ```
 - `zoning_zone_zone_co_7b8a44_idx`
   ```sql
@@ -10708,19 +11657,33 @@ HINT:  Use the REFRESH MATERIALIZED VIEW command.._
   ```sql
   CREATE INDEX zoning_zone_jurisdi_677cbc_idx ON public.zoning_zone USING btree (jurisdiction)
   ```
+- `zoning_zone_geom_29_928713_gist`
+  ```sql
+  CREATE INDEX zoning_zone_geom_29_928713_gist ON public.zoning_zone USING gist (geom_2926)
+  ```
+- `idx_zoning_geom_2926`
+  ```sql
+  CREATE INDEX idx_zoning_geom_2926 ON public.zoning_zone USING gist (geom_2926)
+  ```
+- `zoning_zone_geom_2926_199212dd_id`
+  ```sql
+  CREATE INDEX zoning_zone_geom_2926_199212dd_id ON public.zoning_zone USING gist (geom_2926)
+  ```
 
 ### Sample Row
 
 | Column | Value |
 |--------|-------|
-| `id` | 25729 |
-| `jurisdiction` | Unincorporated Skagit County |
-| `zone_code` | RRv |
-| `zoning_general_class` | RUR |
-| `zoning_specific_class` | RR5+ |
+| `id` | 25732 |
+| `jurisdiction` | Mount Vernon |
+| `zone_code` | P-O |
+| `zoning_general_class` | COM |
+| `zoning_specific_class` | COMOFFI |
 | `source` | WAZA |
-| `reference_url` | https://www.codepublishing.com/WA/SkagitCounty/#!/SkagitCounty14/SkagitCounty1416.html#14.16.320 |
-| `geom_2926` | 01060000206E0B00000100000001030000000500000008060000D4CDD23CD6C2334176AA1C67EF0C21417C446608D4C23341A153555F670A21415B1EE728D1C43341FE725AF6430A214164C60B9F6... |
+| `reference_url` | https://www.codepublishing.com/WA/MountVernon/#!/MountVernon17/MountVernon1736.html#17.36 |
+| `geom_2926` | 01060000206E0B000001000000010300000001000000050000001F2D325C3581334167DB952E10C01F414BFDEF7233813341F540BDF1A7BE1F415E528677CF803341DB2D34BEAFBE1F41F4CD4560D... |
+| `zoning_use_class` | commercial |
+| `jurisdiction_key` | mount_vernon |
 
 ---
 

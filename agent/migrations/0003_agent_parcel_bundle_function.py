@@ -74,7 +74,7 @@ DROP SCHEMA IF EXISTS agent CASCADE;
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('agent', '0002_auto_20241121_0434'),
+        ('agent', '0002_paymentrecord_restaurantreport_and_more'),
     ]
 
     operations = [
