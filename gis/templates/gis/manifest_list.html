@@ -1,0 +1,141 @@
+{% extends "openskagit/base.html" %}
+
+{% block head_extra %}
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+<style>
+  .htmx-indicator {
+    display: none;
+  }
+  .htmx-request .htmx-indicator,
+  .htmx-request.htmx-indicator {
+    display: inline-flex;
+  }
+  .manifest-map-canvas {
+    height: 26rem;
+    border-radius: 0.75rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Registry</p>
+      <h1 class="text-3xl font-bold text-slate-900">GIS Layer Manifest</h1>
+      <p class="mt-2 text-sm text-slate-600">Approved layers that power map features and future internal APIs/tools.</p>
+    </div>
+    <a href="{% url 'gis:submission-list' %}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Submissions</a>
+  </div>
+
+  {% include "gis/partials/manifest_list_panel.html" %}
+  <div id="manifest-map-modal-root"></div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+  defer
+></script>
+<script>
+  (function () {
+    const defaultCenter = [48.45, -122.33];
+    const defaultZoom = 9;
+
+    function parseMapPayload(container) {
+      if (!container) {
+        return null;
+      }
+      const dataEl = container.querySelector("#manifest-map-data");
+      if (!dataEl) {
+        return null;
+      }
+      try {
+        return JSON.parse(dataEl.textContent || "{}");
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function initMapInModal(modalEl, attempt) {
+      if (!modalEl || modalEl.dataset.initialized === "1") {
+        return;
+      }
+      const mapEl = modalEl.querySelector("[data-map-canvas]");
+      if (!mapEl) {
+        return;
+      }
+
+      if (!window.L) {
+        if (attempt >= 12) {
+          return;
+        }
+        window.setTimeout(function () {
+          initMapInModal(modalEl, attempt + 1);
+        }, 150);
+        return;
+      }
+
+      const payload = parseMapPayload(modalEl);
+      if (!payload) {
+        return;
+      }
+      const geojson = payload.geojson || { type: "FeatureCollection", features: [] };
+      const map = window.L.map(mapEl).setView(defaultCenter, defaultZoom);
+      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      const layer = window.L.geoJSON(geojson, {
+        style: function () {
+          return { color: "#0f766e", weight: 2, fillOpacity: 0.2 };
+        },
+        pointToLayer: function (feature, latlng) {
+          return window.L.circleMarker(latlng, {
+            radius: 5,
+            color: "#0c4a6e",
+            fillColor: "#0284c7",
+            fillOpacity: 0.8,
+            weight: 1,
+          });
+        },
+      }).addTo(map);
+
+      if (Array.isArray(payload.bounds) && payload.bounds.length === 2) {
+        map.fitBounds(payload.bounds, { padding: [16, 16] });
+      } else if (layer.getLayers().length && layer.getBounds && layer.getBounds().isValid()) {
+        map.fitBounds(layer.getBounds(), { padding: [16, 16] });
+      }
+
+      modalEl.dataset.initialized = "1";
+    }
+
+    function initManifestModalMaps(scope) {
+      const root = scope || document;
+      const modals = root.querySelectorAll("[data-manifest-map-modal]");
+      modals.forEach(function (modal) {
+        initMapInModal(modal, 0);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      initManifestModalMaps(document);
+    });
+    document.body.addEventListener("htmx:afterSwap", function (event) {
+      if (event.target && event.target.id === "manifest-map-modal-root") {
+        initManifestModalMaps(event.target);
+      }
+    });
+  })();
+</script>
+{% endblock %}

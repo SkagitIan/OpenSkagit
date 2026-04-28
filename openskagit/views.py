@@ -1,3 +1,4 @@
+import base64
 import copy
 import csv
 import datetime as dt
@@ -11,7 +12,11 @@ import re
 import statistics
 import subprocess
 import sys
+import time
+import uuid
+from urllib.parse import urlencode
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from types import SimpleNamespace
 import numpy as np
 from decimal import Decimal, InvalidOperation
@@ -22,17 +27,17 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.humanize.templatetags.humanize import intcomma
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.files.storage import FileSystemStorage, default_storage
+from django.core import signing
 from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.core.paginator import Paginator
-from django.db import connection
+from django.db import close_old_connections, connection
 from django.db.models import Avg, Count, Max, Min, OuterRef, Q, Subquery, Case, When, FloatField, F, Value, Sum
 from django.db.models.functions import Upper
-from django.db.models.expressions import RawSQL
-from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseGone, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.forms import inlineformset_factory
 from django.template.loader import render_to_string
@@ -40,6 +45,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime, parse_date
 from django.utils.formats import date_format
+from django.utils.text import get_valid_filename
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 import httpx
 try:
@@ -54,7 +60,7 @@ from . import activity_feed, adjustment_engine, appeals, cma, llm
 from .neighborhood import get_neighborhood_snapshot
 from .forms import (
     ContactSubmissionForm,
-    ConsultIntakeForm,
+    StaffImageGeneratorForm,
     WeeklyBriefingSectionForm,
     WeeklyBriefingTemplateForm,
 )
@@ -70,6 +76,7 @@ from .models import (
     NeighborhoodTrend,
     Parcel,
     ParcelHistory,
+    StaffImageGenerationJob,
     ParcelWaterfacts,
     Sales,
     SalesSearch,
@@ -85,10 +92,25 @@ from planning.dossier import (
     build_planning_dossier_sections,
 )
 from openskagit.models import ParcelPlanningFacts
+from .services.sedro_woolley_crawl import load_sw_dashboard_context
+from .services.adjustment_support import build_adjustment_support_v1
+from .services.comp_adjustment_quality import compute_adjustment_quality_metrics
+from .services.sales_comps import diagnose_no_comp_path
+from .services.sedro_woolley_map import load_sedro_woolley_zoning_feature_collection
+from .services.sedro_woolley_portal import (
+    empty_sedro_woolley_portal_context,
+    load_sedro_woolley_portal_context,
+)
+from .services.tax_foreclosure_report import (
+    TAX_STATUS_CONFIRMED_DELINQUENT,
+    TAX_STATUS_NOT_DELINQUENT,
+    TAX_STATUS_VERIFY_ERROR,
+    run_tax_foreclosure_scan_and_verify,
+)
 from .valuation_areas import resolve_market_group
 # from gastronet.flavor_signals import extract_flavor_signals  # Disabled: flavor cards not rendered on homepage
 from gastronet.models import MenuItem, Restaurant, Review, SkagitDishIdea
-from openskagit.regression_stats import STATS_DIR, load_regression_run, list_regression_runs
+from openskagit.regression_stats import load_regression_run, list_regression_runs
 from .newsletter import preview_briefing_context, send_weekly_briefing
 
 # Import predictor/interaction configs from the regression command.
@@ -98,21 +120,27 @@ try:
     PREDICTOR_PROFILES = regression_cmd.PREDICTOR_PROFILES
     INTERACTION_BUNDLES = regression_cmd.INTERACTION_BUNDLES
     REGRESSION_MODES = regression_cmd.REGRESSION_MODES
+    CORE_PREDICTORS = regression_cmd.CORE_PREDICTORS
+    CANDIDATE_PREDICTORS = regression_cmd.CANDIDATE_PREDICTORS
+    INTERACTIONS = regression_cmd.INTERACTIONS
+    TIER_INTERACTION_VARS = regression_cmd.TIER_INTERACTION_VARS
 except Exception:
     # Safe fallback if import has side effects or fails.
     PREDICTOR_PROFILES = {"baseline": {}}
     INTERACTION_BUNDLES = {"standard": []}
     REGRESSION_MODES = {"sfr": "Single-family residential"}
+    CORE_PREDICTORS = []
+    CANDIDATE_PREDICTORS = []
+    INTERACTIONS = {}
+    TIER_INTERACTION_VARS = []
 
 
-REVIEW_ENRICHMENTS_CACHE_KEY = "openskagit:review_enrichments_total"
-REVIEW_ENRICHMENTS_CACHE_TTL = 60 * 60 * 24  # 1 day (seconds)
-HOME_PORTAL_METRICS_CACHE_KEY = "openskagit:home_portal_metrics"
-HOME_PORTAL_METRICS_CACHE_TTL = 60 * 60 * 24 * 7  # cache homepage stats for a week
+MCP_CUSTOM_GPT_URL = "https://chatgpt.com/g/g-6957dfe303648191ace4ab760c8c027a-skagitgpt"
+FAVICON_PATH = Path(settings.BASE_DIR) / "static" / "favicon.svg"
 
 
 
-@require_GET
+@require_http_methods(["GET", "HEAD"])
 def sitemap_xml(request):
     """
     Serve the pre-generated sitemap.xml so search engines can crawl portal endpoints.
@@ -121,6 +149,23 @@ def sitemap_xml(request):
     if not sitemap_path.exists():
         raise Http404("sitemap.xml not found.")
     return FileResponse(sitemap_path.open("rb"), content_type="application/xml")
+
+
+@require_http_methods(["GET", "HEAD"])
+def robots_txt(request):
+    robots_lines = [
+        "User-agent: *",
+        "Allow: /",
+        f"Sitemap: {request.build_absolute_uri(reverse('sitemap-xml'))}",
+    ]
+    return HttpResponse("\n".join(robots_lines) + "\n", content_type="text/plain; charset=utf-8")
+
+
+@require_http_methods(["GET", "HEAD"])
+def favicon_ico(request):
+    if not FAVICON_PATH.exists():
+        raise Http404("favicon not found.")
+    return FileResponse(FAVICON_PATH.open("rb"), content_type="image/svg+xml")
 
 
 DOR_LOCATION_LABEL_OVERRIDES = {
@@ -169,7 +214,7 @@ def _load_skagit_flavor_identity_artifact() -> Dict[str, Any]:
         with FLAVOR_IDENTITY_PATH.open("r", encoding="utf-8") as handle:
             return json.load(handle)
     except FileNotFoundError:
-        logger.error("Flavor identity artifact missing at %%s", FLAVOR_IDENTITY_PATH)
+        logger.error("Flavor identity artifact missing at %s", FLAVOR_IDENTITY_PATH)
     except json.JSONDecodeError:
         logger.exception("Flavor identity artifact could not be parsed as JSON")
     return {}
@@ -269,53 +314,484 @@ def _generate_and_store_dish_image(entry: SkagitDishIdea, prompt: Optional[str])
         entry.save(update_fields=["image_prompt"])
 
 
+def _resolve_modal_image_function(
+    modal_module: Any,
+    app_name: str,
+    function_name: str,
+    client: Any,
+    environment_name: Optional[str] = None,
+) -> Any:
+    errors: List[str] = []
+    function_cls = getattr(modal_module, "Function", None)
+    if function_cls is not None:
+        for resolver_name in ("from_name", "lookup"):
+            resolver = getattr(function_cls, resolver_name, None)
+            if not callable(resolver):
+                continue
+            try:
+                resolver_kwargs: Dict[str, Any] = {}
+                if client is not None:
+                    resolver_kwargs["client"] = client
+                if environment_name:
+                    resolver_kwargs["environment_name"] = environment_name
+
+                if resolver_kwargs:
+                    try:
+                        return resolver(app_name, function_name, **resolver_kwargs)
+                    except TypeError:
+                        pass
+
+                if environment_name:
+                    try:
+                        return resolver(app_name, function_name, environment_name=environment_name)
+                    except TypeError:
+                        pass
+
+                return resolver(app_name, function_name)
+            except Exception as exc:
+                errors.append(f"{resolver_name}: {exc}")
+
+    if client is not None:
+        for resolver_name in ("lookup_function", "get_function"):
+            resolver = getattr(client, resolver_name, None)
+            if not callable(resolver):
+                continue
+            try:
+                return resolver(app_name, function_name)
+            except Exception as exc:
+                errors.append(f"client.{resolver_name}: {exc}")
+
+    detail = "; ".join(errors[:3])
+    if detail:
+        raise RuntimeError(
+            f"Unable to resolve Modal function '{function_name}' in app '{app_name}'. {detail}"
+        )
+    raise RuntimeError(f"Unable to resolve Modal function '{function_name}' in app '{app_name}'.")
+
+
+def _invoke_modal_image_function(
+    modal_function: Any,
+    *,
+    prompt: str,
+    init_image_payload: Optional[Any],
+    steps: int,
+    guidance_scale: float,
+    width: int,
+    height: int,
+    seed: int,
+) -> Any:
+    remote = getattr(modal_function, "remote", None)
+    if not callable(remote):
+        raise RuntimeError("Modal function handle does not expose a callable .remote() method.")
+
+    params = {
+        "steps": steps,
+        "guidance_scale": guidance_scale,
+        "width": width,
+        "height": height,
+        "seed": seed,
+    }
+    call_variants = [
+        {"prompt": prompt, "init_image_bytes": init_image_payload, **params},
+        {"prompt": prompt, "init_image_bytes": init_image_payload, "params": params},
+        {"prompt": prompt, "image_bytes": init_image_payload, **params},
+    ]
+
+    last_type_error: Optional[TypeError] = None
+    for kwargs in call_variants:
+        try:
+            return remote(**kwargs)
+        except TypeError as exc:
+            last_type_error = exc
+            continue
+
+    raise RuntimeError(
+        "Modal function signature mismatch. Expected prompt, optional init image bytes, and generation params."
+    ) from last_type_error
+
+
+def _coerce_modal_image_bytes(payload: Any) -> bytes:
+    if isinstance(payload, bytes):
+        return payload
+    if isinstance(payload, bytearray):
+        return bytes(payload)
+    if isinstance(payload, memoryview):
+        return payload.tobytes()
+    if isinstance(payload, (list, tuple)) and payload:
+        return _coerce_modal_image_bytes(payload[0])
+    if isinstance(payload, str):
+        try:
+            return base64.b64decode(payload, validate=True)
+        except Exception as exc:
+            raise RuntimeError("Modal returned a string payload that is not valid base64 image data.") from exc
+    if isinstance(payload, dict):
+        for key in ("image_bytes", "png_bytes", "result_bytes", "image_base64", "image"):
+            if key not in payload:
+                continue
+            value = payload.get(key)
+            if isinstance(value, (bytes, bytearray, memoryview)):
+                return bytes(value)
+            if isinstance(value, str):
+                try:
+                    return base64.b64decode(value, validate=True)
+                except Exception as exc:
+                    raise RuntimeError(f"Modal returned invalid base64 data in '{key}'.") from exc
+    raise RuntimeError("Modal function did not return generated image bytes.")
+
+
+def _generate_image_via_modal(
+    *,
+    prompt: str,
+    init_image_bytes: Optional[bytes],
+    steps: int,
+    guidance_scale: float,
+    width: int,
+    height: int,
+    seed: int,
+) -> bytes:
+    try:
+        import modal
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("Modal client not installed. Add `modal` to dependencies and install it.") from exc
+
+    modal_app_name = (getattr(settings, "MODAL_IMAGE_APP_NAME", "") or "flux-generator").strip()
+    modal_function_name = (getattr(settings, "MODAL_IMAGE_FUNCTION_NAME", "") or "generate_image").strip()
+    modal_class_name = (getattr(settings, "MODAL_IMAGE_CLASS_NAME", "") or "FluxGenerator").strip()
+    init_image_encoding = (getattr(settings, "MODAL_IMAGE_INIT_IMAGE_ENCODING", "bytes") or "bytes").strip().lower()
+    modal_environment_name = (
+        getattr(settings, "MODAL_IMAGE_ENVIRONMENT_NAME", "") or os.getenv("MODAL_ENVIRONMENT", "")
+    ).strip() or None
+    modal_retry_count = max(0, int(getattr(settings, "MODAL_IMAGE_REMOTE_RETRY_COUNT", 1)))
+    modal_retry_delay_seconds = max(
+        0.0, float(getattr(settings, "MODAL_IMAGE_REMOTE_RETRY_DELAY_SECONDS", 1.5))
+    )
+
+    init_image_payload: Optional[Any] = init_image_bytes
+    if init_image_bytes and init_image_encoding == "base64":
+        init_image_payload = base64.b64encode(init_image_bytes).decode("ascii")
+
+    def _is_retryable_modal_error(exc: Exception) -> bool:
+        text = str(exc).lower()
+        retry_tokens = (
+            "deadline exceeded",
+            "timed out",
+            "timeout",
+            "temporarily unavailable",
+            "unavailable",
+            "connection reset",
+            "internal error",
+        )
+        return any(token in text for token in retry_tokens)
+
+    def _invoke_with_retry(modal_target: Any) -> Any:
+        attempts = modal_retry_count + 1
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return _invoke_modal_image_function(
+                    modal_target,
+                    prompt=prompt,
+                    init_image_payload=init_image_payload,
+                    steps=steps,
+                    guidance_scale=guidance_scale,
+                    width=width,
+                    height=height,
+                    seed=seed,
+                )
+            except Exception as exc:
+                last_exc = exc
+                if attempt >= attempts or not _is_retryable_modal_error(exc):
+                    raise
+                logger.warning(
+                    "Retrying Modal image call after transient error (%s/%s): %s",
+                    attempt,
+                    attempts,
+                    exc,
+                )
+                time.sleep(modal_retry_delay_seconds)
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("Modal image generation failed without an exception.")
+
+    payload: Any = None
+    class_lookup_error: Optional[Exception] = None
+
+    # Primary path: deployed Modal app exposes class method FluxGenerator.generate_image.
+    if modal_class_name:
+        cls_cls = getattr(modal, "Cls", None)
+        if cls_cls:
+            try:
+                cls_kwargs: Dict[str, Any] = {}
+                if modal_environment_name:
+                    cls_kwargs["environment_name"] = modal_environment_name
+                modal_cls = cls_cls.from_name(modal_app_name, modal_class_name, **cls_kwargs)
+                modal_instance = modal_cls()
+                modal_method = getattr(modal_instance, modal_function_name, None)
+                if modal_method is None:
+                    raise RuntimeError(
+                        f"Class '{modal_class_name}' does not define method '{modal_function_name}'."
+                    )
+                payload = _invoke_with_retry(modal_method)
+            except Exception as exc:
+                class_lookup_error = exc
+                # If class exists and call reached runtime, do not fall back to top-level function.
+                # Function fallback is only useful when lookup/method wiring is missing.
+                if "does not define method" not in str(exc).lower() and "lookup failed" not in str(exc).lower():
+                    raise RuntimeError(f"Modal class method call failed: {exc}") from exc
+
+    if payload is not None:
+        return _coerce_modal_image_bytes(payload)
+
+    function_error: Optional[Exception] = None
+    try:
+        modal_function = _resolve_modal_image_function(
+            modal_module=modal,
+            app_name=modal_app_name,
+            function_name=modal_function_name,
+            client=None,
+            environment_name=modal_environment_name,
+        )
+        payload = _invoke_with_retry(modal_function)
+    except Exception as exc:
+        function_error = exc
+        if class_lookup_error is not None:
+            raise RuntimeError(
+                "Modal lookup failed for both class and function targets. "
+                f"Class error: {class_lookup_error}; Function error: {function_error}"
+            ) from exc
+        raise RuntimeError(f"Modal function call failed: {function_error}") from exc
+
+    return _coerce_modal_image_bytes(payload)
+
+
+_staff_image_job_workers = max(1, int(getattr(settings, "MODAL_IMAGE_JOB_MAX_WORKERS", 1)))
+_staff_image_job_executor = ThreadPoolExecutor(max_workers=_staff_image_job_workers)
+_staff_image_poll_db_workers = max(1, int(getattr(settings, "MODAL_IMAGE_POLL_DB_WORKERS", 2)))
+_staff_image_poll_db_timeout_seconds = max(
+    1.0, float(getattr(settings, "MODAL_IMAGE_POLL_DB_TIMEOUT_SECONDS", 5.0))
+)
+_staff_image_poll_db_executor = ThreadPoolExecutor(max_workers=_staff_image_poll_db_workers)
+
+
+def _run_staff_image_poll_db_call(fn: Any, *args: Any, **kwargs: Any) -> Any:
+    """
+    Execute polling-related ORM calls in a background thread to avoid gevent/async-context
+    interference with Django's async safety checks.
+    """
+
+    def _runner() -> Any:
+        close_old_connections()
+        previous_flag = os.environ.get("DJANGO_ALLOW_ASYNC_UNSAFE")
+        os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            if previous_flag is None:
+                os.environ.pop("DJANGO_ALLOW_ASYNC_UNSAFE", None)
+            else:
+                os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = previous_flag
+            close_old_connections()
+
+    future = _staff_image_poll_db_executor.submit(_runner)
+    return future.result(timeout=_staff_image_poll_db_timeout_seconds)
+
+
+def _set_staff_image_job_cancelled(job: StaffImageGenerationJob, detail: str) -> None:
+    now = timezone.now()
+    job.status = StaffImageGenerationJob.STATUS_CANCELLED
+    job.cancel_requested = True
+    job.status_detail = detail
+    if not job.completed_at:
+        job.completed_at = now
+    job.save(update_fields=["status", "cancel_requested", "status_detail", "completed_at", "updated_at"])
+
+
+def _run_staff_image_generation_job(job_id: uuid.UUID) -> None:
+    close_old_connections()
+    init_image_name = ""
+    init_image_storage = None
+    job: Optional[StaffImageGenerationJob] = None
+
+    try:
+        try:
+            job = StaffImageGenerationJob.objects.get(id=job_id)
+        except StaffImageGenerationJob.DoesNotExist:
+            return
+
+        if job.cancel_requested or job.status == StaffImageGenerationJob.STATUS_CANCELLED:
+            _set_staff_image_job_cancelled(job, "Generation cancelled before start.")
+            return
+
+        now = timezone.now()
+        job.status = StaffImageGenerationJob.STATUS_RUNNING
+        job.status_detail = "Running generation on Modal."
+        job.started_at = job.started_at or now
+        job.error_message = ""
+        job.save(update_fields=["status", "status_detail", "started_at", "error_message", "updated_at"])
+
+        init_image_bytes: Optional[bytes] = None
+        if job.init_image:
+            init_image_name = job.init_image.name
+            init_image_storage = job.init_image.storage
+            with job.init_image.open("rb") as uploaded_file:
+                init_image_bytes = uploaded_file.read()
+
+        job.refresh_from_db(fields=["cancel_requested", "status"])
+        if job.cancel_requested or job.status == StaffImageGenerationJob.STATUS_CANCELLED:
+            _set_staff_image_job_cancelled(job, "Generation cancelled.")
+            return
+
+        generated_image_bytes = _generate_image_via_modal(
+            prompt=job.prompt,
+            init_image_bytes=init_image_bytes,
+            steps=job.steps,
+            guidance_scale=job.guidance_scale,
+            width=job.width,
+            height=job.height,
+            seed=job.seed,
+        )
+
+        job.refresh_from_db(fields=["cancel_requested", "status"])
+        if job.cancel_requested or job.status == StaffImageGenerationJob.STATUS_CANCELLED:
+            _set_staff_image_job_cancelled(job, "Generation cancelled.")
+            return
+
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        unique_suffix = uuid.uuid4().hex[:8]
+        relative_path = f"generated_images/generated_{timestamp}_{unique_suffix}.png"
+        saved_path = default_storage.save(relative_path, ContentFile(generated_image_bytes))
+
+        completed_at = timezone.now()
+        job.status = StaffImageGenerationJob.STATUS_SUCCEEDED
+        job.status_detail = "Image generated successfully."
+        job.result_image_path = saved_path
+        job.error_message = ""
+        job.completed_at = completed_at
+        job.save(
+            update_fields=[
+                "status",
+                "status_detail",
+                "result_image_path",
+                "error_message",
+                "completed_at",
+                "updated_at",
+            ]
+        )
+    except Exception as exc:
+        logger.exception("Staff image generation job %s failed: %s", job_id, exc)
+        if job is not None:
+            job.refresh_from_db(fields=["cancel_requested", "status"])
+            if job.cancel_requested or job.status == StaffImageGenerationJob.STATUS_CANCELLED:
+                _set_staff_image_job_cancelled(job, "Generation cancelled.")
+            else:
+                job.status = StaffImageGenerationJob.STATUS_FAILED
+                job.status_detail = "Generation failed."
+                job.error_message = str(exc).strip()[:4000] or exc.__class__.__name__
+                job.completed_at = timezone.now()
+                job.save(update_fields=["status", "status_detail", "error_message", "completed_at", "updated_at"])
+    finally:
+        if init_image_name and init_image_storage is not None:
+            try:
+                init_image_storage.delete(init_image_name)
+            except Exception:
+                logger.warning("Failed to clean up temp init image %s for job %s", init_image_name, job_id)
+        if job is not None and job.init_image:
+            StaffImageGenerationJob.objects.filter(id=job.id).update(init_image="")
+        close_old_connections()
+
+
+def _enqueue_staff_image_generation_job(job_id: uuid.UUID) -> None:
+    _staff_image_job_executor.submit(_run_staff_image_generation_job, job_id)
+
+
+def _serialize_form_errors(form: StaffImageGeneratorForm) -> Dict[str, List[str]]:
+    payload: Dict[str, List[str]] = {}
+    for field_name, field_errors in form.errors.items():
+        payload[field_name] = [str(error) for error in field_errors]
+    return payload
+
+
+def _serialize_staff_image_job(job: StaffImageGenerationJob) -> Dict[str, Any]:
+    is_terminal = job.is_terminal
+    status_payload = {
+        "id": str(job.id),
+        "status": job.status,
+        "status_detail": job.status_detail,
+        "error_message": job.error_message,
+        "cancel_requested": job.cancel_requested,
+        "is_terminal": is_terminal,
+        "can_cancel": not is_terminal,
+        "result_image_url": job.result_image_url,
+        "result_image_path": job.result_image_path,
+        "requested_at": job.requested_at.isoformat() if job.requested_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+    }
+    return status_payload
+
+
+def _build_staff_image_job_token(job: StaffImageGenerationJob) -> str:
+    payload = {
+        "job_id": str(job.id),
+        "user_id": job.created_by_id,
+    }
+    return signing.dumps(payload, salt="staff-image-job")
+
+
+def _resolve_staff_image_job_from_token(job_id: uuid.UUID, token: str) -> Optional[StaffImageGenerationJob]:
+    if not token:
+        return None
+    try:
+        payload = signing.loads(token, salt="staff-image-job", max_age=60 * 60 * 24)
+    except signing.BadSignature:
+        return None
+    except signing.SignatureExpired:
+        return None
+
+    token_job_id = str(payload.get("job_id") or "")
+    token_user_id = payload.get("user_id")
+    if token_job_id != str(job_id):
+        return None
+
+    try:
+        job = StaffImageGenerationJob.objects.get(id=job_id)
+    except StaffImageGenerationJob.DoesNotExist:
+        return None
+    if token_user_id != job.created_by_id:
+        return None
+    return job
+
+
+def _cancel_staff_image_job_by_token(job_id: uuid.UUID, token: str) -> Optional[StaffImageGenerationJob]:
+    job = _resolve_staff_image_job_from_token(job_id=job_id, token=token)
+    if job is None:
+        return None
+    if job.is_terminal:
+        return job
+
+    job.cancel_requested = True
+    if job.status == StaffImageGenerationJob.STATUS_PENDING:
+        _set_staff_image_job_cancelled(job, "Generation cancelled before worker start.")
+    else:
+        job.status_detail = "Cancellation requested."
+        job.save(update_fields=["cancel_requested", "status_detail", "updated_at"])
+    job.refresh_from_db()
+    return job
+
+
 def _primary_nav_links():
     return [
         {"href": "/votevector/", "label": "VoteVector"},
         {"href": "/#tools", "label": "Tools"},
-        {"href": "/#community", "label": "Community"},
         {"href": "/#enrichments", "label": "Enrichments"},
-        {"href": "/#stats", "label": "Stats"},
         {"href": "/#model", "label": "Model"},
         {"href": "/#ai", "label": "AI"},
         {"href": "/#cta-briefing", "label": "Briefing"},
-        {"href": "/survey/", "label": "Take Survey"},
-        {"href": "/consult/", "label": "Consulting"},
+        {"href": "/survey/", "label": "Survey"},
         {"href": "/partner/", "label": "Partner"},
         {"href": "/about/", "label": "About"},
         {"href": "/contact/", "label": "Contact"},
     ]
-
-def _total_review_derived_enrichment_count() -> int:
-    cached_value = cache.get(REVIEW_ENRICHMENTS_CACHE_KEY)
-    if cached_value is not None:
-        return cached_value
-
-    per_review_expr = RawSQL(
-        """
-        CASE
-          WHEN jsonb_typeof(analysis_payload) = 'object' THEN (
-            SELECT COUNT(*)
-            FROM jsonb_each(analysis_payload) kv
-            WHERE kv.value <> 'null'::jsonb
-              AND kv.value <> '""'::jsonb
-          )
-          ELSE 0
-        END
-        """,
-        (),
-    )
-
-    total_value = (
-        Review.objects.annotate(
-            _derived_enrichment_count=per_review_expr,
-        )
-        .aggregate(total=Sum("_derived_enrichment_count"))
-        .get("total")
-    )
-    derived_total = int(total_value or 0)
-    cache.set(REVIEW_ENRICHMENTS_CACHE_KEY, derived_total, REVIEW_ENRICHMENTS_CACHE_TTL)
-    return derived_total
 
 
 CMA_SESSION_KEY = "cma_state"
@@ -529,6 +1005,247 @@ ADJUSTMENT_STORYBOARD_ORDER = ["size", "quality", "condition", "time", "location
 
 PARCEL_HISTORY_LIMIT = 24
 
+APPEAL_COMPARABLE_SORT_FIELDS = {
+    "similarity",
+    "sale_price",
+    "sale_date",
+    "distance",
+    "bedrooms",
+    "bathrooms",
+    "sqft",
+    "year_built",
+    "price_per_sqft",
+}
+APPEAL_COMPARABLE_SORT_OPTIONS: List[Dict[str, str]] = [
+    {"value": "similarity", "label": "Similarity"},
+    {"value": "sale_price", "label": "Sale Price"},
+    {"value": "sale_date", "label": "Sale Date"},
+    {"value": "distance", "label": "Distance"},
+    {"value": "bedrooms", "label": "Beds"},
+    {"value": "bathrooms", "label": "Baths"},
+    {"value": "sqft", "label": "Sq Ft"},
+    {"value": "year_built", "label": "Built"},
+    {"value": "price_per_sqft", "label": "$/Sq Ft"},
+]
+APPEAL_COMPARABLE_SORT_DEFAULT_DIR = {
+    "similarity": "desc",
+    "sale_price": "desc",
+    "sale_date": "desc",
+    "distance": "asc",
+    "bedrooms": "desc",
+    "bathrooms": "desc",
+    "sqft": "desc",
+    "year_built": "desc",
+    "price_per_sqft": "desc",
+}
+APPEAL_COMP_SESSION_KEY = "appeal_comp_state"
+APPEAL_SAVED_COMP_LIMIT = 8
+APPEAL_WORKSPACE_SORT_FIELDS = APPEAL_COMPARABLE_SORT_FIELDS | {"saved_order"}
+APPEAL_WORKSPACE_SORT_OPTIONS: List[Dict[str, str]] = [
+    {"value": "saved_order", "label": "Saved Order"},
+    *APPEAL_COMPARABLE_SORT_OPTIONS,
+]
+APPEAL_WORKSPACE_SORT_DEFAULT_DIR = {
+    **APPEAL_COMPARABLE_SORT_DEFAULT_DIR,
+    "saved_order": "asc",
+}
+APPEAL_WORKSPACE_VIEWS = {"board", "map"}
+
+
+def _normalize_parcel_token(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    return re.sub(r"\s+", "", str(value).strip()).upper()
+
+
+def _normalize_saved_order(
+    raw_saved_order: Any,
+    *,
+    allowed_ids: Optional[Set[str]] = None,
+) -> List[str]:
+    order: List[str] = []
+    seen: Set[str] = set()
+    if not isinstance(raw_saved_order, list):
+        return order
+
+    normalized_allowed = (
+        {_normalize_parcel_token(parcel_id) for parcel_id in allowed_ids if _normalize_parcel_token(parcel_id)}
+        if allowed_ids is not None
+        else None
+    )
+    for value in raw_saved_order:
+        parcel_id = _normalize_parcel_token(value)
+        if not parcel_id or parcel_id in seen:
+            continue
+        if normalized_allowed is not None and parcel_id not in normalized_allowed:
+            continue
+        seen.add(parcel_id)
+        order.append(parcel_id)
+        if len(order) >= APPEAL_SAVED_COMP_LIMIT:
+            break
+    return order
+
+
+def _get_appeal_comp_root_state(request) -> Dict[str, Any]:
+    state = request.session.get(APPEAL_COMP_SESSION_KEY)
+    if not isinstance(state, dict):
+        state = {}
+        request.session[APPEAL_COMP_SESSION_KEY] = state
+        request.session.modified = True
+    return state
+
+
+def _get_appeal_comp_parcel_state(request, parcel_number: str) -> Dict[str, Any]:
+    parcel_id = _normalize_parcel_token(parcel_number)
+    state = _get_appeal_comp_root_state(request)
+    parcel_state = state.get(parcel_id)
+    if not isinstance(parcel_state, dict):
+        parcel_state = {
+            "pool": {},
+            "pool_order": [],
+            "saved_order": [],
+            "updated_at": None,
+        }
+        state[parcel_id] = parcel_state
+        request.session.modified = True
+    return parcel_state
+
+
+def _refresh_appeal_comp_pool(
+    request,
+    parcel_number: str,
+    comps: Sequence[cma.ComparableResult],
+) -> Dict[str, Any]:
+    parcel_state = _get_appeal_comp_parcel_state(request, parcel_number)
+    pool: Dict[str, Dict[str, Any]] = {}
+    pool_order: List[str] = []
+    for comp in comps:
+        snapshot = getattr(comp, "snapshot", None)
+        parcel_id = _normalize_parcel_token(getattr(snapshot, "parcel_number", None))
+        if not parcel_id:
+            continue
+        pool[parcel_id] = appeals._comparable_payload(comp)
+        pool_order.append(parcel_id)
+
+    saved_order = _normalize_saved_order(parcel_state.get("saved_order"), allowed_ids=set(pool.keys()))
+    parcel_state["pool"] = pool
+    parcel_state["pool_order"] = pool_order
+    parcel_state["saved_order"] = saved_order
+    parcel_state["updated_at"] = timezone.now().isoformat()
+    request.session.modified = True
+    return parcel_state
+
+
+def _cached_appeal_pool_comparables(
+    request,
+    parcel_number: str,
+    *,
+    display_limit: int,
+) -> Optional[List[cma.ComparableResult]]:
+    parcel_state = _get_appeal_comp_parcel_state(request, parcel_number)
+    pool = parcel_state.get("pool")
+    if not isinstance(pool, dict) or not pool:
+        return None
+
+    raw_order = parcel_state.get("pool_order")
+    ordered_ids: List[str] = []
+    seen: Set[str] = set()
+    if isinstance(raw_order, list):
+        for value in raw_order:
+            parcel_id = _normalize_parcel_token(value)
+            if not parcel_id or parcel_id in seen or parcel_id not in pool:
+                continue
+            seen.add(parcel_id)
+            ordered_ids.append(parcel_id)
+    for value in pool.keys():
+        parcel_id = _normalize_parcel_token(value)
+        if not parcel_id or parcel_id in seen:
+            continue
+        seen.add(parcel_id)
+        ordered_ids.append(parcel_id)
+
+    if len(ordered_ids) < display_limit:
+        return None
+
+    comps: List[cma.ComparableResult] = []
+    for parcel_id in ordered_ids[:display_limit]:
+        payload = pool.get(parcel_id)
+        if not isinstance(payload, dict):
+            return None
+        try:
+            comps.append(appeals._comparable_from_payload(payload))
+        except Exception:
+            logger.exception("Unable to hydrate cached comparable payload for parcel %s", parcel_id)
+            return None
+    return comps
+
+
+def _get_appeal_saved_order(request, parcel_number: str) -> List[str]:
+    parcel_state = _get_appeal_comp_parcel_state(request, parcel_number)
+    pool = parcel_state.get("pool")
+    allowed_ids = set(pool.keys()) if isinstance(pool, dict) else set()
+    saved_order = _normalize_saved_order(parcel_state.get("saved_order"), allowed_ids=allowed_ids)
+    if saved_order != parcel_state.get("saved_order"):
+        parcel_state["saved_order"] = saved_order
+        request.session.modified = True
+    return saved_order
+
+
+def _build_appeal_saved_rows(
+    pool: Dict[str, Dict[str, Any]],
+    saved_order: Sequence[str],
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for parcel_id in saved_order:
+        payload = pool.get(parcel_id) or {}
+        snapshot = payload.get("snapshot") or {}
+        sale_price = _safe_float_value(payload.get("sale_price"))
+        sale_date_raw = payload.get("sale_date")
+        sale_date: Optional[dt.date] = None
+        if isinstance(sale_date_raw, dt.date):
+            sale_date = sale_date_raw
+        elif isinstance(sale_date_raw, str):
+            try:
+                sale_date = dt.date.fromisoformat(sale_date_raw)
+            except ValueError:
+                sale_date = None
+        rows.append(
+            {
+                "parcel_number": parcel_id,
+                "address": snapshot.get("address") or f"Parcel {parcel_id}",
+                "sale_price": sale_price,
+                "sale_date": sale_date,
+            }
+        )
+    return rows
+
+
+def _build_appeal_saved_tray_context(request, parcel_number: str) -> Dict[str, Any]:
+    parcel_state = _get_appeal_comp_parcel_state(request, parcel_number)
+    pool = parcel_state.get("pool")
+    if not isinstance(pool, dict):
+        pool = {}
+        parcel_state["pool"] = pool
+        request.session.modified = True
+    saved_order = _get_appeal_saved_order(request, parcel_number)
+    rows = _build_appeal_saved_rows(pool, saved_order)
+    return {
+        "parcel_number": parcel_number,
+        "saved_rows": rows,
+        "saved_count": len(rows),
+        "saved_limit": APPEAL_SAVED_COMP_LIMIT,
+        "saved_ids": [row["parcel_number"] for row in rows],
+        "workspace_url": reverse("appeal-comp-workspace", args=[parcel_number]),
+    }
+
+
+def _render_appeal_saved_tray_html(request, parcel_number: str) -> str:
+    return render_to_string(
+        "openskagit/partials/appeal_saved_comp_tray.html",
+        _build_appeal_saved_tray_context(request, parcel_number),
+        request=request,
+    )
+
 
 def _centroid_lat_lon(geom) -> Tuple[Optional[float], Optional[float]]:
     """
@@ -601,6 +1318,39 @@ def _parse_limit(raw_limit: Optional[str]) -> int:
         limit = cma.DEFAULT_COMPARABLE_LIMIT
     limit = max(6, limit)
     return min(limit, cma.MAX_COMPARABLE_LIMIT)
+
+
+def _normalize_appeal_comp_sort(
+    requested_field: Optional[str],
+    requested_direction: Optional[str],
+) -> Tuple[str, str]:
+    field = str(requested_field or "similarity").strip().lower()
+    if field not in APPEAL_COMPARABLE_SORT_FIELDS:
+        field = "similarity"
+    default_direction = APPEAL_COMPARABLE_SORT_DEFAULT_DIR.get(field, "desc")
+    direction = str(requested_direction or default_direction).strip().lower()
+    if direction not in {"asc", "desc"}:
+        direction = default_direction
+    return field, direction
+
+
+def _normalize_workspace_comp_sort(
+    requested_field: Optional[str],
+    requested_direction: Optional[str],
+) -> Tuple[str, str]:
+    field = str(requested_field or "saved_order").strip().lower()
+    if field not in APPEAL_WORKSPACE_SORT_FIELDS:
+        field = "saved_order"
+    default_direction = APPEAL_WORKSPACE_SORT_DEFAULT_DIR.get(field, "asc")
+    direction = str(requested_direction or default_direction).strip().lower()
+    if direction not in {"asc", "desc"}:
+        direction = default_direction
+    return field, direction
+
+
+def _normalize_workspace_view(value: Optional[str]) -> str:
+    view = str(value or "board").strip().lower()
+    return view if view in APPEAL_WORKSPACE_VIEWS else "board"
 
 
 def _parse_currency_value(raw: Any) -> Optional[float]:
@@ -690,6 +1440,298 @@ def _percentage_score(value: Optional[float]) -> Optional[int]:
         return None
     percentage = round(value * 100)
     return max(0, min(100, percentage))
+
+
+def _support_reason_labels(
+    *,
+    group_reasons: Sequence[str],
+    quality_flags: Sequence[str],
+    missing_bedrooms: bool,
+    missing_bathrooms: bool,
+    missing_living_area: bool,
+    missing_year_built: bool,
+) -> List[str]:
+    reason_map = {
+        "net_adjustment_above_primary_threshold": "Net adjustment exceeds primary threshold (>10%).",
+        "gross_adjustment_above_primary_threshold": "Gross adjustment exceeds primary threshold (>15%).",
+        "large_size_gap": "Large living-area gap versus subject.",
+        "high_net_adjustment_pct": "High net adjustment (>=15% of sale price).",
+        "high_gross_adjustment_pct": "High gross adjustment (>=25% of sale price).",
+        "dominant_living_area_adjustment": "Living-area adjustment dominates total adjustment.",
+        "dominant_age_adjustment": "Age adjustment dominates total adjustment.",
+        "dominant_time_adjustment": "Time adjustment dominates total adjustment.",
+        "dominant_lot_adjustment": "Lot-size adjustment dominates total adjustment.",
+        "dominant_garage_adjustment": "Garage adjustment dominates total adjustment.",
+    }
+
+    labels: List[str] = []
+    for reason in group_reasons or []:
+        labels.append(reason_map.get(str(reason), str(reason).replace("_", " ")))
+    for flag in quality_flags or []:
+        labels.append(reason_map.get(str(flag), str(flag).replace("_", " ")))
+
+    if missing_bedrooms:
+        labels.append("Bedrooms missing from source data.")
+    if missing_bathrooms:
+        labels.append("Bathrooms missing from source data.")
+    if missing_living_area:
+        labels.append("Living area missing from source data.")
+    if missing_year_built:
+        labels.append("Year built missing from source data.")
+
+    return list(dict.fromkeys(labels))
+
+
+def _parse_iso_date_value(value: Optional[str]) -> Optional[dt.date]:
+    if not value:
+        return None
+    try:
+        return dt.date.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _adjustment_support_valuation_date(
+    subject: cma.PropertySnapshot,
+    advanced_summary: Optional[Dict[str, Any]],
+) -> dt.date:
+    summary_date = _parse_iso_date_value(
+        ((advanced_summary or {}).get("subject") or {}).get("valuation_date")
+    )
+    if summary_date:
+        return summary_date
+    metadata = _metadata_dict(subject)
+    for key in ("valuation_date", "assessment_date"):
+        candidate = metadata.get(key)
+        if isinstance(candidate, dt.datetime):
+            return candidate.date()
+        if isinstance(candidate, dt.date):
+            return candidate
+    today = dt.date.today()
+    return dt.date(today.year, 1, 1)
+
+
+def _adjustment_support_subject_features(
+    subject: cma.PropertySnapshot,
+    valuation_date: dt.date,
+) -> Dict[str, Optional[float]]:
+    metadata = _metadata_dict(subject)
+    gla = _safe_float_value(subject.living_area or metadata.get("calculated_square_footage"))
+
+    year_raw = subject.effective_year_built or subject.year_built
+    year_built: Optional[int] = None
+    try:
+        if year_raw is not None:
+            year_built = int(float(year_raw))
+    except (TypeError, ValueError):
+        year_built = None
+
+    effective_age = (
+        float(max(valuation_date.year - year_built, 0))
+        if year_built is not None and year_built > 0
+        else None
+    )
+
+    garage_sqft = _safe_float_value(subject.garage_sqft)
+    has_garage: Optional[float]
+    if garage_sqft is not None:
+        has_garage = 1.0 if garage_sqft > 0 else 0.0
+    else:
+        has_garage = 1.0 if bool(metadata.get("has_garage")) else 0.0
+
+    acres = _safe_float_value(subject.acres or subject.lot_acres or metadata.get("lot_acres"))
+    log_lot = math.log1p(acres) if acres is not None and acres >= 0 else None
+
+    return {
+        "gla": gla,
+        "effective_age": effective_age,
+        "has_garage": has_garage,
+        "log_lot_acres": log_lot,
+        "months_since_sale": 0.0,
+    }
+
+
+def _adjustment_support_comp_features(
+    snapshot: Optional[cma.PropertySnapshot],
+    sale_date: Optional[dt.date],
+    valuation_date: dt.date,
+) -> Dict[str, Optional[float]]:
+    metadata = _metadata_dict(snapshot) if snapshot else {}
+    living_area = getattr(snapshot, "living_area", None) if snapshot else None
+    gla = _safe_float_value(living_area or metadata.get("calculated_square_footage"))
+
+    year_raw = (
+        getattr(snapshot, "effective_year_built", None)
+        or getattr(snapshot, "year_built", None)
+        or metadata.get("effective_year_built")
+        or metadata.get("year_built")
+    )
+    year_built: Optional[int] = None
+    try:
+        if year_raw is not None:
+            year_built = int(float(year_raw))
+    except (TypeError, ValueError):
+        year_built = None
+
+    effective_age = (
+        float(max(valuation_date.year - year_built, 0))
+        if year_built is not None and year_built > 0
+        else None
+    )
+
+    garage_sqft = _safe_float_value(getattr(snapshot, "garage_sqft", None) if snapshot else None)
+    if garage_sqft is None:
+        garage_sqft = _safe_float_value(
+            metadata.get("garage_sqft")
+            or metadata.get("final_garage_area")
+            or metadata.get("total_garage_area")
+        )
+    has_garage = 1.0 if garage_sqft is not None and garage_sqft > 0 else 0.0
+
+    acres = _safe_float_value(
+        (getattr(snapshot, "acres", None) if snapshot else None)
+        or (getattr(snapshot, "lot_acres", None) if snapshot else None)
+        or metadata.get("lot_acres")
+    )
+    log_lot = math.log1p(acres) if acres is not None and acres >= 0 else None
+
+    if isinstance(sale_date, dt.datetime):
+        comp_sale_date = sale_date.date()
+    else:
+        comp_sale_date = sale_date
+    months_since_sale = (
+        max((valuation_date - comp_sale_date).days / 30.4375, 0.0)
+        if isinstance(comp_sale_date, dt.date)
+        else None
+    )
+
+    return {
+        "gla": gla,
+        "effective_age": effective_age,
+        "has_garage": has_garage,
+        "log_lot_acres": log_lot,
+        "months_since_sale": months_since_sale,
+    }
+
+
+def _compute_comp_adjustment_payload(
+    *,
+    sale_price: Optional[float],
+    subject_features: Dict[str, Optional[float]],
+    comp_features: Dict[str, Optional[float]],
+    coefficients: Dict[str, Any],
+) -> Dict[str, Any]:
+    if sale_price is None or sale_price <= 0:
+        return {
+            "available": False,
+            "adjusted_price": None,
+            "total_adjustment": None,
+            "adjustment_by_key": {},
+            "adjustments": [],
+            "time_months_delta": None,
+        }
+
+    factor_map = [
+        ("gla", "living_area", "Living Area", "sqft"),
+        ("effective_age", "age", "Effective Age", "years"),
+        ("has_garage", "garage", "Garage", ""),
+        ("log_lot_acres", "lot", "Lot", ""),
+        ("months_since_sale", "time", "Time", "months"),
+    ]
+
+    total_adjustment = 0.0
+    adjustment_by_key: Dict[str, float] = {}
+    adjustments: List[Dict[str, Any]] = []
+    time_months_delta: Optional[float] = None
+
+    for coeff_key, ui_key, label, unit in factor_map:
+        beta = _safe_float_value(coefficients.get(coeff_key))
+        subject_value = subject_features.get(coeff_key)
+        comp_value = comp_features.get(coeff_key)
+        if beta is None or subject_value is None or comp_value is None:
+            continue
+        delta = float(subject_value) - float(comp_value)
+        amount = sale_price * (math.exp(beta * delta) - 1.0)
+        if abs(amount) < 1.0:
+            continue
+        total_adjustment += amount
+        adjustment_by_key[ui_key] = round(amount, 2)
+        if ui_key == "time":
+            time_months_delta = round(delta, 2)
+        adjustments.append(
+            {
+                "key": ui_key,
+                "label": label,
+                "amount": round(amount, 2),
+                "delta": round(delta, 2),
+                "unit": unit,
+            }
+        )
+
+    adjusted_price = sale_price + total_adjustment
+    adjustments.sort(key=lambda item: abs(item["amount"]), reverse=True)
+
+    return {
+        "available": bool(adjustments),
+        "adjusted_price": round(adjusted_price, 2) if adjustments else None,
+        "total_adjustment": round(total_adjustment, 2) if adjustments else None,
+        "adjustment_by_key": adjustment_by_key,
+        "adjustments": adjustments,
+        "time_months_delta": time_months_delta,
+    }
+
+
+def _adjustment_warning_explanation(warning: str) -> Optional[str]:
+    if not warning:
+        return None
+    text = warning.strip()
+    if "Initial model was unstable; retried with expanded time/geography context." in text:
+        return (
+            "The first model built from the tightest local sample was unstable, so the analysis widened "
+            "the market context and re-fit before producing hints."
+        )
+    if text.startswith("Reduced variable set for stability:"):
+        raw_vars = text.split(":", 1)[1].strip()
+        variable_labels = {
+            "gla": "living area",
+            "effective_age": "effective age",
+            "has_garage": "garage",
+            "garage_spaces": "garage spaces",
+            "months_since_sale": "time",
+            "log_lot_size": "lot size",
+            "lot_size": "lot size",
+        }
+        selected = []
+        for token in [item.strip() for item in raw_vars.split(",") if item.strip()]:
+            selected.append(variable_labels.get(token, token.replace("_", " ")))
+        selected_text = ", ".join(selected) if selected else "the most stable variables"
+        return (
+            "Some variables were removed to reduce collinearity; this run kept "
+            f"{selected_text} so coefficient signs and magnitudes stay defensible."
+        )
+    if "Coefficient stability check flagged substantial drift across split samples." in text:
+        return (
+            "Coefficients changed too much between earlier and later sales in the sample, which reduces "
+            "confidence in raw adjustment precision."
+        )
+    if "Adjustment hints were suppressed because model quality/sanity checks did not pass." in text:
+        return "The model did not meet minimum quality checks, so adjustments are hidden instead of forced."
+    return None
+
+
+def _decorate_adjustment_support_summary(summary: Dict[str, Any]) -> Dict[str, Any]:
+    decorated = dict(summary or {})
+    warnings_list = decorated.get("warnings") or []
+    explanations = []
+    for warning in warnings_list:
+        explained = _adjustment_warning_explanation(str(warning))
+        if explained:
+            explanations.append(explained)
+    decorated["warning_explanations"] = explanations
+    trust_state = str(decorated.get("trust_state") or "").strip().lower()
+    trust_labels = {"high": "High", "medium": "Medium", "low": "Low"}
+    decorated["trust_state_label"] = trust_labels.get(trust_state, trust_state.title() if trust_state else "Unknown")
+    return decorated
 
 
 def _merge_request_params(request) -> Dict[str, Any]:
@@ -1845,6 +2887,73 @@ API_ENDPOINTS = [
         "default_querystring": "",
         "default_body": "",
     },
+    {
+        "key": "youtube-meeting-jobs",
+        "name": "YouTube Meeting Jobs",
+        "method": "POST",
+        "path": "/api/meetings/youtube/jobs/",
+        "description": "Queue council meeting extraction from a YouTube URL. Returns a pollable job id immediately.",
+        "instructions": "Staff-only endpoint for long-running meeting extraction. Submit the YouTube URL and poll the returned status URL until completion.",
+        "use_case": "Drive asynchronous meeting intelligence pipelines and UI polling workflows.",
+        "parameters": [
+            {"name": "youtube_url", "location": "body", "type": "string", "required": True, "description": "YouTube watch URL, share URL, or video id."},
+            {"name": "force", "location": "body", "type": "bool", "required": False, "description": "Force reprocessing even if a successful result already exists."},
+            {"name": "meeting_context", "location": "body", "type": "object", "required": False, "description": "Optional context keys such as body_name and roll_call_hint."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "POST",
+                "url": "/api/meetings/youtube/jobs/",
+                "body": {
+                    "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    "force": False,
+                    "meeting_context": {
+                        "body_name": "Sedro-Woolley City Council",
+                        "roll_call_hint": "Roll call happens in first 2-5 minutes",
+                    },
+                },
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {},
+        "default_querystring": "",
+        "default_body": json.dumps(
+            {
+                "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                "force": False,
+                "meeting_context": {
+                    "body_name": "Sedro-Woolley City Council",
+                    "roll_call_hint": "Roll call happens in first 2-5 minutes",
+                },
+            },
+            indent=2,
+        ),
+    },
+    {
+        "key": "youtube-meeting-job-detail",
+        "name": "YouTube Meeting Job Detail",
+        "method": "GET",
+        "path": "/api/meetings/youtube/jobs/{job_id}/",
+        "description": "Poll one YouTube meeting analysis job for status, progress, and structured result JSON.",
+        "instructions": "Use this after queueing a job. Poll until status is succeeded or failed.",
+        "use_case": "Drive async progress UI and render extracted meeting details once completed.",
+        "parameters": [
+            {"name": "job_id", "location": "path", "type": "uuid", "required": True, "description": "Job UUID returned from the queue endpoint."},
+        ],
+        "request_example": json.dumps(
+            {
+                "method": "GET",
+                "url": "/api/meetings/youtube/jobs/11111111-1111-1111-1111-111111111111/",
+                "query": {},
+            },
+            indent=2,
+        ),
+        "sample": None,
+        "default_path_params": {"job_id": "11111111-1111-1111-1111-111111111111"},
+        "default_querystring": "",
+        "default_body": "",
+    },
 ]
 
 
@@ -2843,218 +3952,10 @@ def parcel_modal(request, parcel_number: str):
     return render(request, "openskagit/partials/parcel_modal.html", context)
 
 
-def _get_latest_regression_stats_json() -> Tuple[Optional[Dict[str, Any]], Optional[Path]]:
-    """
-    Load the most recent regression stats payload from disk.
-    """
-    if not STATS_DIR.exists():
-        return None, None
-
-    files = sorted(
-        (path for path in STATS_DIR.glob("*.json") if path.is_file()),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-
-    for path in files:
-        try:
-            data = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError) as exc:
-            logger.warning("Unable to load regression stats %s: %s", path.name, exc)
-            continue
-        return data, path
-
-    return None, None
-
-
-def _median_sale_price_from_stats(stats: Sequence[Dict[str, Any]]) -> Optional[float]:
-    sale_prices: List[float] = []
-    for segment in stats:
-        chart = segment.get("chart_data") or []
-        for point in chart:
-            price = point.get("sale_price")
-            if price is None:
-                continue
-            try:
-                sale_prices.append(float(price))
-            except (TypeError, ValueError):
-                continue
-    if not sale_prices:
-        return None
-    return statistics.median(sale_prices)
-
-
-def _format_currency_compact(value: Optional[float]) -> str:
-    if value is None:
-        return "—"
-    thresholds = ((1_000_000, "M"), (1_000, "K"))
-    for threshold, suffix in thresholds:
-        if value >= threshold:
-            scaled = value / threshold
-            short_value = f"{scaled:.1f}".rstrip("0").rstrip(".")
-            return f"${short_value}{suffix}"
-    return _format_currency(value)
-
-
-def _build_data_quality_score(global_metrics: Dict[str, Any]) -> str:
-    components: List[float] = []
-
-    cod_val = global_metrics.get("cod")
-    if cod_val is not None:
-        try:
-            cod_float = float(cod_val)
-        except (TypeError, ValueError):
-            pass
-        else:
-            normalized = cod_float / 100.0 if cod_float > 1 else cod_float
-            components.append(max(0.0, min(1.0, 1.0 - normalized)))
-
-    prd_val = global_metrics.get("prd")
-    if prd_val is not None:
-        try:
-            prd_float = float(prd_val)
-        except (TypeError, ValueError):
-            pass
-        else:
-            components.append(max(0.0, min(1.0, 1.0 - abs(prd_float - 1.0))))
-
-    prb_val = global_metrics.get("prb")
-    if prb_val is not None:
-        try:
-            prb_float = float(prb_val)
-        except (TypeError, ValueError):
-            pass
-        else:
-            components.append(max(0.0, min(1.0, 1.0 - abs(prb_float))))
-
-    if not components:
-        return "—"
-
-    score = sum(components) / len(components)
-    percentage = max(0.0, min(100.0, score * 100))
-    return f"{percentage:.1f}%"
-
-
-def _build_home_portal_metrics() -> Dict[str, Any]:
-    """
-    Expensive homepage metrics only update weekly, so compute them once and reuse.
-    """
-    stats_data, _ = _get_latest_regression_stats_json()
-    stats_list = stats_data.get("stats", []) if isinstance(stats_data, dict) else []
-    global_metrics = stats_data.get("global_metrics", {}) if isinstance(stats_data, dict) else {}
-
-    median_value = _median_sale_price_from_stats(stats_list if isinstance(stats_list, list) else [])
-    median_value_display = _format_currency_compact(median_value)
-    data_quality_score = _build_data_quality_score(global_metrics if isinstance(global_metrics, dict) else {})
-
-    total_parcels = MasterParcel.objects.count()
-    restaurant_count = Restaurant.objects.count()
-    ninety_days_ago = timezone.now() - dt.timedelta(days=90)
-    reviews_analyzed = Review.objects.filter(created_at__gte=ninety_days_ago).count()
-    menu_items_count = MenuItem.objects.count()
-    derived_enrichments_count = _total_review_derived_enrichment_count()
-    last_refresh = timezone.localtime()
-    last_refresh_display = date_format(last_refresh, "M j, Y g:ia T")
-
-    stats_cards = [
-        {
-            "label": "Last refresh",
-            "value": last_refresh_display,
-            "display": last_refresh_display,
-            "caption": "AI + data snapshots stay current.",
-            "accent_class": "bg-emerald-200",
-            "badge_label": "Live",
-            "badge_class": "bg-emerald-50 text-emerald-700",
-            "animate": False,
-        },
-        {
-            "label": "Data quality index",
-            "value": data_quality_score or "—",
-            "display": data_quality_score or "—",
-            "caption": "Share of parcels with complete attributes.",
-            "accent_class": "bg-amber-200",
-            "badge_label": "QA",
-            "badge_class": "bg-amber-50 text-amber-700",
-            "animate": False,
-        },
-        {
-            "label": "Median sale price",
-            "value": median_value_display or "—",
-            "display": median_value_display or "—",
-            "caption": "Latest regression run for countywide sales.",
-            "accent_class": "bg-sage-200",
-            "badge_label": "Market",
-            "badge_class": "bg-sage-50 text-sage-700",
-            "animate": False,
-        },
-        {
-            "label": "Parcels indexed",
-            "value": total_parcels,
-            "caption": "2025 roll stitched with context layers.",
-            "accent_class": "bg-sky-200",
-            "badge_label": "Live",
-            "badge_class": "bg-sky-50 text-sky-700",
-            "animate": True,
-        },
-        {
-            "label": "Derived enrichments",
-            "value": derived_enrichments_count,
-            "caption": "AI-built signals sourced from reviews + menus.",
-            "accent_class": "bg-purple-200",
-            "badge_label": "Signal",
-            "badge_class": "bg-purple-50 text-purple-700",
-            "animate": True,
-        },
-        {
-            "label": "Restaurants tracked",
-            "value": restaurant_count,
-            "caption": "Actively mapped to sentiment + menu data.",
-            "accent_class": "bg-rose-200",
-            "badge_label": "Live",
-            "badge_class": "bg-rose-50 text-rose-700",
-            "animate": True,
-        },
-        {
-            "label": "Menu items indexed",
-            "value": menu_items_count,
-            "caption": "Parsed and versioned from menus + snapshots.",
-            "accent_class": "bg-teal-200",
-            "badge_label": "Fresh",
-            "badge_class": "bg-teal-50 text-teal-700",
-            "animate": True,
-        },
-        {
-            "label": "Reviews analyzed (90d)",
-            "value": reviews_analyzed,
-            "caption": "Latest 90 days of sentiment + topic shifts.",
-            "accent_class": "bg-indigo-200",
-            "badge_label": "Pulse",
-            "badge_class": "bg-indigo-50 text-indigo-700",
-            "animate": True,
-        },
-    ]
-
-    return {
-        "total_parcels": total_parcels,
-        "restaurant_count": restaurant_count,
-        "menu_items_count": menu_items_count,
-        "stats_cards": stats_cards,
-    }
-
-
-def _get_cached_home_portal_metrics() -> Dict[str, Any]:
-    metrics = cache.get(HOME_PORTAL_METRICS_CACHE_KEY)
-    if metrics is None:
-        metrics = _build_home_portal_metrics()
-        cache.set(HOME_PORTAL_METRICS_CACHE_KEY, metrics, HOME_PORTAL_METRICS_CACHE_TTL)
-    return metrics
-
-
 def home(request):
     """
     Render the OpenSkagit portal homepage.
     """
-    metrics = _get_cached_home_portal_metrics()
     # flavor_signal_payload = extract_flavor_signals(limit=3)  # Not used on the homepage; leave disabled for now.
 
     page_title = "OpenSkagit · AI-Enhanced Data Portal for Skagit County"
@@ -3072,19 +3973,19 @@ def home(request):
         "Is this land buildable?",
         "What does zoning actually allow here?",
     ]
+    total_parcels = MasterParcel.objects.count()
+    restaurant_count = Restaurant.objects.count()
+    menu_items_count = MenuItem.objects.count()
 
-    context = {
-        "total_parcels": metrics.get("total_parcels", 0),
-        "restaurant_count": metrics.get("restaurant_count", 0),
-        "menu_items_count": metrics.get("menu_items_count", 0),
-        "stats_cards": metrics.get("stats_cards", []),
-        "hero_questions": hero_questions,
-        # "flavor_signals": flavor_signal_payload,
-    }
+    context = _basic_page_context(page_title, meta_description)
     context.update(
         {
-            "page_title": page_title,
-            "meta_description": meta_description,
+            "total_parcels": total_parcels,
+            "restaurant_count": restaurant_count,
+            "menu_items_count": menu_items_count,
+            "hero_questions": hero_questions,
+            "mcp_custom_gpt_url": MCP_CUSTOM_GPT_URL,
+            # "flavor_signals": flavor_signal_payload,
             "og_title": social_title,
             "og_description": meta_description,
             "og_type": "website",
@@ -3107,132 +4008,519 @@ def _basic_page_context(title: str, description: str) -> Dict[str, Any]:
         "og_description": description,
         "og_type": "website",
         "og_image": "https://res.cloudinary.com/dfz4bhlzs/image/upload/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png",
+        "meta_robots": "",
         "twitter_title": title,
         "twitter_description": description,
+        "twitter_image": "https://res.cloudinary.com/dfz4bhlzs/image/upload/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png",
         "twitter_card": "summary_large_image",
         "canonical_url": None,
         "og_url": None,
-        "favicon": "https://res.cloudinary.com/dfz4bhlzs/image/upload/c_thumb,w_200,g_face/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png",
-        "apple_touch_icon": "https://res.cloudinary.com/dfz4bhlzs/image/upload/c_thumb,w_200,g_face/v1765735577/ChatGPT_Image_Dec_14_2025_10_05_37_AM_oprqoo.png",
+        "favicon": "https://res.cloudinary.com/dfz4bhlzs/image/upload/v1768253765/logoicon_c_crop_w_480_h_467_x_0_y_0-Picsart-BackgroundRemover_uklqfi.png",
+        "apple_touch_icon": "https://res.cloudinary.com/dfz4bhlzs/image/upload/v1768253765/logoicon_c_crop_w_480_h_467_x_0_y_0-Picsart-BackgroundRemover_uklqfi.png",
         "nav_links": _primary_nav_links(),
     }
     return context
 
 
-CONSULT_SERVICE_CARDS = [
-    {
-        "id": "restaurants",
-        "industry": "Restaurants / Cafes / Bars",
-        "tag": "margins, ops, competition",
-        "headline": "Clip the low-margin chaos so service stays fast and profitable.",
-        "back": [
-            "Menu + item margin analysis with actionable margin targets.",
-            "Competition analysis on pricing, menu gaps, and promos.",
-            "Cash-flow pressure map for slow days and labor drag.",
-            "Review + feedback synthesis that feeds concrete fixes.",
-            "Simple ops automations (not marketing or leads).",
-            "OpenTab: what you can stop doing while keeping quality.",
-        ],
+_MCP_HTTP_METHOD_ORDER = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
+_MCP_HTTP_METHOD_SET = {method.lower() for method in _MCP_HTTP_METHOD_ORDER}
+_MCP_GROUP_METADATA = {
+    "health": {
+        "label": "Service Health",
+        "description": "Ping endpoint used by clients to verify API availability before data calls.",
     },
-    {
-        "id": "contractors",
-        "industry": "Contractors (GC, HVAC, Electrical, Plumbing)",
-        "tag": "profitability, throughput",
-        "headline": "Know which jobs quietly lose money and why.",
-        "back": [
-            "Job profitability audit that highlights hidden loss leaders.",
-            "Competition scan for pricing bands and service mix.",
-            "Cash-flow timing work to balance deposits and payouts.",
-            "Estimating sanity checks on over/under-bidding patterns.",
-            "Workflow cleanup from intake through closeout.",
-            "Trade-specific guardrails for repeatable quoting.",
-        ],
+    "lookup": {
+        "label": "Parcel Discovery",
+        "description": "Search by parcel number or address text to resolve parcel_id.",
     },
-    {
-        "id": "retail",
-        "industry": "Retail (Local, Independent)",
-        "tag": "inventory + cash",
-        "headline": "Free up cash and space without guesswork.",
-        "back": [
-            "Product velocity + dead stock detection dashboards.",
-            "Competition analysis on price and assortment gaps.",
-            "Cash tied up in inventory: see the actual drag.",
-            "Seasonal demand patterns you can trust.",
-            "Pricing experiments that move safely when demand is flat.",
-            "Reorder logic that honors local rhythms.",
-        ],
+    "parcel": {
+        "label": "Parcel Intelligence",
+        "description": "Core parcel context: bundle, valuation history, flood metrics, comps, and neighborhood trends.",
     },
-    {
-        "id": "manufacturing",
-        "industry": "Small Manufacturers / Fabricators",
-        "tag": "ops + cash discipline",
-        "headline": "Keep the shop floor flowing and the ledger tidy.",
-        "back": [
-            "Bottleneck analysis where work piles up.",
-            "Product-level profitability by production run.",
-            "Competition benchmarking routed to your product set.",
-            "Order backlog → cash-flow forecasting.",
-            "“What should we stop making?” analysis.",
-            "Ops playbook for consistent handoffs.",
-        ],
+    "overlay": {
+        "label": "Overlay Engine",
+        "description": "Layer catalog + parcel overlay extraction for mapped reference datasets.",
     },
-    {
-        "id": "real-estate",
-        "industry": "Real Estate Investors (not brokers)",
-        "tag": "asset performance",
-        "headline": "Measure runsheet cash, not just permits.",
-        "back": [
-            "Property-level cash-flow clarity with scenario overlays.",
-            "Expense creep detection before it steals returns.",
-            "Rent vs. market drift tracking for each asset.",
-            "Hold vs sell decision support with concrete assumptions.",
-            "Competition analysis showing comps that actually matter.",
-            "Run-the-numbers workbook for seasonal shifts.",
-        ],
+    "legal": {
+        "label": "Legal Code",
+        "description": "Jurisdiction-aware legal search and section retrieval from ingested code sources.",
     },
-    {
-        "id": "property-management",
-        "industry": "Property Management / Small Landlords",
-        "tag": "efficiency + margins",
-        "headline": "Smooth turnover and vendor chaos without extra meetings.",
-        "back": [
-            "Maintenance pattern analysis that spotlights repeat costs.",
-            "Turnover cost breakdown with a call-to-action.",
-            "Cash-flow smoothing + vendor timing fixes.",
-            "Vendor cost comparison so you negotiate from facts.",
-            "Communication automation for ops only.",
-            "Resident touchpoints with auditable trails.",
-        ],
+    "legacy_agent": {
+        "label": "Legacy Agent API",
+        "description": "Bearer-token endpoints from the legacy /agent/api surface.",
     },
-    {
-        "id": "cannabis",
-        "industry": "Cannabis (WA-legal operators only)",
-        "tag": "compliance + margins",
-        "headline": "Stay compliant while protecting every margin.",
-        "back": [
-            "Inventory + SKU profitability tracking.",
-            "Shrinkage / variance detection with thresholds.",
-            "Competition check on pricing + product mix.",
-            "Cash-flow timing that respects taxes and vendors.",
-            "Reporting sanity checks built for compliance systems.",
-            "Operational guardrails that protect margins.",
-        ],
+    "gastronet": {
+        "label": "Gastronet",
+        "description": "Selected food intelligence and ingestion endpoints exposed for tool use.",
     },
-    {
-        "id": "professional-services",
-        "industry": "Professional Services (Accounting, Legal, Consultants)",
-        "tag": "utilization, not leads",
-        "headline": "Reclaim hours and keep utilization honest.",
-        "back": [
-            "Client profitability ranking with confidence bands.",
-            "Time leakage analysis to reclaim buffer hours.",
-            "Fixed-fee vs hourly reality checks.",
-            "Competition positioning analysis that feels real.",
-            "Internal knowledge search / reuse.",
-            "Delivery playbook so every engagement feels the same.",
-        ],
+    "nlq": {
+        "label": "Guarded NLQ",
+        "description": "Natural-language SQL fallback with schema/context and execution guardrails.",
     },
+    "other": {
+        "label": "Other",
+        "description": "Additional operations outside primary parcel and legal groups.",
+    },
+}
+_MCP_GROUP_ORDER = [
+    "health",
+    "lookup",
+    "parcel",
+    "overlay",
+    "legal",
+    "legacy_agent",
+    "gastronet",
+    "nlq",
+    "other",
 ]
+
+
+def _load_mcp_openapi_data(openapi_path: Path) -> Optional[Dict[str, Any]]:
+    if not openapi_path.exists():
+        logger.warning("MCP OpenAPI missing at %s", openapi_path)
+        return None
+
+    try:
+        data = json.loads(openapi_path.read_text())
+    except Exception as exc:  # pragma: no cover - defensive path for malformed files
+        logger.warning("Failed to parse MCP OpenAPI at %s: %s", openapi_path, exc)
+        return None
+
+    if not isinstance(data, dict):
+        logger.warning("MCP OpenAPI at %s did not parse to an object", openapi_path)
+        return None
+
+    return data
+
+
+def _mcp_group_key_for_path(path: str) -> str:
+    tokens = [token for token in path.strip("/").split("/") if token]
+    if not tokens:
+        return "other"
+
+    if tokens[0] == "agent":
+        if len(tokens) >= 2:
+            second = tokens[1]
+            if second == "api":
+                return "legacy_agent"
+            if second in _MCP_GROUP_METADATA:
+                return second
+            if second == "parcel":
+                return "parcel"
+        return "other"
+
+    if tokens[0] == "api":
+        if len(tokens) >= 2 and tokens[1] == "gastronet":
+            return "gastronet"
+        return "other"
+
+    head = tokens[0]
+    return head if head in _MCP_GROUP_METADATA else "other"
+
+
+def _mcp_response_code_sort_key(code: str) -> Tuple[int, Any]:
+    if code.isdigit():
+        return (0, int(code))
+    return (1, code)
+
+
+def _mcp_schema_rule(schema: Dict[str, Any]) -> Optional[str]:
+    if not isinstance(schema, dict):
+        return None
+
+    parts: List[str] = []
+    if "minimum" in schema and "maximum" in schema:
+        parts.append(f"{schema['minimum']}..{schema['maximum']}")
+    else:
+        if "minimum" in schema:
+            parts.append(f">= {schema['minimum']}")
+        if "maximum" in schema:
+            parts.append(f"<= {schema['maximum']}")
+
+    if "default" in schema:
+        parts.append(f"default {schema['default']}")
+
+    if not parts:
+        return None
+
+    return ", ".join(parts)
+
+
+def _extract_mcp_capabilities_from_openapi(
+    openapi_path: Path, openapi_data: Optional[Dict[str, Any]] = None
+) -> List[str]:
+    default_capabilities = [
+        "Parcel lookup by address or parcel number",
+        "Parcel bundle with site facts, geometry, and overlays in one payload",
+        "Zoning, environmental, and jurisdiction overlays for a parcel",
+        "Flood indicators plus neighborhood context around a parcel",
+        "Comparable sales snapshots near a parcel",
+        "Legal code search and section retrieval by jurisdiction",
+        "Guardrailed natural-language answers when structured tools are not enough",
+    ]
+    data = openapi_data or _load_mcp_openapi_data(openapi_path)
+    if not data:
+        return default_capabilities
+
+    entries: List[str] = []
+    for path, methods in data.get("paths", {}).items():
+        if not isinstance(methods, dict):
+            continue
+        for meta in methods.values():
+            method_meta = meta if isinstance(meta, dict) else {}
+            entries.append(
+                " ".join(
+                    [
+                        str(path).lower(),
+                        str(method_meta.get("summary", "")).lower(),
+                        str(method_meta.get("description", "")).lower(),
+                    ]
+                )
+            )
+
+    patterns = [
+        ("health", "Health check endpoint for API uptime verification"),
+        ("lookup", "Parcel lookup by address or parcel number"),
+        ("bundle", "Parcel bundle with site facts, geometry, and overlays in one payload"),
+        ("history", "Valuation and tax roll history for a parcel"),
+        ("flood", "FEMA flood zone indicators and base flood elevations where available"),
+        (
+            "intersect",
+            "Check a parcel against zoning, flood, shoreline, wetlands, city limits, and fire districts",
+        ),
+        ("neighborhood", "Neighborhood ratios and trend context around a parcel"),
+        ("sales", "Comparable sales near a parcel with guardrails on fit"),
+        ("overlay", "List and fetch overlays and reference layers for a location"),
+        ("legal", "Legal code search and section retrieval by jurisdiction"),
+        ("nlq", "Guardrailed natural-language answers when structured tools are not enough"),
+    ]
+
+    capabilities: List[str] = []
+    seen: Set[str] = set()
+    for key, label in patterns:
+        if any(key in entry for entry in entries):
+            if label not in seen:
+                capabilities.append(label)
+                seen.add(label)
+
+    return capabilities or default_capabilities
+
+
+def _summarize_mcp_openapi(openapi_path: Path, openapi_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    fallback = {
+        "title": "OpenSkagit MCP Agent",
+        "version": "unknown",
+        "description": "Read-only MCP endpoints for parcel lookup, overlays, comps, and guarded NLQ.",
+        "openapi_version": "unknown",
+        "server_url": "https://openskagit.com",
+        "spec_source": openapi_path.name,
+        "spec_updated_at": None,
+        "path_count": 0,
+        "operation_count": 0,
+        "method_breakdown": [],
+        "group_cards": [],
+        "response_codes": [],
+        "constraints": [],
+        "guardrails": [],
+        "endpoint_rows": [],
+        "flow_steps": [
+            {
+                "title": "Resolve parcel_id",
+                "detail": "Search by address or parcel fragment before calling parcel-specific endpoints.",
+            },
+            {
+                "title": "Fetch parcel context",
+                "detail": "Use bundle, history, flood, comparables, and neighborhood endpoints for structured parcel data.",
+            },
+            {
+                "title": "Join overlays or legal text",
+                "detail": "Fetch overlay layers and legal code records for planning and compliance context.",
+            },
+            {
+                "title": "Fallback to guarded NLQ",
+                "detail": "Only use NLQ when structured endpoints cannot answer directly.",
+            },
+        ],
+    }
+
+    data = openapi_data or _load_mcp_openapi_data(openapi_path)
+    if not data:
+        return fallback
+
+    paths = data.get("paths")
+    if not isinstance(paths, dict):
+        return fallback
+
+    method_counts: Dict[str, int] = {}
+    group_accumulator: Dict[str, Dict[str, Any]] = {}
+    response_counts: Dict[str, int] = {}
+    constraint_seen: Set[str] = set()
+    constraints: List[Dict[str, str]] = []
+    endpoint_rows: List[Dict[str, Any]] = []
+    guardrail_flags: Set[str] = set()
+
+    method_rank = {name.lower(): index for index, name in enumerate(_MCP_HTTP_METHOD_ORDER)}
+    sorted_paths = sorted(paths.items(), key=lambda item: item[0])
+    for path, methods in sorted_paths:
+        if not isinstance(methods, dict):
+            continue
+
+        for method_name, meta in sorted(methods.items(), key=lambda item: method_rank.get(str(item[0]).lower(), 999)):
+            method = str(method_name).lower()
+            if method not in _MCP_HTTP_METHOD_SET:
+                continue
+
+            method_upper = method.upper()
+            method_counts[method_upper] = method_counts.get(method_upper, 0) + 1
+
+            method_meta = meta if isinstance(meta, dict) else {}
+            summary = str(method_meta.get("summary") or "").strip()
+            description = str(method_meta.get("description") or "").strip()
+            operation_id = str(method_meta.get("operationId") or "").strip()
+            if not operation_id:
+                operation_id = f"{method}_{path.strip('/').replace('/', '_').replace('{', '').replace('}', '')}"
+            if not summary:
+                summary = description or "No summary provided."
+
+            meta_blob = f"{summary} {description}".lower()
+            if "allowlist" in meta_blob or "allowlisted" in meta_blob:
+                guardrail_flags.add("allowlist")
+            if "guardrail" in meta_blob:
+                guardrail_flags.add("guardrail")
+            if "cost/row" in meta_blob or ("cost" in meta_blob and "row" in meta_blob):
+                guardrail_flags.add("cost")
+
+            group_key = _mcp_group_key_for_path(path)
+            group_entry = group_accumulator.setdefault(
+                group_key,
+                {"count": 0, "methods": set(), "operation_ids": [], "sample_paths": []},
+            )
+            group_entry["count"] += 1
+            group_entry["methods"].add(method_upper)
+            group_entry["operation_ids"].append(operation_id)
+            if len(group_entry["sample_paths"]) < 2:
+                group_entry["sample_paths"].append(path)
+
+            required_inputs: List[str] = []
+            optional_inputs: List[str] = []
+            parameters = method_meta.get("parameters")
+            if isinstance(parameters, list):
+                for parameter in parameters:
+                    if not isinstance(parameter, dict):
+                        continue
+                    name = str(parameter.get("name") or "").strip()
+                    if not name:
+                        continue
+
+                    schema = parameter.get("schema")
+                    if not isinstance(schema, dict):
+                        schema = {}
+
+                    if parameter.get("required"):
+                        required_inputs.append(name)
+                    else:
+                        optional_inputs.append(name)
+
+                    rule = _mcp_schema_rule(schema)
+                    if rule:
+                        constraint_key = f"{method_upper}|{path}|{name}|{rule}"
+                        if constraint_key not in constraint_seen:
+                            constraints.append(
+                                {
+                                    "context": f"{method_upper} {path}",
+                                    "field": name,
+                                    "rule": rule,
+                                }
+                            )
+                            constraint_seen.add(constraint_key)
+
+            request_body = method_meta.get("requestBody")
+            if isinstance(request_body, dict):
+                content = request_body.get("content")
+                if isinstance(content, dict):
+                    json_body = content.get("application/json")
+                    if isinstance(json_body, dict):
+                        body_schema = json_body.get("schema")
+                        if isinstance(body_schema, dict):
+                            body_properties = body_schema.get("properties")
+                            required_body_fields = body_schema.get("required")
+                            required_body_set = (
+                                set(required_body_fields)
+                                if isinstance(required_body_fields, list)
+                                else set()
+                            )
+                            if isinstance(body_properties, dict):
+                                for field_name, field_schema in body_properties.items():
+                                    body_field = f"body.{field_name}"
+                                    if field_name in required_body_set:
+                                        required_inputs.append(body_field)
+                                    else:
+                                        optional_inputs.append(body_field)
+
+                                    schema = field_schema if isinstance(field_schema, dict) else {}
+                                    rule = _mcp_schema_rule(schema)
+                                    if rule:
+                                        constraint_key = f"{method_upper}|{path}|{body_field}|{rule}"
+                                        if constraint_key not in constraint_seen:
+                                            constraints.append(
+                                                {
+                                                    "context": f"{method_upper} {path}",
+                                                    "field": body_field,
+                                                    "rule": rule,
+                                                }
+                                            )
+                                            constraint_seen.add(constraint_key)
+
+            required_unique = sorted(set(required_inputs))
+            required_set = set(required_unique)
+            optional_unique = sorted(item for item in set(optional_inputs) if item not in required_set)
+
+            response_codes: List[str] = []
+            responses = method_meta.get("responses")
+            if isinstance(responses, dict):
+                for response_code in responses.keys():
+                    code = str(response_code)
+                    response_codes.append(code)
+                    response_counts[code] = response_counts.get(code, 0) + 1
+
+            endpoint_rows.append(
+                {
+                    "method": method_upper,
+                    "path": path,
+                    "operation_id": operation_id,
+                    "summary": summary,
+                    "required_inputs": required_unique,
+                    "optional_inputs": optional_unique,
+                    "responses": sorted(set(response_codes), key=_mcp_response_code_sort_key),
+                    "group": group_key,
+                }
+            )
+
+    operation_count = len(endpoint_rows)
+    if operation_count == 0:
+        return fallback
+
+    info = data.get("info")
+    info_payload = info if isinstance(info, dict) else {}
+    openapi_version = str(data.get("openapi") or "unknown")
+    title = str(info_payload.get("title") or fallback["title"])
+    version = str(info_payload.get("version") or fallback["version"])
+    description = str(info_payload.get("description") or fallback["description"])
+
+    servers = data.get("servers")
+    server_url = fallback["server_url"]
+    if isinstance(servers, list) and servers:
+        first = servers[0]
+        if isinstance(first, dict):
+            candidate = str(first.get("url") or "").strip()
+            if candidate:
+                server_url = candidate.rstrip("/")
+
+    method_breakdown: List[Dict[str, Any]] = []
+    for method_name in _MCP_HTTP_METHOD_ORDER:
+        count = method_counts.get(method_name, 0)
+        if count <= 0:
+            continue
+        method_breakdown.append(
+            {
+                "method": method_name,
+                "count": count,
+                "percent": round((count / operation_count) * 100),
+            }
+        )
+
+    group_cards: List[Dict[str, Any]] = []
+    known_groups = {key for key in group_accumulator.keys() if key in _MCP_GROUP_ORDER}
+    ordered_groups = [key for key in _MCP_GROUP_ORDER if key in known_groups]
+    ordered_groups.extend(sorted(key for key in group_accumulator.keys() if key not in _MCP_GROUP_ORDER))
+    for group_key in ordered_groups:
+        meta = _MCP_GROUP_METADATA.get(group_key, _MCP_GROUP_METADATA["other"])
+        group_row = group_accumulator[group_key]
+        group_cards.append(
+            {
+                "key": group_key,
+                "label": meta["label"],
+                "description": meta["description"],
+                "count": group_row["count"],
+                "methods": sorted(group_row["methods"]),
+                "operation_ids": sorted(set(group_row["operation_ids"])),
+                "sample_paths": group_row["sample_paths"],
+            }
+        )
+
+    response_codes = []
+    for code, count in sorted(response_counts.items(), key=lambda item: _mcp_response_code_sort_key(item[0])):
+        response_codes.append(
+            {
+                "code": code,
+                "count": count,
+                "percent": round((count / operation_count) * 100),
+            }
+        )
+
+    guardrails: List[str] = []
+    get_count = method_counts.get("GET", 0)
+    if get_count:
+        guardrails.append(f"{get_count} of {operation_count} operations use GET for read-only retrieval.")
+
+    has_limit_cap = any("25" in row["rule"] and row["field"] == "limit" for row in constraints)
+    if has_limit_cap:
+        guardrails.append("Search/list routes set explicit result caps (for example, limit <= 25).")
+
+    if "allowlist" in guardrail_flags:
+        guardrails.append("Overlay intersection is constrained to allowlisted layer keys.")
+
+    if "guardrail" in guardrail_flags or "cost" in guardrail_flags:
+        guardrails.append("NLQ route is documented with SQL guardrails and execution checks.")
+
+    if any(code["code"] == "400" for code in response_codes):
+        guardrails.append("Invalid or missing inputs return explicit 400-series responses.")
+
+    flow_steps = [
+        {
+            "title": "Resolve parcel_id",
+            "detail": "Start with lookup to resolve a parcel from free text address or parcel fragment.",
+        },
+        {
+            "title": "Load parcel context",
+            "detail": "Fetch bundle/history/flood/neighborhood/comps endpoints for deterministic parcel facts.",
+        },
+        {
+            "title": "Expand with overlays and legal",
+            "detail": "Pull overlay layers or legal sections for jurisdiction and compliance context.",
+        },
+        {
+            "title": "Fallback to NLQ",
+            "detail": "Use guarded natural-language SQL only when structured endpoints are insufficient.",
+        },
+    ]
+
+    spec_updated_at = None
+    try:
+        spec_updated_at = dt.datetime.fromtimestamp(openapi_path.stat().st_mtime, tz=dt.timezone.utc).strftime(
+            "%Y-%m-%d %H:%M UTC"
+        )
+    except OSError:
+        spec_updated_at = None
+
+    return {
+        "title": title,
+        "version": version,
+        "description": description,
+        "openapi_version": openapi_version,
+        "server_url": server_url,
+        "spec_source": openapi_path.name,
+        "spec_updated_at": spec_updated_at,
+        "path_count": len(paths),
+        "operation_count": operation_count,
+        "method_breakdown": method_breakdown,
+        "group_cards": group_cards,
+        "response_codes": response_codes,
+        "constraints": constraints,
+        "guardrails": guardrails,
+        "endpoint_rows": endpoint_rows,
+        "flow_steps": flow_steps,
+    }
 
 
 @require_GET
@@ -3241,45 +4529,6 @@ def about_view(request):
     context["canonical_url"] = request.build_absolute_uri()
     context["og_url"] = context["canonical_url"]
     return render(request, "openskagit/about.html", context)
-
-
-@require_http_methods(["GET", "POST"])
-def consult_view(request):
-    context = _basic_page_context(
-        "AI Consulting for Skagit Small Businesses | OpenSkagit",
-        "Practical AI consulting in Skagit County for small businesses and nonprofits. Fixed scope, real workflows, and one clear improvement your team will use.",
-    )
-    context["canonical_url"] = request.build_absolute_uri()
-    context["og_url"] = context["canonical_url"]
-    context["meta_robots"] = "index,follow"
-    context["service_cards"] = CONSULT_SERVICE_CARDS.copy()
-
-    if request.method == "POST":
-        form = ConsultIntakeForm(request.POST)
-        if form.is_valid():
-            cleaned = form.cleaned_data
-            message_lines = [
-                "Consulting intake (openskagit.com/consult)",
-                "",
-                f"Business description: {cleaned['business_description']}",
-                f"Biggest question: {cleaned['biggest_question']}",
-            ]
-            submission = ContactSubmission.objects.create(
-                email=cleaned["email"],
-                topic=ContactSubmission.TOPIC_CONSULTING,
-                message="\n".join(message_lines),
-            )
-            email_sent = _send_contact_submission_email(submission)
-            if not email_sent:
-                logger.warning("Consulting intake email failed to send (submission_id=%s).", submission.id)
-            messages.success(request, "Thanks—got it. I'll reply with next steps.")
-            return redirect("consult")
-        messages.error(request, "Please fix the highlighted fields and try again.")
-    else:
-        form = ConsultIntakeForm()
-
-    context["form"] = form
-    return render(request, "openskagit/consult.html", context)
 
 
 @require_http_methods(["GET", "POST"])
@@ -3322,6 +4571,84 @@ def contact_view(request):
 
     context["form"] = form
     return render(request, "openskagit/contact.html", context)
+
+
+@require_http_methods(["GET", "POST"])
+def coappraiser_upload_view(request):
+    context = _basic_page_context(
+        "CO Appraiser Upload · OpenSkagit",
+        "Upload a CAMA parcel CSV for CO appraiser workflows.",
+    )
+    context["canonical_url"] = request.build_absolute_uri()
+    context["og_url"] = context["canonical_url"]
+
+    if request.method == "POST":
+        upload = request.FILES.get("csv_file")
+        if upload is None:
+            messages.error(request, "Choose a CSV file to upload.")
+            return redirect("coappraiser-upload")
+
+        original_name = Path(upload.name or "").name or "upload.csv"
+        if not original_name.lower().endswith(".csv"):
+            messages.error(request, "Only CSV uploads are supported right now.")
+            return redirect("coappraiser-upload")
+
+        safe_name = get_valid_filename(original_name) or "upload.csv"
+        safe_path = Path(safe_name)
+        stem = safe_path.stem or "upload"
+        suffix = safe_path.suffix.lower() or ".csv"
+        timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+        unique_suffix = uuid.uuid4().hex[:8]
+        relative_path = f"coappraiser/{timestamp}_{unique_suffix}_{stem}{suffix}"
+
+        storage = FileSystemStorage(location=settings.MEDIA_ROOT, base_url=settings.MEDIA_URL)
+        saved_relative_path = storage.save(relative_path, upload)
+        messages.success(request, f"Uploaded {original_name} to /media/{saved_relative_path}.")
+        return redirect("coappraiser-upload")
+
+    return render(request, "openskagit/coappraiser_upload.html", context)
+
+
+@require_GET
+def mcp_openapi_json(request):
+    openapi_path = Path(settings.BASE_DIR) / "mcp_agent_openapi.json"
+    openapi_data = _load_mcp_openapi_data(openapi_path)
+    if not openapi_data:
+        return JsonResponse({"error": "mcp_openapi_unavailable"}, status=503)
+
+    site_url = request.build_absolute_uri("/").rstrip("/")
+    payload = copy.deepcopy(openapi_data)
+    if site_url:
+        payload["servers"] = [{"url": site_url}]
+
+    return JsonResponse(payload)
+
+
+@require_GET
+def mcp_view(request):
+    context = _basic_page_context(
+        "SkagitMCP · OpenSkagit",
+        "Connect AI assistants to Skagit Valley property and planning data through simple, stable tools.",
+    )
+    context["canonical_url"] = request.build_absolute_uri()
+    context["og_url"] = context["canonical_url"]
+    openapi_path = Path(settings.BASE_DIR) / "mcp_agent_openapi.json"
+    openapi_data = _load_mcp_openapi_data(openapi_path)
+    context["mcp_capabilities"] = _extract_mcp_capabilities_from_openapi(openapi_path, openapi_data=openapi_data)
+    context["mcp_openapi"] = _summarize_mcp_openapi(openapi_path, openapi_data=openapi_data)
+    context["mcp_custom_gpt_url"] = MCP_CUSTOM_GPT_URL
+    return render(request, "openskagit/mcp.html", context)
+
+
+@require_GET
+def privacy_policy_view(request):
+    context = _basic_page_context(
+        "Privacy Policy | OpenSkagit",
+        "How OpenSkagit handles personal information, analytics data, and public records.",
+    )
+    context["canonical_url"] = request.build_absolute_uri()
+    context["og_url"] = context["canonical_url"]
+    return render(request, "openskagit/privacy.html", context)
 
 
 def _send_contact_submission_email(submission: ContactSubmission) -> bool:
@@ -3460,6 +4787,85 @@ def votevector_view(request):
     context["og_url"] = context["canonical_url"]
     context["votevector_stats"] = stats
     return render(request, "openskagit/votevector.html", context)
+
+
+@require_GET
+def votevector_district3_view(request):
+    hero_description = (
+        "Commissioner District 3 lens for turnout, neighborhood participation, "
+        "census demographics, neighborhood trends, new construction, and major-party lean."
+    )
+    context = _basic_page_context("VoteVector District 3 · OpenSkagit", hero_description)
+    context.update(
+        {
+            "canonical_url": request.build_absolute_uri(),
+            "votevector_district": {
+                "district_label": "Commissioner District 3",
+                "hero_description": hero_description,
+                "api_endpoint": reverse("votevector-district3-map"),
+                "intro": (
+                    "Toggle NPI, turnout, demographics, party-lean, neighborhood trend, and new construction overlays "
+                    "to inspect District 3 using the most recent election year in the database."
+                ),
+            },
+        }
+    )
+    context["og_url"] = context["canonical_url"]
+    return render(request, "openskagit/votevector_district3.html", context)
+
+
+@require_GET
+def sedro_woolley_portal(request):
+    context = _basic_page_context(
+        "Sedro-Woolley | OpenSkagit",
+        "Public Sedro-Woolley city limits portal: parcels, value, sales, permits, and civic snapshots.",
+    )
+    canonical = request.build_absolute_uri()
+    context["canonical_url"] = canonical
+    context["og_url"] = canonical
+    context["city_map_url"] = reverse("sedro-woolley-zoning-map")
+    context["zoning_map_url"] = context["city_map_url"]
+    context["portal_error"] = None
+
+    try:
+        context["portal"] = load_sedro_woolley_portal_context()
+    except Exception:
+        logger.exception("Unable to load Sedro-Woolley public portal context.")
+        context["portal_error"] = "Data is still loading. Try again in a minute."
+        context["portal"] = empty_sedro_woolley_portal_context()
+
+    return render(request, "openskagit/sedro_woolley_portal.html", context)
+
+
+@require_GET
+def sedro_woolley_zoning_map(request):
+    context = _basic_page_context(
+        "Sedro-Woolley Parcel Map | OpenSkagit",
+        "Interactive parcel map for zoning, land lift, new construction, and ward context in Sedro-Woolley.",
+    )
+    canonical = request.build_absolute_uri()
+    context["canonical_url"] = canonical
+    context["og_url"] = canonical
+    context["zoning_data_endpoint"] = reverse("sedro-woolley-zoning-data")
+    return render(request, "openskagit/sedro_woolley_zoning_map.html", context)
+
+
+@require_GET
+def sedro_woolley_zoning_data(request):
+    refresh_param = (request.GET.get("refresh") or "").strip().lower()
+    force_refresh = bool(request.user.is_staff and refresh_param in {"1", "true", "yes"})
+    try:
+        payload = load_sedro_woolley_zoning_feature_collection(force_refresh=force_refresh)
+    except Exception:
+        logger.exception("Unable to load Sedro-Woolley zoning map data.")
+        return JsonResponse(
+            {
+                "error": "Unable to load Sedro-Woolley zoning map data right now.",
+                "details": {"city": "Sedro-Woolley"},
+            },
+            status=503,
+        )
+    return JsonResponse(payload)
 
 
 @require_POST
@@ -3831,19 +5237,31 @@ def flavor_index(request):
     hero_stats: List[Dict[str, Any]] = []
     for flavor in HERO_FLAVORS:
         intensity = float(flavor_targets.get(flavor) or 0.0)
-        hero_stats.append({"label": flavor.capitalize(), "value": round(intensity * 100)})
+        hero_stats.append(
+            {
+                "label": flavor.capitalize(),
+                "value": round(intensity * 100),
+                "display": "",
+                "suffix": "%",
+                "caption": "",
+            }
+        )
     review_count = Review.objects.count()
     menu_item_count = MenuItem.objects.count()
     hero_stats.extend(
         [
             {
                 "label": "Reviews analyzed",
+                "value": None,
                 "display": intcomma(review_count),
+                "suffix": "",
                 "caption": "Total diner reviews inside the flavor corpus.",
             },
             {
                 "label": "Menu items traced",
+                "value": None,
                 "display": intcomma(menu_item_count),
+                "suffix": "",
                 "caption": "Individual dishes captured across menus.",
             },
         ]
@@ -4676,6 +6094,334 @@ def api_dashboard(request):
     return render(request, "openskagit/api_dashboard.html", context)
 
 
+@staff_member_required
+@require_http_methods(["GET", "POST"])
+def staff_tax_foreclosure_report(request):
+    """
+    Staff-only tax foreclosure scan page.
+    Runs a fresh local candidate scan, live verifies candidates against county data,
+    writes tax_status on MasterParcel, and renders a simple parcel list.
+    """
+
+    def _parse_int(raw: Any, default: int, minimum: int, maximum: int) -> int:
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return default
+        return max(minimum, min(maximum, value))
+
+    def _parse_decimal(raw: Any, default: Decimal, minimum: Decimal) -> Decimal:
+        try:
+            value = Decimal(str(raw))
+        except (InvalidOperation, ValueError):
+            return default
+        return value if value >= minimum else minimum
+
+    def _parse_float(raw: Any, default: float, minimum: float, maximum: float) -> float:
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return default
+        return max(minimum, min(maximum, value))
+
+    source = request.POST if request.method == "POST" else request.GET
+    tax_year = _parse_int(source.get("tax_year"), timezone.now().year, 2000, 2100)
+    min_delinquent = _parse_decimal(source.get("min_delinquent"), Decimal("7500"), Decimal("0"))
+    min_ratio = _parse_float(source.get("min_ratio"), 2.5, 0.0, 20.0)
+    candidate_limit = _parse_int(source.get("candidate_limit"), 120, 1, 2000)
+    max_workers = _parse_int(source.get("max_workers"), 6, 1, 20)
+    display_limit = _parse_int(request.GET.get("display_limit"), 500, 1, 5000)
+    land_use_raw = (source.get("land_use_codes") or "").strip()
+    land_use_codes = [item.strip() for item in land_use_raw.split(",") if item.strip()]
+
+    run_summary: Optional[Dict[str, Any]] = None
+    if request.method == "POST":
+        try:
+            run_summary, _verified_rows = run_tax_foreclosure_scan_and_verify(
+                tax_year=tax_year,
+                min_delinquent=min_delinquent,
+                min_ratio=min_ratio,
+                candidate_limit=candidate_limit,
+                max_workers=max_workers,
+                land_use_codes=land_use_codes,
+            )
+            messages.success(
+                request,
+                (
+                    f"Scan complete. candidates={run_summary['candidate_count']} "
+                    f"confirmed={run_summary['confirmed_count']} "
+                    f"cleared={run_summary['cleared_count']} "
+                    f"errors={run_summary['error_count']} "
+                    f"updated={run_summary['updated_count']}"
+                ),
+            )
+        except Exception as exc:
+            logger.exception("Staff tax foreclosure scan failed: %s", exc)
+            messages.error(request, f"Scan failed: {exc}")
+
+    status_filter = (request.GET.get("status") or TAX_STATUS_CONFIRMED_DELINQUENT).strip()
+    valid_filters = {
+        "all",
+        TAX_STATUS_CONFIRMED_DELINQUENT,
+        TAX_STATUS_NOT_DELINQUENT,
+        TAX_STATUS_VERIFY_ERROR,
+    }
+    if status_filter not in valid_filters:
+        status_filter = TAX_STATUS_CONFIRMED_DELINQUENT
+
+    qs = MasterParcel.objects.filter(tax_status__isnull=False)
+    if status_filter != "all":
+        qs = qs.filter(tax_status=status_filter)
+
+    rows = list(
+        qs.order_by("parcel_number")
+        .values(
+            "parcel_number",
+            "situs_address",
+            "owner__owner_name",
+            "tax_status",
+            "tax_status_updated_at",
+        )[:display_limit]
+    )
+
+    counts_by_status = {
+        item["tax_status"]: item["count"]
+        for item in (
+            MasterParcel.objects.filter(tax_status__isnull=False)
+            .values("tax_status")
+            .annotate(count=Count("parcel_number"))
+        )
+    }
+
+    context = _basic_page_context(
+        "Staff Tax Foreclosure Report | OpenSkagit",
+        "Staff-only report for delinquent parcel scan, live verification, and tax status.",
+    )
+    context.update(
+        {
+            "canonical_url": request.build_absolute_uri(),
+            "og_url": request.build_absolute_uri(),
+            "run_summary": run_summary,
+            "rows": rows,
+            "status_filter": status_filter,
+            "display_limit": display_limit,
+            "tax_year": tax_year,
+            "min_delinquent": str(min_delinquent),
+            "min_ratio": min_ratio,
+            "candidate_limit": candidate_limit,
+            "max_workers": max_workers,
+            "land_use_codes_raw": land_use_raw,
+            "tax_status_confirmed": TAX_STATUS_CONFIRMED_DELINQUENT,
+            "tax_status_not_delinquent": TAX_STATUS_NOT_DELINQUENT,
+            "tax_status_verify_error": TAX_STATUS_VERIFY_ERROR,
+            "counts_by_status": counts_by_status,
+        }
+    )
+    return render(request, "openskagit/staff_tax_foreclosure_report.html", context)
+
+
+@staff_member_required
+@require_GET
+def staff_image_generator(request):
+    """
+    Staff-only image generation page. Jobs execute asynchronously and the frontend polls status.
+    """
+    context = _basic_page_context(
+        "Staff Image Generator | OpenSkagit",
+        "Internal image generation tool powered by a remote Modal deployment.",
+    )
+    context.update(
+        {
+            "canonical_url": request.build_absolute_uri(),
+            "og_url": request.build_absolute_uri(),
+            "form": StaffImageGeneratorForm(),
+            "modal_app_name": getattr(settings, "MODAL_IMAGE_APP_NAME", "flux-generator"),
+            "modal_function_name": getattr(settings, "MODAL_IMAGE_FUNCTION_NAME", "generate_image"),
+            "start_url": reverse("staff-image-generator-start"),
+            "poll_interval_ms": int(getattr(settings, "MODAL_IMAGE_POLL_INTERVAL_MS", 2000)),
+        }
+    )
+    return render(request, "openskagit/staff_image_generator.html", context)
+
+
+@staff_member_required
+@require_POST
+def staff_image_generator_start(request):
+    form = StaffImageGeneratorForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Please fix the highlighted form errors and try again.",
+                "errors": _serialize_form_errors(form),
+            },
+            status=400,
+        )
+
+    upload = form.cleaned_data.get("init_image")
+    job = StaffImageGenerationJob(
+        created_by=request.user,
+        prompt=form.cleaned_data["prompt"],
+        steps=form.cleaned_data["steps"],
+        guidance_scale=form.cleaned_data["guidance_scale"],
+        width=form.cleaned_data["width"],
+        height=form.cleaned_data["height"],
+        seed=form.cleaned_data["seed"],
+        status=StaffImageGenerationJob.STATUS_PENDING,
+        status_detail="Queued for generation.",
+    )
+    if upload is not None:
+        job.init_image = upload
+    job.save()
+    try:
+        _enqueue_staff_image_generation_job(job.id)
+    except Exception as exc:
+        logger.exception("Failed to queue staff image generation job %s: %s", job.id, exc)
+        job.status = StaffImageGenerationJob.STATUS_FAILED
+        job.status_detail = "Unable to queue generation job."
+        job.error_message = str(exc).strip()[:4000] or exc.__class__.__name__
+        job.completed_at = timezone.now()
+        job.save(update_fields=["status", "status_detail", "error_message", "completed_at", "updated_at"])
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Unable to queue generation job.",
+                "job_id": str(job.id),
+            },
+            status=500,
+        )
+
+    job_token = _build_staff_image_job_token(job)
+    status_path = reverse("staff-image-generator-status", kwargs={"job_id": job.id})
+    cancel_path = reverse("staff-image-generator-cancel", kwargs={"job_id": job.id})
+    token_query = urlencode({"token": job_token})
+    return JsonResponse(
+        {
+            "ok": True,
+            "job_id": str(job.id),
+            "job_token": job_token,
+            "status_url": f"{status_path}?{token_query}",
+            "cancel_url": f"{cancel_path}?{token_query}",
+            "status": job.status,
+            "status_detail": job.status_detail,
+        }
+    )
+
+
+@require_GET
+def staff_image_generator_status(request, job_id):
+    token = (request.GET.get("token") or request.headers.get("X-Image-Job-Token") or "").strip()
+    try:
+        job = _run_staff_image_poll_db_call(_resolve_staff_image_job_from_token, job_id=job_id, token=token)
+    except FuturesTimeoutError:
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Timed out while loading generation status.",
+            },
+            status=504,
+        )
+    except Exception as exc:
+        logger.exception("Failed to load staff image generation status for job %s: %s", job_id, exc)
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Unable to load generation status.",
+            },
+            status=500,
+        )
+    if job is None:
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Invalid or expired job token.",
+            },
+            status=403,
+        )
+    return JsonResponse({"ok": True, "job": _serialize_staff_image_job(job)})
+
+
+@require_POST
+def staff_image_generator_cancel(request, job_id):
+    token = (request.GET.get("token") or request.headers.get("X-Image-Job-Token") or "").strip()
+    try:
+        job = _run_staff_image_poll_db_call(_cancel_staff_image_job_by_token, job_id=job_id, token=token)
+    except FuturesTimeoutError:
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Timed out while requesting cancellation.",
+            },
+            status=504,
+        )
+    except Exception as exc:
+        logger.exception("Failed to cancel staff image generation job %s: %s", job_id, exc)
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Unable to cancel generation job.",
+            },
+            status=500,
+        )
+    if job is None:
+        return JsonResponse(
+            {
+                "ok": False,
+                "message": "Invalid or expired job token.",
+            },
+            status=403,
+        )
+    return JsonResponse({"ok": True, "job": _serialize_staff_image_job(job)})
+
+
+@staff_member_required
+@require_GET
+def sw_hub(request):
+    """
+    Staff-only Sedro-Woolley intelligence page backed by crawl artifacts in MEDIA_ROOT.
+    """
+
+    tag_filter = (request.GET.get("tag") or "").strip()
+    query = (request.GET.get("q") or "").strip()
+
+    dashboard = load_sw_dashboard_context(
+        media_root=Path(settings.MEDIA_ROOT),
+        media_url=settings.MEDIA_URL,
+        tag_filter=tag_filter or None,
+        query=query or None,
+        limit=500,
+    )
+
+    summary = dashboard["summary"]
+    manifest_rel_path = summary.get("manifest_path") if isinstance(summary, dict) else None
+    summary_rel_path = summary.get("run_summary_path") if isinstance(summary, dict) else None
+
+    context = _basic_page_context(
+        "Sedro-Woolley Staff Hub | OpenSkagit",
+        "Staff-only Sedro-Woolley data hub across crawl, ingest, and legal code sources.",
+    )
+    context.update(
+        {
+            "summary": dashboard.get("summary", {}),
+            "latest_run": dashboard.get("latest_run", {}),
+            "records": dashboard.get("records", []),
+            "available_tags": dashboard.get("available_tags", []),
+            "category_stats": dashboard.get("category_stats", {}),
+            "pipeline_summary": dashboard.get("pipeline_summary", {}),
+            "legal_summary": dashboard.get("legal_summary", {}),
+            "legal_records": dashboard.get("legal_records", []),
+            "legal_jurisdictions": dashboard.get("legal_jurisdictions", []),
+            "has_data": dashboard.get("has_data", False),
+            "selected_tag": tag_filter,
+            "query": query,
+            "media_root": str(settings.MEDIA_ROOT),
+            "manifest_absolute_path": str(Path(settings.MEDIA_ROOT) / manifest_rel_path) if manifest_rel_path else "",
+            "run_summary_absolute_path": str(Path(settings.MEDIA_ROOT) / summary_rel_path) if summary_rel_path else "",
+        }
+    )
+    return render(request, "openskagit/sw_hub.html", context)
+
+
 def _build_cma_context(request, parcel_number: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     params = params or request.GET
     parcel_state = _get_parcel_state(request, parcel_number)
@@ -4960,17 +6706,24 @@ def appeal_home(request):
     Minimal, citizen-friendly entry with a single address/parcel search box.
     """
     canonical_url = request.build_absolute_uri()
-    return render(
-        request,
-        "openskagit/appeal_home_v3.html",
+    context = _basic_page_context(
+        "Parcel Partner · Find Your Property",
+        "Search Skagit County parcels by address or parcel number to start the Parcel Partner workflow.",
+    )
+    context.update(
         {
             "step": 1,
-            "meta_description": "Search Skagit County parcels by address or parcel number to start the Parcel Partner workflow.",
-            "page_title": "Parcel Partner · Find Your Property",
             "og_title": "Parcel Partner · Find Your Property",
             "og_url": canonical_url,
             "canonical_url": canonical_url,
-        },
+            "portal_badge": "OpenSkagit Parcel Partner",
+            "show_stepper": True,
+        }
+    )
+    return render(
+        request,
+        "openskagit/appeal_home_v3.html",
+        context,
     )
 
 APPEAL_SEARCH_LIMIT = 15
@@ -4982,6 +6735,7 @@ def appeal_parcel_search(request):
     query_too_short = len(query) < APPEAL_MIN_QUERY_LENGTH
     results = []
     source = (request.GET.get("source") or "appeal").strip()
+    include_sale_price = source not in {"alert"}
 
     if not query_too_short:
         is_parcel_like = bool(re.match(r"^[Pp]\s*\d+\s*$", query))
@@ -5003,20 +6757,27 @@ def appeal_parcel_search(request):
             else:
                 qs = qs.filter(address__icontains=query)
 
-        latest_sale_price = (
-            Sales.objects.filter(parcel_number=OuterRef("parcel_number"))
-            .order_by("-sale_date", "-id")
-            .values("sale_price")[:1]
+        qs = (
+            qs.exclude(address__isnull=True)
+            .exclude(address__exact="")
+            .exclude(address__icontains="nan")
         )
 
-        # Safety + result cap
-        results = (
-            qs.exclude(address__isnull=True)
-              .exclude(address__exact="")
-              .exclude(address__icontains="nan")
-              .annotate(sale_price=Subquery(latest_sale_price))
-              .order_by("parcel_number")[:APPEAL_SEARCH_LIMIT]
-        )
+        if include_sale_price:
+            latest_sale_price = (
+                Sales.objects.filter(parcel_number=OuterRef("parcel_number"))
+                .order_by("-sale_date", "-id")
+                .values("sale_price")[:1]
+            )
+            results = (
+                qs.annotate(sale_price=Subquery(latest_sale_price))
+                .order_by("parcel_number")[:APPEAL_SEARCH_LIMIT]
+            )
+        else:
+            results = (
+                qs.only("parcel_number", "address", "neighborhood_code")
+                .order_by("parcel_number")[:APPEAL_SEARCH_LIMIT]
+            )
 
     return render(
         request,
@@ -5114,32 +6875,31 @@ def appeal_result(request, parcel_number: str):
     except ValueError as exc:
         return HttpResponseBadRequest(str(exc))
 
-    neighborhood = appeals.get_subject_neighborhood_snapshot(subject)
+    subject_meta = getattr(subject, "metadata", {}) or {}
+    neighborhood = {
+        "code": subject_meta.get("neighborhood_code"),
+        "name": subject_meta.get("neighborhood"),
+    }
     subject_year_built = subject.year_built or subject.effective_year_built
-
-    neighborhood_geom_geojson = None
-    if neighborhood and neighborhood.get("code"):
-        try:
-            geom = NeighborhoodGeom.objects.get(code=neighborhood["code"])
-            neighborhood_geom_geojson = json.loads(geom.geom_4326.geojson)
-        except NeighborhoodGeom.DoesNotExist:
-            neighborhood_geom_geojson = None
 
     comparables_url = request.path + "comparables/"
     parcel_history_points = _parcel_value_history(parcel_number)
-    planning = (
-        ParcelPlanningFacts.objects.only(*PLANNING_DOSSIER_FIELDS)
-        .filter(parcel__parcel_number=parcel_number)
-        .first()
-    )
-    waterfacts = None
-    if PLANNING_DOSSIER_WATER_FIELDS:
-        waterfacts = (
-            ParcelWaterfacts.objects.only(*PLANNING_DOSSIER_WATER_FIELDS)
-            .filter(parcel__parcel_number=parcel_number)
-            .first()
-        )
-    planning_sections = build_planning_dossier_sections(planning, waterfacts)
+    neighborhood_analysis_url = request.path + "neighborhood-analysis/"
+    # Planning dossier temporarily hidden.
+    # Keep backend hooks in place for easy re-enable later.
+    # planning = (
+    #     ParcelPlanningFacts.objects.only(*PLANNING_DOSSIER_FIELDS)
+    #     .filter(parcel__parcel_number=parcel_number)
+    #     .first()
+    # )
+    # waterfacts = None
+    # if PLANNING_DOSSIER_WATER_FIELDS:
+    #     waterfacts = (
+    #         ParcelWaterfacts.objects.only(*PLANNING_DOSSIER_WATER_FIELDS)
+    #         .filter(parcel__parcel_number=parcel_number)
+    #         .first()
+    #     )
+    # planning_sections = build_planning_dossier_sections(planning, waterfacts)
 
     return render(
         request,
@@ -5148,12 +6908,10 @@ def appeal_result(request, parcel_number: str):
             "subject": subject,
             "parcel_number": parcel_number,
             "neighborhood": neighborhood,
-            "neighborhood_geom_geojson": neighborhood_geom_geojson,
             "subject_year_built": subject_year_built,
             "comparables_url": comparables_url,
+            "neighborhood_analysis_url": neighborhood_analysis_url,
             "parcel_history_points": parcel_history_points,
-            "planning": planning,
-            "planning_sections": planning_sections,
             "step": 2,
             "meta_description": f"Review parcel {parcel_number} assessments, fairness diagnostics, and comparable sales in Parcel Partner.",
             "page_title": f"Parcel Partner · Parcel {parcel_number}",
@@ -5164,47 +6922,85 @@ def appeal_result(request, parcel_number: str):
 
 
 @require_GET
-def appeal_result_comparables(request, parcel_number: str):
-    raw_view_mode = (request.GET.get("view_mode") or "").strip().lower()
-    advanced_mode = raw_view_mode in {"advanced", "adv", "true", "1", "yes", "on"}
-    view_mode = "advanced" if advanced_mode else "standard"
+def appeal_result_neighborhood_analysis(request, parcel_number: str):
     try:
         subject, _ = appeals.load_subject_with_roll_context(parcel_number)
     except ValueError as exc:
         return HttpResponseBadRequest(str(exc))
-    activity_feed.log_activity(
-        "comparison",
-        "Finding Comparisons for",
-        subject.address or parcel_number,
-    )
-    requested_count = int(request.GET.get("count", appeals.INITIAL_COMPARABLE_LIMIT))
-    display_limit = (
-        appeals.EXTENDED_COMPARABLE_LIMIT
-        if requested_count >= appeals.EXTENDED_COMPARABLE_LIMIT
-        else appeals.INITIAL_COMPARABLE_LIMIT
-    )
-    comps, radius_used = appeals._comparable_candidates(subject, display_limit)
 
-    summary = appeals.citizen_assessment_summary(
-        subject,
-        comparables=comps,
-        radius_meters=radius_used,
-        limit=display_limit,
+    neighborhood = appeals.get_subject_neighborhood_snapshot(subject)
+    neighborhood_geom_geojson = None
+    if neighborhood and neighborhood.get("code"):
+        try:
+            geom = NeighborhoodGeom.objects.get(code=neighborhood["code"])
+            neighborhood_geom_geojson = json.loads(geom.geom_4326.geojson)
+        except NeighborhoodGeom.DoesNotExist:
+            neighborhood_geom_geojson = None
+
+    return render(
+        request,
+        "openskagit/partials/appeal_neighborhood_analysis_content.html",
+        {
+            "subject": subject,
+            "neighborhood": neighborhood,
+            "neighborhood_geom_geojson": neighborhood_geom_geojson,
+        },
     )
-    summary_comps = summary.get("comparables") or []
 
-    over_pct = summary.get("over_assessment_pct")
-    comp_count = summary.get("comp_count") or 0
-    neigh = summary.get("neighborhood") or {}
-    neigh_diff = summary.get("neigh_diff_pct")
-    avg_change_pct = neigh.get("avg_increase_pct")
-    your_change_pct = appeals.extract_assessment_change_pct(subject.metadata)
-    if your_change_pct is None and avg_change_pct is not None and neigh_diff is not None:
-        your_change_pct = avg_change_pct + neigh_diff
-    if neigh_diff is None and avg_change_pct is not None and your_change_pct is not None:
-        neigh_diff = your_change_pct - avg_change_pct
 
-    score = summary.get("score") or 0
+def _build_appeal_map_payload(
+    subject: cma.PropertySnapshot,
+    comparables: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+    subject_payload = {
+        "address": getattr(subject, "address", None),
+        "lat": _safe_float_value(getattr(subject, "latitude", None)),
+        "lon": _safe_float_value(getattr(subject, "longitude", None)),
+    }
+    comp_payloads: List[Dict[str, Any]] = []
+    for comp in comparables:
+        lat = _safe_float_value(comp.get("latitude"))
+        lon = _safe_float_value(comp.get("longitude"))
+        if lat is None or lon is None:
+            continue
+        sale_date = comp.get("sale_date")
+        sale_date_display = sale_date.strftime("%b %d, %Y") if hasattr(sale_date, "strftime") else ""
+        comp_payloads.append(
+            {
+                "parcel_number": comp.get("parcel_number"),
+                "address": comp.get("address"),
+                "lat": lat,
+                "lon": lon,
+                "sale_price": _safe_float_value(comp.get("sale_price")),
+                "sale_date_display": sale_date_display,
+                "distance_miles": _safe_float_value(comp.get("distance_miles")),
+                "bedrooms": _safe_float_value(comp.get("bedrooms")),
+                "bathrooms": _safe_float_value(comp.get("bathrooms")),
+                "sqft": _safe_float_value(comp.get("calculated_square_footage") or comp.get("living_area")),
+                "missing_bedrooms": bool(comp.get("missing_bedrooms")),
+                "adjusted_price": _safe_float_value(comp.get("adjusted_price")),
+                "total_adjustment": _safe_float_value(comp.get("total_adjustment")),
+            }
+        )
+    return {
+        "subject": subject_payload,
+        "comparables": comp_payloads,
+    }
+
+
+def _build_appeal_comparables_display_context(
+    *,
+    subject: cma.PropertySnapshot,
+    comparables: Sequence[cma.ComparableResult],
+    display_limit: int,
+    sort_by: str,
+    sort_direction: str,
+    advanced_mode: bool,
+    radius_used: Optional[float],
+    allow_widen_pass: bool,
+    parcel_number: str,
+    debug_flag: bool = False,
+) -> Dict[str, Any]:
     subject_meta = getattr(subject, "metadata", {}) or {}
     subject_area = _safe_float_value(getattr(subject, "living_area", None))
     subject_lot = _safe_float_value(
@@ -5215,48 +7011,60 @@ def appeal_result_comparables(request, parcel_number: str):
     subject_quality = subject_meta.get("quality_score")
     subject_condition = subject_meta.get("condition_score")
 
-    soft_stop = False
-    soft_reasons: List[str] = []
-    if over_pct is not None and over_pct < 7:
-        soft_stop = True
-        soft_reasons.append("Assessed value is less than ~7% above market comps.")
-    if comp_count < 3:
-        soft_stop = True
-        soft_reasons.append("Fewer than 3 strong comparable sales are available.")
-    if (neigh_diff is not None) and neigh_diff <= 0:
-        soft_stop = True
-        soft_reasons.append("Your assessment did not rise more than your neighborhood average.")
-    if score < 45:
-        soft_stop = True
-        soft_reasons.append("Overall appeal likelihood is below ~45%.")
-
-    has_more = len(comps) == display_limit and display_limit < appeals.EXTENDED_COMPARABLE_LIMIT
-    load_more_url = f"{request.path}?count={appeals.EXTENDED_COMPARABLE_LIMIT}"
-
-    # Flatten comparable results for v3 templates (which expect simple dicts)
-    view_comps = []
-    adjustment_map: Dict[str, Dict[str, Any]] = {}
-    advanced_payload: Optional[Dict[str, Any]] = None
     advanced_error: Optional[str] = None
     advanced_summary: Optional[Dict[str, Any]] = None
+    advanced_ready = False
+    valuation_date_for_adjustments: Optional[dt.date] = None
+    subject_adjustment_features: Dict[str, Optional[float]] = {}
+    adjustment_coefficients: Dict[str, Any] = {}
     if advanced_mode:
-        advanced_payload, advanced_error = _compute_adjustment_summary(subject, comps)
-        if advanced_payload:
-            adjustment_map = {
-                str(item.get("comp_id")): item for item in advanced_payload.get("comparables", [])
-            }
+        try:
+            advanced_summary = build_adjustment_support_v1(
+                subject,
+                months_lookback=24,
+                min_sample_target=30,
+                debug=debug_flag,
+            )
+            if advanced_summary.get("status") == "error":
+                advanced_error = advanced_summary.get("error") or "Advanced analysis failed."
+            else:
+                advanced_summary = _decorate_adjustment_support_summary(advanced_summary)
+        except Exception as exc:  # pragma: no cover - defensive safeguard
+            logger.exception("Adjustment support failed for parcel %s", parcel_number)
+            advanced_error = str(exc) or "Advanced analysis failed."
             advanced_summary = {
-                "subject_pred_price": advanced_payload.get("subject_pred_price"),
-                "market_group": advanced_payload.get("market_group"),
+                "model_version": "adjustment_support_v1",
+                "status": "error",
+                "not_enough_sales": False,
+                "suppressed": False,
+                "warnings": [],
             }
 
-    for c in comps:
-        snapshot = getattr(c, "snapshot", None)
+    if advanced_mode and advanced_summary and advanced_summary.get("status") == "ready":
+        advanced_ready = True
+        valuation_date_for_adjustments = _adjustment_support_valuation_date(subject, advanced_summary)
+        subject_adjustment_features = _adjustment_support_subject_features(
+            subject,
+            valuation_date_for_adjustments,
+        )
+        adjustment_coefficients = advanced_summary.get("coefficient_estimates") or {}
+
+    def _comp_calc_square_footage(comp_result: cma.ComparableResult) -> Optional[float]:
+        snapshot = getattr(comp_result, "snapshot", None)
+        comp_meta = getattr(snapshot, "metadata", {}) or {}
+        comp_living_area = _safe_float_value(getattr(snapshot, "living_area", None) if snapshot else None)
+        comp_calc_sqft = _safe_float_value(comp_meta.get("calculated_square_footage"))
+        return comp_calc_sqft if comp_calc_sqft is not None else comp_living_area
+
+    def _build_view_comp(comp_result: cma.ComparableResult, *, saved_index: int) -> Dict[str, Any]:
+        snapshot = getattr(comp_result, "snapshot", None)
         address = getattr(snapshot, "address", None) if snapshot else None
         bedrooms = getattr(snapshot, "bedrooms", None) if snapshot else None
         bathrooms = getattr(snapshot, "bathrooms", None) if snapshot else None
         living_area = getattr(snapshot, "living_area", None) if snapshot else None
         year_built = getattr(snapshot, "year_built", None) if snapshot else None
+        missing_bedrooms = _safe_float_value(bedrooms) is None
+        missing_bathrooms = _safe_float_value(bathrooms) is None
         lat = getattr(snapshot, "latitude", None) if snapshot else None
         lon = getattr(snapshot, "longitude", None) if snapshot else None
         if (lat is None or lon is None) and snapshot is not None:
@@ -5272,7 +7080,7 @@ def appeal_result_comparables(request, parcel_number: str):
         except Exception:
             sqft = None
         try:
-            price = float(c.sale_price) if c.sale_price is not None else None
+            price = float(comp_result.sale_price) if comp_result.sale_price is not None else None
         except Exception:
             price = None
         price_per_sqft = None
@@ -5281,19 +7089,18 @@ def appeal_result_comparables(request, parcel_number: str):
                 price_per_sqft = price / sqft
             except Exception:
                 price_per_sqft = None
-        comp_id = getattr(snapshot, "parcel_number", None) if snapshot else None
-        adjustments = adjustment_map.get(str(comp_id)) if comp_id else None
+
         comp_meta = getattr(snapshot, "metadata", {}) or {}
         comp_living_area = _safe_float_value(living_area)
-        comp_calc_sqft = _safe_float_value(comp_meta.get("calculated_square_footage"))
-        if comp_calc_sqft is None:
-            comp_calc_sqft = comp_living_area
+        comp_calc_sqft = _comp_calc_square_footage(comp_result)
+        missing_living_area = comp_calc_sqft is None
+        missing_year_built = _safe_float_value(year_built) is None
         comp_lot_value = _safe_float_value(
             getattr(snapshot, "acres", None)
             or getattr(snapshot, "lot_acres", None)
             or comp_meta.get("lot_acres")
         )
-        comp_score_obj = getattr(c, "score", None)
+        comp_score_obj = getattr(comp_result, "score", None)
         proximity_score = (
             _safe_float_value(getattr(comp_score_obj, "location_score", None))
             if comp_score_obj
@@ -5340,30 +7147,196 @@ def appeal_result_comparables(request, parcel_number: str):
             "quality_condition": _percentage_score(quality_condition_ratio),
             "land": _percentage_score(land_ratio),
         }
-        view_comps.append(
-            {
-                "parcel_number": getattr(snapshot, "parcel_number", None) if snapshot else None,
-                "address": address,
-                "sale_price": c.sale_price,
-                "sale_date": c.sale_date,
-                "distance_miles": c.distance_miles,
-                "assessed_value": c.assessed_value,
-                "bedrooms": bedrooms,
-                "bathrooms": bathrooms,
-                "living_area": living_area,
-                "calculated_square_footage": comp_calc_sqft,
-                "year_built": year_built,
-                "price_per_sqft": price_per_sqft,
-                "latitude": lat,
-                "longitude": lon,
-                "adjusted_value": adjustments.get("adjusted_value") if adjustments else None,
-                "total_adjustment": adjustments.get("total_adjustment") if adjustments else None,
-                "adjustments": adjustments.get("adjustment_list") if adjustments else [],
-                "similarity": similarity,
-            }
+
+        adjustment_payload = {
+            "available": False,
+            "adjusted_price": None,
+            "total_adjustment": None,
+            "adjustment_by_key": {},
+            "adjustments": [],
+            "time_months_delta": None,
+        }
+        if advanced_ready and valuation_date_for_adjustments is not None:
+            comp_features = _adjustment_support_comp_features(
+                snapshot=snapshot,
+                sale_date=comp_result.sale_date,
+                valuation_date=valuation_date_for_adjustments,
+            )
+            adjustment_payload = _compute_comp_adjustment_payload(
+                sale_price=price,
+                subject_features=subject_adjustment_features,
+                comp_features=comp_features,
+                coefficients=adjustment_coefficients,
+            )
+
+        quality_metrics = compute_adjustment_quality_metrics(
+            sale_price=price,
+            total_adjustment=adjustment_payload.get("total_adjustment"),
+            adjustments=adjustment_payload.get("adjustments") or [],
+            subject_living_area=subject_area,
+            comp_living_area=comp_calc_sqft,
+        )
+        rank_penalty_points = int(quality_metrics.get("penalty_points") or 0) if advanced_ready else 0
+        rank_similarity = max(
+            0.0,
+            float((similarity or {}).get("overall") or 0) - float(rank_penalty_points),
+        )
+        comp_group = str(quality_metrics.get("group") or "primary") if advanced_ready else "primary"
+        support_reasons = _support_reason_labels(
+            group_reasons=quality_metrics.get("group_reasons") or [],
+            quality_flags=quality_metrics.get("flags") or [],
+            missing_bedrooms=missing_bedrooms,
+            missing_bathrooms=missing_bathrooms,
+            missing_living_area=missing_living_area,
+            missing_year_built=missing_year_built,
         )
 
-    # Expose subject coordinates for map rendering if available
+        return {
+            "parcel_number": getattr(snapshot, "parcel_number", None) if snapshot else None,
+            "address": address,
+            "sale_price": comp_result.sale_price,
+            "sale_date": comp_result.sale_date,
+            "distance_miles": comp_result.distance_miles,
+            "assessed_value": comp_result.assessed_value,
+            "bedrooms": bedrooms,
+            "missing_bedrooms": missing_bedrooms,
+            "missing_bathrooms": missing_bathrooms,
+            "missing_living_area": missing_living_area,
+            "missing_year_built": missing_year_built,
+            "bathrooms": bathrooms,
+            "living_area": living_area,
+            "calculated_square_footage": comp_calc_sqft,
+            "year_built": year_built,
+            "price_per_sqft": price_per_sqft,
+            "latitude": lat,
+            "longitude": lon,
+            "similarity": similarity,
+            "adjusted_price": adjustment_payload.get("adjusted_price"),
+            "total_adjustment": adjustment_payload.get("total_adjustment"),
+            "adjustment_by_key": adjustment_payload.get("adjustment_by_key") or {},
+            "adjustments": adjustment_payload.get("adjustments") or [],
+            "time_months_delta": adjustment_payload.get("time_months_delta"),
+            "comp_group": comp_group,
+            "comp_group_reasons": quality_metrics.get("group_reasons") or [],
+            "quality_flags": quality_metrics.get("flags") or [],
+            "_comp_group": comp_group,
+            "_comp_group_reasons": quality_metrics.get("group_reasons") or [],
+            "_rank_penalty_points": rank_penalty_points,
+            "_rank_similarity": rank_similarity,
+            "_quality_flags": quality_metrics.get("flags") or [],
+            "_saved_index": saved_index,
+            "support_reasons": support_reasons,
+        }
+
+    def _sort_view_comps(
+        items: List[Dict[str, Any]],
+        *,
+        metric: str,
+        direction: str,
+    ) -> List[Dict[str, Any]]:
+        descending = direction == "desc"
+
+        def _metric_value(item: Dict[str, Any]) -> Optional[float]:
+            if metric == "saved_order":
+                return _safe_float_value(item.get("_saved_index"))
+            if metric == "similarity":
+                return _safe_float_value(item.get("_rank_similarity"))
+            if metric == "sale_price":
+                return _safe_float_value(item.get("sale_price"))
+            if metric == "sale_date":
+                sale_date = item.get("sale_date")
+                return float(sale_date.toordinal()) if hasattr(sale_date, "toordinal") else None
+            if metric == "distance":
+                return _safe_float_value(item.get("distance_miles"))
+            if metric == "bedrooms":
+                return _safe_float_value(item.get("bedrooms"))
+            if metric == "bathrooms":
+                return _safe_float_value(item.get("bathrooms"))
+            if metric == "sqft":
+                return _safe_float_value(item.get("calculated_square_footage") or item.get("living_area"))
+            if metric == "year_built":
+                return _safe_float_value(item.get("year_built"))
+            if metric == "price_per_sqft":
+                return _safe_float_value(item.get("price_per_sqft"))
+            return _safe_float_value(item.get("_rank_similarity"))
+
+        def _key(item: Dict[str, Any]) -> Tuple[int, int, float, float, int, float]:
+            metric_value = _metric_value(item)
+            metric_key = float(metric_value or 0)
+            if descending:
+                metric_key = -metric_key
+            return (
+                0 if item.get("_comp_group") == "primary" else 1,
+                1 if metric_value is None else 0,
+                metric_key,
+                -float(item.get("_rank_similarity") or 0),
+                -(item.get("sale_date").toordinal() if hasattr(item.get("sale_date"), "toordinal") else 0),
+                float(item.get("distance_miles") or 9999),
+            )
+
+        return sorted(items, key=_key)
+
+    candidate_comps = list(comparables)
+    view_comps = _sort_view_comps(
+        [_build_view_comp(comp_result, saved_index=index) for index, comp_result in enumerate(candidate_comps)],
+        metric=sort_by,
+        direction=sort_direction,
+    )
+
+    if (
+        allow_widen_pass
+        and advanced_ready
+        and display_limit < appeals.EXTENDED_COMPARABLE_LIMIT
+        and sum(1 for item in view_comps if item.get("_comp_group") != "support") < 3
+    ):
+        tightened_gla_ratio_min = 0.85
+        widened = appeals.build_sales_comps_v2(
+            subject,
+            limit=appeals.EXTENDED_COMPARABLE_LIMIT,
+            months=appeals.DEFAULT_LOOKBACK_MONTHS,
+            base_radius_m=appeals.SECONDARY_RADIUS_M,
+            max_radius_m=appeals.SECONDARY_RADIUS_M * 2,
+        )
+        expanded_comps = list(widened.comparables or [])
+        expanded_radius = widened.radius_meters_used
+        seen_parcels = {
+            _normalize_parcel_token(getattr(getattr(comp_result, "snapshot", None), "parcel_number", None))
+            for comp_result in candidate_comps
+        }
+        appended_count = 0
+        for comp_result in expanded_comps:
+            parcel_key = _normalize_parcel_token(getattr(getattr(comp_result, "snapshot", None), "parcel_number", None))
+            if not parcel_key or parcel_key in seen_parcels:
+                continue
+            size_ratio = _ratio_similarity(subject_area, _comp_calc_square_footage(comp_result))
+            if size_ratio is None or size_ratio < tightened_gla_ratio_min:
+                continue
+            seen_parcels.add(parcel_key)
+            candidate_comps.append(comp_result)
+            appended_count += 1
+        if appended_count:
+            if expanded_radius:
+                radius_used = max(radius_used or 0, expanded_radius)
+            view_comps = _sort_view_comps(
+                [_build_view_comp(comp_result, saved_index=index) for index, comp_result in enumerate(candidate_comps)],
+                metric=sort_by,
+                direction=sort_direction,
+            )
+            view_comps = view_comps[:display_limit]
+        if isinstance(advanced_summary, dict):
+            warnings = list(advanced_summary.get("warnings") or [])
+            warnings.append(
+                "Controlled widen pass run (primary comps < 3): expanded geography once and "
+                "kept only tighter GLA matches (>= 85% size similarity)."
+            )
+            if appended_count == 0:
+                warnings.append("No additional widened candidates cleared the tighter GLA gate.")
+            advanced_summary["warnings"] = warnings
+
+    primary_comps = [item for item in view_comps if item.get("_comp_group") != "support"]
+    support_comps = [item for item in view_comps if item.get("_comp_group") == "support"]
+    show_comp_groups = advanced_ready and bool(support_comps)
+
     try:
         lat = getattr(subject, "latitude", None)
         lon = getattr(subject, "longitude", None)
@@ -5377,345 +7350,424 @@ def appeal_result_comparables(request, parcel_number: str):
             lat, lon = _centroid_lat_lon(geom)
         existing_lat = getattr(subject, "latitude", None)
         existing_lon = getattr(subject, "longitude", None)
-        if lat is not None and lon is not None and (
-            existing_lat is None or existing_lon is None
-        ):
+        if lat is not None and lon is not None and (existing_lat is None or existing_lon is None):
             setattr(subject, "latitude", lat)
             setattr(subject, "longitude", lon)
     except Exception:
         pass
 
-    return render(
-        request,
-        "openskagit/appeal_results_comparables_v3.html",
-        {
-            "subject": subject,
-            "comparables": view_comps,
-            "soft_stop": soft_stop,
-            "soft_reasons": soft_reasons,
-            "score": score,
-            "rating": summary.get("rating"),
-            "reasons": summary.get("reasons", []),
-            "has_more": has_more,
-            "load_more_url": load_more_url,
-            "parcel_number": parcel_number,
-            "view_mode": view_mode,
-            "advanced_mode": advanced_mode,
-            "advanced_summary": advanced_summary,
-            "advanced_error": advanced_error,
-            "adjustment_labels": ADJUSTMENT_LABELS,
-            "radius_meters_used": radius_used,
-            "fetch_url": request.path,
-        },
+    sort_labels = {option["value"]: option["label"] for option in APPEAL_WORKSPACE_SORT_OPTIONS}
+    sort_label = sort_labels.get(sort_by, "Similarity")
+    return {
+        "comparables": view_comps,
+        "primary_comparables": primary_comps,
+        "support_comparables": support_comps,
+        "show_comp_groups": show_comp_groups,
+        "advanced_summary": advanced_summary,
+        "advanced_error": advanced_error,
+        "advanced_mode": advanced_mode,
+        "radius_meters_used": radius_used,
+        "sort_label": sort_label,
+        "map_payload": _build_appeal_map_payload(subject, view_comps),
+        "market_area_payload": (
+            advanced_summary.get("market_area")
+            if isinstance(advanced_summary, dict)
+            else None
+        ),
+    }
+
+
+@require_GET
+def appeal_result_comparables(request, parcel_number: str):
+    raw_view_mode = (request.GET.get("view_mode") or "").strip().lower()
+    advanced_mode = raw_view_mode in {"advanced", "adv", "true", "1", "yes", "on"}
+    view_mode = "advanced" if advanced_mode else "standard"
+    current_view = (request.GET.get("current_view") or "list").strip().lower()
+    if current_view not in {"list", "grid", "map"}:
+        current_view = "list"
+    sort_by, sort_direction = _normalize_appeal_comp_sort(
+        request.GET.get("sort_by"),
+        request.GET.get("sort_dir"),
     )
+    try:
+        subject, _ = appeals.load_subject_with_roll_context(parcel_number)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    activity_feed.log_activity(
+        "comparison",
+        "Finding Comparisons for",
+        subject.address or parcel_number,
+    )
+
+    try:
+        requested_count = int(request.GET.get("count", appeals.INITIAL_COMPARABLE_LIMIT))
+    except (TypeError, ValueError):
+        requested_count = appeals.INITIAL_COMPARABLE_LIMIT
+    display_limit = (
+        appeals.EXTENDED_COMPARABLE_LIMIT
+        if requested_count >= appeals.EXTENDED_COMPARABLE_LIMIT
+        else appeals.INITIAL_COMPARABLE_LIMIT
+    )
+
+    parcel_state = _get_appeal_comp_parcel_state(request, parcel_number)
+    comps = _cached_appeal_pool_comparables(
+        request,
+        parcel_number,
+        display_limit=display_limit,
+    )
+    comparables_from_cache = comps is not None
+    if comps is None:
+        comps, radius_used = appeals._comparable_candidates(subject, display_limit)
+        parcel_state = _refresh_appeal_comp_pool(request, parcel_number, comps)
+        parcel_state["last_radius_meters"] = _safe_float_value(radius_used)
+        parcel_state["last_limit"] = display_limit
+        request.session.modified = True
+    else:
+        radius_used = _safe_float_value(parcel_state.get("last_radius_meters"))
+
+    pool = parcel_state.get("pool")
+    pool_count = len(pool) if isinstance(pool, dict) else len(comps)
+    saved_order = _get_appeal_saved_order(request, parcel_number)
+    saved_set = set(saved_order)
+    no_comp_diagnostics: Optional[Dict[str, Any]] = None
+    if not comps:
+        no_comp_diagnostics = diagnose_no_comp_path(
+            subject,
+            limit=display_limit,
+            months=appeals.DEFAULT_LOOKBACK_MONTHS,
+            base_radius_m=appeals.PRIMARY_RADIUS_M,
+            max_radius_m=appeals.SECONDARY_RADIUS_M,
+        )
+
+    summary = appeals.citizen_assessment_summary(
+        subject,
+        comparables=comps,
+        radius_meters=radius_used,
+        limit=display_limit,
+    )
+
+    over_pct = summary.get("over_assessment_pct")
+    comp_count = summary.get("comp_count") or 0
+    neigh = summary.get("neighborhood") or {}
+    neigh_diff = summary.get("neigh_diff_pct")
+    avg_change_pct = neigh.get("avg_increase_pct")
+    your_change_pct = appeals.extract_assessment_change_pct(subject.metadata)
+    if your_change_pct is None and avg_change_pct is not None and neigh_diff is not None:
+        your_change_pct = avg_change_pct + neigh_diff
+    if neigh_diff is None and avg_change_pct is not None and your_change_pct is not None:
+        neigh_diff = your_change_pct - avg_change_pct
+
+    score = summary.get("score") or 0
+    soft_stop = False
+    soft_reasons: List[str] = []
+    if over_pct is not None and over_pct < 7:
+        soft_stop = True
+        soft_reasons.append("Assessed value is less than ~7% above market comps.")
+    if comp_count < 3:
+        soft_stop = True
+        soft_reasons.append("Fewer than 3 strong comparable sales are available.")
+    if (neigh_diff is not None) and neigh_diff <= 0:
+        soft_stop = True
+        soft_reasons.append("Your assessment did not rise more than your neighborhood average.")
+    if score < 45:
+        soft_stop = True
+        soft_reasons.append("Overall appeal likelihood is below ~45%.")
+
+    has_more = False
+    if display_limit < appeals.EXTENDED_COMPARABLE_LIMIT:
+        has_more = pool_count > display_limit or len(comps) == display_limit
+    load_more_query = {
+        "count": appeals.EXTENDED_COMPARABLE_LIMIT,
+        "current_view": current_view,
+        "sort_by": sort_by,
+        "sort_dir": sort_direction,
+    }
+    if advanced_mode:
+        load_more_query["view_mode"] = "advanced"
+    load_more_url = f"{request.path}?{urlencode(load_more_query)}"
+    debug_flag = (request.GET.get("debug") or "").strip().lower() in {"1", "true", "yes", "on"}
+    display_context = _build_appeal_comparables_display_context(
+        subject=subject,
+        comparables=comps,
+        display_limit=display_limit,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        advanced_mode=advanced_mode,
+        radius_used=radius_used,
+        allow_widen_pass=True,
+        parcel_number=parcel_number,
+        debug_flag=debug_flag,
+    )
+
+    for comp in display_context["comparables"]:
+        comp["is_saved"] = _normalize_parcel_token(comp.get("parcel_number")) in saved_set
+
+    tray_context = _build_appeal_saved_tray_context(request, parcel_number)
+    context = {
+        "subject": subject,
+        "soft_stop": soft_stop,
+        "soft_reasons": soft_reasons,
+        "score": score,
+        "rating": summary.get("rating"),
+        "reasons": summary.get("reasons", []),
+        "has_more": has_more,
+        "load_more_url": load_more_url,
+        "extended_limit": appeals.EXTENDED_COMPARABLE_LIMIT,
+        "parcel_number": parcel_number,
+        "view_mode": view_mode,
+        "current_view": current_view,
+        "radius_meters_used": display_context.get("radius_meters_used"),
+        "fetch_url": request.path,
+        "sort_options": APPEAL_COMPARABLE_SORT_OPTIONS,
+        "sort_by": sort_by,
+        "sort_direction": sort_direction,
+        "sort_label": display_context.get("sort_label"),
+        "no_comp_diagnostics": no_comp_diagnostics,
+        "comparables_from_cache": comparables_from_cache,
+        "saved_comps_url": reverse("appeal-saved-comps", args=[parcel_number]),
+        "workspace_url": tray_context["workspace_url"],
+        "saved_rows": tray_context["saved_rows"],
+        "saved_count": tray_context["saved_count"],
+        "saved_limit": tray_context["saved_limit"],
+        "saved_ids": tray_context["saved_ids"],
+        **display_context,
+    }
+
+    fragment = (request.GET.get("fragment") or "").strip().lower()
+    if fragment == "content":
+        return render(request, "openskagit/partials/appeal_comparables_content.html", context)
+    return render(request, "openskagit/appeal_results_comparables_v3.html", context)
+
+
+@require_POST
+def appeal_saved_comps(request, parcel_number: str):
+    try:
+        payload = json.loads((request.body or b"{}").decode("utf-8"))
+    except (TypeError, ValueError, UnicodeDecodeError):
+        return JsonResponse({"ok": False, "error": "Invalid JSON payload."}, status=400)
+
+    if not isinstance(payload, dict):
+        return JsonResponse({"ok": False, "error": "JSON object required."}, status=400)
+
+    action = str(payload.get("action") or "").strip().lower()
+    if action not in {"add", "remove", "reorder", "clear"}:
+        return JsonResponse({"ok": False, "error": "Unsupported action."}, status=400)
+
+    parcel_state = _get_appeal_comp_parcel_state(request, parcel_number)
+    pool = parcel_state.get("pool")
+    if not isinstance(pool, dict):
+        pool = {}
+        parcel_state["pool"] = pool
+        request.session.modified = True
+    pool_keys = {_normalize_parcel_token(parcel_id) for parcel_id in pool.keys() if _normalize_parcel_token(parcel_id)}
+    saved_order = _normalize_saved_order(parcel_state.get("saved_order"), allowed_ids=pool_keys)
+    message = ""
+
+    if action == "add":
+        comp_parcel = _normalize_parcel_token(payload.get("comp_parcel"))
+        if not comp_parcel:
+            return JsonResponse({"ok": False, "error": "comp_parcel is required for add."}, status=400)
+        if comp_parcel not in pool_keys:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "Comparable is not available in the current pool. Refresh comparables and try again.",
+                },
+                status=400,
+            )
+        if comp_parcel in saved_order:
+            message = "Comparable is already saved."
+        elif len(saved_order) >= APPEAL_SAVED_COMP_LIMIT:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": f"Saved comps are capped at {APPEAL_SAVED_COMP_LIMIT}. Remove one before adding another.",
+                },
+                status=400,
+            )
+        else:
+            saved_order.append(comp_parcel)
+            message = "Comparable added."
+
+    elif action == "remove":
+        comp_parcel = _normalize_parcel_token(payload.get("comp_parcel"))
+        if not comp_parcel:
+            return JsonResponse({"ok": False, "error": "comp_parcel is required for remove."}, status=400)
+        saved_order = [parcel_id for parcel_id in saved_order if parcel_id != comp_parcel]
+        message = "Comparable removed."
+
+    elif action == "reorder":
+        order_payload = payload.get("order")
+        if not isinstance(order_payload, list):
+            return JsonResponse({"ok": False, "error": "order must be a list for reorder."}, status=400)
+        normalized_order = _normalize_saved_order(order_payload, allowed_ids=set(saved_order))
+        if len(normalized_order) != len(saved_order) or set(normalized_order) != set(saved_order):
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "order must contain each currently saved comparable exactly once.",
+                },
+                status=400,
+            )
+        saved_order = normalized_order
+        message = "Order updated."
+
+    elif action == "clear":
+        saved_order = []
+        message = "Saved comps cleared."
+
+    parcel_state["saved_order"] = saved_order
+    parcel_state["updated_at"] = timezone.now().isoformat()
+    request.session.modified = True
+
+    tray_context = _build_appeal_saved_tray_context(request, parcel_number)
+    return JsonResponse(
+        {
+            "ok": True,
+            "saved_count": tray_context["saved_count"],
+            "saved_ids": tray_context["saved_ids"],
+            "saved_limit": tray_context["saved_limit"],
+            "workspace_url": tray_context["workspace_url"],
+            "tray_html": render_to_string(
+                "openskagit/partials/appeal_saved_comp_tray.html",
+                tray_context,
+                request=request,
+            ),
+            "message": message,
+        }
+    )
+
+
+def _load_saved_comparable_results(request, parcel_number: str) -> List[cma.ComparableResult]:
+    parcel_state = _get_appeal_comp_parcel_state(request, parcel_number)
+    pool = parcel_state.get("pool")
+    if not isinstance(pool, dict):
+        return []
+    saved_order = _get_appeal_saved_order(request, parcel_number)
+    comparables: List[cma.ComparableResult] = []
+    for parcel_id in saved_order:
+        payload = pool.get(parcel_id)
+        if not isinstance(payload, dict):
+            continue
+        try:
+            comparables.append(appeals._comparable_from_payload(payload))
+        except Exception:
+            logger.exception("Unable to deserialize saved comparable payload %s", parcel_id)
+    return comparables
+
+
+def _build_workspace_board_context(
+    request,
+    *,
+    subject: cma.PropertySnapshot,
+    parcel_number: str,
+    view_mode: str,
+    workspace_view: str,
+    sort_by: str,
+    sort_direction: str,
+) -> Dict[str, Any]:
+    saved_comparables = _load_saved_comparable_results(request, parcel_number)
+    advanced_mode = view_mode == "advanced"
+    display_context = _build_appeal_comparables_display_context(
+        subject=subject,
+        comparables=saved_comparables,
+        display_limit=max(1, len(saved_comparables)),
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        advanced_mode=advanced_mode,
+        radius_used=None,
+        allow_widen_pass=False,
+        parcel_number=parcel_number,
+    )
+    for comp in display_context["comparables"]:
+        comp["is_saved"] = True
+    saved_order = [comp.get("parcel_number") for comp in display_context["comparables"] if comp.get("parcel_number")]
+    return {
+        "subject": subject,
+        "parcel_number": parcel_number,
+        "view_mode": view_mode,
+        "workspace_view": workspace_view,
+        "advanced_mode": advanced_mode,
+        "sort_by": sort_by,
+        "sort_direction": sort_direction,
+        "sort_label": display_context.get("sort_label"),
+        "saved_count": len(saved_comparables),
+        "saved_ids": saved_order,
+        **display_context,
+    }
+
+
+@require_GET
+def appeal_comp_workspace(request, parcel_number: str):
+    try:
+        subject, _ = appeals.load_subject_with_roll_context(parcel_number)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    raw_view_mode = (request.GET.get("view_mode") or "").strip().lower()
+    view_mode = "advanced" if raw_view_mode in {"advanced", "adv", "true", "1", "yes", "on"} else "standard"
+    workspace_view = _normalize_workspace_view(request.GET.get("workspace_view"))
+    sort_by, sort_direction = _normalize_workspace_comp_sort(
+        request.GET.get("sort_by"),
+        request.GET.get("sort_dir"),
+    )
+    context = _build_workspace_board_context(
+        request,
+        subject=subject,
+        parcel_number=parcel_number,
+        view_mode=view_mode,
+        workspace_view=workspace_view,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+    )
+    context.update(
+        {
+            "saved_comps_url": reverse("appeal-saved-comps", args=[parcel_number]),
+            "workspace_board_url": reverse("appeal-comp-workspace-board", args=[parcel_number]),
+            "comparables_url": reverse("appeal-result-comparables", args=[parcel_number]),
+            "sort_options": APPEAL_WORKSPACE_SORT_OPTIONS,
+            "workspace_view": workspace_view,
+            "meta_description": f"Compare saved comps side by side for parcel {parcel_number} in Parcel Partner.",
+            "page_title": f"Parcel Partner · Workspace {parcel_number}",
+            "og_title": f"Parcel Partner · Workspace {parcel_number}",
+            "og_url": request.build_absolute_uri(),
+        }
+    )
+    return render(request, "openskagit/appeal_comp_workspace.html", context)
+
+
+@require_GET
+def appeal_comp_workspace_board(request, parcel_number: str):
+    try:
+        subject, _ = appeals.load_subject_with_roll_context(parcel_number)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    raw_view_mode = (request.GET.get("view_mode") or "").strip().lower()
+    view_mode = "advanced" if raw_view_mode in {"advanced", "adv", "true", "1", "yes", "on"} else "standard"
+    workspace_view = _normalize_workspace_view(request.GET.get("workspace_view"))
+    sort_by, sort_direction = _normalize_workspace_comp_sort(
+        request.GET.get("sort_by"),
+        request.GET.get("sort_dir"),
+    )
+    context = _build_workspace_board_context(
+        request,
+        subject=subject,
+        parcel_number=parcel_number,
+        view_mode=view_mode,
+        workspace_view=workspace_view,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+    )
+    return render(request, "openskagit/partials/appeal_comp_workspace_board.html", context)
 
 
 @require_GET
 def appeal_fairness_analysis(request, parcel_number: str):
-    """
-    Run an on-demand fairness analysis that blends subject, neighborhood,
-    and comparable sales metrics using IAAO-style concepts.
-    """
-    pn = (parcel_number or "").strip()
-    if not pn:
-        return HttpResponseBadRequest("Parcel number is required.")
-
-    try:
-        subject, _ = appeals.load_subject_with_roll_context(pn)
-    except ValueError as exc:
-        return HttpResponseBadRequest(str(exc))
-
-    summary = appeals.citizen_assessment_summary(subject)
-    comparables = summary.get("comparables") or []
-    neighborhood = summary.get("neighborhood") or {}
-
-    def _to_float(value: Any) -> Optional[float]:
-        if value in (None, "", "null"):
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError, InvalidOperation):
-            return None
-
-    def _serialize_subject(snapshot: cma.PropertySnapshot) -> Dict[str, Any]:
-        metadata = snapshot.metadata if isinstance(snapshot.metadata, dict) else {}
-        return {
-            "parcel_number": snapshot.parcel_number,
-            "address": snapshot.address,
-            "assessed_value": _to_float(snapshot.assessed_value or metadata.get("assessed_value")),
-            "sale_price": _to_float(snapshot.sale_price),
-            "sale_date": snapshot.sale_date.isoformat() if snapshot.sale_date else None,
-            "bedrooms": _to_float(snapshot.bedrooms),
-            "bathrooms": _to_float(snapshot.bathrooms),
-            "living_area_sqft": _to_float(snapshot.living_area),
-            "year_built": snapshot.year_built or snapshot.effective_year_built,
-            "neighborhood_code": metadata.get("neighborhood_code"),
-            "valuation_area": metadata.get("valuation_area"),
-            "assessment_roll_year": metadata.get("assessment_roll_year"),
-        }
-
-    def _serialize_comparable(comp: cma.ComparableResult) -> Dict[str, Any]:
-        snapshot = getattr(comp, "snapshot", None)
-        address = getattr(snapshot, "address", None) if snapshot else None
-        bedrooms = getattr(snapshot, "bedrooms", None) if snapshot else None
-        bathrooms = getattr(snapshot, "bathrooms", None) if snapshot else None
-        living_area = getattr(snapshot, "living_area", None) if snapshot else None
-        year_built = getattr(snapshot, "year_built", None) if snapshot else None
-        return {
-            "parcel_number": getattr(snapshot, "parcel_number", None) if snapshot else None,
-            "address": address,
-            "sale_price": _to_float(comp.sale_price),
-            "sale_date": comp.sale_date.isoformat() if comp.sale_date else None,
-            "assessed_value": _to_float(comp.assessed_value),
-            "distance_miles": _to_float(comp.distance_miles),
-            "bedrooms": _to_float(bedrooms),
-            "bathrooms": _to_float(bathrooms),
-            "living_area_sqft": _to_float(living_area),
-            "year_built": year_built,
-        }
-
-    serialized_comps = [_serialize_comparable(c) for c in comparables]
-
-    # Basic fairness metrics grounded in IAAO concepts:
-    #   - level (sales ratio / median ratio)
-    #   - uniformity (COD)
-    #   - vertical equity (PRD)
-    neighborhood_cod = _to_float(neighborhood.get("cod"))
-    neighborhood_prd = _to_float(neighborhood.get("prd"))
-    neighborhood_sales_ratio = _to_float(neighborhood.get("sales_ratio"))
-    over_assessment_pct = summary.get("over_assessment_pct")
-    comp_count = summary.get("comp_count") or 0
-    score = summary.get("score")
-    rating = summary.get("rating")
-
-    metrics: Dict[str, Any] = {
-        "over_assessment_pct": _to_float(over_assessment_pct),
-        "comp_count": comp_count,
-        "appeal_score": _to_float(score),
-        "appeal_rating": rating,
-        "cod": neighborhood_cod,
-        "prd": neighborhood_prd,
-        "sales_ratio": neighborhood_sales_ratio,
-    }
-
-    # Status buckets for quick visual flags
-    def _level_status(ratio: Optional[float]) -> Dict[str, Any]:
-        if ratio is None:
-            return {
-                "label": "Level unknown",
-                "severity": "unknown",
-                "description": "We could not calculate a neighborhood sales ratio.",
-            }
-        if 90 <= ratio <= 110:
-            return {
-                "label": "Within IAAO range",
-                "severity": "ok",
-                "description": "Neighborhood level is broadly aligned with the IAAO 90–110% target range.",
-            }
-        return {
-            "label": "Outside IAAO range",
-            "severity": "watch",
-            "description": "Neighborhood level appears outside the typical 90–110% IAAO range.",
-        }
-
-    def _cod_status(cod_value: Optional[float]) -> Dict[str, Any]:
-        if cod_value is None:
-            return {
-                "label": "Uniformity unknown",
-                "severity": "unknown",
-                "description": "We do not have a COD metric for this neighborhood.",
-            }
-        if cod_value < 10:
-            return {
-                "label": "Excellent uniformity",
-                "severity": "ok",
-                "description": "COD below ~10 suggests very consistent assessments among similar properties.",
-            }
-        if cod_value < 15:
-            return {
-                "label": "Acceptable uniformity",
-                "severity": "ok",
-                "description": "COD between ~10–15 is generally viewed as acceptable for residential property.",
-            }
-        return {
-            "label": "Patchy uniformity",
-            "severity": "watch",
-            "description": "COD above ~15 suggests assessments vary more than IAAO guidelines recommend.",
-        }
-
-    def _prd_status(prd_value: Optional[float]) -> Dict[str, Any]:
-        if prd_value is None:
-            return {
-                "label": "Vertical equity unknown",
-                "severity": "unknown",
-                "description": "We do not have a PRD metric for this neighborhood.",
-            }
-        if 0.98 <= prd_value <= 1.03:
-            return {
-                "label": "Balanced by value",
-                "severity": "ok",
-                "description": "High- and low-value properties appear to be assessed at similar ratios.",
-            }
-        if prd_value > 1.03:
-            return {
-                "label": "Regressive pattern",
-                "severity": "concern",
-                "description": "Higher-value properties tend to be under-assessed relative to lower-value homes.",
-            }
-        return {
-            "label": "Progressive pattern",
-            "severity": "watch",
-            "description": "Higher-value properties tend to be over-assessed relative to lower-value homes.",
-        }
-
-    level_status = _level_status(neighborhood_sales_ratio)
-    cod_status = _cod_status(neighborhood_cod)
-    prd_status = _prd_status(neighborhood_prd)
-
-    context_payload = {
-        "subject": _serialize_subject(subject),
-        "neighborhood": {
-            "code": neighborhood.get("code"),
-            "name": neighborhood.get("name"),
-            "year": neighborhood.get("year"),
-            "cod": neighborhood_cod,
-            "prd": neighborhood_prd,
-            "sales_ratio": neighborhood_sales_ratio,
-            "reliability": neighborhood.get("reliability"),
-            "reliability_display": neighborhood.get("reliability_display"),
-            "valid_sales": neighborhood.get("valid_sales"),
-            "parcels": neighborhood.get("parcels"),
-        },
-        "comparables": serialized_comps,
-        "metrics": metrics,
-    }
-
-    system_prompt = (
-        "You are a property tax fairness reviewer for a county assessor's office. "
-        "Use IAAO mass appraisal standards around level, uniformity (COD), and price-related bias (PRD). "
-        "Explain findings for residents in plain language, without legal advice."
-        "talk to a citizen that doesn't have a lot of knowledge about all this.  instead of the subject, say, your house."
-        "talk directly to home owner"
-    )
-
-    context_json = json.dumps(context_payload, ensure_ascii=False)
-
-    user_prompt = (
-        "Review this property-tax context and provide a fairness analysis.\n\n"
-        "Context JSON (read-only):\n"
-        f"{context_json}\n\n"
-        "Using IAAO concepts:\n"
-        "  - Level: Are assessments near 100% of market value (90–110% band)?\n"
-        "  - Uniformity: Is COD in an acceptable range for residential property?\n"
-        "  - Vertical equity: Does PRD suggest regressivity or progressivity?\n\n"
-        "Return STRICT JSON with this exact shape and no extra commentary:\n"
-        "{\n"
-        '  "summary": "2–3 sentence plain-language overview.",\n'
-        '  "subject_vs_neighborhood": ["bullet-style insight", "..."],\n'
-        '  "subject_vs_comparables": ["bullet-style insight", "..."],\n'
-        '  "fairness_flags": [\n'
-        '    {"label": "Horizontal equity", "severity": "info|watch|concern", "detail": "..."}\n'
-        "  ],\n"
-        '  "iaao_signals": "Short explanation of what COD, PRD, and sales ratios suggest.",\n'
-        '  "next_steps": ["Concrete, non-legal suggestions for the homeowner"],\n'
-        '  "disclaimer": "Short reminder that this is not legal advice."\n'
-        "}\n"
-    )
-
-    analysis: Dict[str, Any] = {
-        "summary": "",
-        "subject_vs_neighborhood": [],
-        "subject_vs_comparables": [],
-        "fairness_flags": [],
-        "iaao_signals": "",
-        "next_steps": [],
-        "disclaimer": "",
-    }
-    analysis_error: Optional[str] = None
-    raw_text: str = ""
-
-    try:
-        client = llm.get_openai_client()
-        model_name = getattr(settings, "OPENAI_RESPONSES_MODEL", "gpt-4o-mini")
-        response = client.responses.create(
-            model=model_name,
-            input=str(f"System Prompt {system_prompt}, User Prompt: {user_prompt}"),
-            temperature=0.2,
-        )
-        raw_text = getattr(response, "output_text", "") or ""
-        text = raw_text.strip()
-        try:
-            if text:
-                parsed = json.loads(text)
-                if isinstance(parsed, dict):
-                    analysis.update(parsed)
-                else:
-                    analysis["summary"] = text
-        except json.JSONDecodeError:
-            # Fall back to wrapping the model text as a simple summary.
-            analysis["summary"] = text
-    except llm.MissingCredentials as exc:
-        analysis_error = str(exc)
-    except llm.MissingDependency as exc:
-        analysis_error = str(exc)
-    except llm.OpenAIError as exc:
-        analysis_error = str(exc)
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.exception("Unexpected error during fairness analysis for parcel %s", pn)
-        analysis_error = str(exc)
-
-    history_points = _load_neighborhood_sales_ratio_history(neighborhood.get("code"))
-
-    subject_over_pct = metrics.get("over_assessment_pct")
-    subject_ratio_pct = None if subject_over_pct is None else 100 + subject_over_pct
-    distribution_context = {
-        "subject_ratio": subject_ratio_pct,
-        "neighborhood_median_ratio": neighborhood.get("median_ratio_pct"),
-        "iaao_range": {"low": 90, "high": 110},
-    }
-
-    adjustment_payload, adjustment_error = _compute_adjustment_summary(subject, comparables)
-    adjustment_storyboard = []
-    if adjustment_payload:
-        adjustment_storyboard = _prepare_adjustment_storyboard(adjustment_payload, subject, comparables)
-
-    horizontal_diff = None
-    if subject_ratio_pct is not None and neighborhood_sales_ratio is not None:
-        horizontal_diff = subject_ratio_pct - neighborhood_sales_ratio
-
-    radar_data = {
-        "level_ratio": neighborhood_sales_ratio,
-        "uniformity": neighborhood_cod,
-        "horizontal_diff": horizontal_diff,
-        "vertical_prd": neighborhood_prd,
-        "over_under_pct": metrics.get("over_assessment_pct"),
-    }
-
-    appeal_gauge = {
-        "score": metrics.get("appeal_score"),
-        "rating": metrics.get("appeal_rating") or rating,
-    }
-
-    context = {
-        "subject": subject,
-        "parcel_number": pn,
-        "neighborhood": neighborhood,
-        "metrics": metrics,
-        "level_status": level_status,
-        "cod_status": cod_status,
-        "prd_status": prd_status,
-        "history_points": history_points,
-        "distribution_context": distribution_context,
-        "adjustment_storyboard": adjustment_storyboard,
-        "adjustment_error": adjustment_error,
-        "radar_data": radar_data,
-        "appeal_gauge": appeal_gauge,
-        "analysis": analysis,
-        "analysis_error": analysis_error,
-        "analysis_raw_text": raw_text,
-    }
-
-    return render(request, "openskagit/appeal_fairness_analysis_v3.html", context)
+    message = "Fairness analysis is deprecated and no longer available in Parcel Partner."
+    logger.info("Deprecated fairness endpoint requested for parcel %s", parcel_number)
+    return HttpResponseGone(message)
 
 
 def _parse_iso_datetime(value: Optional[str]) -> Optional[dt.datetime]:
@@ -5757,6 +7809,7 @@ def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, 
                     "chart_data": seg.get("chart_data") or [],
                 }
             )
+    stats_rows = [row for row in stats_list if isinstance(row, dict)]
 
     raw_coefficients = diagnostics.get("coefficients") or []
     coefficients_raw = [
@@ -5765,6 +7818,8 @@ def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, 
     ]
     coefficients_by_group: Dict[str, Dict[str, Any]] = {}
     for entry in coefficients_raw:
+        if not isinstance(entry, dict):
+            continue
         market_group = entry.get("market_group")
         if not market_group:
             continue
@@ -5774,9 +7829,7 @@ def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, 
         }
 
     model_stats: Dict[str, Dict[str, Any]] = {}
-    for stat in stats_list:
-        if not isinstance(stat, dict):
-            continue
+    for stat in stats_rows:
         label = stat.get("label") or stat.get("market_group")
         if not label:
             continue
@@ -5785,7 +7838,10 @@ def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, 
     interactive_rows: List[Dict[str, Any]] = []
     for group_name, group_data in coefficients_by_group.items():
         stats = model_stats.get(group_name, {})
-        for coeff in group_data.get("coefficients", []):
+        coeff_rows = group_data.get("coefficients", []) or []
+        for coeff in coeff_rows:
+            if not isinstance(coeff, dict):
+                continue
             interactive_rows.append(
                 {
                     "market_group": group_name,
@@ -5803,8 +7859,11 @@ def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, 
             )
 
     aggregated_value_drivers: Dict[str, Dict[str, Any]] = {}
-    for stats in stats_list:
-        for driver in stats.get("value_drivers", []) or []:
+    for stats in stats_rows:
+        drivers = stats.get("value_drivers", []) or []
+        for driver in drivers:
+            if not isinstance(driver, dict):
+                continue
             predictor = driver.get("predictor")
             if not predictor:
                 continue
@@ -5899,17 +7958,19 @@ def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, 
 
     total_observations = 0
     if diagnostics.get("global_metrics"):
-        total_observations = diagnostics["global_metrics"].get("total_observations") or 0
+        global_metrics = diagnostics["global_metrics"]
+        if isinstance(global_metrics, dict):
+            total_observations = global_metrics.get("total_observations") or 0
     if not total_observations:
-        total_observations = sum(int(stat.get("n") or 0) for stat in stats_list)
+        total_observations = sum(int(stat.get("n") or 0) for stat in stats_rows)
 
     generated_at = diagnostics.get("generated_at") or diagnostics.get("generated")
     last_updated = _parse_iso_datetime(generated_at)
-    adjustment_run_stats_json = json.dumps(stats_list, default=str)
-    chart_data = stats_list[0].get("chart_data", []) if stats_list else []
+    adjustment_run_stats_json = json.dumps(stats_rows, default=str)
+    chart_data = stats_rows[0].get("chart_data", []) if stats_rows else []
 
     return {
-        "adjustment_run_stats": stats_list,
+        "adjustment_run_stats": stats_rows,
         "adjustment_run_stats_json": adjustment_run_stats_json,
         "coefficients_by_group": coefficients_by_group,
         "model_stats": model_stats,
@@ -5918,7 +7979,7 @@ def _build_methodology_context_from_diagnostics(diagnostics: Optional[Dict[str, 
         "last_updated": last_updated,
         "latest_adjustment_run": {"run_id": diagnostics.get("run_id"), "created_at": last_updated} if diagnostics else None,
         "total_observations": total_observations,
-        "model_stats_list": stats_list,
+        "model_stats_list": stats_rows,
         "chart_data": chart_data,
     }
 
@@ -6369,17 +8430,374 @@ def _parse_tags(raw: str) -> List[str]:
     return [t.strip() for t in raw.split(",") if t.strip()]
 
 
+def _dedupe_ordered(items: Sequence[str]) -> List[str]:
+    seen: Set[str] = set()
+    ordered: List[str] = []
+    for item in items:
+        token = (item or "").strip()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        ordered.append(token)
+    return ordered
+
+
+def _sanitize_selection(raw_items: Sequence[str], allowed: Set[str]) -> List[str]:
+    return [token for token in _dedupe_ordered(raw_items) if token in allowed]
+
+
 def _load_diagnostics(path: Optional[str]) -> Optional[Dict[str, Any]]:
     if not path or not os.path.exists(path):
         return None
     try:
         with open(path, "r") as f:
-            return json.load(f)
+            payload = json.load(f)
+            if not isinstance(payload, dict):
+                logger.warning("Diagnostics payload is not an object for path %s", path)
+                return None
+            return payload
     except Exception:
         return None
 
 
-@staff_member_required
+REGRESSION_GATE_PASSWORD = "grandson2025"
+REGRESSION_GATE_SESSION_KEY = "regression_control_unlocked_at"
+REGRESSION_GATE_SESSION_TTL = dt.timedelta(hours=12)
+REGRESSION_SEGMENTATION_OPTIONS = [
+    {
+        "value": "valuation_area",
+        "label": "Valuation Area (Recommended)",
+        "description": "Stable county macro segments (west/central/east style).",
+    },
+    {
+        "value": "city_district",
+        "label": "City / District",
+        "description": "Groups by city jurisdiction from master parcel records.",
+    },
+    {
+        "value": "hood_code",
+        "label": "Neighborhood (hood_code)",
+        "description": "Most granular grouping; can be sparse in low-sale neighborhoods.",
+    },
+]
+
+REGRESSION_PREDICTOR_SOURCE_HINTS: Dict[str, Dict[str, str]] = {
+    "log_area": {"model": "MasterParcel", "field": "final_living_area / total_living_area"},
+    "log_area_sq": {"model": "MasterParcel", "field": "living area curvature"},
+    "log_age": {"model": "MasterParcel", "field": "year_built"},
+    "log_eff_age": {"model": "MasterParcel", "field": "eff_year_built"},
+    "quality_score": {"model": "MasterParcel", "field": "quality_score"},
+    "condition_score": {"model": "MasterParcel", "field": "condition_score"},
+    "log_lot": {"model": "MasterParcel", "field": "acres"},
+    "log_lot_sq": {"model": "MasterParcel", "field": "lot size curvature"},
+    "land_share": {"model": "MasterParcel", "field": "land vs total market value"},
+    "log_far": {"model": "MasterParcel", "field": "floor_area_ratio"},
+    "has_garage": {"model": "MasterParcel", "field": "garage area rollup"},
+    "has_basement": {"model": "MasterParcel", "field": "basement area rollup"},
+    "bedrooms": {"model": "MasterParcel", "field": "number_of_bedrooms"},
+    "bathrooms": {"model": "MasterParcel", "field": "total_baths"},
+    "baths_per_bed": {"model": "MasterParcel", "field": "bathrooms / bedrooms"},
+    "is_view": {"model": "MasterParcel", "field": "hood_code-derived view flag"},
+    "missing_quality": {"model": "MasterParcel", "field": "quality_score null flag"},
+    "missing_condition": {"model": "MasterParcel", "field": "condition_score null flag"},
+    "log_elev": {"model": "ParcelGeometry", "field": "elev"},
+    "log_major_road": {"model": "ParcelGeometry", "field": "dist_major_road"},
+    "view_aspect_west": {"model": "ParcelGeometry", "field": "aspect"},
+    "view_elev": {"model": "ParcelGeometry", "field": "is_view x log_elev"},
+    "view_level": {"model": "ParcelGeometry", "field": "view + aspect composite"},
+    "in_flood_zone_flag": {"model": "ParcelPlanningFacts", "field": "in_flood_zone"},
+    "in_sfha_flag": {"model": "ParcelPlanningFacts", "field": "in_sfha"},
+    "in_wetland_flag": {"model": "ParcelPlanningFacts", "field": "in_wetland"},
+    "in_shoreline_flag": {"model": "ParcelPlanningFacts", "field": "in_shoreline_jurisdiction"},
+    "sewer_available_flag": {"model": "ParcelPlanningFacts", "field": "public_sewer_available"},
+    "recent_permits_flag": {"model": "ParcelPlanningFacts", "field": "has_recent_permits_5yr"},
+    "log_buildable_area": {"model": "ParcelPlanningFacts", "field": "buildable_area_sqft"},
+    "t": {"model": "Sales", "field": "sale_date months since anchor"},
+    "t_sq": {"model": "Sales", "field": "time curvature"},
+    "land_time": {"model": "Derived", "field": "land_share x time"},
+    "area_time": {"model": "Derived", "field": "log_area x time"},
+}
+
+
+def _build_regression_predictor_catalog(
+    core_predictor_options: Sequence[str],
+    candidate_predictor_options: Sequence[str],
+) -> List[Dict[str, str]]:
+    core_set = set(core_predictor_options)
+    rows: List[Dict[str, str]] = []
+    for predictor in _dedupe_ordered(list(core_predictor_options) + list(candidate_predictor_options)):
+        hint = REGRESSION_PREDICTOR_SOURCE_HINTS.get(predictor, {"model": "Derived", "field": "engineered feature"})
+        rows.append(
+            {
+                "name": predictor,
+                "scope": "core" if predictor in core_set else "candidate",
+                "source_model": hint["model"],
+                "source_field": hint["field"],
+            }
+        )
+    return rows
+
+
+def _is_regression_gate_unlocked(request) -> bool:
+    unlocked_at_raw = request.session.get(REGRESSION_GATE_SESSION_KEY)
+    if not unlocked_at_raw:
+        return False
+    unlocked_at = parse_datetime(unlocked_at_raw)
+    if not unlocked_at:
+        request.session.pop(REGRESSION_GATE_SESSION_KEY, None)
+        return False
+    if timezone.is_naive(unlocked_at):
+        unlocked_at = timezone.make_aware(unlocked_at, timezone.get_current_timezone())
+    if timezone.now() - unlocked_at > REGRESSION_GATE_SESSION_TTL:
+        request.session.pop(REGRESSION_GATE_SESSION_KEY, None)
+        return False
+    return True
+
+
+def _unlock_regression_gate(request) -> None:
+    request.session[REGRESSION_GATE_SESSION_KEY] = timezone.now().isoformat()
+
+
+def regression_gate_required(view_func):
+    @functools.wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if _is_regression_gate_unlocked(request):
+            return view_func(request, *args, **kwargs)
+
+        accepts_json = "application/json" in (request.headers.get("Accept") or "")
+        if accepts_json:
+            return JsonResponse(
+                {"error": "Regression access password required.", "code": "regression_password_required"},
+                status=403,
+            )
+
+        messages.info(request, "Enter the regression password to access experiment pages.")
+        return redirect("regression_control")
+
+    return _wrapped
+
+
+def regression_control_center(request):
+    if not _is_regression_gate_unlocked(request):
+        error_message = None
+        if request.method == "POST":
+            password = (request.POST.get("gate_password") or "").strip()
+            if password == REGRESSION_GATE_PASSWORD:
+                _unlock_regression_gate(request)
+                return redirect("regression_control")
+            error_message = "Incorrect password. Please try again."
+        return render(
+            request,
+            "openskagit/regression/password_gate.html",
+            {"error_message": error_message},
+        )
+
+    predictor_profiles = list(PREDICTOR_PROFILES.keys())
+    interaction_bundles = list(INTERACTION_BUNDLES.keys())
+    locked_mode = "sfr"
+    segmentation_options = list(REGRESSION_SEGMENTATION_OPTIONS)
+    segmentation_option_values = {opt["value"] for opt in segmentation_options}
+    default_market_group_col = (
+        segmentation_options[0]["value"] if segmentation_options else "valuation_area"
+    )
+    profile_core_options: List[str] = []
+    profile_candidate_options: List[str] = []
+    for profile in PREDICTOR_PROFILES.values():
+        if not isinstance(profile, dict):
+            continue
+        profile_core_options.extend(profile.get("core") or [])
+        profile_candidate_options.extend(profile.get("candidates") or [])
+
+    core_predictor_options = _dedupe_ordered(list(CORE_PREDICTORS) + profile_core_options)
+    candidate_predictor_options = _dedupe_ordered(list(CANDIDATE_PREDICTORS) + profile_candidate_options)
+    core_option_set = set(core_predictor_options)
+    candidate_predictor_options = [p for p in candidate_predictor_options if p not in core_option_set]
+    interaction_term_options = sorted(INTERACTIONS.keys())
+    tier_interaction_var_options = _dedupe_ordered(
+        list(TIER_INTERACTION_VARS) + core_predictor_options + candidate_predictor_options
+    )
+    predictor_option_set = set(_dedupe_ordered(core_predictor_options + candidate_predictor_options))
+    interaction_term_set = set(interaction_term_options)
+    tier_interaction_var_set = set(tier_interaction_var_options)
+    predictor_catalog_rows = _build_regression_predictor_catalog(
+        core_predictor_options,
+        candidate_predictor_options,
+    )
+    recipe_candidate_rows = [row for row in predictor_catalog_rows if row.get("scope") == "candidate"]
+
+    default_profile = "baseline" if "baseline" in predictor_profiles else (predictor_profiles[0] if predictor_profiles else "")
+    default_bundle = "standard" if "standard" in interaction_bundles else (interaction_bundles[0] if interaction_bundles else "")
+
+    form_defaults = {
+        "name": "",
+        "mode": locked_mode,
+        "market_group_col": default_market_group_col,
+        "predictor_profile": default_profile,
+        "interaction_bundle": default_bundle,
+        "countywide": False,
+        "no_interactions": False,
+        "tags": "",
+        "notes": "",
+        "core_include": [],
+        "core_exclude": [],
+        "candidate_include": [],
+        "candidate_exclude": [],
+        "force_include": [],
+        "force_exclude": [],
+        "interaction_terms": [],
+        "tier_interaction_vars": list(TIER_INTERACTION_VARS),
+    }
+
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+        mode = locked_mode
+        predictor_profile = (request.POST.get("predictor_profile") or default_profile).strip()
+        interaction_bundle = (request.POST.get("interaction_bundle") or default_bundle).strip()
+        countywide = request.POST.get("countywide") == "on"
+        no_interactions = request.POST.get("no_interactions") == "on"
+        market_group_col = (request.POST.get("market_group_col") or default_market_group_col).strip()
+        notes = (request.POST.get("notes") or "").strip()
+        tags_raw = (request.POST.get("tags") or "").strip()
+        tags = _parse_tags(tags_raw)
+        core_include = _sanitize_selection(request.POST.getlist("core_include"), predictor_option_set)
+        core_exclude = _sanitize_selection(request.POST.getlist("core_exclude"), predictor_option_set)
+        candidate_include = _sanitize_selection(request.POST.getlist("candidate_include"), predictor_option_set)
+        candidate_exclude = _sanitize_selection(request.POST.getlist("candidate_exclude"), predictor_option_set)
+        force_include = _sanitize_selection(request.POST.getlist("force_include"), predictor_option_set)
+        force_exclude = _sanitize_selection(request.POST.getlist("force_exclude"), predictor_option_set)
+        interaction_terms = _sanitize_selection(request.POST.getlist("interaction_terms"), interaction_term_set)
+        tier_interaction_vars = _sanitize_selection(
+            request.POST.getlist("tier_interaction_vars"),
+            tier_interaction_var_set,
+        )
+
+        if predictor_profile not in predictor_profiles:
+            messages.error(request, f"Invalid predictor profile '{predictor_profile}'.")
+            return redirect("regression_control")
+        if interaction_bundle not in interaction_bundles:
+            messages.error(request, f"Invalid interaction bundle '{interaction_bundle}'.")
+            return redirect("regression_control")
+        if market_group_col not in segmentation_option_values:
+            messages.error(request, f"Invalid segmentation '{market_group_col}'.")
+            return redirect("regression_control")
+
+        if not name:
+            timestamp = timezone.localtime().strftime("%Y-%m-%d %H:%M")
+            name = f"Regression {mode} {predictor_profile} {timestamp}"
+
+        experiment = ExperimentRun.objects.create(
+            name=name,
+            mode=mode,
+            predictor_profile=predictor_profile,
+            interaction_bundle=interaction_bundle,
+            countywide=countywide,
+            market_group_col=market_group_col,
+            notes=notes,
+            tags=tags,
+            full_config={
+                "mode": mode,
+                "predictor_profile": predictor_profile,
+                "interaction_bundle": interaction_bundle,
+                "no_interactions": no_interactions,
+                "countywide": countywide,
+                "market_group_col": market_group_col,
+                "tags": tags,
+                "core_include": core_include,
+                "core_exclude": core_exclude,
+                "candidate_include": candidate_include,
+                "candidate_exclude": candidate_exclude,
+                "force_include": force_include,
+                "force_exclude": force_exclude,
+                "interaction_terms": interaction_terms,
+                "tier_interaction_vars": tier_interaction_vars,
+            },
+        )
+
+        manage_py = Path(settings.BASE_DIR) / "manage.py"
+        cmd = [
+            sys.executable,
+            str(manage_py),
+            "regression_masterparcel",
+            "--experiment",
+            "--experiment-id",
+            str(experiment.id),
+            "--mode",
+            mode,
+            "--predictor-set",
+            predictor_profile,
+            "--interactions",
+            interaction_bundle,
+            "--market-group-col",
+            market_group_col,
+        ]
+        if no_interactions:
+            cmd.append("--no-interactions")
+        if countywide:
+            cmd.append("--countywide")
+        if core_include:
+            cmd.extend(["--core-include", ",".join(core_include)])
+        if core_exclude:
+            cmd.extend(["--core-exclude", ",".join(core_exclude)])
+        if candidate_include:
+            cmd.extend(["--candidate-include", ",".join(candidate_include)])
+        if candidate_exclude:
+            cmd.extend(["--candidate-exclude", ",".join(candidate_exclude)])
+        if force_include:
+            cmd.extend(["--force-include", ",".join(force_include)])
+        if force_exclude:
+            cmd.extend(["--force-exclude", ",".join(force_exclude)])
+        if interaction_terms:
+            cmd.extend(["--interaction-terms", ",".join(interaction_terms)])
+        if tier_interaction_vars:
+            cmd.extend(["--tier-interaction-vars", ",".join(tier_interaction_vars)])
+
+        try:
+            subprocess.Popen(
+                cmd,
+                cwd=str(settings.BASE_DIR),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            messages.success(request, f"Regression experiment '{name}' launched.")
+        except OSError as exc:
+            messages.error(request, f"Failed to launch experiment: {exc}")
+            experiment.status = ExperimentRun.STATUS_FAILED
+            experiment.error_message = str(exc)
+            experiment.save(update_fields=["status", "error_message"])
+
+        return redirect("regression_control")
+
+    experiments = ExperimentRun.objects.order_by("-created_at")[:100]
+    status_counts = {
+        "all": ExperimentRun.objects.count(),
+        "completed": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_COMPLETED).count(),
+        "running": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_RUNNING).count(),
+        "failed": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_FAILED).count(),
+        "pending": ExperimentRun.objects.filter(status=ExperimentRun.STATUS_PENDING).count(),
+    }
+
+    return render(
+        request,
+        "openskagit/regression/control_center.html",
+        {
+            "experiments": experiments,
+            "status_counts": status_counts,
+            "predictor_profiles": predictor_profiles,
+            "interaction_bundles": interaction_bundles,
+            "form_defaults": form_defaults,
+            "locked_mode": locked_mode,
+            "segmentation_options": segmentation_options,
+            "has_running": status_counts["running"] > 0,
+            "core_predictor_options": core_predictor_options,
+            "candidate_predictor_options": candidate_predictor_options,
+            "interaction_term_options": interaction_term_options,
+            "recipe_candidate_rows": recipe_candidate_rows,
+        },
+    )
+
+
+@regression_gate_required
 def experiment_list(request):
     status_filter = request.GET.get("status")
     starred_filter = request.GET.get("starred")
@@ -6415,7 +8833,7 @@ def experiment_list(request):
     )
 
 
-@staff_member_required
+@regression_gate_required
 def experiment_create(request):
     predictor_profiles = list(PREDICTOR_PROFILES.keys())
     interaction_bundles = list(INTERACTION_BUNDLES.keys())
@@ -6502,7 +8920,100 @@ def experiment_create(request):
     )
 
 
-@staff_member_required
+def _build_experiment_market_readouts(diagnostics: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    diagnostics = diagnostics or {}
+    segments_raw = diagnostics.get("segments") or []
+    coefficient_groups_raw = diagnostics.get("coefficients") or []
+
+    coefficients_by_segment: Dict[str, List[Dict[str, Any]]] = {}
+    for group in coefficient_groups_raw:
+        if not isinstance(group, dict):
+            continue
+        segment_label = group.get("market_group")
+        if not segment_label:
+            continue
+        rows = group.get("coefficients") or []
+        coefficients_by_segment[segment_label] = [row for row in rows if isinstance(row, dict)]
+
+    tier_rank = {
+        "ALL": 0,
+        "T1_LOW": 1,
+        "T2_MID": 2,
+        "T3_HIGH": 3,
+    }
+
+    grouped: Dict[str, Dict[str, Any]] = {}
+    market_order: List[str] = []
+
+    for seg in segments_raw:
+        if not isinstance(seg, dict):
+            continue
+
+        market_group = str(seg.get("market_group") or "UNKNOWN")
+        segment_label = str(seg.get("segment") or f"{market_group}__{seg.get('value_tier') or 'ALL'}")
+        performance = seg.get("performance") if isinstance(seg.get("performance"), dict) else {}
+        predictors = seg.get("predictors") if isinstance(seg.get("predictors"), dict) else {}
+        ratio_distribution = seg.get("ratio_distribution") if isinstance(seg.get("ratio_distribution"), dict) else {}
+        calibration = seg.get("calibration") if isinstance(seg.get("calibration"), dict) else {}
+        predictors_all = predictors.get("all") if isinstance(predictors.get("all"), list) else []
+        predictors_mandatory = predictors.get("mandatory") if isinstance(predictors.get("mandatory"), list) else []
+        predictors_added = predictors.get("added") if isinstance(predictors.get("added"), list) else []
+        calibration_bands = calibration.get("bands") if isinstance(calibration.get("bands"), list) else []
+        flags = seg.get("flags") if isinstance(seg.get("flags"), list) else []
+        errors = seg.get("errors") if isinstance(seg.get("errors"), list) else []
+
+        vif_raw = seg.get("vif") if isinstance(seg.get("vif"), dict) else {}
+        vif_rows: List[Dict[str, Any]] = []
+        for term, value in vif_raw.items():
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                continue
+            vif_rows.append({"term": term, "value": round(float(numeric_value), 3)})
+        vif_rows.sort(key=lambda row: row["value"], reverse=True)
+
+        segment_entry = {
+            "segment_label": segment_label,
+            "value_tier": str(seg.get("value_tier") or "ALL"),
+            "performance": performance,
+            "ratio_distribution": ratio_distribution,
+            "predictors_all": predictors_all,
+            "predictors_mandatory": predictors_mandatory,
+            "predictors_added": predictors_added,
+            "coefficients": coefficients_by_segment.get(segment_label, []),
+            "vif_rows": vif_rows,
+            "calibration_bands": calibration_bands,
+            "calibration_prb": calibration.get("prb"),
+            "flags": flags,
+            "errors": errors,
+            "time_trend": seg.get("time_trend") if isinstance(seg.get("time_trend"), dict) else None,
+        }
+
+        if market_group not in grouped:
+            grouped[market_group] = {
+                "market_group": market_group,
+                "segments": [],
+                "segment_count": 0,
+                "observation_total": 0,
+            }
+            market_order.append(market_group)
+
+        grouped[market_group]["segments"].append(segment_entry)
+        grouped[market_group]["segment_count"] += 1
+        grouped[market_group]["observation_total"] += int(performance.get("n") or 0)
+
+    market_groups: List[Dict[str, Any]] = []
+    for market_group in market_order:
+        group_entry = grouped[market_group]
+        group_entry["segments"].sort(
+            key=lambda row: (tier_rank.get(row.get("value_tier"), 99), row.get("segment_label", ""))
+        )
+        market_groups.append(group_entry)
+
+    return market_groups
+
+
+@regression_gate_required
 def experiment_detail(request, experiment_id):
     experiment = get_object_or_404(ExperimentRun, id=experiment_id)
     diagnostics = _load_diagnostics(experiment.diagnostics_path)
@@ -6510,7 +9021,28 @@ def experiment_detail(request, experiment_id):
     stats = diagnostics.get("stats", []) if diagnostics else []
     coefficients = diagnostics.get("coefficients", []) if diagnostics else []
 
-    methodology_context = _build_methodology_context_from_diagnostics(diagnostics) if diagnostics else {}
+    methodology_context: Dict[str, Any] = {}
+    diagnostics_warning = ""
+    if diagnostics:
+        try:
+            methodology_context = _build_methodology_context_from_diagnostics(diagnostics)
+        except Exception as exc:  # pragma: no cover - defensive fallback for historical payloads
+            logger.exception("Failed to build methodology context for experiment %s: %s", experiment_id, exc)
+            diagnostics_warning = "Diagnostics loaded, but parts of this run use an older format and could not be fully rendered."
+
+    global_metrics = diagnostics.get("global_metrics") if isinstance(diagnostics, dict) else {}
+    if not isinstance(global_metrics, dict):
+        global_metrics = {}
+
+    predictor_inventory = diagnostics.get("predictor_inventory") if isinstance(diagnostics, dict) else {}
+    if not isinstance(predictor_inventory, dict):
+        predictor_inventory = {}
+
+    predictor_overrides = diagnostics.get("predictor_overrides") if isinstance(diagnostics, dict) else {}
+    if not isinstance(predictor_overrides, dict):
+        predictor_overrides = {}
+
+    market_group_readouts = _build_experiment_market_readouts(diagnostics)
 
     return render(
         request,
@@ -6521,12 +9053,17 @@ def experiment_detail(request, experiment_id):
             "segments": segments,
             "stats": stats,
             "coefficients": coefficients,
+            "diagnostics_warning": diagnostics_warning,
+            "global_metrics": global_metrics,
+            "predictor_inventory": predictor_inventory,
+            "predictor_overrides": predictor_overrides,
+            "market_group_readouts": market_group_readouts,
             **methodology_context,
         },
     )
 
 
-@staff_member_required
+@regression_gate_required
 def experiment_status_json(request, experiment_id):
     experiment = get_object_or_404(ExperimentRun, id=experiment_id)
     progress = None
@@ -6546,7 +9083,7 @@ def experiment_status_json(request, experiment_id):
     )
 
 
-@staff_member_required
+@regression_gate_required
 def experiment_compare(request):
     exp1_id = request.GET.get("exp1")
     exp2_id = request.GET.get("exp2")

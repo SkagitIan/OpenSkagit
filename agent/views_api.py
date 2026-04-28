@@ -4,6 +4,7 @@ import os
 import time
 from functools import wraps
 
+from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.db import connection
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -37,18 +38,40 @@ def token_required(f):
 
 class SimpleLoggingMiddleware:
     """A simple middleware to log requests to stdout."""
+    sync_capable = True
+    async_capable = True
+
     def __init__(self, get_response):
         self.get_response = get_response
+        self._is_async = iscoroutinefunction(get_response)
+        if self._is_async:
+            markcoroutinefunction(self)
 
     def __call__(self, request: HttpRequest):
+        if self._is_async:
+            return self.__acall__(request)
+        return self.__sync_call__(request)
+
+    def __sync_call__(self, request: HttpRequest):
         start_time = time.time()
         response = self.get_response(request)
         duration = (time.time() - start_time) * 1000
-        
+
         if request.path.startswith("/agent/api/"):
             log_str = f"[AGENT-API] {request.method} {request.get_full_path()} {response.status_code} {duration:.2f}ms"
             print(log_str)
-            
+
+        return response
+
+    async def __acall__(self, request: HttpRequest):
+        start_time = time.time()
+        response = await self.get_response(request)
+        duration = (time.time() - start_time) * 1000
+
+        if request.path.startswith("/agent/api/"):
+            log_str = f"[AGENT-API] {request.method} {request.get_full_path()} {response.status_code} {duration:.2f}ms"
+            print(log_str)
+
         return response
 
 # --- API Views ---

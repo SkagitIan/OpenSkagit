@@ -1,0 +1,335 @@
+{% extends "openskagit/base.html" %}
+
+{% block head_extra %}
+<style>
+  @keyframes staffPulse {
+    0% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 0.35; transform: scale(1); }
+  }
+  .staff-pulse-dot {
+    animation: staffPulse 1.2s ease-in-out infinite;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">Staff Image Generator</h1>
+    <p class="mt-2 text-sm text-slate-600">
+      Runs on Modal app
+      <code class="rounded bg-slate-100 px-1 py-0.5 text-xs text-slate-800">{{ modal_app_name }}</code>
+      via method
+      <code class="rounded bg-slate-100 px-1 py-0.5 text-xs text-slate-800">{{ modal_function_name }}</code>.
+    </p>
+
+    <form id="image-generator-form" method="post" enctype="multipart/form-data" class="mt-6 space-y-5">
+      {% csrf_token %}
+      <div>
+        <label for="{{ form.prompt.id_for_label }}" class="block text-sm font-semibold text-slate-800">Prompt</label>
+        {{ form.prompt }}
+      </div>
+
+      <div>
+        <label for="{{ form.init_image.id_for_label }}" class="block text-sm font-semibold text-slate-800">Attach Initial Image (optional - for image-to-image mode)</label>
+        {{ form.init_image }}
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <label for="{{ form.steps.id_for_label }}" class="block text-sm font-semibold text-slate-800">Number of inference steps</label>
+          {{ form.steps }}
+        </div>
+        <div>
+          <label for="{{ form.guidance_scale.id_for_label }}" class="block text-sm font-semibold text-slate-800">Guidance scale</label>
+          {{ form.guidance_scale }}
+        </div>
+        <div>
+          <label for="{{ form.seed.id_for_label }}" class="block text-sm font-semibold text-slate-800">Seed</label>
+          {{ form.seed }}
+        </div>
+        <div>
+          <label for="{{ form.width.id_for_label }}" class="block text-sm font-semibold text-slate-800">Width</label>
+          {{ form.width }}
+        </div>
+        <div>
+          <label for="{{ form.height.id_for_label }}" class="block text-sm font-semibold text-slate-800">Height</label>
+          {{ form.height }}
+        </div>
+      </div>
+
+      <div id="form-error-box" class="hidden rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+
+      <button id="submit-job-btn" type="submit" class="inline-flex items-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700">
+        Generate Image
+      </button>
+    </form>
+  </div>
+
+  <div id="generation-status-panel" class="mt-6 hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="flex items-center gap-3">
+      <span id="generation-status-dot" class="h-3 w-3 rounded-full bg-slate-400"></span>
+      <p id="generation-status-text" class="text-sm font-semibold text-slate-900">Waiting...</p>
+    </div>
+    <p id="generation-status-detail" class="mt-2 text-sm text-slate-600"></p>
+    <p id="generation-error-text" class="mt-3 hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"></p>
+    <button id="cancel-job-btn" type="button" class="mt-4 hidden inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+      Cancel Generation
+    </button>
+  </div>
+
+  <div id="generated-image-panel" class="mt-6 hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h2 class="text-xl font-semibold text-slate-900">Generated Image</h2>
+    <p class="mt-2 text-sm text-slate-600">
+      Saved to
+      <code id="generated-image-path" class="rounded bg-slate-100 px-1 py-0.5 text-xs text-slate-800"></code>
+    </p>
+    <img id="generated-image-preview" src="" alt="Generated image output" class="mt-4 w-full rounded-xl border border-slate-200 bg-slate-100 object-contain">
+    <a id="generated-image-link" href="#" target="_blank" rel="noopener" class="mt-4 inline-flex text-sm font-semibold text-slate-700 underline decoration-slate-400 underline-offset-2 hover:text-slate-900">
+      Open image in a new tab
+    </a>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const form = document.getElementById("image-generator-form");
+    const submitBtn = document.getElementById("submit-job-btn");
+    const formErrorBox = document.getElementById("form-error-box");
+    const statusPanel = document.getElementById("generation-status-panel");
+    const statusDot = document.getElementById("generation-status-dot");
+    const statusText = document.getElementById("generation-status-text");
+    const statusDetail = document.getElementById("generation-status-detail");
+    const errorText = document.getElementById("generation-error-text");
+    const cancelBtn = document.getElementById("cancel-job-btn");
+    const imagePanel = document.getElementById("generated-image-panel");
+    const imagePreview = document.getElementById("generated-image-preview");
+    const imagePath = document.getElementById("generated-image-path");
+    const imageLink = document.getElementById("generated-image-link");
+
+    const startUrl = "{{ start_url|escapejs }}";
+    const pollIntervalMs = Number("{{ poll_interval_ms|default:2000 }}") || 2000;
+
+    let pollHandle = null;
+    let activeJob = null;
+
+    function csrfToken() {
+      const tokenField = form.querySelector("input[name=csrfmiddlewaretoken]");
+      return tokenField ? tokenField.value : "";
+    }
+
+    function clearFormErrors() {
+      formErrorBox.classList.add("hidden");
+      formErrorBox.textContent = "";
+    }
+
+    function showFormErrors(message, errors) {
+      const lines = [message || "Unable to submit generation request."];
+      if (errors && typeof errors === "object") {
+        Object.keys(errors).forEach((field) => {
+          const fieldErrors = errors[field] || [];
+          fieldErrors.forEach((err) => {
+            lines.push(`${field}: ${err}`);
+          });
+        });
+      }
+      formErrorBox.textContent = lines.join(" ");
+      formErrorBox.classList.remove("hidden");
+    }
+
+    function setStatus(mode, headline, detail) {
+      statusPanel.classList.remove("hidden");
+      statusText.textContent = headline;
+      statusDetail.textContent = detail || "";
+      errorText.classList.add("hidden");
+      errorText.textContent = "";
+
+      statusDot.className = "h-3 w-3 rounded-full";
+      if (mode === "working") {
+        statusDot.classList.add("bg-blue-500", "staff-pulse-dot");
+      } else if (mode === "success") {
+        statusDot.classList.add("bg-emerald-500");
+      } else if (mode === "error") {
+        statusDot.classList.add("bg-red-500");
+      } else if (mode === "cancelled") {
+        statusDot.classList.add("bg-amber-500");
+      } else {
+        statusDot.classList.add("bg-slate-400");
+      }
+    }
+
+    function showErrorDetail(message) {
+      if (!message) {
+        return;
+      }
+      errorText.textContent = message;
+      errorText.classList.remove("hidden");
+    }
+
+    function setSubmitting(isSubmitting) {
+      submitBtn.disabled = isSubmitting;
+      submitBtn.classList.toggle("opacity-60", isSubmitting);
+      submitBtn.classList.toggle("cursor-not-allowed", isSubmitting);
+      if (!isSubmitting) {
+        submitBtn.textContent = "Generate Image";
+      } else {
+        submitBtn.textContent = "Submitting...";
+      }
+    }
+
+    function stopPolling() {
+      if (pollHandle !== null) {
+        window.clearInterval(pollHandle);
+        pollHandle = null;
+      }
+    }
+
+    function renderGeneratedImage(job) {
+      if (!job || !job.result_image_url) {
+        return;
+      }
+      imagePreview.src = job.result_image_url;
+      imagePath.textContent = job.result_image_path || "";
+      imageLink.href = job.result_image_url;
+      imagePanel.classList.remove("hidden");
+    }
+
+    async function pollJobStatus() {
+      if (!activeJob || !activeJob.status_url) {
+        return;
+      }
+
+      let response;
+      try {
+        response = await fetch(activeJob.status_url, {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+            "X-Image-Job-Token": activeJob.job_token || "",
+          },
+        });
+      } catch (err) {
+        setStatus("working", "Still waiting for Modal...", "Network issue while polling status. Retrying.");
+        return;
+      }
+
+      if (!response.ok) {
+        setStatus("error", "Unable to load generation status.", "Please refresh and try again.");
+        showErrorDetail(`Status request failed with HTTP ${response.status}.`);
+        stopPolling();
+        setSubmitting(false);
+        cancelBtn.classList.add("hidden");
+        return;
+      }
+
+      const payload = await response.json();
+      const job = payload.job || {};
+
+      if (job.status === "pending" || job.status === "running") {
+        setStatus("working", "Generating image...", job.status_detail || "Modal is processing your request.");
+        cancelBtn.classList.remove("hidden");
+        return;
+      }
+
+      stopPolling();
+      setSubmitting(false);
+      cancelBtn.classList.add("hidden");
+
+      if (job.status === "succeeded") {
+        setStatus("success", "Image generation complete.", job.status_detail || "Result saved.");
+        renderGeneratedImage(job);
+        return;
+      }
+
+      if (job.status === "cancelled") {
+        setStatus("cancelled", "Generation cancelled.", job.status_detail || "Cancelled.");
+        return;
+      }
+
+      setStatus("error", "Generation failed.", job.status_detail || "Modal returned an error.");
+      showErrorDetail(job.error_message || "Unknown generation error.");
+    }
+
+    async function submitJob(event) {
+      event.preventDefault();
+      clearFormErrors();
+      stopPolling();
+      imagePanel.classList.add("hidden");
+      setSubmitting(true);
+      setStatus("working", "Submitting generation job...", "Requesting a Modal worker.");
+      cancelBtn.classList.add("hidden");
+
+      let response;
+      try {
+        response = await fetch(startUrl, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken(),
+            "Accept": "application/json",
+          },
+          body: new FormData(form),
+        });
+      } catch (err) {
+        setSubmitting(false);
+        setStatus("error", "Unable to submit generation job.", "Network error.");
+        return;
+      }
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (err) {
+        payload = {};
+      }
+
+      if (!response.ok || !payload.ok) {
+        setSubmitting(false);
+        setStatus("error", "Form validation failed.", "Please correct inputs and try again.");
+        showFormErrors(payload.message, payload.errors);
+        return;
+      }
+
+      activeJob = {
+        job_id: payload.job_id,
+        job_token: payload.job_token || "",
+        status_url: payload.status_url,
+        cancel_url: payload.cancel_url,
+      };
+
+      setStatus("working", "Generation started.", payload.status_detail || "Polling Modal status...");
+      cancelBtn.classList.remove("hidden");
+      await pollJobStatus();
+      pollHandle = window.setInterval(pollJobStatus, pollIntervalMs);
+    }
+
+    async function cancelJob() {
+      if (!activeJob || !activeJob.cancel_url) {
+        return;
+      }
+      cancelBtn.disabled = true;
+      setStatus("working", "Cancellation requested...", "Waiting for worker acknowledgement.");
+      try {
+        await fetch(activeJob.cancel_url, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken(),
+            "Accept": "application/json",
+            "X-Image-Job-Token": activeJob.job_token || "",
+          },
+        });
+      } catch (err) {
+        setStatus("error", "Cancellation request failed.", "Could not reach server.");
+      } finally {
+        cancelBtn.disabled = false;
+        await pollJobStatus();
+      }
+    }
+
+    form.addEventListener("submit", submitJob);
+    cancelBtn.addEventListener("click", cancelJob);
+  })();
+</script>
+{% endblock %}

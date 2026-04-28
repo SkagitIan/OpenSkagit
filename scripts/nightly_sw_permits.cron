@@ -1,0 +1,11 @@
+# Install with:
+# crontab /home/django/django_project/scripts/nightly_sw_permits.cron
+#
+# Runs every night at 02:15 server local time.
+15 2 * * * /bin/bash /home/django/django_project/scripts/nightly_sw_permits.sh
+#
+# Runs blank-status audit every Sunday at 03:15 server local time.
+15 3 * * 0 /bin/bash /home/django/django_project/scripts/weekly_sw_permit_blank_audit.sh
+#
+# Root alert cron should call:
+# 15 5 * * * cd /home/django/django_project && /usr/bin/flock -n /tmp/sw_permit_alert.lock /usr/bin/python3 manage.py nightly_sw_permit_alert --skip-sync >> /home/django/django_project/logs/nightly_sw_permit_alert.log 2>&1

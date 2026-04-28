@@ -531,6 +531,8 @@ class ComparableResult:
     def __post_init__(self) -> None:
         if not isinstance(self.snapshot, PropertySnapshot):
             raise TypeError("ComparableResult.snapshot must be a PropertySnapshot instance.")
+        self.sale_price = _to_decimal(self.sale_price)
+        self.assessed_value = _to_decimal(self.assessed_value)
 
     def marker_payload(self) -> Dict[str, object]:
         point = self.snapshot.display_point()
@@ -556,7 +558,11 @@ class ComputationResult:
     sort_direction: str
 
     def summary(self) -> Dict[str, object]:
-        sale_values = [comp.sale_price for comp in self.comparables]
+        sale_values: List[Decimal] = []
+        for comp in self.comparables:
+            price = _to_decimal(getattr(comp, "sale_price", None))
+            if price is not None:
+                sale_values.append(price)
         if not sale_values:
             return {
                 "count": 0,
@@ -609,7 +615,7 @@ def _to_decimal(value: Optional[object]) -> Optional[Decimal]:
         return None
     try:
         return Decimal(str(value))
-    except (ValueError, TypeError):
+    except (InvalidOperation, ValueError, TypeError):
         return None
 
 
@@ -1199,8 +1205,6 @@ def build_comparables(
     geom = _normalize_subject_geom(subject)
     valuation_date = _subject_valuation_date(subject)
     subject_metadata = _metadata_dict(subject)
-    subject_neighborhood = subject_metadata.get("neighborhood_code")
-    subject_city = subject_metadata.get("city_district")
     subject_land_use = (subject_metadata.get("land_use_code") or "").strip()
 
     # ---------------------------------------
@@ -1319,7 +1323,9 @@ def build_comparables(
     else:
         order_by = ("distance_meters",)
 
-    if (sort_direction or "").lower() == "desc":
+    # Score sorting happens in-memory after ComparableResult objects are built.
+    # Keep DB prefetch order distance-first so retrieval remains stable and broad.
+    if normalized_sort in {"sale_price", "sale_date"} and (sort_direction or "").lower() == "desc":
         order_by = tuple(
             f"-{f}" if not f.startswith("-") else f[1:]
             for f in order_by
@@ -1330,35 +1336,7 @@ def build_comparables(
     qs = qs.order_by(*distinct_order).distinct("parcel_number")
 
     total_needed = limit * oversample_factor
-    raw_rows: List[MasterParcel] = []
-    fetched_parcels: set[str] = set()
-
-    def _fetch_rows(base_qs, needed: int) -> None:
-        if needed <= 0:
-            return
-        rows = list(base_qs[:needed])
-        for row in rows:
-            parcel = getattr(row, "parcel_number", None)
-            if parcel:
-                fetched_parcels.add(parcel)
-        raw_rows.extend(rows)
-
-    if subject_neighborhood:
-        _fetch_rows(qs.filter(hood_code=subject_neighborhood), total_needed)
-
-    if len(raw_rows) < total_needed and subject_city:
-        remaining = total_needed - len(raw_rows)
-        city_qs = qs.filter(city_district=subject_city)
-        if fetched_parcels:
-            city_qs = city_qs.exclude(parcel_number__in=list(fetched_parcels))
-        _fetch_rows(city_qs, remaining)
-
-    if len(raw_rows) < total_needed:
-        remaining = total_needed - len(raw_rows)
-        fallback_qs = qs
-        if fetched_parcels:
-            fallback_qs = fallback_qs.exclude(parcel_number__in=list(fetched_parcels))
-        _fetch_rows(fallback_qs, remaining)
+    raw_rows: List[MasterParcel] = list(qs[:total_needed])
 
     # ---------------------------------------
     # 6. Build ComparableResult structures
@@ -1402,7 +1380,7 @@ def build_comparables(
 
         comp = ComparableResult(
             snapshot=snapshot,
-            sale_price=row.comp_sale_price,
+            sale_price=_to_decimal(getattr(row, "comp_sale_price", None)),
             assessed_value=current_property_value(row),
             sale_date=comp_sale_date,
             distance_meters=distance_value_m,

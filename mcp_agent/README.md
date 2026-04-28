@@ -2,28 +2,49 @@
 
 Endpoints are mounted under `/agent/` (see `mcp_agent/urls.py`). They are read-only JSON surfaces for AI agents and tools.
 
+## OpenAI Schema Sync
+
+- Canonical schema file: `mcp_agent_openapi.json` (repo root).
+- Public schema URL: `GET /mcp/openapi.json` (same document with runtime server URL).
+- Coverage currently includes:
+  - modern MCP routes under `/agent/*` (`mcp_agent`)
+  - legacy tokenized tools under `/agent/api/*` (`agent.views_api`)
+  - selected external tool endpoints (for example `/api/gastronet/menu-items/`)
+- Regenerate/validate schema output for Custom GPT Actions:
+  - `python3 manage.py generate_mcp_schema --format openapi --write mcp_agent_openapi.json`
+- The command fails if any documented `/agent/*` route from `mcp_agent` or `agent.views_api` is missing from OpenAPI.
+
 ## Endpoints
 
 - `GET /agent/health/`  
   Returns `{ "ok": true, "service": "agent-api", "version": "v1" }`. No inputs. Sanity/uptime check.
 
 - `GET /agent/lookup/?q=<fragment>&limit=<int>`  
-  Fast parcel search using the indexed `parcel` table (`openskagit.models.Parcel`), joining `master_parcel` for `situs_address`. Searches `parcel.parcel_number` and `parcel.address` with `icontains`. `limit` defaults to 10, max 25. Response is a list of candidates:  
+  Fast parcel search using the indexed `parcel` table (`openskagit.models.Parcel`), joining `master_parcel` for `situs_address`. Matches mixed-case parcel numbers or address fragments across `parcel.address` and `master_parcel.situs_address`, prioritizing exact/startswith parcel hits. `limit` defaults to 10, max 25. Response is a list of candidates:  
   ```json
   { "parcel_id": "P12345", "situs_address": "...", "owner_name": null, "city": null, "state": null, "zip": null }
   ```
   Owner/mailing fields are intentionally omitted here.
 
 - `GET /agent/parcel/<parcel_id>/bundle/`  
-  Thin wrapper that calls the Postgres function `agent.parcel_bundle_v1(parcel_id)` (created in `mcp_agent/migrations/0001_agent_parcel_bundle.py`). Returns a single JSON object:  
-  - `parcel`: row from `public.master_parcel` (`openskagit.models.MasterParcel`).  
-  - `geometry`: GeoJSON from `public.openskagit_parcelgeometry` (prefers `geom_2926_valid`, then `geom_2926`; falls back to `public.stg_parcel_geometry.geom_2926`).  
-  - `planning_facts`: row from `public.parcel_planning_facts` (`openskagit.models.ParcelPlanningFacts`).  
-  - `assessments`: valuations from `master_parcel` plus latest tax year/payment from `public.parcel_tax_history`.  
-  - `sales`: up to 10 most recent from `public.sales`.  
-  - `zoning_tags`: tags from `public.parcel_zoning` joined to `public.zoning_zone`.  
-  - `overlay_tags`: compact booleans derived from `parcel_planning_facts` (e.g., in_sfha, in_floodway, in_wetland, in_shoreline_jurisdiction, in_npdes_area, in_historic_register).  
-  - `sources`: table names used.
+  Reads from the materialized view `public.v_parcel_bundle_core`, returning:  
+  - `parcel_id`  
+  - `parcel`: `master_parcel` row as JSON (minus `updated_at`)  
+  - `geometry`: GeoJSON centroid  
+  - `overlays`: per-layer hits (citylimits, flood, zoning, shoreline, fire, school, legislative, precinct, sewer, water, census_acs)  
+  - `sources`: table names / layers referenced
+
+- `GET /agent/parcel/<parcel_id>/history/`  
+  Returns the stored ParcelHistory payload for the parcel: `{parcel_id, rows, roll_year, neighborhood_code, scraped_at}`. 404 if there is no ParcelHistory record; `rows` is returned as-is (coerced from JSON).
+
+- `GET /agent/parcel/<parcel_id>/flood/`  
+  Reads from the materialized view `public.v_parcel_flood` (one row per parcel). Returns `{parcel_id, flood_zone_primary, flood_zone_subtype_primary, is_sfha, flood_zones, flood_zone_subtypes, static_bfe_max, v_datum_primary, fema_zone_hit_count}`. 404 if the parcel has no entry in the view.
+
+- `GET /agent/parcel/<parcel_id>/listing/?site=redfin&model=gemini-2.0-flash&include_raw=0`  
+  Grounded listing lookup using Gemini + Google Search. The endpoint resolves parcel address candidates from `master_parcel.situs_address` and `parcel.address`, then asks Gemini to find the exact property listing (Redfin-first by default, with fallback to Zillow/Realtor/other if needed). Returns:
+  - `parcel`: address inputs used for search (`situs_address`, `parcel_address`, `address_candidates`)
+  - `listing_research`: execution status, model/site hint, parsed listing details (`public_remarks`, last sale, prices, upgrades/remodel mentions, etc.), and grounded `sources` URLs when available
+  `include_raw=1` includes the raw Gemini text response for debugging. Requires `GENAI_API_KEY` (or `GEMINI_API_KEY`).
 
 - `POST /agent/parcel/<parcel_id>/intersect/`  
   Body: `{"layers": ["layer_key", ...]}`. Valid keys are enforced by allowlist (`mcp_agent.views.LAYER_ALLOWLIST`):  

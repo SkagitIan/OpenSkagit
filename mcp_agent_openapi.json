@@ -1,0 +1,1010 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenSkagit MCP Agent",
+    "version": "0.2.0",
+    "description": "MCP endpoints for parcel lookup, overlays, comps, neighborhood analysis, guarded NLQ, and selected ingestion tools."
+  },
+  "servers": [
+    {
+      "url": "https://openskagit.com"
+    }
+  ],
+  "paths": {
+    "/agent/health/": {
+      "get": {
+        "operationId": "health",
+        "summary": "Health check for MCP agent",
+        "description": "Call to verify the MCP agent API is online before issuing parcel or overlay requests.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/agent/api/health/": {
+      "get": {
+        "operationId": "legacyAgentHealth",
+        "summary": "Legacy agent health check",
+        "description": "Legacy /agent/api surface health check.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          },
+          "500": {
+            "description": "Server token not configured"
+          }
+        }
+      }
+    },
+    "/agent/api/lookup/": {
+      "get": {
+        "operationId": "legacyAgentLookupParcel",
+        "summary": "Legacy parcel lookup",
+        "description": "Legacy /agent/api parcel lookup over MasterParcel with owner_name enrichment.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Parcel number or situs address fragment."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 10
+            },
+            "description": "Max number of matches to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Missing or invalid params"
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          }
+        }
+      }
+    },
+    "/agent/api/parcel/{parcel_id}/bundle/": {
+      "get": {
+        "operationId": "legacyAgentParcelBundle",
+        "summary": "Legacy parcel bundle",
+        "description": "Legacy /agent/api parcel bundle from database function agent.parcel_bundle_v1(parcel_id).",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          },
+          "404": {
+            "description": "Parcel not found"
+          }
+        }
+      }
+    },
+    "/agent/api/parcel/{parcel_id}/intersect/": {
+      "post": {
+        "operationId": "legacyAgentParcelIntersect",
+        "summary": "Legacy parcel intersect",
+        "description": "Legacy /agent/api intersection endpoint with legacy layer keys and allowlist.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "layers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "layers"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Missing or invalid params"
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          },
+          "404": {
+            "description": "Parcel not found"
+          }
+        }
+      }
+    },
+    "/agent/api/docs/search/": {
+      "get": {
+        "operationId": "legacyAgentSearchDocs",
+        "summary": "Legacy docs search stub",
+        "description": "Legacy /agent/api docs search endpoint. Currently returns not_implemented.",
+        "responses": {
+          "501": {
+            "description": "Not implemented"
+          },
+          "401": {
+            "description": "Missing/invalid token"
+          }
+        }
+      }
+    },
+    "/agent/lookup/": {
+      "get": {
+        "operationId": "lookupParcel",
+        "summary": "Search parcels by number or address",
+        "description": "Use when you only have a parcel number fragment or address text and need a parcel_id to drive other endpoints. Matches parcel numbers (case-insensitive) and address fragments across parcel.address and master_parcel.situs_address, prioritizing exact parcel hits. Returns up to 25 lightweight matches.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Parcel number or address fragment to search for."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 10
+            },
+            "description": "Max number of matches to return (capped at 25)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Missing or invalid params"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/bundle/": {
+      "get": {
+        "operationId": "parcelBundle",
+        "summary": "Parcel bundle from v_parcel_bundle_core",
+        "description": "Use after you know parcel_id to fetch the canonical bundle payload (parcel JSON, geometry, overlay summary, sources) from v_parcel_bundle_core.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number (e.g., 'P12345')."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/history/": {
+      "get": {
+        "operationId": "parcelHistoryRows",
+        "summary": "Parcel valuation history rows",
+        "description": "Use when a user asks for tax roll/valuation history. Returns the ParcelHistory.rows payload plus roll_year, neighborhood_code, and scraped_at.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/flood/": {
+      "get": {
+        "operationId": "parcelFloodMetrics",
+        "summary": "Parcel FEMA flood metrics",
+        "description": "Use when asked about FEMA flood status (zones, BFE, SFHA). Pulls a single record from v_parcel_flood including flood_zone_primary, subtype, is_sfha, static_bfe_max, and zone hit count.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/imagery-change/": {
+      "get": {
+        "operationId": "parcelImageryChangeCompare",
+        "summary": "Parcel aerial imagery change detection (2019 vs current) with assessor sketch",
+        "description": "Looks up parcel centroid coordinates, builds Pictometry WMTS tile URLs for 2019 and current imagery, fetches the county assessor improvement sketch image (footprint proxy), and optionally runs Gemini multimodal comparison. Supports center-tile mode or 3x3 tile grid mode (stitched mosaics preferred for AI).",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          },
+          {
+            "name": "z",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 22,
+              "default": 19
+            },
+            "description": "Web Mercator tile zoom used to compute WMTS tiles."
+          },
+          {
+            "name": "tile_span",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0
+            },
+            "description": "Tile neighborhood span around the center tile. 0 = center tile only, 1 = 3x3 grid."
+          },
+          {
+            "name": "analyze",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": "If true, fetches imagery + sketch and runs Gemini comparison. If false, returns URLs/metadata only."
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "gemini-2.0-flash"
+            },
+            "description": "Gemini model name used for multimodal analysis."
+          },
+          {
+            "name": "compact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Trims debug-heavy fields for frontend use (raw model text, detailed image fetch metadata, tile arrays)."
+          },
+          {
+            "name": "include_raw_text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Overrides compact mode to include ai_analysis.raw_text."
+          },
+          {
+            "name": "include_ai_inputs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Overrides compact mode to include detailed ai_inputs image fetch metadata."
+          },
+          {
+            "name": "include_tile_arrays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Overrides compact mode to include imagery.layers.*.tiles arrays."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK (imagery/sketch metadata and optional AI comparison result)"
+          },
+          "400": {
+            "description": "Invalid query params (e.g., z or tile_span)"
+          },
+          "404": {
+            "description": "Parcel not found or parcel geometry unavailable"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/listing/": {
+      "get": {
+        "operationId": "parcelListing",
+        "summary": "Grounded parcel listing research (Gemini + Google Search)",
+        "description": "Use when you want listing details for a parcel (public remarks, last sale date/price, upgrades/remodel mentions, list price). Resolves parcel/master-parcel addresses, then runs Gemini with Google Search grounding. Redfin is preferred by default but can be changed with the site hint.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          },
+          {
+            "name": "site",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "redfin",
+                "zillow",
+                "realtor",
+                "any"
+              ],
+              "default": "redfin"
+            },
+            "description": "Preferred listing site hint. The endpoint may fall back to another major source if no reliable match exists."
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "gemini-2.0-flash"
+            },
+            "description": "Gemini model name."
+          },
+          {
+            "name": "include_raw",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Include raw Gemini response text for debugging."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad request (e.g., invalid site)"
+          },
+          "404": {
+            "description": "Parcel not found or parcel address unavailable"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/intersect/": {
+      "post": {
+        "operationId": "parcelIntersect",
+        "summary": "Intersect parcel with allowed reference layers",
+        "description": "Use when you need to know if a parcel intersects specific overlays. Accepts allowlisted layer keys (zoning_zone, floodzones, wetlands, shoreline, npdes_area, city_limits, fire_districts) and returns per-layer feature details capped at 200 rows.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "layers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "layers"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Parcel not found"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/neighborhood-metrics/": {
+      "get": {
+        "operationId": "parcelNeighborhoodMetrics",
+        "summary": "Neighborhood metrics and trends for parcel",
+        "description": "Use when asked about neighborhood ratios, trends, or stability for a parcel. Looks up the parcel's hood_code and returns NeighborhoodMetrics (sales_ratio, COD, PRD, reliability) and NeighborhoodTrend records ordered by year.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Parcel or neighborhood not found"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/neighborhood-analysis/": {
+      "get": {
+        "operationId": "parcelNeighborhoodAnalysis",
+        "summary": "Neighborhood analysis alias for parcel",
+        "description": "Alias of /agent/parcel/{parcel_id}/neighborhood-metrics/ for callers using neighborhood-analysis naming.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Parcel or neighborhood not found"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/sales-comps/": {
+      "get": {
+        "operationId": "parcelSalesComps",
+        "summary": "Sales comparables near parcel",
+        "description": "Use when a user asks for comparable sales near a subject parcel. Returns ranked comps filtered by land_use_code, proximity, recency, size/age/quality tolerances, and living area; will relax filters if too few results.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 12
+            },
+            "description": "Max number of comparables to return (default 12, cap 25)."
+          },
+          {
+            "name": "months",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120,
+              "default": 18
+            },
+            "description": "Lookback window in months for sales recency."
+          },
+          {
+            "name": "base_radius_m",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 2500
+            },
+            "description": "Radius in meters treated as preferred distance tier (~1.5 miles)."
+          },
+          {
+            "name": "max_radius_m",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 12000
+            },
+            "description": "Max search radius in meters; values below base_radius_m will be bumped up."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Missing or invalid params"
+          },
+          "404": {
+            "description": "Parcel missing or lacks geometry/land use"
+          },
+          "500": {
+            "description": "Comparable view init failed"
+          }
+        }
+      }
+    },
+    "/agent/parcel/{parcel_id}/sales-comps/v2/": {
+      "get": {
+        "operationId": "parcelSalesCompsV2",
+        "summary": "Sales comparables near parcel (v2 alias)",
+        "description": "Alias of /agent/parcel/{parcel_id}/sales-comps/. Use this when callers pin to the explicit v2 route.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 12
+            },
+            "description": "Max number of comparables to return (default 12, cap 25)."
+          },
+          {
+            "name": "months",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120,
+              "default": 18
+            },
+            "description": "Lookback window in months for sales recency."
+          },
+          {
+            "name": "base_radius_m",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 2500
+            },
+            "description": "Radius in meters treated as preferred distance tier (~1.5 miles)."
+          },
+          {
+            "name": "max_radius_m",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 12000
+            },
+            "description": "Max search radius in meters; values below base_radius_m will be bumped up."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Missing or invalid params"
+          },
+          "404": {
+            "description": "Parcel missing or lacks geometry/land use"
+          },
+          "500": {
+            "description": "Comparable view init failed"
+          }
+        }
+      }
+    },
+    "/agent/overlay/list/": {
+      "get": {
+        "operationId": "overlayList",
+        "summary": "List enabled overlays from v_overlay_list",
+        "description": "Use first to discover valid overlay layer keys and metadata (source table, geom column, SRID, row count, tags, cost_class) before calling intersect or overlay/get.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/agent/overlay/get/": {
+      "get": {
+        "operationId": "overlayGet",
+        "summary": "Fetch overlay payload for a parcel",
+        "description": "Use when you already know which overlay layers to fetch for a parcel. Calls the database function overlay_get and returns its raw JSON payload.",
+        "parameters": [
+          {
+            "name": "parcel_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact parcel number."
+          },
+          {
+            "name": "layers",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated overlay layer keys (typically from overlay/list)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Parcel missing"
+          },
+          "500": {
+            "description": "Database error"
+          }
+        }
+      }
+    },
+    "/agent/legal/jurisdictions/": {
+      "get": {
+        "operationId": "legalJurisdictions",
+        "summary": "List legal jurisdictions",
+        "description": "Returns configured legal jurisdictions with slug, name, publisher, and aliases.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/agent/legal/search/": {
+      "get": {
+        "operationId": "legalSearch",
+        "summary": "Search legal code by jurisdiction",
+        "description": "Searches ingested legal text in the database for the selected jurisdiction and returns stable IDs for retrieval.",
+        "parameters": [
+          {
+            "name": "jurisdiction",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Jurisdiction slug or alias (e.g., sedro_woolley, anacortes, washington_state)."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query text."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 10
+            },
+            "description": "Max hits to return (default 10, cap 25)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Missing or invalid params"
+          }
+        }
+      }
+    },
+    "/agent/legal/get/": {
+      "get": {
+        "operationId": "legalGet",
+        "summary": "Get full legal section by stable ID",
+        "description": "Fetches the latest section revision from ingested legal data using an ID returned by /agent/legal/search/.",
+        "parameters": [
+          {
+            "name": "jurisdiction",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Jurisdiction slug or alias."
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Stable ID from legal search results."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Missing or invalid params"
+          },
+          "404": {
+            "description": "ID not found"
+          }
+        }
+      }
+    },
+    "/api/gastronet/menu-items/": {
+      "post": {
+        "operationId": "gastronetIngestMenuItems",
+        "summary": "Ingest or update restaurant menu items",
+        "description": "Useful ingestion endpoint from Gastronet. Accepts a restaurant id and normalized menu_data entries, then upserts items by (restaurant, source_url, name).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurant": {
+                    "type": "integer"
+                  },
+                  "source_url": {
+                    "type": "string"
+                  },
+                  "menu_data": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "price": {
+                          "type": [
+                            "string",
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "section": {
+                          "type": "string"
+                        },
+                        "currency": {
+                          "type": "string"
+                        },
+                        "source_url": {
+                          "type": "string"
+                        },
+                        "dietary_tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "restaurant",
+                  "menu_data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Invalid payload"
+          },
+          "404": {
+            "description": "Restaurant not found"
+          }
+        }
+      }
+    },
+    "/agent/nlq/": {
+      "post": {
+        "operationId": "nlq",
+        "summary": "Natural language to SQL with guardrails",
+        "description": "Use only when other structured endpoints cannot answer. Generates SQL from a natural-language question with schema context and guardrails, validates cost/row count, then returns columns + rows.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "minimum": 500,
+                    "maximum": 10000,
+                    "default": 3000
+                  },
+                  "max_tables": {
+                    "type": "integer",
+                    "default": 8
+                  },
+                  "refresh_schema": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "question"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Rejected or bad request"
+          },
+          "502": {
+            "description": "SQL generation failed"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}

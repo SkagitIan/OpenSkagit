@@ -5,12 +5,20 @@ def ensure_bigserial_pk(table_name: str) -> str:
     return f"""
     DO $$
     DECLARE
+        target_table regclass;
         existing_pk text;
     BEGIN
+        target_table := to_regclass('public.{table_name}');
+        IF target_table IS NULL THEN
+            -- Legacy installs may never have created these physical tables.
+            -- Keep migration idempotent for fresh test databases.
+            RETURN;
+        END IF;
+
         SELECT conname
         INTO existing_pk
         FROM pg_constraint
-        WHERE conrelid = 'public.{table_name}'::regclass
+        WHERE conrelid = target_table
           AND contype = 'p';
 
         IF existing_pk IS NOT NULL THEN

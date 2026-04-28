@@ -10,15 +10,20 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='taxcodearea',
-            name='id',
-            field=models.BigAutoField(primary_key=True, serialize=False),
-        ),
-        migrations.AlterField(
-            model_name='taxcodeareadistrict',
-            name='id',
-            field=models.BigAutoField(primary_key=True, serialize=False),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.AlterField(
+                    model_name='taxcodearea',
+                    name='id',
+                    field=models.BigAutoField(primary_key=True, serialize=False),
+                ),
+                migrations.AlterField(
+                    model_name='taxcodeareadistrict',
+                    name='id',
+                    field=models.BigAutoField(primary_key=True, serialize=False),
+                ),
+            ],
         ),
         migrations.CreateModel(
             name='TaxingDistrictLevy',

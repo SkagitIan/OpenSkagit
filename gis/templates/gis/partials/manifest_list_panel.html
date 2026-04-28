@@ -1,0 +1,136 @@
+<div id="manifest-list-panel" class="mt-5 space-y-5">
+  <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <form
+      id="gis-manifest-filter-form"
+      method="get"
+      action="{% url 'gis:manifest-list' %}"
+      class="grid gap-3 md:grid-cols-4"
+      hx-get="{% url 'gis:manifest-list' %}"
+      hx-target="#manifest-list-panel"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-indicator="#manifest-actions-indicator"
+    >
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider text-slate-500" for="{{ filter_form.category.id_for_label }}">Category</label>
+        {{ filter_form.category }}
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider text-slate-500" for="{{ filter_form.source_org.id_for_label }}">Source org</label>
+        {{ filter_form.source_org }}
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider text-slate-500" for="{{ filter_form.usability.id_for_label }}">Usability</label>
+        {{ filter_form.usability }}
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase tracking-wider text-slate-500" for="{{ filter_form.status.id_for_label }}">Status</label>
+        {{ filter_form.status }}
+      </div>
+      <div class="md:col-span-4 flex flex-wrap items-center gap-2">
+        <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Apply filters</button>
+        <a
+          href="{% url 'gis:manifest-list' %}"
+          class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          hx-get="{% url 'gis:manifest-list' %}"
+          hx-target="#manifest-list-panel"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          hx-indicator="#manifest-actions-indicator"
+        >
+          Reset
+        </a>
+        <div id="manifest-actions-indicator" class="htmx-indicator rounded-lg border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          Working...
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if messages %}
+    <div class="space-y-2">
+      {% for message in messages %}
+        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100">
+          <tr>
+            <th class="px-4 py-3 text-left font-semibold text-slate-700">Key</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-700">Label</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-700">Usability</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-700">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for entry in entries %}
+            <tr>
+              <td class="px-4 py-3 text-xs font-semibold text-slate-900">{{ entry.key }}</td>
+              <td class="px-4 py-3 text-xs text-slate-700">{{ entry.label }}</td>
+              <td class="px-4 py-3 text-xs text-slate-700">{{ entry.usability }}</td>
+              <td class="px-4 py-3 text-xs text-slate-700">{{ entry.status }}</td>
+              <td class="px-4 py-3 text-xs">
+                <details class="relative">
+                  <summary class="inline-flex cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100">
+                    Actions
+                  </summary>
+                  <div class="absolute right-0 z-20 mt-2 w-40 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                    <a href="{% url 'gis:manifest-detail' entry.id %}" class="block rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-sky-700 hover:bg-slate-100">Open</a>
+                    <button
+                      type="button"
+                      class="mt-1 block w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-teal-700 hover:bg-teal-50"
+                      hx-get="{% url 'gis:manifest-map-modal' entry.id %}"
+                      hx-target="#manifest-map-modal-root"
+                      hx-swap="innerHTML"
+                      hx-indicator="#manifest-actions-indicator"
+                    >
+                      Show on map
+                    </button>
+                    <form
+                      method="post"
+                      action="{% url 'gis:manifest-test' entry.id %}"
+                      hx-post="{% url 'gis:manifest-test' entry.id %}"
+                      hx-target="#manifest-list-panel"
+                      hx-swap="outerHTML"
+                      hx-include="#gis-manifest-filter-form"
+                      hx-indicator="#manifest-actions-indicator"
+                    >
+                      {% csrf_token %}
+                      <button type="submit" class="mt-1 block w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                        Test
+                      </button>
+                    </form>
+                    <form
+                      method="post"
+                      action="{% url 'gis:manifest-delete' entry.id %}"
+                      onsubmit="return confirm('Delete manifest entry {{ entry.key }}?');"
+                      hx-post="{% url 'gis:manifest-delete' entry.id %}"
+                      hx-target="#manifest-list-panel"
+                      hx-swap="outerHTML"
+                      hx-include="#gis-manifest-filter-form"
+                      hx-indicator="#manifest-actions-indicator"
+                    >
+                      {% csrf_token %}
+                      <button type="submit" class="mt-1 block w-full rounded-lg px-2 py-1.5 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                </details>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="px-4 py-10 text-center text-sm text-slate-500">No manifest records match the current filter.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

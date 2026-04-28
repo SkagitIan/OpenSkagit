@@ -1,0 +1,882 @@
+{% extends "openskagit/appeal_base_v3.html" %}
+
+{% block extra_css %}
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .reg-shell {
+    font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  }
+
+  .recipe-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .recipe-card {
+    border: 1px solid #d6e2d9;
+    border-radius: 0.9rem;
+    background: #ffffff;
+    padding: 1rem;
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+
+  .recipe-input:checked + .recipe-card {
+    border-color: #1f3327;
+    box-shadow: 0 0 0 2px rgba(31, 51, 39, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .tab-btn.active {
+    background: #1f3327;
+    border-color: #1f3327;
+    color: #ffffff;
+  }
+
+  .drop-zone {
+    min-height: 13rem;
+    border: 1px dashed #b7c8bb;
+    border-radius: 0.75rem;
+    background: #f8fcf9;
+    padding: 0.5rem;
+  }
+
+  .drop-zone.drag-over {
+    border-color: #1f3327;
+    background: #edf5f0;
+  }
+
+  .var-chip {
+    border: 1px solid #dbe7dd;
+    border-radius: 0.6rem;
+    background: #ffffff;
+    padding: 0.45rem 0.55rem;
+    margin-bottom: 0.4rem;
+    cursor: grab;
+  }
+
+  .var-chip:active {
+    cursor: grabbing;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reg-shell max-w-7xl mx-auto px-4 py-8 space-y-6">
+  <div class="rounded-2xl border border-[#d8e5dc] bg-gradient-to-br from-[#f8fcfa] to-white p-6">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+      <div>
+        <p class="text-xs uppercase tracking-[0.2em] text-[#4e6b59]">Regression Mission Control</p>
+        <h1 class="mt-1 text-2xl md:text-3xl font-semibold text-[#16261c]">Guided + advanced regression experiments</h1>
+        <p class="mt-2 text-sm text-[#2d4738] max-w-3xl">
+          Pick sales scope, segmentation, and variable recipe without writing formulas. Start guided, then move to advanced only when needed.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="{% url 'experiment_list' %}" class="inline-flex items-center px-3 py-2 rounded-lg border border-[#dbe7dd] bg-white text-sm font-semibold text-[#1f3327] hover:bg-[#f4faf6]">All Experiments</a>
+        <a href="{% url 'experiment_compare' %}" class="inline-flex items-center px-3 py-2 rounded-lg border border-[#dbe7dd] bg-white text-sm font-semibold text-[#1f3327] hover:bg-[#f4faf6]">Compare Runs</a>
+      </div>
+    </div>
+  </div>
+
+  {% if messages %}
+  <section class="space-y-2">
+    {% for message in messages %}
+    <div class="rounded-lg px-4 py-3 text-sm border
+      {% if message.tags == 'error' %}border-red-200 bg-red-50 text-red-800
+      {% elif message.tags == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-800
+      {% else %}border-blue-200 bg-blue-50 text-blue-800{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div class="rounded-xl border border-[#dbe7dd] bg-white p-3">
+      <div class="text-xs uppercase tracking-[0.15em] text-gray-500">Total Runs</div>
+      <div class="mt-1 text-2xl font-semibold text-[#1f3327]">{{ status_counts.all }}</div>
+    </div>
+    <div class="rounded-xl border border-[#dbe7dd] bg-white p-3">
+      <div class="text-xs uppercase tracking-[0.15em] text-gray-500">Running</div>
+      <div class="mt-1 text-2xl font-semibold text-blue-700">{{ status_counts.running }}</div>
+    </div>
+    <div class="rounded-xl border border-[#dbe7dd] bg-white p-3">
+      <div class="text-xs uppercase tracking-[0.15em] text-gray-500">Completed</div>
+      <div class="mt-1 text-2xl font-semibold text-emerald-700">{{ status_counts.completed }}</div>
+    </div>
+    <div class="rounded-xl border border-[#dbe7dd] bg-white p-3">
+      <div class="text-xs uppercase tracking-[0.15em] text-gray-500">Failed</div>
+      <div class="mt-1 text-2xl font-semibold text-red-700">{{ status_counts.failed }}</div>
+    </div>
+    <div class="rounded-xl border border-[#dbe7dd] bg-white p-3">
+      <div class="text-xs uppercase tracking-[0.15em] text-gray-500">Sales Window</div>
+      <div class="mt-1 text-sm font-semibold text-[#1f3327]">Rolling 10 years</div>
+      <div class="text-xs text-gray-500">Fixed default for consistency</div>
+    </div>
+  </section>
+
+  <section class="rounded-2xl border border-[#dbe7dd] bg-white p-5 md:p-6 shadow-sm">
+    <div class="flex flex-wrap gap-2 mb-4" id="regression-tabs">
+      <button type="button" class="tab-btn active inline-flex items-center px-3 py-2 rounded-lg border border-[#dbe7dd] text-sm font-semibold text-[#1f3327]" data-tab="guided">Guided</button>
+      <button type="button" class="tab-btn inline-flex items-center px-3 py-2 rounded-lg border border-[#dbe7dd] text-sm font-semibold text-[#1f3327]" data-tab="advanced">Advanced</button>
+      <button type="button" class="tab-btn inline-flex items-center px-3 py-2 rounded-lg border border-[#dbe7dd] text-sm font-semibold text-[#1f3327]" data-tab="results">Results</button>
+    </div>
+
+    <form method="post" id="experiment-form" class="space-y-5">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="{{ locked_mode }}">
+      <input type="hidden" id="predictor_profile_input" name="predictor_profile" value="{{ form_defaults.predictor_profile }}">
+      <input type="hidden" id="interaction_bundle_input" name="interaction_bundle" value="{{ form_defaults.interaction_bundle }}">
+      <input type="checkbox" id="no_interactions_input" name="no_interactions" class="hidden" {% if form_defaults.no_interactions %}checked{% endif %}>
+      <div id="dynamic-variable-inputs"></div>
+
+      <div data-tab-panel="guided" class="space-y-5">
+        <div>
+          <label for="run_name" class="block text-sm font-semibold text-[#1f3327] mb-1">Run name</label>
+          <input
+            id="run_name"
+            type="text"
+            name="name"
+            value="{{ form_defaults.name }}"
+            placeholder="Example: Feb segmented recommended"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+        </div>
+
+        <div>
+          <div class="text-sm font-semibold text-[#1f3327]">Recipe preset</div>
+          <p class="text-xs text-gray-600 mt-1">These map to real predictor and interaction settings.</p>
+          <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <label>
+              <input class="recipe-input" type="radio" name="recipe_preset" value="quick">
+              <div class="recipe-card">
+                <div class="text-sm font-semibold text-[#1f3327]">Quick Check</div>
+                <div class="mt-1 text-xs text-gray-600">Fast pass, minimal interactions.</div>
+              </div>
+            </label>
+            <label>
+              <input class="recipe-input" type="radio" name="recipe_preset" value="balanced" checked>
+              <div class="recipe-card">
+                <div class="text-sm font-semibold text-[#1f3327]">Recommended</div>
+                <div class="mt-1 text-xs text-gray-600">Best first run for most comparisons.</div>
+              </div>
+            </label>
+            <label>
+              <input class="recipe-input" type="radio" name="recipe_preset" value="explore">
+              <div class="recipe-card">
+                <div class="text-sm font-semibold text-[#1f3327]">Explore</div>
+                <div class="mt-1 text-xs text-gray-600">Richer variable/interactions for discovery.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="rounded-lg border border-[#e6efe8] bg-[#f8fcf9] p-3">
+            <label for="market_group_col" class="block text-sm font-semibold text-[#1f3327] mb-1">Segmentation</label>
+            <select id="market_group_col" name="market_group_col" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              {% for option in segmentation_options %}
+              <option value="{{ option.value }}" {% if form_defaults.market_group_col == option.value %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+            <div id="segmentation_hint" class="mt-1 text-xs text-gray-600"></div>
+          </div>
+
+          <div class="rounded-lg border border-[#e6efe8] bg-[#f8fcf9] p-3">
+            <label for="interaction_strength" class="block text-sm font-semibold text-[#1f3327] mb-1">Interaction strength</label>
+            <select id="interaction_strength" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              <option value="auto" selected>Auto (from recipe)</option>
+              <option value="none">None</option>
+              <option value="rich">Rich</option>
+            </select>
+            <p class="mt-1 text-xs text-gray-600">Controls whether interaction effects are disabled, default, or expanded.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="rounded-lg border border-[#e6efe8] bg-[#f8fcf9] p-3">
+            <label class="inline-flex items-center gap-2 text-sm font-semibold text-[#1f3327]">
+              <input id="countywide_toggle" type="checkbox" name="countywide" {% if form_defaults.countywide %}checked{% endif %}>
+              <span>Countywide mode</span>
+            </label>
+            <p class="mt-1 text-xs text-gray-600">Run one countywide model. Segmentation selection is ignored when enabled.</p>
+          </div>
+          <div class="rounded-lg border border-[#e6efe8] bg-[#f8fcf9] p-3">
+            <div class="text-sm font-semibold text-[#1f3327]">Sales Screening</div>
+            <p class="mt-1 text-xs text-gray-600">Current command uses valid SFR sales and rolling 10 years. Detailed screening controls are fixed in this version.</p>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-[#e6efe8] bg-[#f8fcf9] p-3">
+          <div class="text-sm font-semibold text-[#1f3327]">Signal packs (candidate variable packs)</div>
+          <p class="text-xs text-gray-600 mt-1">Turn packs on to add groups of independent variables from MasterParcel, ParcelGeometry, and ParcelPlanningFacts.</p>
+          <div class="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+            <label class="inline-flex items-start gap-2 rounded border border-[#dbe7dd] bg-white px-3 py-2">
+              <input class="mt-0.5 pack-toggle" type="checkbox" value="structure">
+              <span><strong>Structure</strong><br><span class="text-xs text-gray-600">beds, baths, garage, basement, effective age</span></span>
+            </label>
+            <label class="inline-flex items-start gap-2 rounded border border-[#dbe7dd] bg-white px-3 py-2">
+              <input class="mt-0.5 pack-toggle" type="checkbox" value="site">
+              <span><strong>Site & lot</strong><br><span class="text-xs text-gray-600">lot size, FAR, land share</span></span>
+            </label>
+            <label class="inline-flex items-start gap-2 rounded border border-[#dbe7dd] bg-white px-3 py-2">
+              <input class="mt-0.5 pack-toggle" type="checkbox" value="terrain_view">
+              <span><strong>Terrain & view</strong><br><span class="text-xs text-gray-600">elevation, road distance, view terms</span></span>
+            </label>
+            <label class="inline-flex items-start gap-2 rounded border border-[#dbe7dd] bg-white px-3 py-2">
+              <input class="mt-0.5 pack-toggle" type="checkbox" value="planning">
+              <span><strong>Planning overlays</strong><br><span class="text-xs text-gray-600">flood, wetland, shoreline, sewer, permits</span></span>
+            </label>
+            <label class="inline-flex items-start gap-2 rounded border border-[#dbe7dd] bg-white px-3 py-2">
+              <input class="mt-0.5 pack-toggle" type="checkbox" value="data_flags">
+              <span><strong>Data-quality flags</strong><br><span class="text-xs text-gray-600">missing quality/condition indicators</span></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div data-tab-panel="advanced" class="space-y-5 hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label for="manual_predictor_profile" class="block text-xs font-semibold text-gray-700 mb-1">Predictor profile override</label>
+            <select id="manual_predictor_profile" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              {% for profile in predictor_profiles %}
+              <option value="{{ profile }}" {% if form_defaults.predictor_profile == profile %}selected{% endif %}>{{ profile }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="manual_interaction_bundle" class="block text-xs font-semibold text-gray-700 mb-1">Interaction bundle override</label>
+            <select id="manual_interaction_bundle" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              {% for bundle in interaction_bundles %}
+              <option value="{{ bundle }}" {% if form_defaults.interaction_bundle == bundle %}selected{% endif %}>{{ bundle }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-[#dbe7dd] bg-[#f8fcf9] p-3">
+          <div class="text-sm font-semibold text-[#1f3327]">Drag & drop variable recipe builder (candidate terms)</div>
+          <p class="text-xs text-gray-600 mt-1">Drag variables between Include and Exclude. Source model is shown on each card.</p>
+
+          <div class="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div>
+              <div class="text-xs font-semibold text-gray-700 mb-1">Available</div>
+              <div id="bucket-available" class="drop-zone" data-bucket="available"></div>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-gray-700 mb-1">Include in recipe</div>
+              <div id="bucket-include" class="drop-zone" data-bucket="include"></div>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-gray-700 mb-1">Exclude from recipe</div>
+              <div id="bucket-exclude" class="drop-zone" data-bucket="exclude"></div>
+            </div>
+          </div>
+          <p class="mt-2 text-xs text-gray-500">Tip: drag to move. Click a card to cycle buckets.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Core exclude</label>
+            <select name="core_exclude" multiple size="8" class="w-full rounded-lg border border-gray-300 px-2 py-2 text-xs">
+              {% for predictor in core_predictor_options %}
+              <option value="{{ predictor }}" {% if predictor in form_defaults.core_exclude %}selected{% endif %}>{{ predictor }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Force include</label>
+            <select name="force_include" multiple size="8" class="w-full rounded-lg border border-gray-300 px-2 py-2 text-xs">
+              {% for predictor in core_predictor_options %}
+              <option value="{{ predictor }}" {% if predictor in form_defaults.force_include %}selected{% endif %}>{{ predictor }}</option>
+              {% endfor %}
+              {% for predictor in candidate_predictor_options %}
+              <option value="{{ predictor }}" {% if predictor in form_defaults.force_include %}selected{% endif %}>{{ predictor }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Force exclude</label>
+            <select name="force_exclude" multiple size="8" class="w-full rounded-lg border border-gray-300 px-2 py-2 text-xs">
+              {% for predictor in core_predictor_options %}
+              <option value="{{ predictor }}" {% if predictor in form_defaults.force_exclude %}selected{% endif %}>{{ predictor }}</option>
+              {% endfor %}
+              {% for predictor in candidate_predictor_options %}
+              <option value="{{ predictor }}" {% if predictor in form_defaults.force_exclude %}selected{% endif %}>{{ predictor }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-semibold text-gray-700 mb-1">Custom interaction terms</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+            {% for term in interaction_term_options %}
+            <label class="inline-flex items-center gap-2 rounded border border-[#dbe7dd] bg-white px-2 py-1">
+              <input type="checkbox" name="interaction_terms" value="{{ term }}" {% if term in form_defaults.interaction_terms %}checked{% endif %}>
+              <span>{{ term }}</span>
+            </label>
+            {% empty %}
+            <span class="text-gray-500">No interaction terms available.</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label for="tags" class="block text-xs font-semibold text-gray-700 mb-1">Tags (comma-separated)</label>
+            <input id="tags" type="text" name="tags" value="{{ form_defaults.tags }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="baseline, hood-code">
+          </div>
+          <div>
+            <label for="notes" class="block text-xs font-semibold text-gray-700 mb-1">Notes</label>
+            <textarea id="notes" name="notes" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="What are you testing?">{{ form_defaults.notes }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-[#e6efe8] pt-4">
+        <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-[#1f3327] px-4 py-2 text-sm font-semibold text-white hover:bg-[#16261c]">
+          Launch Experiment
+        </button>
+        <span id="run_summary" class="text-xs text-gray-600">Recipe: Recommended</span>
+      </div>
+    </form>
+
+    <div data-tab-panel="results" class="hidden mt-5 space-y-4">
+      <div>
+        <h2 class="text-xl font-semibold text-[#16261c]">Recent Runs</h2>
+        <p class="text-sm text-gray-600">Open a run for full diagnostics and coefficient details.</p>
+      </div>
+
+      <div class="overflow-x-auto border border-[#e6efe8] rounded-lg">
+        <table class="min-w-full text-sm">
+          <thead class="bg-[#f4faf6] text-gray-700">
+            <tr>
+              <th class="text-left px-3 py-2 font-semibold">Run</th>
+              <th class="text-left px-3 py-2 font-semibold">Status</th>
+              <th class="text-left px-3 py-2 font-semibold">Created</th>
+              <th class="text-left px-3 py-2 font-semibold">IAAO Snapshot</th>
+              <th class="text-left px-3 py-2 font-semibold">Open</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for exp in experiments %}
+            <tr class="border-t border-[#edf4ef]">
+              <td class="px-3 py-2">
+                <div class="font-semibold text-[#1f3327]">{{ exp.name }}</div>
+                <div class="text-xs text-gray-500">{{ exp.mode }} · {{ exp.predictor_profile }} · {{ exp.interaction_bundle }} · {{ exp.market_group_col }}</div>
+              </td>
+              <td class="px-3 py-2">
+                <span class="text-xs px-2 py-1 rounded-full border
+                  {% if exp.status == 'completed' %}border-emerald-200 bg-emerald-50 text-emerald-800
+                  {% elif exp.status == 'running' %}border-blue-200 bg-blue-50 text-blue-800
+                  {% elif exp.status == 'failed' %}border-red-200 bg-red-50 text-red-800
+                  {% else %}border-gray-200 bg-gray-50 text-gray-700{% endif %}">
+                  {{ exp.get_status_display }}
+                </span>
+              </td>
+              <td class="px-3 py-2 text-xs text-gray-600">{{ exp.created_at|date:"M j, Y g:i a" }}</td>
+              <td class="px-3 py-2 text-xs text-gray-700">
+                {% if exp.status == 'completed' %}
+                  PRD {% if exp.global_prd == None %}—{% else %}{{ exp.global_prd|floatformat:3 }}{% endif %}
+                  · COD {% if exp.global_cod == None %}—{% else %}{{ exp.global_cod|floatformat:3 }}{% endif %}
+                  · PRB {% if exp.global_prb == None %}—{% else %}{{ exp.global_prb|floatformat:3 }}{% endif %}
+                {% elif exp.status == 'failed' %}
+                  Failed
+                {% elif exp.status == 'running' %}
+                  In progress
+                {% else %}
+                  Pending
+                {% endif %}
+              </td>
+              <td class="px-3 py-2">
+                <a href="{{ exp.get_absolute_url }}" class="text-sm font-semibold text-[#1f3327] hover:text-[#6B9080]">View</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="px-3 py-6 text-center text-gray-500">No experiment runs found yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <details class="rounded-lg border border-[#dbe7dd] p-3 bg-[#f8fcf9]">
+        <summary class="cursor-pointer text-sm font-semibold text-[#1f3327]">Show full metric columns</summary>
+        <div class="mt-3 overflow-x-auto border border-[#e6efe8] rounded-lg">
+          <table class="min-w-full text-xs">
+            <thead class="bg-white text-gray-700">
+              <tr>
+                <th class="text-left px-2 py-2">Run</th>
+                <th class="text-right px-2 py-2">COD</th>
+                <th class="text-right px-2 py-2">PRD</th>
+                <th class="text-right px-2 py-2">PRB</th>
+                <th class="text-right px-2 py-2">R²</th>
+                <th class="text-right px-2 py-2">RMSE</th>
+                <th class="text-right px-2 py-2">Obs</th>
+                <th class="text-right px-2 py-2">Segments</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for exp in experiments %}
+              <tr class="border-t border-[#edf4ef]">
+                <td class="px-2 py-1.5 text-gray-700">{{ exp.name }}</td>
+                <td class="px-2 py-1.5 text-right">{% if exp.global_cod == None %}—{% else %}{{ exp.global_cod|floatformat:3 }}{% endif %}</td>
+                <td class="px-2 py-1.5 text-right">{% if exp.global_prd == None %}—{% else %}{{ exp.global_prd|floatformat:3 }}{% endif %}</td>
+                <td class="px-2 py-1.5 text-right">{% if exp.global_prb == None %}—{% else %}{{ exp.global_prb|floatformat:3 }}{% endif %}</td>
+                <td class="px-2 py-1.5 text-right">{% if exp.global_r2 == None %}—{% else %}{{ exp.global_r2|floatformat:3 }}{% endif %}</td>
+                <td class="px-2 py-1.5 text-right">{% if exp.global_rmse == None %}—{% else %}{{ exp.global_rmse|floatformat:3 }}{% endif %}</td>
+                <td class="px-2 py-1.5 text-right">{% if exp.total_observations == None %}—{% else %}{{ exp.total_observations }}{% endif %}</td>
+                <td class="px-2 py-1.5 text-right">{% if exp.segment_count == None %}—{% else %}{{ exp.segment_count }}{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </section>
+</div>
+
+{{ recipe_candidate_rows|json_script:"recipe-candidates-data" }}
+{{ form_defaults.candidate_include|json_script:"default-candidate-include" }}
+{{ form_defaults.candidate_exclude|json_script:"default-candidate-exclude" }}
+
+<script>
+  (function () {
+    var profileOptions = [{% for profile in predictor_profiles %}"{{ profile|escapejs }}"{% if not forloop.last %}, {% endif %}{% endfor %}];
+    var bundleOptions = [{% for bundle in interaction_bundles %}"{{ bundle|escapejs }}"{% if not forloop.last %}, {% endif %}{% endfor %}];
+
+    var defaultProfile = "{{ form_defaults.predictor_profile|escapejs }}";
+    var defaultBundle = "{{ form_defaults.interaction_bundle|escapejs }}";
+
+    var predictorInput = document.getElementById("predictor_profile_input");
+    var bundleInput = document.getElementById("interaction_bundle_input");
+    var noInteractionsInput = document.getElementById("no_interactions_input");
+    var manualProfile = document.getElementById("manual_predictor_profile");
+    var manualBundle = document.getElementById("manual_interaction_bundle");
+    var interactionStrength = document.getElementById("interaction_strength");
+    var runSummary = document.getElementById("run_summary");
+    var dynamicVariableInputs = document.getElementById("dynamic-variable-inputs");
+
+    var candidateRows = JSON.parse(document.getElementById("recipe-candidates-data").textContent || "[]");
+    var defaultCandidateInclude = JSON.parse(document.getElementById("default-candidate-include").textContent || "[]");
+    var defaultCandidateExclude = JSON.parse(document.getElementById("default-candidate-exclude").textContent || "[]");
+
+    var candidateLookup = {};
+    candidateRows.forEach(function (row) {
+      candidateLookup[row.name] = row;
+    });
+
+    function pickOption(options, preferred, fallback) {
+      if (preferred && options.indexOf(preferred) >= 0) {
+        return preferred;
+      }
+      if (fallback && options.indexOf(fallback) >= 0) {
+        return fallback;
+      }
+      return options.length ? options[0] : "";
+    }
+
+    var standardBundle = pickOption(bundleOptions, "standard", defaultBundle);
+    var richBundle = pickOption(bundleOptions, "kitchen_sink", standardBundle);
+    var minimalBundle = pickOption(bundleOptions, "minimal", standardBundle);
+
+    var recipes = {
+      quick: {
+        label: "Quick Check",
+        profile: pickOption(profileOptions, "baseline", defaultProfile),
+        bundle: minimalBundle,
+        interactionMode: "none"
+      },
+      balanced: {
+        label: "Recommended",
+        profile: pickOption(profileOptions, defaultProfile, "baseline"),
+        bundle: standardBundle,
+        interactionMode: "auto"
+      },
+      explore: {
+        label: "Explore",
+        profile: pickOption(profileOptions, profileOptions[profileOptions.length - 1], defaultProfile),
+        bundle: richBundle,
+        interactionMode: "rich"
+      }
+    };
+
+    var featurePackMap = {
+      structure: ["bedrooms", "bathrooms", "baths_per_bed", "has_garage", "has_basement", "log_eff_age"],
+      site: ["log_lot", "log_lot_sq", "land_share", "log_far"],
+      terrain_view: ["log_elev", "log_major_road", "view_aspect_west", "view_elev", "view_level", "is_view"],
+      planning: [
+        "in_flood_zone_flag",
+        "in_sfha_flag",
+        "in_wetland_flag",
+        "in_shoreline_flag",
+        "sewer_available_flag",
+        "recent_permits_flag",
+        "log_buildable_area"
+      ],
+      data_flags: ["missing_quality", "missing_condition"]
+    };
+
+    var includeSet = new Set(defaultCandidateInclude.filter(function (name) { return candidateLookup[name]; }));
+    var excludeSet = new Set(defaultCandidateExclude.filter(function (name) { return candidateLookup[name]; }));
+    includeSet.forEach(function (name) { excludeSet.delete(name); });
+
+    var availableSet = new Set();
+    candidateRows.forEach(function (row) {
+      if (!includeSet.has(row.name) && !excludeSet.has(row.name)) {
+        availableSet.add(row.name);
+      }
+    });
+
+    var buckets = {
+      available: document.getElementById("bucket-available"),
+      include: document.getElementById("bucket-include"),
+      exclude: document.getElementById("bucket-exclude")
+    };
+
+    function sortedNames(nameSet) {
+      return Array.from(nameSet).sort(function (a, b) {
+        return a.localeCompare(b);
+      });
+    }
+
+    function cycleBucket(currentBucket) {
+      if (currentBucket === "available") {
+        return "include";
+      }
+      if (currentBucket === "include") {
+        return "exclude";
+      }
+      return "available";
+    }
+
+    function moveVariable(name, targetBucket) {
+      availableSet.delete(name);
+      includeSet.delete(name);
+      excludeSet.delete(name);
+
+      if (targetBucket === "include") {
+        includeSet.add(name);
+      } else if (targetBucket === "exclude") {
+        excludeSet.add(name);
+      } else {
+        availableSet.add(name);
+      }
+
+      renderBuckets();
+      updateRunSummary();
+    }
+
+    function createChip(name, bucketName) {
+      var row = candidateLookup[name] || { name: name, source_model: "Derived", source_field: "engineered" };
+      var chip = document.createElement("div");
+      chip.className = "var-chip";
+      chip.draggable = true;
+      chip.dataset.name = name;
+      chip.dataset.bucket = bucketName;
+      chip.innerHTML = "<div class='text-xs font-semibold text-[#1f3327]'>" + row.name + "</div>" +
+        "<div class='mt-0.5 text-[11px] text-gray-600'>" + row.source_model + " · " + row.source_field + "</div>";
+
+      chip.addEventListener("dragstart", function (event) {
+        event.dataTransfer.setData("text/plain", JSON.stringify({ name: name, from: bucketName }));
+      });
+
+      chip.addEventListener("click", function () {
+        moveVariable(name, cycleBucket(bucketName));
+      });
+      return chip;
+    }
+
+    function renderBucket(container, names, bucketName) {
+      if (!container) {
+        return;
+      }
+      container.innerHTML = "";
+      if (!names.length) {
+        var empty = document.createElement("div");
+        empty.className = "text-xs text-gray-500 px-2 py-1";
+        empty.textContent = "Drop variables here";
+        container.appendChild(empty);
+        return;
+      }
+      names.forEach(function (name) {
+        container.appendChild(createChip(name, bucketName));
+      });
+    }
+
+    function renderBuckets() {
+      renderBucket(buckets.available, sortedNames(availableSet), "available");
+      renderBucket(buckets.include, sortedNames(includeSet), "include");
+      renderBucket(buckets.exclude, sortedNames(excludeSet), "exclude");
+    }
+
+    Object.keys(buckets).forEach(function (bucketName) {
+      var container = buckets[bucketName];
+      if (!container) {
+        return;
+      }
+      container.addEventListener("dragover", function (event) {
+        event.preventDefault();
+        container.classList.add("drag-over");
+      });
+      container.addEventListener("dragleave", function () {
+        container.classList.remove("drag-over");
+      });
+      container.addEventListener("drop", function (event) {
+        event.preventDefault();
+        container.classList.remove("drag-over");
+        try {
+          var payload = JSON.parse(event.dataTransfer.getData("text/plain") || "{}");
+          if (payload.name) {
+            moveVariable(payload.name, bucketName);
+          }
+        } catch (err) {
+          // Ignore malformed drag payloads.
+        }
+      });
+    });
+
+    function selectedRecipeKey() {
+      var checked = document.querySelector("input[name='recipe_preset']:checked");
+      return checked ? checked.value : "balanced";
+    }
+
+    function setSelectValue(selectEl, value) {
+      if (!selectEl) {
+        return;
+      }
+      for (var i = 0; i < selectEl.options.length; i += 1) {
+        if (selectEl.options[i].value === value) {
+          selectEl.selectedIndex = i;
+          return;
+        }
+      }
+    }
+
+    function applyInteractionMode(mode) {
+      if (!noInteractionsInput || !bundleInput) {
+        return;
+      }
+
+      if (mode === "none") {
+        noInteractionsInput.checked = true;
+        return;
+      }
+
+      noInteractionsInput.checked = false;
+      if (mode === "rich") {
+        bundleInput.value = richBundle;
+        setSelectValue(manualBundle, richBundle);
+        return;
+      }
+
+      var recipeKey = selectedRecipeKey();
+      var recipe = recipes[recipeKey] || recipes.balanced;
+      bundleInput.value = recipe.bundle;
+      setSelectValue(manualBundle, recipe.bundle);
+    }
+
+    function activePackCount() {
+      return document.querySelectorAll(".pack-toggle:checked").length;
+    }
+
+    function selectedPackVariables() {
+      var vars = new Set();
+      document.querySelectorAll(".pack-toggle:checked").forEach(function (input) {
+        var packVars = featurePackMap[input.value] || [];
+        packVars.forEach(function (name) {
+          if (candidateLookup[name]) {
+            vars.add(name);
+          }
+        });
+      });
+      return vars;
+    }
+
+    function appendHidden(name, value) {
+      var input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      dynamicVariableInputs.appendChild(input);
+    }
+
+    function rebuildDynamicInputs() {
+      if (!dynamicVariableInputs) {
+        return;
+      }
+      dynamicVariableInputs.innerHTML = "";
+
+      var included = new Set(includeSet);
+      selectedPackVariables().forEach(function (name) {
+        included.add(name);
+      });
+
+      included.forEach(function (name) {
+        appendHidden("candidate_include", name);
+      });
+      excludeSet.forEach(function (name) {
+        appendHidden("candidate_exclude", name);
+      });
+    }
+
+    function updateRunSummary(extra) {
+      if (!runSummary) {
+        return;
+      }
+      var recipeKey = selectedRecipeKey();
+      var recipe = recipes[recipeKey] || recipes.balanced;
+      var marketGroupSelect = document.getElementById("market_group_col");
+      var segmentation = marketGroupSelect ? marketGroupSelect.value : "valuation_area";
+      var countywide = document.getElementById("countywide_toggle").checked;
+      var parts = [
+        "Recipe: " + recipe.label,
+        countywide ? "countywide" : ("segmentation " + segmentation),
+        activePackCount() + " packs",
+        includeSet.size + " include vars",
+        excludeSet.size + " exclude vars"
+      ];
+      if (extra) {
+        parts.push(extra);
+      }
+      runSummary.textContent = parts.join(" · ");
+    }
+
+    function applyRecipe(recipeKey) {
+      var config = recipes[recipeKey] || recipes.balanced;
+      if (predictorInput) {
+        predictorInput.value = config.profile;
+      }
+      if (bundleInput) {
+        bundleInput.value = config.bundle;
+      }
+      setSelectValue(manualProfile, config.profile);
+      setSelectValue(manualBundle, config.bundle);
+      if (interactionStrength) {
+        interactionStrength.value = config.interactionMode;
+      }
+      applyInteractionMode(config.interactionMode);
+      updateRunSummary();
+    }
+
+    function syncManualOverrides() {
+      if (manualProfile && predictorInput) {
+        predictorInput.value = manualProfile.value;
+      }
+      if (manualBundle && bundleInput) {
+        bundleInput.value = manualBundle.value;
+      }
+      updateRunSummary("custom override");
+    }
+
+    function wireTabs() {
+      var tabButtons = document.querySelectorAll("#regression-tabs .tab-btn");
+      var tabPanels = document.querySelectorAll("[data-tab-panel]");
+
+      function activate(tabName) {
+        tabButtons.forEach(function (btn) {
+          btn.classList.toggle("active", btn.dataset.tab === tabName);
+        });
+        tabPanels.forEach(function (panel) {
+          panel.classList.toggle("hidden", panel.dataset.tabPanel !== tabName);
+        });
+      }
+
+      tabButtons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          activate(btn.dataset.tab);
+        });
+      });
+
+      activate("guided");
+    }
+
+    function wireSegmentationHint() {
+      var hintMap = {
+        {% for option in segmentation_options %}
+        "{{ option.value|escapejs }}": "{{ option.description|escapejs }}",
+        {% endfor %}
+      };
+      var select = document.getElementById("market_group_col");
+      var hint = document.getElementById("segmentation_hint");
+      function refresh() {
+        if (!select || !hint) {
+          return;
+        }
+        hint.textContent = hintMap[select.value] || "";
+      }
+      if (select) {
+        select.addEventListener("change", function () {
+          refresh();
+          updateRunSummary();
+        });
+      }
+      refresh();
+    }
+
+    wireTabs();
+    wireSegmentationHint();
+
+    document.querySelectorAll("input[name='recipe_preset']").forEach(function (input) {
+      input.addEventListener("change", function () {
+        applyRecipe(input.value);
+      });
+    });
+
+    document.querySelectorAll(".pack-toggle").forEach(function (input) {
+      input.addEventListener("change", function () {
+        updateRunSummary();
+      });
+    });
+
+    if (interactionStrength) {
+      interactionStrength.addEventListener("change", function () {
+        applyInteractionMode(interactionStrength.value);
+        updateRunSummary();
+      });
+    }
+
+    var countywideToggle = document.getElementById("countywide_toggle");
+    if (countywideToggle) {
+      countywideToggle.addEventListener("change", function () {
+        updateRunSummary();
+      });
+    }
+
+    if (manualProfile) {
+      manualProfile.addEventListener("change", syncManualOverrides);
+    }
+    if (manualBundle) {
+      manualBundle.addEventListener("change", syncManualOverrides);
+    }
+
+    var form = document.getElementById("experiment-form");
+    if (form) {
+      form.addEventListener("submit", function () {
+        rebuildDynamicInputs();
+      });
+    }
+
+    renderBuckets();
+    applyRecipe("balanced");
+    rebuildDynamicInputs();
+  })();
+</script>
+
+{% if has_running %}
+<script>
+  setTimeout(function () {
+    window.location.reload();
+  }, 12000);
+</script>
+{% endif %}
+{% endblock %}

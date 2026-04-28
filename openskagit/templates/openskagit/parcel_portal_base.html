@@ -101,6 +101,7 @@
         <div class="inline-flex items-center gap-2 rounded-full border border-sage-200/80 bg-white/80 px-4 py-2 text-sm font-semibold text-sage-700 shadow-lg">
           <span class="text-sage-500"><i class="fa-solid fa-seedling" aria-hidden="true"></i></span>
           {{ badge_label }}
+          {% block portal_badge_action %}{% endblock %}
         </div>
         {% endwith %}
         {% block hero %}

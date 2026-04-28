@@ -1,0 +1,329 @@
+{% extends "openskagit/base.html" %}
+
+{% block content %}
+<section class="py-10">
+  <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+    <header class="space-y-2">
+      <h1 class="text-2xl font-semibold text-slate-900">Competition Analysis UI</h1>
+      <p class="text-sm text-slate-600">
+        Pick a subject restaurant, select competitors, and run analysis with live progress messages.
+      </p>
+    </header>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-4">
+      <h2 class="text-base font-semibold text-slate-900">Step status</h2>
+      <ul class="mt-3 space-y-1 text-sm">
+        <li id="step-subject">1. Select restaurant: waiting</li>
+        <li id="step-competitors">2. Pick competitors: waiting</li>
+        <li id="step-analysis">3. Run analysis: waiting</li>
+      </ul>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <h2 class="text-base font-semibold text-slate-900">1) Subject restaurant</h2>
+      <div class="flex gap-2">
+        <input
+          id="subject-input"
+          type="text"
+          autocomplete="off"
+          placeholder="Search restaurant..."
+          class="flex-1 rounded-md border border-slate-300 px-3 py-2"
+        />
+        <button
+          id="load-competitors-btn"
+          type="button"
+          class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+        >
+          Find competitors
+        </button>
+      </div>
+      <input id="subject-place-id" type="hidden" />
+      <p id="subject-selected" class="text-sm text-slate-600">No subject selected.</p>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <h2 class="text-base font-semibold text-slate-900">1a) Competitors</h2>
+      <div id="competitors-list" class="space-y-2 text-sm text-slate-600">
+        No competitors loaded yet.
+      </div>
+      <div class="space-y-1">
+        <label for="report-engine" class="text-sm font-medium text-slate-900">Report engine</label>
+        <select
+          id="report-engine"
+          class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        >
+          <option value="deep_research" {% if default_report_engine == "deep_research" %}selected{% endif %}>
+            Deep research (`client.interactions.create`)
+          </option>
+          <option value="generate_content" {% if default_report_engine == "generate_content" %}selected{% endif %}>
+            Generate content (`client.models.generate_content`)
+          </option>
+        </select>
+      </div>
+      <button
+        id="start-analysis-btn"
+        type="button"
+        class="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        disabled
+      >
+        2) Start analysis
+      </button>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <h2 class="text-base font-semibold text-slate-900">3) Live progress</h2>
+      <pre id="progress-log" class="h-64 overflow-auto rounded-md bg-slate-950 p-3 text-xs text-emerald-200"></pre>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <h2 class="text-base font-semibold text-slate-900">Final report</h2>
+      <pre id="final-report" class="max-h-80 overflow-auto rounded-md bg-slate-100 p-3 text-xs text-slate-900"></pre>
+      <h3 class="text-sm font-semibold text-slate-900">Master payload</h3>
+      <pre id="final-payload" class="max-h-80 overflow-auto rounded-md bg-slate-100 p-3 text-xs text-slate-900"></pre>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  (function () {
+    const competitorsUrl = "{% url 'gastronet:competition-ui-competitors' %}";
+    const startUrl = "{% url 'gastronet:competition-ui-start' %}";
+    const streamUrlTemplate = "{% url 'gastronet:competition-ui-stream' run_id='RUN_ID' %}";
+
+    const subjectInput = document.getElementById("subject-input");
+    const subjectPlaceIdInput = document.getElementById("subject-place-id");
+    const subjectSelected = document.getElementById("subject-selected");
+    const loadCompetitorsBtn = document.getElementById("load-competitors-btn");
+    const competitorsList = document.getElementById("competitors-list");
+    const startAnalysisBtn = document.getElementById("start-analysis-btn");
+    const progressLog = document.getElementById("progress-log");
+    const finalReport = document.getElementById("final-report");
+    const finalPayload = document.getElementById("final-payload");
+    const reportEngineSelect = document.getElementById("report-engine");
+    const stepSubject = document.getElementById("step-subject");
+    const stepCompetitors = document.getElementById("step-competitors");
+    const stepAnalysis = document.getElementById("step-analysis");
+
+    let stream = null;
+
+    function setStep(element, text) {
+      element.textContent = text;
+    }
+
+    function appendLog(message) {
+      const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+      progressLog.textContent += `${line}\n`;
+      progressLog.scrollTop = progressLog.scrollHeight;
+    }
+
+    function getCsrfToken() {
+      const cookie = document.cookie
+        .split(";")
+        .map((chunk) => chunk.trim())
+        .find((chunk) => chunk.startsWith("csrftoken="));
+      return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
+    }
+
+    function selectedCompetitorIds() {
+      return Array.from(
+        document.querySelectorAll('input[name="competitor_place_id"]:checked')
+      ).map((checkbox) => checkbox.value);
+    }
+
+    function renderCompetitors(data) {
+      const competitors = data.competitors || [];
+      if (!competitors.length) {
+        competitorsList.innerHTML = "<p>No competitors returned. You can still run subject-only analysis.</p>";
+        startAnalysisBtn.disabled = false;
+        setStep(stepCompetitors, "2. Pick competitors: 0 found (subject-only mode)");
+        return;
+      }
+
+      competitorsList.innerHTML = competitors
+        .map((comp) => (
+          `<label class="block rounded border border-slate-200 p-2">` +
+          `<input type="checkbox" name="competitor_place_id" value="${comp.place_id}" checked> ` +
+          `<strong>${comp.name || "Unnamed"}</strong><br>` +
+          `<span class="text-xs text-slate-500">${comp.address || ""}</span>` +
+          `</label>`
+        ))
+        .join("");
+      startAnalysisBtn.disabled = false;
+      setStep(stepCompetitors, "2. Pick competitors: ready");
+    }
+
+    async function loadCompetitors() {
+      const placeId = subjectPlaceIdInput.value.trim();
+      if (!placeId) {
+        alert("Select a restaurant from autocomplete first.");
+        return;
+      }
+
+      appendLog("Loading competitors...");
+      loadCompetitorsBtn.disabled = true;
+
+      try {
+        const response = await fetch(competitorsUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken(),
+          },
+          body: JSON.stringify({ place_id: placeId }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load competitors.");
+        }
+
+        const subject = data.subject || {};
+        subjectSelected.textContent = `${subject.name || "Unknown"} (${subject.address || "No address"})`;
+        appendLog(`Loaded ${data.competitors.length} competitor options.`);
+        renderCompetitors(data);
+      } catch (error) {
+        appendLog(`Error: ${error.message}`);
+      } finally {
+        loadCompetitorsBtn.disabled = false;
+      }
+    }
+
+    async function startAnalysis() {
+      const subjectPlaceId = subjectPlaceIdInput.value.trim();
+      if (!subjectPlaceId) {
+        alert("Select a subject first.");
+        return;
+      }
+
+      try {
+        if (stream) {
+          stream.close();
+          stream = null;
+        }
+
+        finalReport.textContent = "";
+        finalPayload.textContent = "";
+        setStep(stepAnalysis, "3. Run analysis: starting");
+        appendLog(`Starting analysis job (${reportEngineSelect.value})...`);
+        startAnalysisBtn.disabled = true;
+
+        const response = await fetch(startUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCsrfToken(),
+          },
+          body: JSON.stringify({
+            subject_place_id: subjectPlaceId,
+            competitor_place_ids: selectedCompetitorIds(),
+            report_engine: reportEngineSelect.value,
+          }),
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          data = null;
+        }
+
+        if (!response.ok) {
+          const fallbackMessage = `Unable to start analysis (HTTP ${response.status}).`;
+          appendLog(`Error: ${(data && data.error) || fallbackMessage}`);
+          setStep(stepAnalysis, "3. Run analysis: failed");
+          startAnalysisBtn.disabled = false;
+          return;
+        }
+
+        if (!data || !data.run_id) {
+          appendLog("Error: server response missing run_id.");
+          setStep(stepAnalysis, "3. Run analysis: failed");
+          startAnalysisBtn.disabled = false;
+          return;
+        }
+
+        const runId = data.run_id;
+        appendLog(`Run created: ${runId} (engine: ${data.report_engine || reportEngineSelect.value})`);
+        setStep(stepAnalysis, "3. Run analysis: running");
+
+        const streamUrl = streamUrlTemplate.replace("RUN_ID", runId);
+        stream = new EventSource(streamUrl);
+
+        stream.onmessage = (event) => {
+          const payload = JSON.parse(event.data);
+          if (payload.event === "heartbeat") {
+            return;
+          }
+
+          appendLog(payload.message || payload.event);
+
+          if (payload.event === "done") {
+            if (payload.data && payload.data.final_report) {
+              finalReport.textContent = payload.data.final_report;
+            }
+            if (payload.data && payload.data.master_payload) {
+              finalPayload.textContent = JSON.stringify(payload.data.master_payload, null, 2);
+            }
+            setStep(stepAnalysis, "3. Run analysis: completed");
+            startAnalysisBtn.disabled = false;
+            stream.close();
+            stream = null;
+          }
+
+          if (payload.event === "error") {
+            setStep(stepAnalysis, "3. Run analysis: failed");
+            startAnalysisBtn.disabled = false;
+          }
+        };
+
+        stream.onerror = () => {
+          appendLog("Stream disconnected.");
+          startAnalysisBtn.disabled = false;
+        };
+      } catch (error) {
+        appendLog(`Error: ${error.message}`);
+        setStep(stepAnalysis, "3. Run analysis: failed");
+        startAnalysisBtn.disabled = false;
+      }
+    }
+
+    loadCompetitorsBtn.addEventListener("click", loadCompetitors);
+    startAnalysisBtn.addEventListener("click", startAnalysis);
+
+    window.initCompetitionUiAutocomplete = function () {
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        return;
+      }
+
+      const autocomplete = new google.maps.places.Autocomplete(subjectInput, {
+        types: ["establishment"],
+        componentRestrictions: { country: "us" },
+      });
+      autocomplete.setFields(["place_id", "name", "formatted_address"]);
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (!place || !place.place_id) {
+          return;
+        }
+        subjectPlaceIdInput.value = place.place_id;
+        subjectInput.value = place.name || subjectInput.value;
+        subjectSelected.textContent = `${place.name || "Selected"} (${place.formatted_address || "No address"})`;
+        setStep(stepSubject, "1. Select restaurant: ready");
+      });
+    };
+  })();
+</script>
+
+{% if google_places_api_key %}
+<script
+  async
+  defer
+  src="https://maps.googleapis.com/maps/api/js?key={{ google_places_api_key }}&libraries=places&callback=initCompetitionUiAutocomplete"
+></script>
+{% else %}
+<script>
+  console.warn("GOOGLE_PLACES_API_KEY is missing. Autocomplete will not initialize.");
+</script>
+{% endif %}
+{% endblock %}

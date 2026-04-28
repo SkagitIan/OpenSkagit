@@ -1,0 +1,108 @@
+{% with img_scan=route.imagery_scan listing_scan=route.listing_scan drive_state=route.routing_state %}
+  <div id="route-scan-panel-{{ plan.id }}-{{ route.cluster_id }}" class="mt-4 space-y-2">
+    <div class="rounded-2xl border border-sky-200 bg-sky-50/70 px-4 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="text-sm text-slate-700">
+          {% if img_scan %}
+            <div class="font-semibold text-slate-900">
+              Imagery review: {{ img_scan.processed_count|default:0 }}/{{ img_scan.total_count|default:route.stop_count }} complete
+              · {{ img_scan.changed_count|default:0 }} flagged
+            </div>
+          {% else %}
+            <div class="font-semibold text-slate-900">Imagery review: 0/{{ route.stop_count }} complete · 0 flagged</div>
+          {% endif %}
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center rounded-xl border border-sky-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-sky-50"
+          hx-get="{% url 'coappraiser-route-imagery-manual-modal' plan.id route.cluster_id %}"
+          hx-target="#coappraiser-imagery-modal-body"
+          hx-swap="innerHTML"
+          hx-select="[data-imagery-manual-root]"
+        >
+          Review Imagery
+        </button>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-violet-200 bg-violet-50/70 px-4 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="text-sm text-slate-700">
+          {% if listing_scan %}
+            <div class="font-semibold text-slate-900">
+              Listing: {{ listing_scan.processed_count|default:0 }}/{{ listing_scan.total_count|default:route.stop_count }} complete
+              · {{ listing_scan.flagged_count|default:0 }} flagged
+              {% if listing_scan.error_count %}
+                · {{ listing_scan.error_count }} errors
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="font-semibold text-slate-900">Listing: Ready to run.</div>
+          {% endif %}
+        </div>
+        <form
+          method="post"
+          hx-post="{{ route_listing_start_url }}"
+          hx-target="#route-scan-panel-{{ plan.id }}-{{ route.cluster_id }}"
+          hx-swap="outerHTML"
+        >
+          {% csrf_token %}
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-xl border border-violet-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-violet-50"
+            {% if listing_scan and listing_scan.status == "running" %}disabled{% endif %}
+          >
+            {% if listing_scan and listing_scan.status == "completed" %}Run Listing Again{% else %}Run Listing Check{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="text-sm text-slate-700">
+          <div class="font-semibold text-slate-900">
+            Driving Line
+            {% if route.estimated_duration_label or route.estimated_distance_label %}
+              · {{ route.estimated_duration_label|default:"" }}{% if route.estimated_duration_label and route.estimated_distance_label %} · {% endif %}{{ route.estimated_distance_label|default:"" }}
+            {% endif %}
+          </div>
+          {% if drive_state and drive_state.message %}
+            <div class="mt-0.5 text-xs text-slate-600">{{ drive_state.message }}</div>
+          {% endif %}
+        </div>
+        <form
+          method="post"
+          hx-post="{{ route_drive_start_url }}"
+          hx-target="#route-scan-panel-{{ plan.id }}-{{ route.cluster_id }}"
+          hx-swap="outerHTML"
+        >
+          {% csrf_token %}
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-emerald-50"
+            {% if listing_scan and listing_scan.status == "running" %}disabled{% endif %}
+          >
+            {% if route.route_geojson %}Re-Route Driving Line{% else %}Route Driving Line{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% if listing_scan and listing_scan.status == "running" %}
+      <div
+        hx-get="{{ route_listing_tick_url }}"
+        hx-trigger="load delay:700ms"
+        hx-target="#route-scan-panel-{{ plan.id }}-{{ route.cluster_id }}"
+        hx-swap="outerHTML"
+      ></div>
+    {% endif %}
+
+    <div
+      hx-get="{{ route_rows_url }}"
+      hx-trigger="load"
+      hx-target="#route-stops-body-{{ route.cluster_id }}"
+      hx-swap="outerHTML"
+    ></div>
+  </div>
+{% endwith %}

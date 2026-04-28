@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>New Weekly Survey</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #dbe3ec;">
+          <tr>
+            <td style="background:#0f766e;padding:20px 24px;color:#ffffff;">
+              <div style="font-size:12px;letter-spacing:0.16em;text-transform:uppercase;opacity:0.9;">OpenSkagit</div>
+              <h1 style="margin:8px 0 0 0;font-size:24px;line-height:1.2;font-weight:700;">New weekly survey is live</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 10px 0;font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:#475569;">
+                Week of {{ week_start_date|date:"M j" }}
+              </p>
+              <p style="margin:0 0 18px 0;font-size:18px;line-height:1.45;font-weight:700;color:#0f172a;">
+                {{ question_prompt }}
+              </p>
+
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 18px 0;">
+                <tr>
+                  <td style="border-radius:999px;background:#0f766e;">
+                    <a
+                      href="{{ survey_url }}"
+                      style="display:inline-block;padding:12px 20px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;"
+                    >
+                      Respond Now
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:13px;line-height:1.5;color:#475569;">
+                You received this because you subscribed for weekly survey reminders.
+              </p>
+              <p style="margin:10px 0 0 0;font-size:13px;line-height:1.5;color:#475569;">
+                <a href="{{ unsubscribe_url }}" style="color:#0f766e;text-decoration:underline;">Unsubscribe</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

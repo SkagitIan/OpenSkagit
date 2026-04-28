@@ -61,45 +61,6 @@
     {{ hero_questions|json_script:"hero-question-data" }}
   {% endif %}
 
-  <!-- Live stats -->
-  <section class="bg-white py-14" id="stats">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-      <h2 class="text-3xl font-bold text-gray-900 mb-4">Live operational stats</h2>
-      <p class="text-gray-600">Real-time signals from active datasets and pipelines.</p>
-    </div>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
-      <div class="stat-ticker-shell" role="region" aria-label="Live operational stats ticker">
-        <div class="stat-ticker-track">
-          {% for _ in '12' %}
-            {% for stat in stats_cards %}
-            <div class="ticker-item">
-              <div class="ticker-label">
-                <span class="ticker-dot {{ stat.accent_class|default:'bg-os-sky' }}"></span>
-                <span class="ticker-label-text">{{ stat.label }}</span>
-                {% if stat.badge_label %}
-                <span class="ticker-badge {{ stat.badge_class|default:'bg-gray-900/10 text-gray-800' }}">{{ stat.badge_label }}</span>
-                {% endif %}
-              </div>
-              <div class="ticker-value">
-                {% if stat.value|default_if_none:'' != '' and stat.animate|default:False %}
-                <span data-animate-number data-target="{{ stat.value }}">{{ stat.value|intcomma }}</span>
-                {% elif stat.value|default_if_none:'' != '' %}
-                <span>{{ stat.value|intcomma }}</span>
-                {% else %}
-                <span>{{ stat.display }}</span>
-                {% endif %}
-              </div>
-              {% if stat.caption %}
-              <div class="ticker-caption">{{ stat.caption }}</div>
-              {% endif %}
-            </div>
-            {% endfor %}
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- How OpenSkagit Works -->
   <section class="py-16 bg-gray-50" id="model">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -170,11 +131,45 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
     </div>
   </section>
 
+  <!-- Newsletter CTA -->
+  <section id="cta-briefing" class="py-16 bg-gradient-to-b from-white to-os-teal/10">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="bg-white border border-os-teal/20 rounded-2xl shadow-xl p-8 md:p-10 space-y-6">
+        <div class="text-center space-y-3">
+          <h2 class="text-3xl font-bold text-gray-900">Inside the OpenSkagit lab</h2>
+          <p class="text-gray-700">Watch us build tools that make Skagit Valley's data actually useful and see what we're discovering along the way.</p>
+        </div>
+        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Fresh tools: VoteVector, Flavor Index, Parcel Helper</li>
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Weird stuff we found in the data this week</li>
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Survey results from your neighbors</li>
+          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Sneak peeks at what's next</li>
+        </ul>
+        <form id="briefing-form" class="flex flex-col md:flex-row gap-3" method="post" novalidate>
+          {% csrf_token %}
+          <input
+            id="briefing-email"
+            type="email"
+            name="email"
+            required
+            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-os-teal focus:ring-2 focus:ring-os-teal/20 transition"
+            placeholder="you@example.com"
+            autocomplete="email"
+          />
+          <button type="submit" id="briefing-submit" class="px-6 py-3 bg-os-teal text-white rounded-xl font-semibold shadow-md hover:bg-os-teal/90 transition-colors">
+            Get updates
+          </button>
+        </form>
+        <p id="briefing-success" class="text-sm text-os-teal text-center hidden">Subscribed - thanks for helping us keep the Valley informed.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- Tools -->
   <section id="tools" class="py-16 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12">
-        <h2 class="text-3xl font-bold text-gray-900 mb-3">Tools for Skagit Valley</h2>
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">Skagit Valley Projects</h2>
         <p class="text-gray-700 max-w-3xl mx-auto">Built to be used. New tools and datasets roll out continuously.</p>
       </div>
 
@@ -190,6 +185,20 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
           <p class="text-gray-600 text-sm mb-4">A parcel-first view of Skagit Valley: key facts, mapping layers, and location-aware insights in one place.</p>
           <div class="flex items-center text-sm text-os-teal font-semibold">
             <span>{{ total_parcels|intcomma }} parcels covered →</span>
+          </div>
+        </a>
+
+        <a href="/alert/" class="group bg-white border-2 border-gray-200 rounded-2xl p-6 card-hover hover:border-os-teal transition-all shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-os-teal/10 rounded-xl flex items-center justify-center text-os-teal text-xl">
+              <i class="fa-solid fa-bell"></i>
+            </div>
+            <span class="inline-flex items-center text-xs font-semibold text-white bg-os-teal px-2.5 py-1 rounded-full shadow">Live</span>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-os-teal transition-colors">Parcel Record Alerts</h3>
+          <p class="text-gray-600 text-sm mb-4">Track your parcels and get email notifications when new high-signal recorded documents appear in the county index.</p>
+          <div class="flex items-center text-sm text-os-teal font-semibold">
+            <span>Set up free alerts →</span>
           </div>
         </a>
 
@@ -221,15 +230,23 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
           </div>
         </a>
 
-        <div class="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div class="group bg-white border-2 border-gray-200 rounded-2xl p-6 card-hover hover:border-os-teal transition-all shadow-sm">
           <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-lg">
-              <i class="fa-solid fa-magnifying-glass-location"></i>
+            <div class="w-12 h-12 bg-os-teal/10 rounded-xl flex items-center justify-center text-os-teal text-lg">
+              <i class="fa-solid fa-robot"></i>
             </div>
-            <span class="inline-flex items-center text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-full">Coming soon</span>
+            <span class="inline-flex items-center text-xs font-semibold text-white bg-os-teal px-2.5 py-1 rounded-full shadow">Live</span>
           </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">Parcel Profiler</h3>
-          <p class="text-gray-600 text-sm mb-4">Parcel Profiler surfaces constraints, risk signals, and smart next steps for any property so you know what’s behind the headline.</p>
+          <h3 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-os-teal transition-colors">SkagitMCP</h3>
+          <p class="text-gray-600 text-sm mb-4">Connect AI assistants to Skagit Valley property + planning data through simple tools.</p>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 text-sm font-semibold">
+            <a href="/mcp/" class="inline-flex items-center justify-center px-4 py-2 bg-os-teal text-white rounded-xl shadow hover:bg-os-teal/90">
+              Learn more
+            </a>
+            <a href="{{ mcp_custom_gpt_url }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center px-4 py-2 text-os-teal border border-os-teal/30 rounded-xl hover:border-os-teal/60">
+              Try it in ChatGPT
+            </a>
+          </div>
         </div>
 
         <div class="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm">
@@ -243,55 +260,8 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
           <p class="text-gray-600 text-sm mb-4">Clear breakdown of property taxes with trend context and plain-English explanations of what changed.</p>
         </div>
 
-        <div class="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500 text-lg">
-              <i class="fa-solid fa-newspaper"></i>
-            </div>
-            <span class="inline-flex items-center text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-full">Coming soon</span>
-          </div>
-          <h3 class="text-xl font-bold text-gray-900 mb-2">Civic Briefings</h3>
-          <p class="text-gray-600 text-sm mb-4">Agenda and document summaries tagged by impact area—housing, flood, roads, taxes, business—with links back to sources.</p>
-        </div>
       </div>
 
-    </div>
-  </section>
-
-  <!-- Consulting -->
-  <section id="community" class="py-16 bg-gradient-to-b from-white to-os-teal/10">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="bg-white border border-os-teal/15 rounded-2xl shadow-xl p-8 md:p-10">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-          <div class="space-y-4 max-w-3xl">
-            <p class="text-sm font-semibold text-os-teal uppercase tracking-wide">Consulting</p>
-            <h2 class="text-3xl font-bold text-gray-900">Get your time back. Reduce mistakes. Move faster.</h2>
-            <p class="text-gray-700 text-lg">I help Skagit small teams fix one high-friction workflow&mdash;so work moves without extra meetings, dropped balls, or rework. AI is just the lever.</p>
-            <ul class="text-sm text-gray-600 space-y-2">
-              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Built for small crews and real budgets.</span></li>
-              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Clear scope, clear &ldquo;done.&rdquo;</span></li>
-              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Your team stays in control.</span></li>
-            </ul>
-            <ul class="text-sm text-gray-600 space-y-2 pt-2 border-t border-slate-200">
-              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Save hours weekly by removing repetitive steps.</span></li>
-              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Reduce errors with simple checks + consistent outputs.</span></li>
-              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Speed up turnaround on the work that customers feel.</span></li>
-              <li class="flex items-start gap-2"><span class="text-os-lime">•</span><span>Make knowledge shareable so it’s not stuck in one person’s head.</span></li>
-            </ul>
-          </div>
-          <div class="flex-shrink-0">
-            <a href="/consult/" class="inline-flex items-center px-6 py-3 rounded-xl bg-os-teal text-white font-semibold shadow-lg hover:bg-os-teal/90 transition-colors">
-              Explore consulting
-              <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </a>
-            <div class="mt-3 text-center">
-              <a href="/consult/#services" class="text-sm font-semibold text-os-teal underline decoration-os-teal/40 hover:text-os-teal/90">See packages</a>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -404,6 +374,36 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
     </div>
   </section>
 
+  <!-- Custom Maps -->
+  <section class="py-16 bg-white" id="custom-maps">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-900 mb-3">Custom maps</h2>
+        <p class="text-gray-700 max-w-3xl mx-auto">Interactive city-specific mapping projects built from local parcel, zoning, and planning data.</p>
+      </div>
+      <a href="/maps/sedro-woolley/" class="group block overflow-hidden rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-shadow bg-white">
+        <div class="aspect-[16/9] overflow-hidden bg-slate-100">
+          <img
+            src="https://res.cloudinary.com/dfz4bhlzs/image/upload/v1771862330/Screenshot_2026-02-23_072013_xci5rj.png"
+            alt="Sedro-Woolley Parcel Map preview"
+            class="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+            loading="lazy"
+          >
+        </div>
+        <div class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p class="text-sm font-semibold uppercase tracking-wide text-os-teal">Featured map</p>
+            <h3 class="text-2xl font-bold text-gray-900">Sedro-Woolley Parcel Map</h3>
+            <p class="text-gray-600 mt-1">Zoning filters, land-lift candidates, and parcel-level context in one interactive view.</p>
+          </div>
+          <span class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-os-teal text-white font-semibold">
+            Open map
+          </span>
+        </div>
+      </a>
+    </div>
+  </section>
+
 <!-- Partnerships -->
 <!-- <section id="partners" class="py-16 bg-white">
   <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -467,43 +467,6 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
 
   </div>
 </section> -->
-
-
-<!-- Closing CTA -->
-  <section id="cta-briefing" class="py-16 bg-gradient-to-b from-white to-os-teal/10">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="bg-white border border-os-teal/20 rounded-2xl shadow-xl p-8 md:p-10 space-y-6">
-        <div class="text-center space-y-3">
-          <h2 class="text-3xl font-bold text-gray-900">Inside the OpenSkagit lab</h2>
-          <p class="text-gray-700">Watch us build tools that make Skagit Valley's data actually useful—and see what we're discovering along the way.</p>
-        </div>
-        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-700">
-          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Fresh tools: VoteVector, Flavor Index, Parcel Helper</li>
-          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Weird stuff we found in the data this week</li>
-          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Survey results from your neighbors</li>
-          <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-os-lime"></span>Sneak peeks at what's next</li>
-        </ul>
-        <form id="briefing-form" class="flex flex-col md:flex-row gap-3" method="post" novalidate>
-          {% csrf_token %}
-          <input
-            id="briefing-email"
-            type="email"
-            name="email"
-            required
-            class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-os-teal focus:ring-2 focus:ring-os-teal/20 transition"
-            placeholder="you@example.com"
-            autocomplete="email"
-          />
-          <button type="submit" id="briefing-submit" class="px-6 py-3 bg-os-teal text-white rounded-xl font-semibold shadow-md hover:bg-os-teal/90 transition-colors">
-            Get updates
-          </button>
-        </form>
-        <p id="briefing-success" class="text-sm text-os-teal text-center hidden">Subscribed — thanks for helping us keep the Valley informed.</p>
-
-      </div>
-    </div>
-  </section>
-
 </div>
 {% endblock %}
 
@@ -511,25 +474,6 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
 <!-- JavaScript -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" crossorigin="anonymous"></script>
   <script>
-    function animateCounter(element, target, duration = 1600) {
-      const end = Number(target);
-      if (!Number.isFinite(end)) {
-        return;
-      }
-      const start = 0;
-      const increment = end / (duration / 16 || 1);
-      let current = start;
-      const timer = setInterval(() => {
-        current += increment;
-        if ((increment >= 0 && current >= end) || (increment < 0 && current <= end)) {
-          element.textContent = Number(end).toLocaleString();
-          clearInterval(timer);
-        } else {
-          element.textContent = Math.floor(current).toLocaleString();
-        }
-      }, 16);
-    }
-
     document.addEventListener('DOMContentLoaded', function() {
       const disclaimerKey = 'openskagitAiDisclaimerAccepted';
       const aiModalOverlay = document.getElementById('ai-modal-overlay');
@@ -579,15 +523,6 @@ We train a local-first AI on Skagit Valley's unique context, so it can think abo
           hideAiModal();
         });
       }
-
-      document.querySelectorAll('[data-animate-number]').forEach((element) => {
-        const targetAttr = element.getAttribute('data-target');
-        const value = Number(targetAttr);
-        if (!Number.isFinite(value)) {
-          return;
-        }
-        animateCounter(element, value);
-      });
 
       const heroDataNode = document.getElementById('hero-question-data');
       const heroQuestionText = document.getElementById('hero-question-text');

@@ -1,0 +1,285 @@
+{% load humanize formatting %}
+{% if neighborhood %}
+  <div
+    id="neighborhood-analysis-panel"
+    data-cod="{{ neighborhood.cod|default_if_none:0 }}"
+    data-prd="{{ neighborhood.prd|default_if_none:1 }}"
+    data-sales-ratio="{{ neighborhood.sales_ratio|default_if_none:100 }}"
+  >
+    {% if neighborhood_geom_geojson %}
+      {{ neighborhood_geom_geojson|json_script:"neighborhood-geom-data" }}
+    {% endif %}
+    <div class="neighborhood-card" id="neighborhood-section-card" data-mode="map" data-hood-id="{{ neighborhood.code|default:subject.neighborhood_code|default:'' }}">
+      <div class="neighborhood-card__inner">
+        <div class="neighborhood-card__front">
+          <div class="neighborhood-card__front-header">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-sage-500">Neighborhood fairness</p>
+              <h3 class="text-2xl font-semibold text-slate-900">IAAO-aligned quality checks</h3>
+              <p class="text-sm text-slate-600">Click any card for methodology or flip to explore maps and multi-year trends.</p>
+            </div>
+            <div class="flex w-full max-w-[190px] flex-col gap-2">
+              {% if neighborhood_geom_geojson %}
+              <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('map')">
+                <span>View map</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+              </button>
+              {% endif %}
+              <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('trend')">
+                <span>Trends</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="gauge-grid">
+            <div class="gauge-card" id="cod-card">
+              <div class="gauge-card__inner">
+                <div class="gauge-card__front">
+                  <div class="gauge-card__header">
+                    <div>
+                      <p class="text-xs uppercase tracking-wide text-slate-400">Uniformity</p>
+                      <h4 class="text-lg font-semibold text-slate-900">Coefficient of Dispersion</h4>
+                    </div>
+                    <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip COD card">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="gauge-container">
+                    <canvas id="cod-gauge" width="200" height="120"></canvas>
+                    <div class="gauge-value">{{ neighborhood.cod|default:0|floatformat:1 }}</div>
+                  </div>
+                  <div>
+                    {% if neighborhood.cod and neighborhood.cod < 10 %}
+                      <span class="status-badge status-badge--excellent">Excellent uniformity</span>
+                    {% elif neighborhood.cod and neighborhood.cod < 15 %}
+                      <span class="status-badge status-badge--good">Good uniformity</span>
+                    {% else %}
+                      <span class="status-badge status-badge--fair">Needs review</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="gauge-card__back">
+                  <div class="gauge-card__header">
+                    <h4 class="text-lg font-semibold text-slate-900">What is COD?</h4>
+                    <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip back">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="text-sm text-slate-600">COD measures horizontal equity—how consistent assessments are among similar properties. Lower values mean tighter groupings.</p>
+                  <div class="mt-4 space-y-3">
+                    <div class="metric-item">
+                      <div class="metric-label">COD ≤ 10</div>
+                      <div class="metric-desc">Excellent uniformity for residential parcels.</div>
+                    </div>
+                    <div class="metric-item">
+                      <div class="metric-label">Above 15</div>
+                      <div class="metric-desc">Signals assessment drift or missing features.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="gauge-card" id="prd-card">
+              <div class="gauge-card__inner">
+                <div class="gauge-card__front">
+                  <div class="gauge-card__header">
+                    <div>
+                      <p class="text-xs uppercase tracking-wide text-slate-400">Vertical equity</p>
+                      <h4 class="text-lg font-semibold text-slate-900">Price-Related Differential</h4>
+                    </div>
+                    <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip PRD card">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="gauge-container">
+                    <canvas id="prd-gauge" width="200" height="120"></canvas>
+                    <div class="gauge-value">{{ neighborhood.prd|default:1|floatformat:2 }}</div>
+                  </div>
+                  <div>
+                    {% if neighborhood.prd and neighborhood.prd >= 0.98 and neighborhood.prd <= 1.03 %}
+                      <span class="status-badge status-badge--excellent">Balanced</span>
+                    {% elif neighborhood.prd and neighborhood.prd > 1.03 %}
+                      <span class="status-badge status-badge--fair">Regressive</span>
+                    {% else %}
+                      <span class="status-badge status-badge--fair">Progressive</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="gauge-card__back">
+                  <div class="gauge-card__header">
+                    <h4 class="text-lg font-semibold text-slate-900">What is PRD?</h4>
+                    <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip back">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="text-sm text-slate-600">PRD highlights whether high-value parcels are assessed differently than low-value parcels. Values above 1.03 suggest regressivity, below 0.98 suggest progressivity.</p>
+                  <div class="mt-4 space-y-3">
+                    <div class="metric-item">
+                      <div class="metric-label">Target 1.00</div>
+                      <div class="metric-desc">High- and low-value homes move together.</div>
+                    </div>
+                    <div class="metric-item">
+                      <div class="metric-label">Rebalanced actions</div>
+                      <div class="metric-desc">Field reviews, model adjustments, or zoning-specific factors.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="gauge-card" id="sales-ratio-card">
+              <div class="gauge-card__inner">
+                <div class="gauge-card__front">
+                  <div class="gauge-card__header">
+                    <div>
+                      <p class="text-xs uppercase tracking-wide text-slate-400">Level of assessment</p>
+                      <h4 class="text-lg font-semibold text-slate-900">Assessment to Sales Ratio</h4>
+                    </div>
+                    <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip ratio card">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="gauge-container">
+                    <canvas id="sales-ratio-gauge" width="200" height="120"></canvas>
+                    <div class="gauge-value">{{ neighborhood.sales_ratio|default:100|floatformat:0 }}%</div>
+                  </div>
+                  <div>
+                    {% if neighborhood.sales_ratio and neighborhood.sales_ratio >= 90 and neighborhood.sales_ratio <= 110 %}
+                      <span class="status-badge status-badge--excellent">Within IAAO standard</span>
+                    {% else %}
+                      <span class="status-badge status-badge--fair">Outside band</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="gauge-card__back">
+                  <div class="gauge-card__header">
+                    <h4 class="text-lg font-semibold text-slate-900">Why watch the ratio?</h4>
+                    <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip back">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="text-sm text-slate-600">Assessment ÷ sale price compared to the IAAO 90–110% guidance. Sustained drift outside that window may warrant county-level study.</p>
+                  <div class="mt-4 space-y-3">
+                    <div class="metric-item">
+                      <div class="metric-label">Above 110%</div>
+                      <div class="metric-desc">Potential over-assessment relative to market.</div>
+                    </div>
+                    <div class="metric-item">
+                      <div class="metric-label">Below 90%</div>
+                      <div class="metric-desc">Signals under-assessment or lagging roll updates.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% if neighborhood_geom_geojson %}
+          <div class="neighborhood-card__back neighborhood-back-panel neighborhood-back--map">
+            <div class="neighborhood-card__front-header">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Neighborhood footprint</p>
+                <h3 class="text-2xl font-semibold text-slate-900">{{ neighborhood.name|default:"Map preview" }}</h3>
+                <p class="text-sm text-slate-600">Your parcel plotted inside the neighborhood boundary used for fairness diagnostics.</p>
+              </div>
+              <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('front')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+                </svg>
+                <span>Back to metrics</span>
+              </button>
+            </div>
+            <div id="neighborhood-map" class="h-80 w-full rounded-2xl border border-slate-100"></div>
+          </div>
+        {% endif %}
+        <div class="neighborhood-card__back neighborhood-back-panel neighborhood-back--trend" id="neighborhood-trend-panel" data-url="{% if neighborhood.code %}{% url 'neighborhood-trend-data' neighborhood.code %}{% endif %}">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Neighborhood trends</p>
+              <h4 class="text-2xl font-semibold text-slate-900">{{ neighborhood.name|default:subject.neighborhood_description|default:subject.neighborhood_code|default:"Trends" }}</h4>
+              <p class="text-sm text-slate-600">Compare market values, tax load, and fairness indicators over time.</p>
+            </div>
+            <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('front')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
+              </svg>
+              <span>Back to metrics</span>
+            </button>
+          </div>
+          <div class="mt-4 grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
+            <div>
+              <div class="flex flex-wrap gap-2" id="trend-mode-buttons">
+                <button type="button" class="trend-mode-btn trend-mode-btn--active" data-trend-mode="values">Values</button>
+                <button type="button" class="trend-mode-btn" data-trend-mode="tax">Tax vs Value</button>
+                <button type="button" class="trend-mode-btn" data-trend-mode="yoy">YoY %</button>
+                <button type="button" class="trend-mode-btn" data-trend-mode="tax-percent">Tax % of Value</button>
+              </div>
+              <div class="relative mt-4 min-h-[280px] rounded-2xl border border-slate-100 bg-white/70 p-3 shadow-inner">
+                <canvas id="hood-trend-canvas" class="h-full w-full"></canvas>
+                <div id="trend-panel-message" class="absolute inset-3 hidden items-center justify-center text-center text-sm text-slate-500"></div>
+              </div>
+            </div>
+            <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 shadow-inner">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Summary</p>
+              <div class="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                <div class="trend-summary-card">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Range</p>
+                  <p id="trend-summary-range" class="text-lg font-semibold text-slate-900">—</p>
+                </div>
+                <div class="trend-summary-card">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Avg stability</p>
+                  <p id="trend-summary-stability" class="text-lg font-semibold text-slate-900">—</p>
+                </div>
+                <div class="trend-summary-card">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Sales ratio</p>
+                  <p id="trend-summary-salesratio" class="text-lg font-semibold text-slate-900">—</p>
+                </div>
+                <div class="trend-summary-card">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">COD</p>
+                  <p id="trend-summary-cod" class="text-lg font-semibold text-slate-900">—</p>
+                </div>
+                <div class="trend-summary-card">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">PRD</p>
+                  <p id="trend-summary-prd" class="text-lg font-semibold text-slate-900">—</p>
+                </div>
+                <div class="trend-summary-card">
+                  <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">PRB</p>
+                  <p id="trend-summary-prb" class="text-lg font-semibold text-slate-900">—</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+    Neighborhood analysis is unavailable for this parcel.
+  </div>
+{% endif %}

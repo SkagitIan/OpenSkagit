@@ -70,6 +70,45 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _running_under_gevent() -> bool:
+    """
+    Detect Gunicorn gevent workers so Django ORM can run without tripping
+    asyncio safety checks in gevent's event-loop context.
+    """
+    try:
+        from gevent import monkey
+    except Exception:
+        return False
+    return bool(monkey.is_module_patched("socket"))
+
+
+def _running_under_gunicorn() -> bool:
+    argv = " ".join(sys.argv).lower()
+    server_software = str(os.environ.get("SERVER_SOFTWARE", "")).lower()
+    return "gunicorn" in argv or "gunicorn" in server_software
+
+
+def _allow_async_unsafe_for_runtime() -> bool:
+    """
+    Django's async safety check can false-positive under gevent/gunicorn worker
+    contexts, even for normal sync views (including /admin). Keep it enabled by
+    default, but relax it for this known deployment runtime.
+    """
+    if _running_under_gevent():
+        return True
+    if _running_under_gunicorn():
+        try:
+            import gevent  # noqa: F401
+        except Exception:
+            return False
+        return True
+    return False
+
+
+if _allow_async_unsafe_for_runtime():
+    os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -81,18 +120,19 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'planning',
     'openskagit',
-    'openskagit.kidslab',
     'mcp_agent',
     'rest_framework',
     "django.contrib.gis",
     "leaflet",
     'django.contrib.humanize',
+    'django.contrib.postgres',
     'agent',
     'reference_data',
     'gastronet',
     'anymail',
     'django_extensions',
     'legal_code',
+    'gis.apps.GisConfig',
 ]
 
 LEAFLET_CONFIG = {
@@ -110,12 +150,26 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY", "")
 GENAI_API_KEY = os.getenv("GENAI_API_KEY", "")
+YOUTUBE_MEETING_GEMINI_MODEL = os.getenv("YOUTUBE_MEETING_GEMINI_MODEL", "gemini-2.0-flash")
 OUTSCRAPER_API_KEY = os.getenv("OUTSCRAPER_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MODAL_IMAGE_APP_NAME = os.getenv("MODAL_IMAGE_APP_NAME", "flux-generator")
+MODAL_IMAGE_FUNCTION_NAME = os.getenv("MODAL_IMAGE_FUNCTION_NAME", "generate_image")
+MODAL_IMAGE_CLASS_NAME = os.getenv("MODAL_IMAGE_CLASS_NAME", "FluxGenerator")
+MODAL_IMAGE_GENERATION_TIMEOUT_SECONDS = int(os.getenv("MODAL_IMAGE_GENERATION_TIMEOUT_SECONDS", "120"))
+MODAL_IMAGE_INIT_IMAGE_ENCODING = os.getenv("MODAL_IMAGE_INIT_IMAGE_ENCODING", "bytes")
+MODAL_IMAGE_ENVIRONMENT_NAME = os.getenv("MODAL_IMAGE_ENVIRONMENT_NAME", "")
+MODAL_IMAGE_JOB_MAX_WORKERS = int(os.getenv("MODAL_IMAGE_JOB_MAX_WORKERS", "1"))
+MODAL_IMAGE_POLL_INTERVAL_MS = int(os.getenv("MODAL_IMAGE_POLL_INTERVAL_MS", "2000"))
+MODAL_IMAGE_POLL_DB_WORKERS = int(os.getenv("MODAL_IMAGE_POLL_DB_WORKERS", "2"))
+MODAL_IMAGE_POLL_DB_TIMEOUT_SECONDS = float(os.getenv("MODAL_IMAGE_POLL_DB_TIMEOUT_SECONDS", "5"))
+MODAL_IMAGE_REMOTE_RETRY_COUNT = int(os.getenv("MODAL_IMAGE_REMOTE_RETRY_COUNT", "0"))
+MODAL_IMAGE_REMOTE_RETRY_DELAY_SECONDS = float(os.getenv("MODAL_IMAGE_REMOTE_RETRY_DELAY_SECONDS", "1.5"))
 REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
+INVESTOR_LEADS_BYPASS_CHECKOUT = _env_flag("INVESTOR_LEADS_BYPASS_CHECKOUT", False)
 
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
@@ -146,31 +200,50 @@ LOG_FILE = _log_file_path(LOG_DIR / "django.log")
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+        "null": {
+            "class": "logging.NullHandler",
         },
         "file": {
             "class": "logging.handlers.RotatingFileHandler",
             "filename": LOG_FILE,
             "maxBytes": 1024 * 1024 * 5,  # 5 MB
             "backupCount": 5,
+            "formatter": "standard",
         },
     },
     "root": {
         "handlers": ["console", "file"],
-        "level": "DEBUG",  # <- this line forces debug output
+        "level": "INFO",
     },
     "loggers": {
         "django": {
             "handlers": ["console", "file"],
-            "level": "DEBUG",
-            "propagate": True,
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.template": {
+            "handlers": ["console", "file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security.DisallowedHost": {
+            "handlers": ["null"],
+            "propagate": False,
         },
         "openskagit": {  # your app
             "handlers": ["console", "file"],
-            "level": "DEBUG",
-            "propagate": True,
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }
@@ -280,6 +353,17 @@ STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# CO Appraiser parcel route planner (free/open routing defaults)
+COAPPRAISER_DEPOT_NAME = os.environ.get("COAPPRAISER_DEPOT_NAME", "Skagit County Assessor (Mount Vernon)")
+COAPPRAISER_DEPOT_LAT = float(os.environ.get("COAPPRAISER_DEPOT_LAT", "48.4190"))
+COAPPRAISER_DEPOT_LON = float(os.environ.get("COAPPRAISER_DEPOT_LON", "-122.3348"))
+COAPPRAISER_ROUTER_BASE_URL = os.environ.get("COAPPRAISER_ROUTER_BASE_URL", "https://router.project-osrm.org")
+COAPPRAISER_ROUTER_TIMEOUT_SECONDS = float(os.environ.get("COAPPRAISER_ROUTER_TIMEOUT_SECONDS", "20"))
+COAPPRAISER_ROUTER_MAX_COORDS = int(os.environ.get("COAPPRAISER_ROUTER_MAX_COORDS", "100"))
+COAPPRAISER_CLUSTER_BACKEND = os.environ.get("COAPPRAISER_CLUSTER_BACKEND", "auto")
+COAPPRAISER_SPOPT_MAX_READY_STOPS = int(os.environ.get("COAPPRAISER_SPOPT_MAX_READY_STOPS", "500"))
+COAPPRAISER_ASYNC_MIN_READY_STOPS = int(os.environ.get("COAPPRAISER_ASYNC_MIN_READY_STOPS", "450"))
+
 # Directory where 'collectstatic' will put everything
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -299,6 +383,9 @@ SESSION_COOKIE_SAMESITE = None
 CSRF_COOKIE_SAMESITE = None
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# Keep cross-origin requests origin-only so OSM tile requests include a valid
+# referrer without leaking full URL paths.
+SECURE_REFERRER_POLICY = os.environ.get("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,

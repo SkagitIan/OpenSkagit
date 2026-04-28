@@ -12,16 +12,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RenameIndex(
-            model_name='parcelwaterfacts',
-            new_name='openskagit__public__2044ad_idx',
-            old_name='assessor_wa_public__72bad9_idx',
-        ),
-        migrations.RenameIndex(
-            model_name='parcelwaterfacts',
-            new_name='openskagit__has_pou_81a6b2_idx',
-            old_name='assessor_wa_has_pou_af6d64_idx',
-        ),
         migrations.AddField(
             model_name='parcelgeometry',
             name='centroid_2926',
@@ -36,8 +26,23 @@ class Migration(migrations.Migration):
             model_name='parcelgeometry',
             index=django.contrib.postgres.indexes.GistIndex(fields=['centroid_2926'], name='openskagit__centroi_4fae49_gist'),
         ),
-        migrations.AlterModelTable(
-            name='parcelwaterfacts',
-            table='openskagit_parcelwaterfacts',
+        migrations.SeparateDatabaseAndState(
+            database_operations=[],
+            state_operations=[
+                migrations.RenameIndex(
+                    model_name='parcelwaterfacts',
+                    new_name='openskagit__public__2044ad_idx',
+                    old_name='assessor_wa_public__72bad9_idx',
+                ),
+                migrations.RenameIndex(
+                    model_name='parcelwaterfacts',
+                    new_name='openskagit__has_pou_81a6b2_idx',
+                    old_name='assessor_wa_has_pou_af6d64_idx',
+                ),
+                migrations.AlterModelTable(
+                    name='parcelwaterfacts',
+                    table='openskagit_parcelwaterfacts',
+                ),
+            ],
         ),
     ]

@@ -1,0 +1,18 @@
+OpenSkagit Recorded Document Alert (Test)
+
+This is a manual test notification for parcel recorded-document alerts.
+
+Recipient: {{ recipient_email }}
+Generated: {{ generated_at|date:"Y-m-d H:i:s T" }}
+
+Parcel: {{ parcel_id }}
+Address: {{ situs_address|default:"-" }}
+Owner: {{ owner_name|default:"-" }}
+
+Sample document details
+- Type: {{ document_type }}
+- Recording number: {{ recording_number }}
+- Recorded date: {{ recorded_date }}
+- Source: {{ document_url }}
+
+If this arrived as expected, email delivery and template rendering are working.

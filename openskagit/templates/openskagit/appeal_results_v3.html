@@ -3,16 +3,30 @@
 
 {% block page_title %}Parcel Partner · Step 2{% endblock %}
 
+{% block portal_badge_action %}
+<a
+  href="{% url 'appeal-home' %}"
+  class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-sage-300 bg-sage-50 text-sage-700 transition hover:bg-sage-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage-400 focus-visible:ring-offset-1"
+  aria-label="Start over parcel search"
+  title="Start over"
+>
+  <i class="fa-solid fa-rotate-right text-xs" aria-hidden="true"></i>
+</a>
+{% endblock %}
+
 {% block hero %}
-<div class="space-y-4 text-center">
+<div class="text-center">
   <p class="text-xs font-semibold uppercase tracking-[0.4em] text-sage-500">Step 2 — Parcel {{ parcel_number }}</p>
-  <h1 class="text-3xl font-extrabold text-slate-900 sm:text-4xl">{{ subject.address|default:"Address unavailable" }}</h1>
-  <p class="mx-auto max-w-3xl text-base text-slate-600">Review county roll values alongside OpenSkagit fairness diagnostics and contextual layers that match the same Tailwind-based design language used on Flavor and VoteVector.</p>
 </div>
-{% endblock %}Search for your home for tailored insights
+{% endblock %}
 
 {% block content %}
 <style>
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   .property-hero {
     background: linear-gradient(135deg, #4f7266, #6b9080, #8fa3d1);
     color: #fff;
@@ -93,6 +107,71 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: rgba(255, 255, 255, 0.8);
+  }
+  .neighborhood-disclosure {
+    margin-top: var(--space-8);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--gray-200);
+    background: #fff;
+    box-shadow: var(--shadow-md);
+  }
+  .neighborhood-disclosure > summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-6);
+    cursor: pointer;
+  }
+  .neighborhood-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+  .neighborhood-disclosure__icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--gray-200);
+    color: var(--gray-500);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition-fast);
+    flex-shrink: 0;
+  }
+  .neighborhood-disclosure[open] .neighborhood-disclosure__icon {
+    transform: rotate(180deg);
+  }
+  .neighborhood-disclosure__content {
+    padding: 0 var(--space-6) var(--space-6);
+  }
+  .neighborhood-analysis-placeholder,
+  .neighborhood-analysis-loading {
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    padding: var(--space-5);
+    color: var(--gray-600);
+    font-size: 0.9rem;
+  }
+  .neighborhood-analysis-placeholder__title {
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: 0.35rem;
+  }
+  .neighborhood-analysis-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    justify-content: center;
+  }
+  .neighborhood-analysis-spinner {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    border: 2px solid #d7e3da;
+    border-top-color: #5f7f71;
+    animation: spin 0.8s linear infinite;
   }
 
   .neighborhood-card {
@@ -350,284 +429,40 @@
 </section>
 {{ parcel_history_points|json_script:"parcel-history-data" }}
 
-{% include "planning/partials/planning_dossier_card.html" with planning=planning planning_sections=planning_sections %}
+{# Planning dossier hidden for now; backend hooks intentionally retained for re-enable. #}
+{# {% include "planning/partials/planning_dossier_card.html" with planning=planning planning_sections=planning_sections %} #}
 
-<div class="neighborhood-card" id="neighborhood-section-card" data-mode="map" data-hood-id="{{ neighborhood.code|default:subject.neighborhood_code|default:'' }}">
-  <div class="neighborhood-card__inner">
-    <div class="neighborhood-card__front">
-      <div class="neighborhood-card__front-header">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-sage-500">Neighborhood fairness</p>
-          <h3 class="text-2xl font-semibold text-slate-900">IAAO-aligned quality checks</h3>
-          <p class="text-sm text-slate-600">Click any card for methodology or flip to explore maps and multi-year trends.</p>
-        </div>
-        <div class="flex w-full max-w-[190px] flex-col gap-2">
-          {% if neighborhood_geom_geojson %}
-          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('map')">
-            <span>View map</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-            </svg>
-          </button>
-          {% endif %}
-          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('trend')">
-            <span>Trends</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-      <div class="gauge-grid">
-        <div class="gauge-card" id="cod-card">
-          <div class="gauge-card__inner">
-            <div class="gauge-card__front">
-              <div class="gauge-card__header">
-                <div>
-                  <p class="text-xs uppercase tracking-wide text-slate-400">Uniformity</p>
-                  <h4 class="text-lg font-semibold text-slate-900">Coefficient of Dispersion</h4>
-                </div>
-                <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip COD card">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="gauge-container">
-                <canvas id="cod-gauge" width="200" height="120"></canvas>
-                <div class="gauge-value">{{ neighborhood.cod|default:0|floatformat:1 }}</div>
-              </div>
-              <div>
-                {% if neighborhood.cod and neighborhood.cod < 10 %}
-                  <span class="status-badge status-badge--excellent">Excellent uniformity</span>
-                {% elif neighborhood.cod and neighborhood.cod < 15 %}
-                  <span class="status-badge status-badge--good">Good uniformity</span>
-                {% else %}
-                  <span class="status-badge status-badge--fair">Needs review</span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="gauge-card__back">
-              <div class="gauge-card__header">
-                <h4 class="text-lg font-semibold text-slate-900">What is COD?</h4>
-                <button class="flip-indicator" onclick="flipCard('cod-card')" aria-label="Flip back">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="1 4 1 10 7 10"></polyline>
-                    <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-                  </svg>
-                </button>
-              </div>
-              <p class="text-sm text-slate-600">COD measures horizontal equity—how consistent assessments are among similar properties. Lower values mean tighter groupings.</p>
-              <div class="mt-4 space-y-3">
-                <div class="metric-item">
-                  <div class="metric-label">COD ≤ 10</div>
-                  <div class="metric-desc">Excellent uniformity for residential parcels.</div>
-                </div>
-                <div class="metric-item">
-                  <div class="metric-label">Above 15</div>
-                  <div class="metric-desc">Signals assessment drift or missing features.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="gauge-card" id="prd-card">
-          <div class="gauge-card__inner">
-            <div class="gauge-card__front">
-              <div class="gauge-card__header">
-                <div>
-                  <p class="text-xs uppercase tracking-wide text-slate-400">Vertical equity</p>
-                  <h4 class="text-lg font-semibold text-slate-900">Price-Related Differential</h4>
-                </div>
-                <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip PRD card">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="gauge-container">
-                <canvas id="prd-gauge" width="200" height="120"></canvas>
-                <div class="gauge-value">{{ neighborhood.prd|default:1|floatformat:2 }}</div>
-              </div>
-              <div>
-                {% if neighborhood.prd and neighborhood.prd >= 0.98 and neighborhood.prd <= 1.03 %}
-                  <span class="status-badge status-badge--excellent">Balanced</span>
-                {% elif neighborhood.prd and neighborhood.prd > 1.03 %}
-                  <span class="status-badge status-badge--fair">Regressive</span>
-                {% else %}
-                  <span class="status-badge status-badge--fair">Progressive</span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="gauge-card__back">
-              <div class="gauge-card__header">
-                <h4 class="text-lg font-semibold text-slate-900">What is PRD?</h4>
-                <button class="flip-indicator" onclick="flipCard('prd-card')" aria-label="Flip back">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="1 4 1 10 7 10"></polyline>
-                    <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-                  </svg>
-                </button>
-              </div>
-              <p class="text-sm text-slate-600">PRD highlights whether high-value parcels are assessed differently than low-value parcels. Values above 1.03 suggest regressivity, below 0.98 suggest progressivity.</p>
-              <div class="mt-4 space-y-3">
-                <div class="metric-item">
-                  <div class="metric-label">Target 1.00</div>
-                  <div class="metric-desc">High- and low-value homes move together.</div>
-                </div>
-                <div class="metric-item">
-                  <div class="metric-label">Rebalanced actions</div>
-                  <div class="metric-desc">Field reviews, model adjustments, or zoning-specific factors.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="gauge-card" id="sales-ratio-card">
-          <div class="gauge-card__inner">
-            <div class="gauge-card__front">
-              <div class="gauge-card__header">
-                <div>
-                  <p class="text-xs uppercase tracking-wide text-slate-400">Level of assessment</p>
-                  <h4 class="text-lg font-semibold text-slate-900">Assessment to Sales Ratio</h4>
-                </div>
-                <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip ratio card">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                  </svg>
-                </button>
-              </div>
-              <div class="gauge-container">
-                <canvas id="sales-ratio-gauge" width="200" height="120"></canvas>
-                <div class="gauge-value">{{ neighborhood.sales_ratio|default:100|floatformat:0 }}%</div>
-              </div>
-              <div>
-                {% if neighborhood.sales_ratio and neighborhood.sales_ratio >= 90 and neighborhood.sales_ratio <= 110 %}
-                  <span class="status-badge status-badge--excellent">Within IAAO standard</span>
-                {% else %}
-                  <span class="status-badge status-badge--fair">Outside band</span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="gauge-card__back">
-              <div class="gauge-card__header">
-                <h4 class="text-lg font-semibold text-slate-900">Why watch the ratio?</h4>
-                <button class="flip-indicator" onclick="flipCard('sales-ratio-card')" aria-label="Flip back">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="1 4 1 10 7 10"></polyline>
-                    <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-                  </svg>
-                </button>
-              </div>
-              <p class="text-sm text-slate-600">Assessment ÷ sale price compared to the IAAO 90–110% guidance. Sustained drift outside that window may warrant county-level study.</p>
-              <div class="mt-4 space-y-3">
-                <div class="metric-item">
-                  <div class="metric-label">Above 110%</div>
-                  <div class="metric-desc">Potential over-assessment relative to market.</div>
-                </div>
-                <div class="metric-item">
-                  <div class="metric-label">Below 90%</div>
-                  <div class="metric-desc">Signals under-assessment or lagging roll updates.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+<details id="neighborhood-analysis" class="neighborhood-disclosure">
+  <summary>
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-sage-600">Neighborhood analysis</p>
+      <p class="mt-1 text-sm text-slate-600">Expand to review IAAO-aligned neighborhood metrics, map context, and trends.</p>
     </div>
-    {% if neighborhood_geom_geojson %}
-      <div class="neighborhood-card__back neighborhood-back-panel neighborhood-back--map">
-        <div class="neighborhood-card__front-header">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Neighborhood footprint</p>
-            <h3 class="text-2xl font-semibold text-slate-900">{{ neighborhood.name|default:"Map preview" }}</h3>
-            <p class="text-sm text-slate-600">Your parcel plotted inside the neighborhood boundary used for fairness diagnostics.</p>
-          </div>
-          <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('front')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="1 4 1 10 7 10"></polyline>
-              <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-            </svg>
-            <span>Back to metrics</span>
-          </button>
-        </div>
-        <div id="neighborhood-map" class="h-80 w-full rounded-2xl border border-slate-100"></div>
-      </div>
-    {% endif %}
-    <div class="neighborhood-card__back neighborhood-back-panel neighborhood-back--trend" id="neighborhood-trend-panel" data-url="{% if neighborhood.code %}{% url 'neighborhood-trend-data' neighborhood.code %}{% endif %}">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Neighborhood trends</p>
-          <h4 class="text-2xl font-semibold text-slate-900">{{ neighborhood.name|default:subject.neighborhood_description|default:subject.neighborhood_code|default:"Trends" }}</h4>
-          <p class="text-sm text-slate-600">Compare market values, tax load, and fairness indicators over time.</p>
-        </div>
-        <button type="button" class="neighborhood-flip-button" onclick="flipNeighborhoodSection('front')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <polyline points="1 4 1 10 7 10"></polyline>
-            <path d="M3.51 15a9 9 0 0 0 2.13-9.36L1 10"></path>
-          </svg>
-          <span>Back to metrics</span>
-        </button>
-      </div>
-      <div class="mt-4 grid gap-6 lg:grid-cols-[1.2fr,0.8fr]">
-        <div>
-          <div class="flex flex-wrap gap-2" id="trend-mode-buttons">
-            <button type="button" class="trend-mode-btn trend-mode-btn--active" data-trend-mode="values">Values</button>
-            <button type="button" class="trend-mode-btn" data-trend-mode="tax">Tax vs Value</button>
-            <button type="button" class="trend-mode-btn" data-trend-mode="yoy">YoY %</button>
-            <button type="button" class="trend-mode-btn" data-trend-mode="tax-percent">Tax % of Value</button>
-          </div>
-          <div class="relative mt-4 min-h-[280px] rounded-2xl border border-slate-100 bg-white/70 p-3 shadow-inner">
-            <canvas id="hood-trend-canvas" class="h-full w-full"></canvas>
-            <div id="trend-panel-message" class="absolute inset-3 hidden items-center justify-center text-center text-sm text-slate-500"></div>
-          </div>
-        </div>
-        <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 shadow-inner">
-          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Summary</p>
-          <div class="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-            <div class="trend-summary-card">
-              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Range</p>
-              <p id="trend-summary-range" class="text-lg font-semibold text-slate-900">—</p>
-            </div>
-            <div class="trend-summary-card">
-              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Avg stability</p>
-              <p id="trend-summary-stability" class="text-lg font-semibold text-slate-900">—</p>
-            </div>
-            <div class="trend-summary-card">
-              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">Sales ratio</p>
-              <p id="trend-summary-salesratio" class="text-lg font-semibold text-slate-900">—</p>
-            </div>
-            <div class="trend-summary-card">
-              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">COD</p>
-              <p id="trend-summary-cod" class="text-lg font-semibold text-slate-900">—</p>
-            </div>
-            <div class="trend-summary-card">
-              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">PRD</p>
-              <p id="trend-summary-prd" class="text-lg font-semibold text-slate-900">—</p>
-            </div>
-            <div class="trend-summary-card">
-              <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-slate-500">PRB</p>
-              <p id="trend-summary-prb" class="text-lg font-semibold text-slate-900">—</p>
-            </div>
-          </div>
-        </div>
+    <span class="neighborhood-disclosure__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </span>
+  </summary>
+  <div class="neighborhood-disclosure__content">
+    <div
+      id="neighborhood-analysis-content"
+      data-url="{{ neighborhood_analysis_url }}"
+      data-loaded="false"
+      data-loading="false"
+    >
+      <div class="neighborhood-analysis-placeholder">
+        <div class="neighborhood-analysis-placeholder__title">Neighborhood analysis is available on demand.</div>
+        <p>Open this section to load metrics, map context, and trend diagnostics.</p>
       </div>
     </div>
   </div>
-</div>
+</details>
 
 <div id="comparables-placeholder" class="mt-12" data-url="{{ comparables_url }}"></div>
 {% endblock %}
 
 {% block extra_js %}
-{% if neighborhood_geom_geojson %}
-  {{ neighborhood_geom_geojson|json_script:"neighborhood-geom-data" }}
-{% endif %}
 <script>
   function createGauge(canvasId, value, min, max, idealMin, idealMax) {
     const canvas = document.getElementById(canvasId);
@@ -700,6 +535,95 @@
   let neighborhoodTrendChart = null;
   let neighborhoodTrendData = null;
   let neighborhoodTrendMode = 'values';
+
+  function executeInlineScripts(container) {
+    if (!container) return;
+    container.querySelectorAll('script').forEach((oldScript) => {
+      const script = document.createElement('script');
+      if (oldScript.type) script.type = oldScript.type;
+      if (oldScript.src) {
+        script.src = oldScript.src;
+      } else {
+        script.text = oldScript.textContent || '';
+      }
+      document.body.appendChild(script);
+      setTimeout(() => script.remove(), 0);
+    });
+  }
+
+  function resetNeighborhoodRuntime() {
+    if (neighborhoodMap) {
+      neighborhoodMap.remove();
+    }
+    neighborhoodMap = null;
+    neighborhoodMapInitialized = false;
+    if (neighborhoodTrendChart) {
+      neighborhoodTrendChart.destroy();
+    }
+    neighborhoodTrendChart = null;
+    neighborhoodTrendData = null;
+    neighborhoodTrendMode = 'values';
+  }
+
+  function initializeNeighborhoodAnalysis() {
+    const panel = document.getElementById('neighborhood-analysis-panel');
+    if (!panel || panel.dataset.initialized === 'true') {
+      return;
+    }
+    const codValue = parseFloat(panel.dataset.cod || '0');
+    const prdValue = parseFloat(panel.dataset.prd || '1');
+    const salesRatioValue = parseFloat(panel.dataset.salesRatio || '100');
+    createGauge('cod-gauge', Number.isNaN(codValue) ? 0 : codValue, 0, 30, 5, 15);
+    createGauge('prd-gauge', Number.isNaN(prdValue) ? 1 : prdValue, 0.8, 1.2, 0.98, 1.03);
+    createGauge('sales-ratio-gauge', Number.isNaN(salesRatioValue) ? 100 : salesRatioValue, 70, 130, 90, 110);
+    panel.dataset.initialized = 'true';
+    const trendPanel = document.getElementById('neighborhood-trend-panel');
+    if (trendPanel && !trendPanel.dataset.url) {
+      setTrendMessage('Neighborhood trends unavailable.');
+    }
+    updateNeighborhoodCardHeight();
+  }
+
+  function loadNeighborhoodAnalysis(forceReload = false) {
+    const container = document.getElementById('neighborhood-analysis-content');
+    if (!container) return;
+    const url = container.dataset.url;
+    const isLoaded = container.dataset.loaded === 'true';
+    const isLoading = container.dataset.loading === 'true';
+    if (!url) {
+      container.innerHTML = '<div class="neighborhood-analysis-placeholder">Neighborhood analysis is unavailable.</div>';
+      return;
+    }
+    if (isLoading) return;
+    if (isLoaded && !forceReload) {
+      initializeNeighborhoodAnalysis();
+      return;
+    }
+
+    container.dataset.loading = 'true';
+    container.innerHTML = '<div class="neighborhood-analysis-loading"><span class="neighborhood-analysis-spinner"></span><span>Loading neighborhood analysis…</span></div>';
+    resetNeighborhoodRuntime();
+
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Neighborhood analysis request failed');
+        }
+        return response.text();
+      })
+      .then((html) => {
+        container.innerHTML = html;
+        executeInlineScripts(container);
+        container.dataset.loaded = 'true';
+        container.dataset.loading = 'false';
+        initializeNeighborhoodAnalysis();
+      })
+      .catch(() => {
+        container.dataset.loading = 'false';
+        container.dataset.loaded = 'false';
+        container.innerHTML = '<div class="neighborhood-analysis-placeholder">Unable to load neighborhood analysis. Please try again.</div>';
+      });
+  }
 
   function flipNeighborhoodSection(targetMode) {
     const card = document.getElementById('neighborhood-section-card');
@@ -1043,20 +967,33 @@
       return query ? `${baseUrl}?${query}` : baseUrl;
     }
 
-    function fetchComparables(url) {
-      if (!url || !placeholder) return;
-      placeholder.innerHTML = '<div class="flex items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-white/90 p-6 text-sm text-slate-500"><span class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></span>Loading comparables…</div>';
+    function fetchComparables(url, params = {}) {
+      if (!url || !placeholder) return Promise.resolve();
 
-      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      const fragmentMode = params && params.fragment === 'content';
+      const root = document.getElementById('appeal-comparables-root');
+      const contentTarget = root ? root.querySelector('#appeal-comparables-content') : null;
+      const target = fragmentMode && contentTarget ? contentTarget : placeholder;
+      const loadingHtml = '<div class="flex items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-white/90 p-6 text-sm text-slate-500"><span class="h-4 w-4 animate-spin rounded-full border-2 border-sage-200 border-t-sage-500"></span>Loading comparables…</div>';
+      target.innerHTML = loadingHtml;
+
+      return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then((response) => {
           if (!response.ok) throw new Error('Unable to fetch');
           return response.text();
         })
         .then((text) => {
-          placeholder.innerHTML = text;
-          executeInlineScripts(placeholder);
+          target.innerHTML = text;
+          executeInlineScripts(target);
+          if (fragmentMode && typeof window.appealComparablesDidSwap === 'function') {
+            window.appealComparablesDidSwap();
+          }
         })
         .catch(() => {
+          if (fragmentMode && contentTarget) {
+            contentTarget.innerHTML = '<div class="rounded-2xl border border-rose-100 bg-rose-50 p-6 text-sm text-rose-600">Unable to refresh comparables. Please try again.</div>';
+            return;
+          }
           if (placeholder) {
             placeholder.innerHTML = '<div class="rounded-2xl border border-rose-100 bg-rose-50 p-6 text-sm text-rose-600">Unable to load comparables. Please try again.</div>';
           }
@@ -1065,12 +1002,16 @@
 
     window.appealFetchComparables = function (viewMode = 'standard', params = {}) {
       const url = buildUrl(viewMode, params);
-      fetchComparables(url);
+      return fetchComparables(url, params);
     };
 
     window.appealUpdateComparables = function (viewMode = 'standard', params = {}) {
-      const url = buildUrl(viewMode, params);
-      fetchComparables(url);
+      const mergedParams = { ...(params || {}) };
+      if (!Object.prototype.hasOwnProperty.call(mergedParams, 'fragment')) {
+        mergedParams.fragment = 'content';
+      }
+      const url = buildUrl(viewMode, mergedParams);
+      return fetchComparables(url, mergedParams);
     };
   })();
 
@@ -1083,30 +1024,37 @@
   });
 
   document.addEventListener('DOMContentLoaded', () => {
-    const codValue = {{ neighborhood.cod|default:0 }};
-    const prdValue = {{ neighborhood.prd|default:1 }};
-    const salesRatioValue = {{ neighborhood.sales_ratio|default:100 }};
-    createGauge('cod-gauge', codValue, 0, 30, 5, 15);
-    createGauge('prd-gauge', prdValue, 0.8, 1.2, 0.98, 1.03);
-    createGauge('sales-ratio-gauge', salesRatioValue, 70, 130, 90, 110);
     drawParcelHistoryCharts();
     window.appealFetchComparables();
 
-    const trendButtons = document.querySelectorAll('[data-trend-mode]');
-    trendButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        const mode = button.dataset.trendMode || 'values';
-        neighborhoodTrendMode = mode;
-        trendButtons.forEach((btn) => {
-          btn.classList.toggle('trend-mode-btn--active', btn === button);
-        });
-        renderTrendChart();
+    document.addEventListener('click', (event) => {
+      const trendButton = event.target.closest('[data-trend-mode]');
+      if (!trendButton) return;
+      const mode = trendButton.dataset.trendMode || 'values';
+      neighborhoodTrendMode = mode;
+      document.querySelectorAll('[data-trend-mode]').forEach((btn) => {
+        btn.classList.toggle('trend-mode-btn--active', btn === trendButton);
       });
+      renderTrendChart();
     });
 
-    const trendPanel = document.getElementById('neighborhood-trend-panel');
-    if (trendPanel && !trendPanel.dataset.url) {
-      setTrendMessage('Neighborhood trends unavailable.');
+    const neighborhoodDisclosure = document.getElementById('neighborhood-analysis');
+    if (neighborhoodDisclosure) {
+      neighborhoodDisclosure.addEventListener('toggle', () => {
+        if (neighborhoodDisclosure.open) {
+          loadNeighborhoodAnalysis();
+          return;
+        }
+        const card = document.getElementById('neighborhood-section-card');
+        if (card) {
+          card.classList.remove('flipped');
+          card.dataset.mode = 'map';
+          card.style.height = '';
+        }
+      });
+      if (neighborhoodDisclosure.open) {
+        loadNeighborhoodAnalysis();
+      }
     }
   });
 </script>

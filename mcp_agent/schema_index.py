@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,13 +12,34 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+logger = logging.getLogger(__name__)
 
-SCHEMA_CACHE_PATH = Path(
-    os.environ.get(
-        "MCP_AGENT_SCHEMA_CACHE",
-        Path(__file__).resolve().parent.parent / "var" / "mcp_schema_index.json",
+
+def _resolve_cache_path() -> Path:
+    configured = Path(
+        os.environ.get(
+            "MCP_AGENT_SCHEMA_CACHE",
+            Path(__file__).resolve().parent.parent / "var" / "mcp_schema_index.json",
+        )
     )
-)
+    parent = configured.parent
+    # Prefer the configured path when we have write access to the directory (or file if it exists).
+    if (parent.exists() and os.access(parent, os.W_OK)) or (
+        configured.exists() and os.access(configured, os.W_OK)
+    ):
+        return configured
+
+    fallback = Path(tempfile.gettempdir()) / "mcp_schema_index.json"
+    if configured != fallback:
+        logger.warning(
+            "Schema cache path %s is not writable; falling back to %s",
+            configured,
+            fallback,
+        )
+    return fallback
+
+
+SCHEMA_CACHE_PATH = _resolve_cache_path()
 SCHEMA_MAX_AGE_SECONDS = int(os.environ.get("MCP_AGENT_SCHEMA_MAX_AGE_SECONDS", 24 * 3600))
 
 
@@ -184,7 +207,6 @@ def _load_cache_from_disk() -> Optional[Dict[str, object]]:
 
 
 def _save_cache_to_disk(cache: Dict[str, object]) -> None:
-    _ensure_cache_dir()
     tables_raw = {}
     for key, table_meta in cache["tables"].items():
         tables_raw[key] = {
@@ -194,8 +216,16 @@ def _save_cache_to_disk(cache: Dict[str, object]) -> None:
             "geometry": [g.__dict__ for g in table_meta.geometry],
         }
     payload = {"tables": tables_raw, "built_at": cache.get("built_at")}
-    with SCHEMA_CACHE_PATH.open("w") as f:
-        json.dump(payload, f)
+    try:
+        _ensure_cache_dir()
+        with SCHEMA_CACHE_PATH.open("w") as f:
+            json.dump(payload, f)
+    except OSError as exc:
+        logger.warning(
+            "Unable to write schema cache to %s: %s. Using in-memory cache only.",
+            SCHEMA_CACHE_PATH,
+            exc,
+        )
 
 
 def get_schema_index(force_refresh: bool = False) -> Dict[str, object]:

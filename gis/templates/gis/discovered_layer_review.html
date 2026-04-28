@@ -1,0 +1,153 @@
+{% extends "openskagit/base.html" %}
+
+{% block content %}
+<section class="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">Layer Review #{{ layer.id }}</p>
+        <h1 class="mt-1 text-2xl font-bold text-slate-900">{{ layer.layer_name|default:"(unnamed layer)" }}</h1>
+        <p class="mt-2 break-all text-sm text-slate-600">{{ layer.layer_url }}</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="{% url 'gis:submission-detail' layer.source_submission.id %}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Back to submission</a>
+        <a href="{% url 'gis:manifest-list' %}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Manifest</a>
+      </div>
+    </div>
+
+    {% if messages %}
+      <div class="mt-4 space-y-2">
+        {% for message in messages %}
+          <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Service</p>
+        <p class="mt-1 text-sm font-semibold text-slate-900">{{ layer.service_type }} / {{ layer.layer_id|default:"-" }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Qualification</p>
+        <p class="mt-1 text-sm font-semibold text-slate-900">{{ layer.qualification_status }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Usability</p>
+        <p class="mt-1 text-sm font-semibold text-slate-900">{{ layer.usability }}</p>
+      </div>
+      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Relevance</p>
+        <p class="mt-1 text-sm font-semibold text-slate-900">{{ layer.skagit_relevance }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-2">
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-900">Review Fields</h2>
+      <form method="post" class="mt-4 space-y-4">
+        {% csrf_token %}
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ review_form.source_org.id_for_label }}">Source org</label>
+          {{ review_form.source_org }}
+          {% for error in review_form.source_org.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ review_form.category.id_for_label }}">Category</label>
+          {{ review_form.category }}
+          {% for error in review_form.category.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ review_form.coverage.id_for_label }}">Coverage</label>
+          {{ review_form.coverage }}
+          {% for error in review_form.coverage.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ review_form.skagit_relevance.id_for_label }}">Skagit relevance</label>
+          {{ review_form.skagit_relevance }}
+          {% for error in review_form.skagit_relevance.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ review_form.usability.id_for_label }}">Usability</label>
+          {{ review_form.usability }}
+          {% for error in review_form.usability.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ review_form.notes.id_for_label }}">Review notes</label>
+          {{ review_form.notes }}
+          {% for error in review_form.notes.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="flex flex-wrap gap-2 pt-2">
+          <button type="submit" name="action" value="save" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Save Review</button>
+          <button type="submit" name="action" value="reject" class="rounded-xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50">Reject Layer</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 class="text-lg font-semibold text-slate-900">Promote to Manifest</h2>
+      <form method="post" class="mt-4 space-y-4">
+        {% csrf_token %}
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ promotion_form.key.id_for_label }}">Manifest key</label>
+          {{ promotion_form.key }}
+          <p class="mt-1 text-xs text-slate-500">{{ promotion_form.key.help_text }}</p>
+          {% for error in promotion_form.key.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ promotion_form.label.id_for_label }}">Label</label>
+          {{ promotion_form.label }}
+          {% for error in promotion_form.label.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ promotion_form.category.id_for_label }}">Category</label>
+          {{ promotion_form.category }}
+          {% for error in promotion_form.category.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ promotion_form.default_fields.id_for_label }}">Default fields</label>
+          {{ promotion_form.default_fields }}
+          <p class="mt-1 text-xs text-slate-500">{{ promotion_form.default_fields.help_text }}</p>
+          {% for error in promotion_form.default_fields.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="text-sm font-semibold text-slate-800" for="{{ promotion_form.notes.id_for_label }}">Manifest notes</label>
+          {{ promotion_form.notes }}
+          {% for error in promotion_form.notes.errors %}<p class="mt-1 text-xs text-rose-700">{{ error }}</p>{% endfor %}
+        </div>
+        <div class="flex items-center gap-2">
+          {{ promotion_form.canonical_for_category }}
+          <label class="text-sm text-slate-700" for="{{ promotion_form.canonical_for_category.id_for_label }}">Canonical for category</label>
+        </div>
+
+        {% for error in promotion_form.non_field_errors %}
+          <p class="text-xs text-rose-700">{{ error }}</p>
+        {% endfor %}
+
+        <button type="submit" name="action" value="approve" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Approve and Promote</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-2">
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-semibold text-slate-900">Qualification JSON</h3>
+      <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-slate-100">{{ qualification_json_pretty }}</pre>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-semibold text-slate-900">Layer Metadata JSON</h3>
+      <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-slate-100">{{ metadata_json_pretty }}</pre>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-semibold text-slate-900">Fields JSON</h3>
+      <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-slate-100">{{ fields_json_pretty }}</pre>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 class="text-sm font-semibold text-slate-900">Capabilities JSON</h3>
+      <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-slate-100">{{ capabilities_json_pretty }}</pre>
+    </div>
+  </div>
+</section>
+{% endblock %}

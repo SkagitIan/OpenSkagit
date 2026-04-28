@@ -10,6 +10,22 @@ from .menu_scraping import (
 app_name = "gastronet"
 
 urlpatterns = [
+    path("competition-ui/", views.competition_analysis_ui, name="competition-ui"),
+    path(
+        "competition-ui/competitors/",
+        views.competition_ui_competitors,
+        name="competition-ui-competitors",
+    ),
+    path(
+        "competition-ui/start/",
+        views.competition_ui_start,
+        name="competition-ui-start",
+    ),
+    path(
+        "competition-ui/stream/<str:run_id>/",
+        views.competition_ui_stream,
+        name="competition-ui-stream",
+    ),
     path("menu-items/", views.ingest_menu_items, name="menu-items"),
     path(
         "menu-items/generate/",

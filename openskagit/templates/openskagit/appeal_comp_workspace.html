@@ -1,0 +1,915 @@
+{% extends "openskagit/parcel_portal_base.html" %}
+{% load humanize formatting %}
+
+{% block page_title %}Parcel Partner · Side-by-Side Workspace{% endblock %}
+
+{% block content %}
+<style>
+  .workspace-shell {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-2xl);
+    background: #fff;
+    box-shadow: var(--shadow-lg);
+    padding: var(--space-6);
+    display: grid;
+    gap: var(--space-5);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .workspace-shell > * {
+    min-width: 0;
+  }
+
+  .workspace-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .workspace-header__eyebrow {
+    margin: 0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-500);
+  }
+
+  .workspace-header__title {
+    margin: 0.2rem 0 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .workspace-header__meta {
+    margin-top: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--gray-600);
+  }
+
+  .workspace-header__actions {
+    display: inline-flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin-left: auto;
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  .workspace-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid var(--gray-200);
+    color: var(--gray-700);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .workspace-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .workspace-controls__left,
+  .workspace-controls__right {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .workspace-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    background: var(--gray-50);
+  }
+
+  .workspace-control label {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-500);
+  }
+
+  .workspace-control select {
+    border: none;
+    background: transparent;
+    color: var(--gray-800);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .workspace-mode-toggle,
+  .workspace-surface-toggle {
+    display: inline-flex;
+    gap: var(--space-1);
+    background: var(--gray-100);
+    padding: var(--space-1);
+    border-radius: var(--radius-lg);
+  }
+
+  .workspace-mode-btn,
+  .workspace-surface-btn {
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--gray-600);
+    cursor: pointer;
+    background: transparent;
+  }
+
+  .workspace-mode-btn--active,
+  .workspace-surface-btn--active {
+    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+    color: #fff;
+  }
+
+  .workspace-status {
+    margin: 0;
+    min-height: 1.1rem;
+    font-size: 0.78rem;
+    color: var(--gray-500);
+  }
+
+  .workspace-status--loading {
+    color: #0f766e;
+    font-weight: 700;
+  }
+
+  .workspace-status--error {
+    color: #b91c1c;
+    font-weight: 700;
+  }
+
+  #appeal-workspace-board {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .workspace-carousel-nav {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .workspace-carousel-btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    border: 1px solid var(--gray-300);
+    background: #fff;
+    color: var(--gray-700);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .workspace-carousel-btn:hover {
+    border-color: var(--dusty-grape);
+    color: var(--dusty-grape);
+  }
+
+  .workspace-columns {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-3);
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-width: 0;
+    max-width: 100%;
+    padding-bottom: var(--space-2);
+    scroll-padding-inline: var(--space-2);
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+  }
+
+  .workspace-column {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    flex: 0 0 min(320px, 82vw);
+    min-width: 0;
+    min-height: 100%;
+    scroll-snap-align: start;
+  }
+
+  .workspace-column--subject {
+    border-color: rgba(107, 144, 128, 0.38);
+    background: linear-gradient(180deg, rgba(246, 255, 248, 0.95), #fff);
+    flex-basis: min(340px, 84vw);
+    position: sticky;
+    left: 0;
+    z-index: 3;
+  }
+
+  .workspace-column.is-dragging {
+    opacity: 0.45;
+  }
+
+  .workspace-column__header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--space-2);
+    align-items: start;
+  }
+
+  .workspace-column__header-main {
+    min-width: 0;
+  }
+
+  .workspace-column__eyebrow {
+    margin: 0;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-500);
+  }
+
+  .workspace-column__title {
+    margin: 0.22rem 0 0;
+    font-size: 1.05rem;
+    color: var(--gray-900);
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .workspace-column__parcel {
+    margin: 0.32rem 0 0;
+    font-size: 0.79rem;
+    color: var(--gray-600);
+  }
+
+  .workspace-column__drag {
+    margin: 0.38rem 0 0;
+    font-size: 0.73rem;
+    color: var(--gray-500);
+  }
+
+  .workspace-column__remove {
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    background: #fff5f5;
+    border-radius: 999px;
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .workspace-column__remove:hover {
+    background: #fee2e2;
+  }
+
+  .workspace-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin: 0;
+  }
+
+  .workspace-stat {
+    border: 1px solid var(--gray-100);
+    border-radius: var(--radius-md);
+    background: var(--gray-50);
+    padding: 0.45rem 0.55rem;
+  }
+
+  .workspace-stat dt {
+    font-size: 0.67rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+  }
+
+  .workspace-stat dd {
+    margin: 0.15rem 0 0;
+    font-size: 0.83rem;
+    color: var(--gray-900);
+    font-weight: 700;
+  }
+
+  .workspace-stat--wide {
+    grid-column: 1 / -1;
+  }
+
+  .workspace-stat--sale {
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(45, 212, 191, 0.08));
+    border-color: rgba(15, 118, 110, 0.28);
+  }
+
+  .workspace-stat--sale dt {
+    color: #0f766e;
+  }
+
+  .workspace-stat--sale dd {
+    font-size: 1.45rem;
+    letter-spacing: 0.01em;
+    color: #0f172a;
+  }
+
+  .workspace-adjustment {
+    margin-left: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .workspace-adjustment--up {
+    color: #047857;
+  }
+
+  .workspace-adjustment--down {
+    color: #b91c1c;
+  }
+
+  .workspace-adjustment-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .workspace-adjustment-chip {
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.69rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+  }
+
+  .workspace-adjustment-chip--up {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.32);
+    color: #065f46;
+  }
+
+  .workspace-adjustment-chip--down {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #991b1b;
+  }
+
+  .workspace-map-panel {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    background: #fff;
+    padding: var(--space-3);
+  }
+
+  .workspace-map-panel__meta {
+    margin: 0 0 0.5rem;
+    font-size: 0.82rem;
+    color: var(--gray-600);
+  }
+
+  .workspace-map {
+    height: min(62vh, 620px);
+    width: 100%;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .workspace-empty {
+    border: 1px dashed var(--gray-300);
+    border-radius: var(--radius-xl);
+    background: var(--gray-50);
+    padding: var(--space-6);
+    text-align: center;
+  }
+
+  .workspace-empty h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--gray-800);
+  }
+
+  .workspace-empty p {
+    margin: 0.4rem 0 0;
+    color: var(--gray-600);
+    font-size: 0.9rem;
+  }
+
+  .workspace-empty__link {
+    display: inline-flex;
+    margin-top: var(--space-3);
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--dusty-grape);
+    color: var(--dusty-grape);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+
+  @media (max-width: 1024px) {
+    .workspace-header__actions {
+      margin-left: 0;
+    }
+
+    .workspace-shell {
+      padding: var(--space-4);
+    }
+
+    .workspace-column {
+      flex-basis: min(300px, 86vw);
+    }
+
+    .workspace-column--subject {
+      flex-basis: min(320px, 90vw);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .workspace-column--subject {
+      position: static;
+    }
+
+    .workspace-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .workspace-controls__left,
+    .workspace-controls__right {
+      width: 100%;
+    }
+
+    .workspace-mode-toggle,
+    .workspace-surface-toggle,
+    .workspace-control {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .workspace-status {
+      min-height: 1.35rem;
+    }
+
+    .workspace-column,
+    .workspace-column--subject {
+      flex-basis: 90vw;
+    }
+  }
+</style>
+
+<section class="workspace-shell">
+  <div class="workspace-header">
+    <div>
+      <p class="workspace-header__eyebrow">Parcel Partner</p>
+      <h2 class="workspace-header__title">Saved comps workspace</h2>
+      <p class="workspace-header__meta">
+        Parcel {{ parcel_number }} · <span id="workspace-saved-count">{{ saved_count }}</span> comps saved
+      </p>
+    </div>
+    <div class="workspace-header__actions">
+      <a class="workspace-back-link" href="{% url 'appeal-result' parcel_number %}">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+        Back to parcel
+      </a>
+    </div>
+  </div>
+
+  <div class="workspace-controls">
+    <div class="workspace-controls__left">
+      <div class="workspace-mode-toggle" role="group" aria-label="Workspace mode">
+        <button
+          type="button"
+          class="workspace-mode-btn {% if view_mode != 'advanced' %}workspace-mode-btn--active{% endif %}"
+          data-workspace-control
+          data-workspace-mode="standard"
+        >
+          Standard
+        </button>
+        <button
+          type="button"
+          class="workspace-mode-btn {% if view_mode == 'advanced' %}workspace-mode-btn--active{% endif %}"
+          data-workspace-control
+          data-workspace-mode="advanced"
+        >
+          Advanced
+        </button>
+      </div>
+
+      <div class="workspace-surface-toggle" role="group" aria-label="Workspace view">
+        <button
+          type="button"
+          class="workspace-surface-btn {% if workspace_view != 'map' %}workspace-surface-btn--active{% endif %}"
+          data-workspace-control
+          data-workspace-view="board"
+        >
+          Board
+        </button>
+        <button
+          type="button"
+          class="workspace-surface-btn {% if workspace_view == 'map' %}workspace-surface-btn--active{% endif %}"
+          data-workspace-control
+          data-workspace-view="map"
+        >
+          Map
+        </button>
+      </div>
+    </div>
+
+    <div class="workspace-controls__right">
+      <div class="workspace-control">
+        <label for="workspace-sort-by">Sort</label>
+        <select id="workspace-sort-by" data-workspace-control>
+          {% for option in sort_options %}
+            <option value="{{ option.value }}" {% if option.value == sort_by %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="workspace-control">
+        <label for="workspace-sort-dir">Direction</label>
+        <select id="workspace-sort-dir" data-workspace-control>
+          <option value="asc" {% if sort_direction == 'asc' %}selected{% endif %}>Ascending</option>
+          <option value="desc" {% if sort_direction == 'desc' %}selected{% endif %}>Descending</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <p id="workspace-loading-status" class="workspace-status" aria-live="polite"></p>
+
+  <div
+    id="appeal-workspace-board"
+    data-board-url="{{ workspace_board_url }}"
+    data-saved-url="{{ saved_comps_url }}"
+  >
+    {% include "openskagit/partials/appeal_comp_workspace_board.html" %}
+  </div>
+</section>
+
+<script>
+  (function () {
+    const boardHost = document.getElementById('appeal-workspace-board');
+    if (!boardHost) return;
+
+    const sortBySelect = document.getElementById('workspace-sort-by');
+    const sortDirSelect = document.getElementById('workspace-sort-dir');
+    const savedCountNode = document.getElementById('workspace-saved-count');
+    const statusNode = document.getElementById('workspace-loading-status');
+    let currentMode = '{{ view_mode|default:"standard" }}';
+    let currentWorkspaceView = '{{ workspace_view|default:"board" }}';
+    let draggedColumn = null;
+    let workspaceMap = null;
+    let workspaceMarkerLayer = null;
+    let isRefreshing = false;
+
+    function getCsrfToken() {
+      const cookie = document.cookie
+        .split(';')
+        .map((entry) => entry.trim())
+        .find((entry) => entry.startsWith('csrftoken='));
+      return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
+    }
+
+    function setSavedCountFromBoard() {
+      const fragment = boardHost.querySelector('#appeal-workspace-board-fragment');
+      if (!fragment || !savedCountNode) return;
+      const count = fragment.dataset.savedCount;
+      if (count !== undefined) {
+        savedCountNode.textContent = count;
+      }
+    }
+
+    function setActiveModeButton() {
+      document.querySelectorAll('[data-workspace-mode]').forEach((button) => {
+        button.classList.toggle('workspace-mode-btn--active', button.dataset.workspaceMode === currentMode);
+      });
+    }
+
+    function setActiveViewButton() {
+      document.querySelectorAll('[data-workspace-view]').forEach((button) => {
+        button.classList.toggle('workspace-surface-btn--active', button.dataset.workspaceView === currentWorkspaceView);
+      });
+    }
+
+    function setControlsDisabled(disabled) {
+      document.querySelectorAll('[data-workspace-control]').forEach((node) => {
+        node.disabled = disabled;
+      });
+    }
+
+    function setStatus(message, kind = '') {
+      if (!statusNode) return;
+      statusNode.textContent = message || '';
+      statusNode.classList.remove('workspace-status--loading', 'workspace-status--error');
+      if (kind === 'loading') {
+        statusNode.classList.add('workspace-status--loading');
+      }
+      if (kind === 'error') {
+        statusNode.classList.add('workspace-status--error');
+      }
+    }
+
+    function clearStatus() {
+      setStatus('');
+    }
+
+    function destroyWorkspaceMap() {
+      if (workspaceMap) {
+        workspaceMap.remove();
+      }
+      workspaceMap = null;
+      workspaceMarkerLayer = null;
+    }
+
+    function parseWorkspaceMapPayload() {
+      const node = boardHost.querySelector('#appeal-workspace-map-payload');
+      if (!node) return null;
+      try {
+        return JSON.parse(node.textContent || '{}');
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function renderWorkspaceMap() {
+      if (!workspaceMap || !workspaceMarkerLayer) return;
+      const payload = parseWorkspaceMapPayload() || {};
+      const subject = payload.subject || {};
+      const comparables = Array.isArray(payload.comparables) ? payload.comparables : [];
+      workspaceMarkerLayer.clearLayers();
+
+      const subjectLat = Number(subject.lat);
+      const subjectLon = Number(subject.lon);
+      if (Number.isFinite(subjectLat) && Number.isFinite(subjectLon)) {
+        const marker = L.marker([subjectLat, subjectLon]).addTo(workspaceMarkerLayer);
+        marker.bindPopup(`<strong>Subject</strong><div>${subject.address || ''}</div>`);
+      }
+
+      comparables.forEach((comp) => {
+        const lat = Number(comp.lat);
+        const lon = Number(comp.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          return;
+        }
+        const marker = L.marker([lat, lon]).addTo(workspaceMarkerLayer);
+        const sale = Number(comp.sale_price);
+        marker.bindPopup(`
+          <strong>${comp.address || ''}</strong>
+          ${comp.parcel_number ? `<div>Parcel ${comp.parcel_number}</div>` : ''}
+          <div>Sale ${Number.isFinite(sale) ? `$${sale.toLocaleString()}` : '—'}</div>
+          <div>${comp.sale_date_display || ''}</div>
+        `);
+      });
+
+      if (workspaceMarkerLayer.getLayers().length && workspaceMarkerLayer.getBounds().isValid()) {
+        workspaceMap.fitBounds(workspaceMarkerLayer.getBounds(), { padding: [42, 42] });
+      }
+      setTimeout(() => workspaceMap.invalidateSize(), 120);
+    }
+
+    function initWorkspaceMapIfNeeded() {
+      if (currentWorkspaceView !== 'map' || typeof L === 'undefined') {
+        return;
+      }
+      const mapEl = boardHost.querySelector('#appeal-workspace-map');
+      if (!mapEl || workspaceMap) return;
+
+      workspaceMap = L.map(mapEl).setView([48.5, -122.5], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(workspaceMap);
+      workspaceMarkerLayer = L.featureGroup().addTo(workspaceMap);
+      renderWorkspaceMap();
+    }
+
+    function buildBoardUrl() {
+      const url = new URL(boardHost.dataset.boardUrl, window.location.origin);
+      url.searchParams.set('view_mode', currentMode);
+      url.searchParams.set('workspace_view', currentWorkspaceView);
+      if (sortBySelect && sortBySelect.value) {
+        url.searchParams.set('sort_by', sortBySelect.value);
+      }
+      if (sortDirSelect && sortDirSelect.value) {
+        url.searchParams.set('sort_dir', sortDirSelect.value);
+      }
+      return url.toString();
+    }
+
+    async function refreshBoard(reason = 'update') {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      setControlsDisabled(true);
+      if (reason === 'advanced' && currentMode === 'advanced') {
+        setStatus('Running advanced analysis…', 'loading');
+      } else {
+        setStatus('Updating workspace…', 'loading');
+      }
+      destroyWorkspaceMap();
+
+      try {
+        const response = await fetch(buildBoardUrl(), {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!response.ok) {
+          throw new Error('Unable to refresh workspace board.');
+        }
+        boardHost.innerHTML = await response.text();
+        setSavedCountFromBoard();
+        if (typeof anime !== 'undefined') {
+          anime.remove('#appeal-workspace-board-fragment');
+          anime({
+            targets: '#appeal-workspace-board-fragment',
+            opacity: [0.25, 1],
+            translateY: [8, 0],
+            duration: 260,
+            easing: 'easeOutQuad',
+          });
+        }
+        initWorkspaceMapIfNeeded();
+        clearStatus();
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message || 'Unable to refresh workspace.', 'error');
+      } finally {
+        isRefreshing = false;
+        setControlsDisabled(false);
+      }
+    }
+
+    async function postSavedAction(action, payload) {
+      const response = await fetch(boardHost.dataset.savedUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Saved comp action failed.');
+      }
+      return data;
+    }
+
+    function animateCarousel(container, direction) {
+      if (!container) return;
+      const firstComp = container.querySelector('[data-workspace-comp]') || container.querySelector('.workspace-column');
+      const step = firstComp ? firstComp.getBoundingClientRect().width + 12 : 320;
+      const delta = direction === 'next' ? step : -step;
+      const target = Math.max(0, container.scrollLeft + delta);
+
+      if (typeof anime !== 'undefined') {
+        anime.remove(container);
+        anime({
+          targets: container,
+          scrollLeft: target,
+          duration: 420,
+          easing: 'easeOutCubic',
+        });
+      } else {
+        container.scrollTo({ left: target, behavior: 'smooth' });
+      }
+    }
+
+    document.addEventListener('change', (event) => {
+      if (event.target === sortBySelect || event.target === sortDirSelect) {
+        refreshBoard('sort');
+      }
+    });
+
+    document.addEventListener('click', (event) => {
+      const modeButton = event.target.closest('[data-workspace-mode]');
+      if (modeButton) {
+        const nextMode = modeButton.dataset.workspaceMode || 'standard';
+        if (nextMode !== currentMode) {
+          currentMode = nextMode;
+          setActiveModeButton();
+          refreshBoard(nextMode === 'advanced' ? 'advanced' : 'mode');
+        }
+        return;
+      }
+
+      const viewButton = event.target.closest('[data-workspace-view]');
+      if (viewButton) {
+        const nextView = viewButton.dataset.workspaceView || 'board';
+        if (nextView !== currentWorkspaceView) {
+          currentWorkspaceView = nextView;
+          setActiveViewButton();
+          refreshBoard('view');
+        }
+        return;
+      }
+
+      const removeButton = event.target.closest('[data-workspace-remove]');
+      if (removeButton) {
+        const parcel = removeButton.dataset.compParcel || '';
+        if (!parcel) return;
+        postSavedAction('remove', { comp_parcel: parcel })
+          .then(() => refreshBoard('remove'))
+          .catch((error) => {
+            console.error(error);
+            setStatus(error.message || 'Unable to remove comparable.', 'error');
+          });
+        return;
+      }
+
+      const nextButton = event.target.closest('[data-workspace-carousel-next]');
+      if (nextButton) {
+        const container = boardHost.querySelector('[data-workspace-carousel]');
+        animateCarousel(container, 'next');
+        return;
+      }
+
+      const prevButton = event.target.closest('[data-workspace-carousel-prev]');
+      if (prevButton) {
+        const container = boardHost.querySelector('[data-workspace-carousel]');
+        animateCarousel(container, 'prev');
+      }
+    });
+
+    document.addEventListener('dragstart', (event) => {
+      if (currentWorkspaceView !== 'board') return;
+      const column = event.target.closest('[data-workspace-comp]');
+      if (!column) return;
+      draggedColumn = column;
+      column.classList.add('is-dragging');
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+      }
+    });
+
+    document.addEventListener('dragend', () => {
+      if (draggedColumn) {
+        draggedColumn.classList.remove('is-dragging');
+      }
+      draggedColumn = null;
+    });
+
+    document.addEventListener('dragover', (event) => {
+      if (currentWorkspaceView !== 'board') return;
+      const container = boardHost.querySelector('#appeal-workspace-columns');
+      if (!container || !draggedColumn) return;
+      const target = event.target.closest('[data-workspace-comp]');
+      if (!target || target === draggedColumn) return;
+      event.preventDefault();
+      const rect = target.getBoundingClientRect();
+      const insertAfter = event.clientX > rect.left + (rect.width / 2);
+      container.insertBefore(draggedColumn, insertAfter ? target.nextSibling : target);
+    });
+
+    document.addEventListener('drop', (event) => {
+      if (currentWorkspaceView !== 'board') return;
+      const container = boardHost.querySelector('#appeal-workspace-columns');
+      if (!container || !draggedColumn || !container.contains(draggedColumn)) return;
+      event.preventDefault();
+      const order = Array.from(container.querySelectorAll('[data-workspace-comp]'))
+        .map((el) => el.dataset.compParcel || '')
+        .filter(Boolean);
+      if (sortBySelect) {
+        sortBySelect.value = 'saved_order';
+      }
+      postSavedAction('reorder', { order })
+        .then(() => refreshBoard('reorder'))
+        .catch((error) => {
+          console.error(error);
+          setStatus(error.message || 'Unable to reorder comparables.', 'error');
+        });
+    });
+
+    setActiveModeButton();
+    setActiveViewButton();
+    setSavedCountFromBoard();
+    initWorkspaceMapIfNeeded();
+  })();
+</script>
+{% endblock %}

@@ -121,6 +121,14 @@ We’re adding tests *selectively*:
   - smoke tests using Django test client (status 200 + one expected string).
 - Don’t boil the ocean. Add tests where failures are expensive.
 
+### PostGIS test DB (important)
+- Default behavior: `manage.py test` falls back to SQLite unless `USE_POSTGIS_FOR_TESTS` is set.
+- For this repo, prefer PostGIS test runs:
+  - `USE_POSTGIS_FOR_TESTS=1 python3 manage.py test <test_label> --keepdb`
+- Why `--keepdb`: avoids interactive prompts when `test_<DB_NAME>` already exists (example: `test_skagit`) and keeps runs repeatable in non-interactive terminals.
+- If you intentionally want SQLite for a quick/local check:
+  - `USE_SQLITE_FOR_TESTS=1 python3 manage.py test <test_label>`
+
 ---
 
 ## Logging + errors

@@ -1,0 +1,303 @@
+{% extends "openskagit/base.html" %}
+
+{% block content %}
+<section class="bg-gradient-to-b from-slate-100 via-white to-slate-50 py-10">
+  <div class="mx-auto max-w-7xl px-6">
+    <div class="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-900/10">
+      <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Staff Only</p>
+      <h1 class="mt-2 text-3xl font-bold text-slate-900">Sedro-Woolley Intelligence Hub</h1>
+      <p class="mt-3 text-sm text-slate-600">
+        Cross-run index for all Sedro-Woolley crawl, ingest, and legal code data.
+      </p>
+      <p class="mt-1 text-xs text-slate-500">
+        Current MEDIA_ROOT: <code>{{ media_root }}</code>
+      </p>
+      <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <p class="font-semibold">Crawl command</p>
+        <code class="mt-2 block rounded-xl bg-slate-900 px-3 py-2 text-xs text-slate-100">
+          python3 manage.py scrape_sedro_woolley --max-pages 12000 --max-depth 10 --resume
+        </code>
+      </div>
+    </div>
+
+    {% if has_data %}
+      <div class="mt-6 grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Data Scope</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900">{{ summary.scope|default:"all_runs" }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Crawl Runs</p>
+          <p class="mt-2 text-2xl font-bold text-slate-900">{{ summary.total_runs|default:0 }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Crawl Records</p>
+          <p class="mt-2 text-2xl font-bold text-slate-900">{{ summary.records_written|default:0 }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Processed URLs</p>
+          <p class="mt-2 text-2xl font-bold text-slate-900">{{ summary.urls_processed|default:0 }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">HTML Pages</p>
+          <p class="mt-2 text-2xl font-bold text-slate-900">{{ summary.html_pages|default:0 }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Files</p>
+          <p class="mt-2 text-2xl font-bold text-slate-900">{{ summary.files|default:0 }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Legal Sections</p>
+          <p class="mt-2 text-2xl font-bold text-slate-900">{{ legal_summary.section_count|default:0 }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Failures</p>
+          <p class="mt-2 text-2xl font-bold {% if summary.failure_count %}text-rose-700{% else %}text-emerald-700{% endif %}">
+            {{ summary.failure_count|default:0 }}
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-6 grid gap-4 lg:grid-cols-2">
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-base font-semibold text-slate-900">Latest Crawl Run</h2>
+          <div class="mt-3 space-y-1 text-sm text-slate-600">
+            <p><span class="font-semibold text-slate-800">Run ID:</span> <span class="break-all">{{ latest_run.run_id|default:"-" }}</span></p>
+            <p><span class="font-semibold text-slate-800">Started:</span> {{ latest_run.started_at|default:"-" }}</p>
+            <p><span class="font-semibold text-slate-800">Finished:</span> {{ latest_run.finished_at|default:"-" }}</p>
+            <p><span class="font-semibold text-slate-800">Duration:</span> {{ latest_run.duration_seconds|default:0 }}s</p>
+            <p><span class="font-semibold text-slate-800">Manifest:</span> <code>{{ latest_run.manifest_path|default:"-" }}</code></p>
+            {% if manifest_absolute_path %}
+              <p><span class="font-semibold text-slate-800">Manifest file:</span> <code>{{ manifest_absolute_path }}</code></p>
+            {% endif %}
+            {% if run_summary_absolute_path %}
+              <p><span class="font-semibold text-slate-800">Run summary file:</span> <code>{{ run_summary_absolute_path }}</code></p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="text-base font-semibold text-slate-900">Ingest Pipeline Status</h2>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">PDF Ingest</p>
+              <p class="mt-2 text-sm text-slate-700">Run: {{ pipeline_summary.pdf_ingest.run_id|default:"-" }}</p>
+              <p class="text-sm text-slate-700">Success: {{ pipeline_summary.pdf_ingest.success_count|default:0 }}</p>
+              <p class="text-sm text-slate-700">Failed: {{ pipeline_summary.pdf_ingest.failure_count|default:0 }}</p>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">HTML Ingest</p>
+              <p class="mt-2 text-sm text-slate-700">Run: {{ pipeline_summary.html_ingest.run_id|default:"-" }}</p>
+              <p class="text-sm text-slate-700">Success: {{ pipeline_summary.html_ingest.success_count|default:0 }}</p>
+              <p class="text-sm text-slate-700">Failed: {{ pipeline_summary.html_ingest.failure_count|default:0 }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <form method="get" class="grid gap-3 md:grid-cols-[2fr_1fr_auto]">
+          <label class="block text-sm font-semibold text-slate-700">
+            Search crawl + legal data
+            <input
+              type="text"
+              name="q"
+              value="{{ query }}"
+              placeholder="minutes, budget, ordinance, section id..."
+              class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            >
+          </label>
+          <label class="block text-sm font-semibold text-slate-700">
+            Crawl tag filter
+            <select name="tag" class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+              <option value="">All tags</option>
+              {% for tag in available_tags %}
+                <option value="{{ tag }}" {% if selected_tag == tag %}selected{% endif %}>{{ tag }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="flex items-end gap-2">
+            <button class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">Apply</button>
+            <a href="{% url 'sw-hub' %}" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Reset</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="mt-6 grid gap-4 lg:grid-cols-3">
+        <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900">By Resource Type</h3>
+          <div class="mt-3 space-y-2 text-sm">
+            {% for name, count in category_stats.by_resource_type.items %}
+              <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <span class="font-medium text-slate-700">{{ name }}</span>
+                <span class="font-semibold text-slate-900">{{ count }}</span>
+              </div>
+            {% empty %}
+              <p class="text-slate-500">No resource type data yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900">Top File Extensions</h3>
+          <div class="mt-3 space-y-2 text-sm">
+            {% for ext, count in category_stats.by_extension.items %}
+              <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <span class="font-medium text-slate-700">{{ ext|default:"(none)" }}</span>
+                <span class="font-semibold text-slate-900">{{ count }}</span>
+              </div>
+            {% empty %}
+              <p class="text-slate-500">No extension data yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900">Top Tags</h3>
+          <div class="mt-3 space-y-2 text-sm">
+            {% for tag, count in category_stats.tag_counts.items %}
+              <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <span class="font-medium text-slate-700">{{ tag }}</span>
+                <span class="font-semibold text-slate-900">{{ count }}</span>
+              </div>
+            {% empty %}
+              <p class="text-slate-500">No tag data yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <h2 class="text-sm font-semibold text-slate-900">Crawl Records (Filtered)</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Fetched</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Run</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Type</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Source</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Tags</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Size</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Artifacts</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in records %}
+                <tr>
+                  <td class="px-4 py-3 text-xs text-slate-600">{{ row.fetched_at|default:"-" }}</td>
+                  <td class="px-4 py-3 text-xs text-slate-600">{{ row.run_id|default:"-" }}</td>
+                  <td class="px-4 py-3">
+                    <span class="inline-flex rounded-full border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700">
+                      {{ row.resource_type }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <a href="{{ row.url }}" target="_blank" rel="noopener noreferrer" class="font-medium text-sky-700 hover:underline break-all">
+                      {{ row.title|default:row.url }}
+                    </a>
+                    <p class="mt-1 text-xs text-slate-500 break-all">{{ row.url }}</p>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1">
+                      {% for tag in row.tags %}
+                        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{{ tag }}</span>
+                      {% empty %}
+                        <span class="text-xs text-slate-500">-</span>
+                      {% endfor %}
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-slate-700">{{ row.size_bytes|default:0|filesizeformat }}</td>
+                  <td class="px-4 py-3 text-xs">
+                    {% if row.download_url %}
+                      <a class="mr-2 text-sky-700 hover:underline" href="{{ row.download_url }}" target="_blank" rel="noopener noreferrer">main</a>
+                    {% endif %}
+                    {% if row.text_download_url %}
+                      <a class="mr-2 text-sky-700 hover:underline" href="{{ row.text_download_url }}" target="_blank" rel="noopener noreferrer">text</a>
+                    {% endif %}
+                    {% if row.raw_html_download_url %}
+                      <a class="text-sky-700 hover:underline" href="{{ row.raw_html_download_url }}" target="_blank" rel="noopener noreferrer">raw</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="7" class="px-4 py-10 text-center text-sm text-slate-500">
+                    No crawl records matched your filters.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <h2 class="text-sm font-semibold text-slate-900">Legal Code Coverage</h2>
+          <p class="mt-1 text-xs text-slate-600">Search query also filters the section list below.</p>
+        </div>
+        <div class="px-4 py-4 text-sm text-slate-700">
+          <p><span class="font-semibold text-slate-900">Jurisdictions:</span>
+            {% for name in legal_jurisdictions %}
+              <span class="mr-1 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{{ name }}</span>
+            {% empty %}
+              <span class="text-slate-500">No Sedro-Woolley legal jurisdiction found.</span>
+            {% endfor %}
+          </p>
+          <p class="mt-2">
+            <span class="font-semibold text-slate-900">Docs:</span> {{ legal_summary.document_count|default:0 }}
+            <span class="ml-4 font-semibold text-slate-900">Chapters:</span> {{ legal_summary.chapter_count|default:0 }}
+            <span class="ml-4 font-semibold text-slate-900">Sections:</span> {{ legal_summary.section_count|default:0 }}
+            <span class="ml-4 font-semibold text-slate-900">Chunks:</span> {{ legal_summary.chunk_count|default:0 }}
+          </p>
+        </div>
+        <div class="overflow-x-auto border-t border-slate-200">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Scraped</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Section</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Heading</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Chunks</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in legal_records %}
+                <tr>
+                  <td class="px-4 py-3 text-xs text-slate-600">{{ row.scraped_at|default:"-" }}</td>
+                  <td class="px-4 py-3 text-xs font-semibold text-slate-800">{{ row.section_id|default:"-" }}</td>
+                  <td class="px-4 py-3">
+                    {% if row.source_url %}
+                      <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer" class="text-sky-700 hover:underline">
+                        {{ row.heading|default:row.source_url }}
+                      </a>
+                    {% else %}
+                      <span class="text-slate-700">{{ row.heading|default:"-" }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-4 py-3 text-xs text-slate-700">{{ row.chunk_count|default:0 }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="4" class="px-4 py-10 text-center text-sm text-slate-500">
+                    No legal sections matched your search.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      <div class="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+        No Sedro-Woolley crawl or legal artifacts were found yet. Run
+        <code>python3 manage.py scrape_sedro_woolley</code>
+        and confirm legal data has been ingested for Sedro-Woolley.
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

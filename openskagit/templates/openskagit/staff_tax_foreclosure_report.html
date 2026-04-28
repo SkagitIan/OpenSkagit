@@ -1,0 +1,139 @@
+{% extends "openskagit/base.html" %}
+
+{% block content %}
+<section class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <h1 class="text-2xl font-bold text-slate-900 sm:text-3xl">Staff Tax Foreclosure Report</h1>
+    <p class="mt-2 text-sm text-slate-600">
+      Runs a fresh candidate scan, live-verifies parcel tax status with the county site, and updates
+      <code class="rounded bg-slate-100 px-1 py-0.5 text-xs">master_parcel.tax_status</code>.
+    </p>
+
+    {% if messages %}
+      <div class="mt-4 space-y-2">
+        {% for message in messages %}
+          <div class="rounded-lg px-3 py-2 text-sm {% if message.tags == 'error' %}border border-red-200 bg-red-50 text-red-700{% else %}border border-emerald-200 bg-emerald-50 text-emerald-700{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post" class="mt-6 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+      {% csrf_token %}
+      <label class="text-sm text-slate-700">
+        <span class="mb-1 block font-semibold">Tax Year</span>
+        <input type="number" name="tax_year" value="{{ tax_year }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+      </label>
+      <label class="text-sm text-slate-700">
+        <span class="mb-1 block font-semibold">Min Delinquent</span>
+        <input type="number" step="0.01" min="0" name="min_delinquent" value="{{ min_delinquent }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+      </label>
+      <label class="text-sm text-slate-700">
+        <span class="mb-1 block font-semibold">Min Ratio</span>
+        <input type="number" step="0.01" min="0" name="min_ratio" value="{{ min_ratio }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+      </label>
+      <label class="text-sm text-slate-700">
+        <span class="mb-1 block font-semibold">Candidate Limit</span>
+        <input type="number" min="1" name="candidate_limit" value="{{ candidate_limit }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+      </label>
+      <label class="text-sm text-slate-700">
+        <span class="mb-1 block font-semibold">Max Workers</span>
+        <input type="number" min="1" max="20" name="max_workers" value="{{ max_workers }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+      </label>
+      <label class="text-sm text-slate-700 sm:col-span-2 lg:col-span-3">
+        <span class="mb-1 block font-semibold">Land Use Filter (optional)</span>
+        <input
+          type="text"
+          name="land_use_codes"
+          value="{{ land_use_codes_raw }}"
+          placeholder="blank = all parcels, or e.g. 110,111,112"
+          class="w-full rounded-lg border border-slate-300 px-3 py-2"
+        />
+      </label>
+      <div class="sm:col-span-2 lg:col-span-3">
+        <button type="submit" class="inline-flex items-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-700">
+          Run Fresh Scan + Verify
+        </button>
+      </div>
+    </form>
+
+    {% if run_summary %}
+      <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <p>
+          <span class="font-semibold">Run Summary:</span>
+          candidates={{ run_summary.candidate_count }},
+          verified={{ run_summary.verified_count }},
+          confirmed={{ run_summary.confirmed_count }},
+          cleared={{ run_summary.cleared_count }},
+          errors={{ run_summary.error_count }},
+          updated={{ run_summary.updated_count }},
+          duration={{ run_summary.duration_seconds }}s
+        </p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <form method="get" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <label class="text-sm text-slate-700">
+        <span class="mb-1 block font-semibold">Status Filter</span>
+        <select name="status" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+          <option value="all" {% if status_filter == "all" %}selected{% endif %}>All</option>
+          <option value="{{ tax_status_confirmed }}" {% if status_filter == tax_status_confirmed %}selected{% endif %}>Confirmed Delinquent</option>
+          <option value="{{ tax_status_not_delinquent }}" {% if status_filter == tax_status_not_delinquent %}selected{% endif %}>Not Delinquent Now</option>
+          <option value="{{ tax_status_verify_error }}" {% if status_filter == tax_status_verify_error %}selected{% endif %}>Verify Error</option>
+        </select>
+      </label>
+      <label class="text-sm text-slate-700">
+        <span class="mb-1 block font-semibold">Display Limit</span>
+        <input type="number" name="display_limit" min="1" max="5000" value="{{ display_limit }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+      </label>
+      <div class="flex items-end">
+        <button type="submit" class="inline-flex items-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+          Apply Filters
+        </button>
+      </div>
+      <div class="flex items-end text-xs text-slate-600">
+        <p>
+          Counts:
+          confirmed={{ counts_by_status.confirmed_delinquent|default:0 }},
+          cleared={{ counts_by_status.not_delinquent_now|default:0 }},
+          errors={{ counts_by_status.verify_error|default:0 }}
+        </p>
+      </div>
+    </form>
+
+    <div class="mt-5 overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50">
+          <tr>
+            <th class="px-3 py-2 text-left font-semibold text-slate-700">Parcel</th>
+            <th class="px-3 py-2 text-left font-semibold text-slate-700">Address</th>
+            <th class="px-3 py-2 text-left font-semibold text-slate-700">Owner</th>
+            <th class="px-3 py-2 text-left font-semibold text-slate-700">Tax Status</th>
+            <th class="px-3 py-2 text-left font-semibold text-slate-700">Updated</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for row in rows %}
+            <tr>
+              <td class="px-3 py-2 font-mono text-xs text-slate-900">{{ row.parcel_number }}</td>
+              <td class="px-3 py-2 text-slate-700">{{ row.situs_address|default:"-" }}</td>
+              <td class="px-3 py-2 text-slate-700">{{ row.owner__owner_name|default:"-" }}</td>
+              <td class="px-3 py-2 text-slate-700">{{ row.tax_status|default:"-" }}</td>
+              <td class="px-3 py-2 text-slate-500">{{ row.tax_status_updated_at|date:"Y-m-d H:i" }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="px-3 py-6 text-center text-slate-500">
+                No parcels found for the selected status filter.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -158,6 +158,12 @@ class Command(BaseCommand):
         parser.add_argument("--limit", type=int, default=None)
 
     def handle(self, *args, **opts):
+        self.stdout.write(
+            self.style.WARNING(
+                "Deprecated command: prefer `manage.py ingest_legal_jurisdiction --jurisdiction <slug>`."
+            )
+        )
+
         base_dir = Path("data/codepublishing")
         files = sorted(base_dir.glob("*.html"))
 

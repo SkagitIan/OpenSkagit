@@ -23,6 +23,12 @@ class Command(BaseCommand):
     help = "Ingest Anacortes Municipal Code (municipal.codes)"
 
     def handle(self, *args, **opts):
+        self.stdout.write(
+            self.style.WARNING(
+                "Deprecated command: prefer `manage.py ingest_legal_jurisdiction --jurisdiction anacortes`."
+            )
+        )
+
         file_path = Path("data/anacortes/AMC_Title_19.html")
         if not file_path.exists():
             raise RuntimeError("Anacortes HTML file not found")

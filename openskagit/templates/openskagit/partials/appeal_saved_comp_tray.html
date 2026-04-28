@@ -1,0 +1,49 @@
+{% load humanize %}
+<section class="saved-comp-tray" aria-live="polite">
+  <div class="saved-comp-tray__header">
+    <div>
+      <p class="saved-comp-tray__eyebrow">Working file</p>
+      <p class="saved-comp-tray__title">{{ saved_count }} / {{ saved_limit }} comps saved</p>
+    </div>
+    <a
+      href="{{ workspace_url }}"
+      class="saved-comp-tray__workspace-btn {% if saved_count == 0 %}saved-comp-tray__workspace-btn--disabled{% endif %}"
+      {% if saved_count == 0 %}aria-disabled="true" tabindex="-1"{% endif %}
+    >
+      Open side-by-side
+    </a>
+  </div>
+
+  {% if saved_rows %}
+    <div class="saved-comp-tray__chips">
+      {% for row in saved_rows %}
+        <span class="saved-comp-chip" data-saved-chip-parcel="{{ row.parcel_number }}">
+          <span class="saved-comp-chip__text">
+            <span class="saved-comp-chip__parcel">{{ row.parcel_number }}</span>
+            <span class="saved-comp-chip__meta">
+              {{ row.address|default:"Address unavailable" }}
+              {% if row.sale_price is not None %}
+                · ${{ row.sale_price|floatformat:0|intcomma }}
+              {% endif %}
+            </span>
+          </span>
+          <button
+            type="button"
+            class="saved-comp-chip__remove"
+            data-saved-tray-remove
+            data-comp-parcel="{{ row.parcel_number }}"
+            aria-label="Remove {{ row.parcel_number }} from working file"
+            title="Remove"
+          >
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </span>
+      {% endfor %}
+    </div>
+    <p class="saved-comp-tray__empty">Get more comps to expand options.</p>
+  {% else %}
+    <p class="saved-comp-tray__empty">
+      Save comps from the list below, then open the side-by-side workspace.
+    </p>
+  {% endif %}
+</section>

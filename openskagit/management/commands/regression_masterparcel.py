@@ -105,6 +105,14 @@ CANDIDATE_PREDICTORS = [
     "view_aspect_west",
     "view_elev",
     "view_level",
+    # Planning/overlay candidate signals
+    "in_flood_zone_flag",
+    "in_sfha_flag",
+    "in_wetland_flag",
+    "in_shoreline_flag",
+    "sewer_available_flag",
+    "recent_permits_flag",
+    "log_buildable_area",
 
 ]
 
@@ -231,6 +239,21 @@ def dedupe(seq):
         ordered.append(item)
     return ordered
 
+
+def parse_csv_list(raw: Any) -> list[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple, set)):
+        values: list[str] = []
+        for item in raw:
+            values.extend(parse_csv_list(item))
+        return dedupe(values)
+    text = str(raw).strip()
+    if not text:
+        return []
+    return dedupe([token.strip() for token in text.split(",") if token and token.strip()])
+
+
 def create_interactions(df: pd.DataFrame, interactions: dict = INTERACTIONS, active: list | None = None):
     """
     Create interaction terms in a declarative way. Returns df and metadata.
@@ -268,6 +291,9 @@ class Command(BaseCommand):
         self.active_interactions = []
         self.active_interaction_bundle = DEFAULT_INTERACTION_BUNDLE
         self.predictor_profile_name = DEFAULT_PREDICTOR_SET
+        self.tier_interaction_vars = list(TIER_INTERACTION_VARS)
+        self.force_include_predictors = []
+        self.force_exclude_predictors = []
         self.experiment_mode = False
         self.experiment_run = None
         self.experiment_id = None
@@ -308,6 +334,54 @@ class Command(BaseCommand):
             "--no-interactions",
             action="store_true",
             help="Disable custom interaction generation",
+        )
+        parser.add_argument(
+            "--core-include",
+            type=str,
+            default="",
+            help="Comma-separated predictors to append to the core set",
+        )
+        parser.add_argument(
+            "--core-exclude",
+            type=str,
+            default="",
+            help="Comma-separated predictors to remove from the core set",
+        )
+        parser.add_argument(
+            "--candidate-include",
+            type=str,
+            default="",
+            help="Comma-separated predictors to append to the candidate set",
+        )
+        parser.add_argument(
+            "--candidate-exclude",
+            type=str,
+            default="",
+            help="Comma-separated predictors to remove from the candidate set",
+        )
+        parser.add_argument(
+            "--force-include",
+            type=str,
+            default="",
+            help="Comma-separated predictors forced into mandatory predictors",
+        )
+        parser.add_argument(
+            "--force-exclude",
+            type=str,
+            default="",
+            help="Comma-separated predictors/interactions to remove from all sets",
+        )
+        parser.add_argument(
+            "--interaction-terms",
+            type=str,
+            default="",
+            help="Comma-separated interaction term names to run (overrides bundle selection)",
+        )
+        parser.add_argument(
+            "--tier-interaction-vars",
+            type=str,
+            default=None,
+            help="Comma-separated predictors used for tier-specific interaction generation",
         )
 
     def _log(self, message: str, style=None):
@@ -525,7 +599,9 @@ class Command(BaseCommand):
             mp.condition_score,
 
             -- Neighborhood / use
+            mp.hood_code AS hood_code,
             mp.hood_code AS neighborhood_code,
+            COALESCE(NULLIF(TRIM(mp.city_district), ''), 'UNINCORP') AS city_district,
             mp.land_use_code,
             mp.proptype AS property_type,
 
@@ -555,11 +631,20 @@ class Command(BaseCommand):
                 ELSE 0
             END AS is_view,
 
-            -- Geo placeholders (join ParcelGeometry later)
-            NULL::double precision AS elev,
-            NULL::double precision AS slope,
-            NULL::double precision AS aspect,
-            NULL::double precision AS dist_major_road,
+            -- ParcelGeometry + planning facts
+            COALESCE(pg.elev, 0)::double precision AS elev,
+            COALESCE(pg.slope, 0)::double precision AS slope,
+            COALESCE(pg.aspect, 0)::double precision AS aspect,
+            COALESCE(pg.dist_major_road, ppf.dist_to_public_road_ft, 0)::double precision AS dist_major_road,
+
+            -- Planning/overlay candidate signals
+            COALESCE(ppf.buildable_area_sqft, 0)::double precision AS buildable_area_sqft,
+            CASE WHEN COALESCE(ppf.in_flood_zone, false) THEN 1 ELSE 0 END AS in_flood_zone_flag,
+            CASE WHEN COALESCE(ppf.in_sfha, false) THEN 1 ELSE 0 END AS in_sfha_flag,
+            CASE WHEN COALESCE(ppf.in_wetland, false) THEN 1 ELSE 0 END AS in_wetland_flag,
+            CASE WHEN COALESCE(ppf.in_shoreline_jurisdiction, false) THEN 1 ELSE 0 END AS in_shoreline_flag,
+            CASE WHEN COALESCE(ppf.public_sewer_available, false) THEN 1 ELSE 0 END AS sewer_available_flag,
+            CASE WHEN COALESCE(ppf.has_recent_permits_5yr, false) THEN 1 ELSE 0 END AS recent_permits_flag,
 
             -- Valuation area (ported from prior logic)
             CASE
@@ -581,9 +666,13 @@ class Command(BaseCommand):
         FROM sales s
         JOIN master_parcel mp
           ON mp.parcel_number = s.parcel_number
+        LEFT JOIN openskagit_parcelgeometry pg
+          ON pg.parcel_id = mp.parcel_number
+        LEFT JOIN parcel_planning_facts ppf
+          ON ppf.parcel_id = mp.parcel_number
         WHERE s.sale_type = 'VALID SALE'
           AND s.sale_price > 10000
-          AND s.sale_date >= DATE '2015-01-01'
+          AND s.sale_date >= CURRENT_DATE - INTERVAL '10 years'
           AND COALESCE(COALESCE(mp.final_living_area, mp.total_living_area, mp.living_area), 0) > 0
           AND COALESCE(mp.acres, 0) > 0
           {mode_filter}
@@ -645,13 +734,26 @@ class Command(BaseCommand):
         df["slope_pct"] = df["slope"].fillna(0)
         df["dist_major_road"] = df["dist_major_road"].fillna(0)
         df["log_major_road"] = np.log1p(df["dist_major_road"])
-        # >>> VIEW TEST FEATURES <<<
-        #df["view_aspect_west"] = df["aspect"].apply(lambda a: 1 if 225 <= a <= 315 else 0)
+        df["view_aspect_west"] = df["aspect"].between(225, 315).astype(int)
         df["view_elev"] = df["is_view"] * df["log_elev"]
         df["view_level"] = (
             (df["is_view"] == 1).astype(int) +
             (df["aspect"].between(225, 315)).astype(int)
         )
+
+        # 5b. Planning/overlay-derived terms
+        df["buildable_area_sqft"] = df["buildable_area_sqft"].fillna(0)
+        df["log_buildable_area"] = np.log1p(df["buildable_area_sqft"].clip(lower=0))
+        for flag_col in [
+            "in_flood_zone_flag",
+            "in_sfha_flag",
+            "in_wetland_flag",
+            "in_shoreline_flag",
+            "sewer_available_flag",
+            "recent_permits_flag",
+        ]:
+            if flag_col in df.columns:
+                df[flag_col] = df[flag_col].fillna(0).astype(int)
 
 
 
@@ -757,14 +859,14 @@ class Command(BaseCommand):
         elif tier_name == "T2_MID": tier_suffix = "T2"
         elif tier_name == "T3_HIGH": tier_suffix = "T3"
 
-        mandatory = list(self.core_predictors)
+        mandatory = dedupe(list(self.core_predictors) + list(self.force_include_predictors))
         
         # ... inside run_adjustment_model
         if tier_suffix:
             dummy_col = f"value_tier_{tier_suffix}"
             df[dummy_col] = 1.0
             # Generate interactions
-            for var in TIER_INTERACTION_VARS:
+            for var in self.tier_interaction_vars:
                 if var in df.columns:
                     inter_col = f"{var}_{tier_suffix}"
                     df[inter_col] = df[var] * df[dummy_col]
@@ -777,7 +879,11 @@ class Command(BaseCommand):
 
         # 3. Safety Filter: Ensure variables exist
         mandatory = [c for c in mandatory if c in df.columns]
-        candidates = [c for c in self.candidate_predictors if c in df.columns and c not in mandatory]
+        candidates = [
+            c
+            for c in self.candidate_predictors
+            if c in df.columns and c not in mandatory and c not in self.force_exclude_predictors
+        ]
 
         # 4. Stepwise Selection & Fit
         final_predictors = self.select_predictors_stepwise(df, "log_price", mandatory, candidates)
@@ -1005,26 +1111,71 @@ class Command(BaseCommand):
             run_mode = DEFAULT_MODE
 
         core_predictors, candidate_predictors, profile_name = self.resolve_predictor_profile(options.get("predictor_set"))
-        self.core_predictors = core_predictors
-        self.candidate_predictors = candidate_predictors
+        core_include = parse_csv_list(options.get("core_include"))
+        core_exclude = set(parse_csv_list(options.get("core_exclude")))
+        candidate_include = parse_csv_list(options.get("candidate_include"))
+        candidate_exclude = set(parse_csv_list(options.get("candidate_exclude")))
+        force_include = parse_csv_list(options.get("force_include"))
+        force_exclude = set(parse_csv_list(options.get("force_exclude")))
+
+        excluded_predictors = set(core_exclude) | set(candidate_exclude) | force_exclude
+        force_include = [p for p in force_include if p not in force_exclude]
+
+        self.core_predictors = [
+            p for p in dedupe(core_predictors + core_include + force_include) if p not in excluded_predictors
+        ]
+        self.candidate_predictors = [
+            p for p in dedupe(candidate_predictors + candidate_include) if p not in excluded_predictors
+        ]
+        self.candidate_predictors = [p for p in self.candidate_predictors if p not in self.core_predictors]
+        self.force_include_predictors = [p for p in force_include if p not in excluded_predictors]
+        self.force_exclude_predictors = sorted(excluded_predictors)
         self.predictor_profile_name = profile_name
-        self.tiering_predictors = dedupe(self.core_predictors + TIERING_ADDITIONAL_PREDICTORS)
-        self._log(f"Predictor profile: {profile_name} (core={len(core_predictors)}, candidates={len(candidate_predictors)})")
+        self.tiering_predictors = [
+            p for p in dedupe(self.core_predictors + TIERING_ADDITIONAL_PREDICTORS) if p not in excluded_predictors
+        ]
+        self._log(
+            f"Predictor profile: {profile_name} (core={len(self.core_predictors)}, candidates={len(self.candidate_predictors)})"
+        )
 
         interaction_bundle = options.get("interactions") or DEFAULT_INTERACTION_BUNDLE
+        custom_interactions = parse_csv_list(options.get("interaction_terms"))
+        tier_vars_raw = options.get("tier_interaction_vars")
+        custom_tier_vars = parse_csv_list(tier_vars_raw) if tier_vars_raw is not None else None
+
+        if custom_tier_vars is None:
+            self.tier_interaction_vars = [v for v in TIER_INTERACTION_VARS if v not in excluded_predictors]
+        else:
+            self.tier_interaction_vars = [v for v in custom_tier_vars if v not in excluded_predictors]
+
         if options.get("no_interactions"):
             interaction_bundle = "none"
             active_interactions = []
+        elif custom_interactions:
+            interaction_bundle = "custom"
+            unknown_interactions = [name for name in custom_interactions if name not in INTERACTIONS]
+            if unknown_interactions:
+                self._log(
+                    f"Unknown interaction terms ignored: {', '.join(unknown_interactions)}",
+                    style=self.style.WARNING,
+                )
+            active_interactions = [name for name in custom_interactions if name in INTERACTIONS]
         else:
             active_interactions = INTERACTION_BUNDLES.get(interaction_bundle, [])
+        active_interactions = [name for name in dedupe(active_interactions) if name not in excluded_predictors]
         self.active_interactions = active_interactions
         self.active_interaction_bundle = interaction_bundle
         if active_interactions:
             self._log(f"Interaction bundle '{interaction_bundle}': {len(active_interactions)} terms queued")
         elif interaction_bundle == "none":
             self._log("Custom interactions disabled (--no-interactions).")
+        elif custom_interactions:
+            self._log("No valid custom interactions selected.", style=self.style.WARNING)
 
-        self.candidate_predictors = dedupe(self.candidate_predictors + self.active_interactions)
+        self.candidate_predictors = [
+            p for p in dedupe(self.candidate_predictors + self.active_interactions) if p not in excluded_predictors
+        ]
+        self.candidate_predictors = [p for p in self.candidate_predictors if p not in self.core_predictors]
 
         dataset = DATASET_SOURCE
 
@@ -1042,6 +1193,12 @@ class Command(BaseCommand):
             )
 
         mg_col = options["market_group_col"]
+        if mg_col not in df.columns:
+            self._log(
+                f"Market group column '{mg_col}' not found in dataset; falling back to 'valuation_area'.",
+                style=self.style.WARNING,
+            )
+            mg_col = "valuation_area"
         run_stats = []
         coef_rows = []
         coefficients_output = {}
@@ -1058,6 +1215,17 @@ class Command(BaseCommand):
             "interaction_bundle": interaction_bundle,
             "active_interactions": self.active_interactions,
             "interaction_meta": interaction_meta,
+            "tier_interaction_vars": self.tier_interaction_vars,
+            "predictor_overrides": {
+                "core_include": core_include,
+                "core_exclude": sorted(core_exclude),
+                "candidate_include": candidate_include,
+                "candidate_exclude": sorted(candidate_exclude),
+                "force_include": self.force_include_predictors,
+                "force_exclude": self.force_exclude_predictors,
+                "interaction_terms": custom_interactions,
+                "tier_interaction_vars": custom_tier_vars,
+            },
         }
 
         available_cols = set(df.columns)
@@ -1065,6 +1233,14 @@ class Command(BaseCommand):
             "core": {"selected": self.core_predictors, "missing": [p for p in self.core_predictors if p not in available_cols]},
             "candidates": {"selected": self.candidate_predictors, "missing": [p for p in self.candidate_predictors if p not in available_cols]},
             "interactions": {"requested": self.active_interactions, "created": interaction_meta.get("created", [])},
+            "tier_interaction_vars": {
+                "selected": self.tier_interaction_vars,
+                "missing": [p for p in self.tier_interaction_vars if p not in available_cols],
+            },
+            "forced": {
+                "include": self.force_include_predictors,
+                "exclude": self.force_exclude_predictors,
+            },
         }
 
         # Grouping

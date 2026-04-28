@@ -1,0 +1,192 @@
+{% load humanize formatting %}
+<div
+  id="appeal-workspace-board-fragment"
+  data-saved-count="{{ saved_count }}"
+  data-sort-by="{{ sort_by }}"
+  data-sort-dir="{{ sort_direction }}"
+  data-view-mode="{{ view_mode }}"
+  data-workspace-view="{{ workspace_view|default:'board' }}"
+>
+  {% if workspace_view == "map" %}
+    <section class="workspace-map-panel">
+      <p class="workspace-map-panel__meta">
+        Subject + {{ saved_count }} saved comps on the map.
+      </p>
+      <div id="appeal-workspace-map" class="workspace-map"></div>
+      {% if not comparables %}
+        <p class="workspace-map-panel__meta">No saved comps yet. Save comps to compare locations side by side.</p>
+      {% endif %}
+    </section>
+  {% elif comparables %}
+    {% if saved_count >= 8 %}
+      <div class="workspace-carousel-nav" aria-label="Carousel navigation">
+        <button type="button" class="workspace-carousel-btn" data-workspace-carousel-prev title="Previous comp" aria-label="Previous comp">
+          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="workspace-carousel-btn" data-workspace-carousel-next title="Next comp" aria-label="Next comp">
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </button>
+      </div>
+    {% endif %}
+
+    <div class="workspace-columns" id="appeal-workspace-columns" data-workspace-carousel>
+      <article class="workspace-column workspace-column--subject">
+        <header class="workspace-column__header">
+          <div class="workspace-column__header-main">
+            <p class="workspace-column__eyebrow">Subject</p>
+            <h3 class="workspace-column__title">{{ subject.address|default:subject.parcel_number }}</h3>
+            <p class="workspace-column__parcel">Parcel {{ subject.parcel_number }}</p>
+          </div>
+        </header>
+        <dl class="workspace-stats">
+          <div class="workspace-stat workspace-stat--wide workspace-stat--sale">
+            <dt>Assessed Value</dt>
+            <dd>
+              {% if subject.assessed_value %}
+                ${{ subject.assessed_value|floatformat:0|intcomma }}
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+          </div>
+          <div class="workspace-stat">
+            <dt>Beds</dt>
+            <dd>{{ subject.bedrooms|default:"—"|floatformat:"-1" }}</dd>
+          </div>
+          <div class="workspace-stat">
+            <dt>Baths</dt>
+            <dd>{{ subject.bathrooms|quarter_baths|default:"—" }}</dd>
+          </div>
+          <div class="workspace-stat">
+            <dt>Sq Ft</dt>
+            <dd>{{ subject.living_area|default:"—"|floatformat:0|intcomma }}</dd>
+          </div>
+          <div class="workspace-stat">
+            <dt>Year</dt>
+            <dd>{{ subject.year_built|default:subject.effective_year_built|default:"—" }}</dd>
+          </div>
+          <div class="workspace-stat">
+            <dt>Acres</dt>
+            <dd>{{ subject.acres|default:"—"|floatformat:2 }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      {% for comp in comparables %}
+        <article
+          class="workspace-column"
+          draggable="true"
+          data-workspace-comp
+          data-comp-parcel="{{ comp.parcel_number }}"
+        >
+          <header class="workspace-column__header">
+            <div class="workspace-column__header-main">
+              <p class="workspace-column__eyebrow">Comparable</p>
+              <h3 class="workspace-column__title">{{ comp.address|default:"Address unavailable" }}</h3>
+              <p class="workspace-column__parcel">Parcel {{ comp.parcel_number }}</p>
+              <p class="workspace-column__drag">
+                <i class="fa-solid fa-grip-vertical" aria-hidden="true"></i>
+                Drag to reorder
+              </p>
+            </div>
+            <button
+              type="button"
+              class="workspace-column__remove"
+              data-workspace-remove
+              data-comp-parcel="{{ comp.parcel_number }}"
+              title="Remove comp"
+              aria-label="Remove {{ comp.parcel_number }}"
+            >
+              <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+            </button>
+          </header>
+          <dl class="workspace-stats">
+            <div class="workspace-stat workspace-stat--wide workspace-stat--sale">
+              <dt>Sale Price</dt>
+              <dd>
+                {% if comp.sale_price is not None %}
+                  ${{ comp.sale_price|floatformat:0|intcomma }}
+                {% else %}
+                  —
+                {% endif %}
+              </dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>Sold</dt>
+              <dd>{{ comp.sale_date|date:"M j, Y"|default:"—" }}</dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>Distance</dt>
+              <dd>{{ comp.distance_miles|floatformat:2|default:"—" }} mi</dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>Beds</dt>
+              <dd>{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>Baths</dt>
+              <dd>{{ comp.bathrooms|quarter_baths|default:"—" }}</dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>Sq Ft</dt>
+              <dd>{{ comp.calculated_square_footage|default:comp.living_area|default:"—"|floatformat:0|intcomma }}</dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>Built</dt>
+              <dd>{{ comp.year_built|default:"—" }}</dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>$/Sq Ft</dt>
+              <dd>
+                {% if comp.price_per_sqft is not None %}
+                  ${{ comp.price_per_sqft|floatformat:0|intcomma }}
+                {% else %}
+                  —
+                {% endif %}
+              </dd>
+            </div>
+            <div class="workspace-stat">
+              <dt>Similarity</dt>
+              <dd>{{ comp.similarity.overall|default:0 }}%</dd>
+            </div>
+            {% if advanced_mode %}
+              <div class="workspace-stat workspace-stat--wide">
+                <dt>Adjusted</dt>
+                <dd>
+                  {% if comp.adjusted_price is not None %}
+                    ${{ comp.adjusted_price|floatformat:0|intcomma }}
+                    {% if comp.total_adjustment %}
+                      <span class="{% if comp.total_adjustment > 0 %}workspace-adjustment workspace-adjustment--up{% else %}workspace-adjustment workspace-adjustment--down{% endif %}">
+                        {% if comp.total_adjustment > 0 %}+{% endif %}${{ comp.total_adjustment|floatformat:0|intcomma }}
+                      </span>
+                    {% endif %}
+                  {% else %}
+                    —
+                  {% endif %}
+                </dd>
+              </div>
+            {% endif %}
+          </dl>
+
+          {% if advanced_mode and comp.adjustments %}
+            <div class="workspace-adjustment-list">
+              {% for item in comp.adjustments %}
+                <span class="workspace-adjustment-chip {% if item.amount > 0 %}workspace-adjustment-chip--up{% else %}workspace-adjustment-chip--down{% endif %}">
+                  {{ item.label }}
+                  {% if item.amount > 0 %}+{% endif %}${{ item.amount|floatformat:0|intcomma }}
+                </span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="workspace-empty">
+      <h3>No saved comps yet</h3>
+      <p>Go back to Comparable Sales and save properties to build your side-by-side board.</p>
+      <a href="{% url 'appeal-result-comparables' parcel_number %}" class="workspace-empty__link">Back to Comparable Sales</a>
+    </div>
+  {% endif %}
+</div>
+{{ map_payload|json_script:"appeal-workspace-map-payload" }}

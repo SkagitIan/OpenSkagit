@@ -1,0 +1,1123 @@
+{% extends "openskagit/base.html" %}
+
+{% block head_extra %}
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  >
+{% endblock %}
+
+{% block content %}
+<section class="bg-white py-6 sm:py-8">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="space-y-6">
+      <div class="space-y-3">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-600">CO Appraiser</p>
+          <h1 class="mt-1 text-xl font-bold text-slate-900">Parcel Route Planner</h1>
+          <p class="mt-1 text-sm text-slate-700">
+            Upload a CSV of parcel IDs and group them into day-sized geographic routes. No routing optimization yet.
+          </p>
+        </div>
+
+        {% if messages %}
+          <div class="space-y-3">
+            {% for message in messages %}
+              <div class="rounded-2xl border-l-4 px-4 py-3 text-sm font-medium
+                {% if 'success' in message.tags %} border-emerald-500 bg-emerald-50 text-emerald-900
+                {% elif 'error' in message.tags %} border-red-500 bg-red-50 text-red-900
+                {% elif 'warning' in message.tags %} border-amber-500 bg-amber-50 text-amber-900
+                {% else %} border-slate-500 bg-slate-50 text-slate-900
+                {% endif %}
+              ">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 class="text-lg font-semibold text-slate-900">1. Upload Parcel CSV</h2>
+          <form method="post" enctype="multipart/form-data" class="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+            {% csrf_token %}
+            <div>
+              <label for="id_name" class="mb-1 block text-sm font-medium text-slate-800">Label (optional)</label>
+              <input
+                id="id_name"
+                name="name"
+                type="text"
+                placeholder="Sedro-Woolley field run"
+                class="block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              >
+            </div>
+            <div>
+              <label for="id_csv_file" class="mb-1 block text-sm font-medium text-slate-800">CSV file</label>
+              <input
+                id="id_csv_file"
+                name="csv_file"
+                type="file"
+                accept=".csv,text/csv"
+                required
+                class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-slate-700"
+              >
+            </div>
+            <button
+              type="submit"
+              class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 lg:self-end"
+            >
+              Upload CSV
+            </button>
+          </form>
+        </div>
+
+        {% if parcel_set %}
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="text-lg font-semibold text-slate-900">2. Parcel Set</h2>
+                <p class="mt-0.5 text-sm text-slate-600">
+                  {{ parcel_set.name|default:parcel_set.source_filename }}
+                </p>
+              </div>
+              <a
+                href="?parcel_set={{ parcel_set.id }}"
+                class="text-xs font-medium text-slate-600 underline decoration-slate-300 hover:text-slate-900"
+              >
+                Reload
+              </a>
+            </div>
+
+            <div class="mt-3 grid grid-cols-2 gap-2 text-sm lg:grid-cols-4">
+              <div class="rounded-xl bg-slate-50 p-2.5">
+                <div class="text-xs text-slate-500">Rows</div>
+                <div class="text-lg font-semibold text-slate-900">{{ parcel_set.total_rows }}</div>
+              </div>
+              <div class="rounded-xl bg-slate-50 p-2.5">
+                <div class="text-xs text-slate-500">Unique Parcels</div>
+                <div class="text-lg font-semibold text-slate-900">{{ parcel_set.unique_parcel_count }}</div>
+              </div>
+              <div class="rounded-xl bg-emerald-50 p-2.5">
+                <div class="text-xs text-emerald-700">Ready</div>
+                <div class="text-lg font-semibold text-emerald-900">{{ parcel_set.found_count }}</div>
+              </div>
+              <div class="rounded-xl bg-amber-50 p-2.5">
+                <div class="text-xs text-amber-700">Missing / No Geometry</div>
+                <div class="text-lg font-semibold text-amber-900">
+                  {{ parcel_set.missing_count|add:parcel_set.missing_geometry_count }}
+                </div>
+              </div>
+            </div>
+
+            <form method="post" action="{% url 'coappraiser-generate-plan' parcel_set.id %}" class="mt-4 space-y-3">
+              {% csrf_token %}
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-700">3. Generate Routes</h3>
+              <div class="grid gap-2 lg:grid-cols-2">
+                {% for preset in mode_presets %}
+                  <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 p-2.5 hover:border-slate-400">
+                    <input
+                      type="radio"
+                      name="mode"
+                      value="{{ preset.value }}"
+                      class="mt-1"
+                      {% if parcel_set.mode_last_used == preset.value or not parcel_set.mode_last_used and preset.value == 'driving' %}checked{% endif %}
+                    >
+                    <span class="block">
+                      <span class="block text-sm font-semibold text-slate-900 leading-tight">{{ preset.label }}</span>
+                      <span class="mt-0.5 block text-xs text-slate-600 leading-tight">
+                        Target {{ preset.target_stops }} stops/day ({{ preset.min_stops }}-{{ preset.max_stops }}) · grid {{ preset.grid_cell_size_m }}m
+                      </span>
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+              <button
+                type="submit"
+                {% if not parcel_set.found_count %}disabled{% endif %}
+                class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Generate Routes
+              </button>
+            </form>
+
+            {% if parcel_set_details %}
+              {% if parcel_set_details.missing_rows %}
+                <div class="mt-4">
+                  <h4 class="text-sm font-semibold text-slate-800">Missing parcels (sample)</h4>
+                  <ul class="mt-2 space-y-1 text-xs text-slate-600">
+                    {% for row in parcel_set_details.missing_rows %}
+                      <li>Row {{ row.source_row }}: {{ row.parcel_number_normalized }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+              {% if parcel_set_details.missing_geometry_rows %}
+                <div class="mt-3">
+                  <h4 class="text-sm font-semibold text-slate-800">Missing geometry (sample)</h4>
+                  <ul class="mt-2 space-y-1 text-xs text-slate-600">
+                    {% for row in parcel_set_details.missing_geometry_rows %}
+                      <li>Row {{ row.source_row }}: {{ row.parcel_number_normalized }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {% if recent_parcel_sets %}
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-900">Recent Parcel Sets</h2>
+            <ul class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              {% for recent in recent_parcel_sets %}
+                <li class="flex items-center gap-1.5">
+                  <a class="text-slate-800 underline decoration-slate-300 hover:text-slate-950" href="?parcel_set={{ recent.id }}">
+                    {{ recent.name|default:recent.source_filename }}
+                  </a>
+                  <span class="text-slate-500">{{ recent.found_count }} ready</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="space-y-6">
+        {% if plan %}
+          <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="text-xl font-semibold text-slate-900">Route Plan</h2>
+                <p class="text-sm text-slate-600">
+                {{ plan.get_mode_display }} · {{ plan.created_at|date:"Y-m-d H:i" }} · Route grouping plan
+                </p>
+              </div>
+              {% if plan.status == "completed" %}
+                <a
+                  href="{% url 'coappraiser-export-plan-csv' plan.id %}"
+                  class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+                >
+                  Export CSV
+                </a>
+              {% endif %}
+            </div>
+
+            {% if plan.status == "failed" %}
+              <div class="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+                {{ plan.error_message|default:"Route generation failed." }}
+              </div>
+            {% endif %}
+            {% if plan.status == "pending" %}
+              <div id="coappraiser-plan-pending" class="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                Large route set is processing in the background. This page refreshes automatically.
+              </div>
+            {% endif %}
+
+            {% if plan.summary %}
+              <div class="mt-4 grid gap-3 sm:grid-cols-4 text-sm">
+                <div class="rounded-2xl bg-slate-50 p-3">
+                  <div class="text-slate-500">Routes</div>
+                  <div class="text-xl font-semibold text-slate-900">{{ plan.cluster_count }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-3">
+                  <div class="text-slate-500">Route Stops</div>
+                  <div class="text-xl font-semibold text-slate-900">{{ plan.routed_stop_count }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-3">
+                  <div class="text-slate-500">Excluded</div>
+                  <div class="text-xl font-semibold text-slate-900">{{ plan.excluded_stop_count }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-3">
+                  <div class="text-slate-500">Grid</div>
+                  <div class="text-xl font-semibold text-slate-900">{{ plan.grid_cell_size_m }}m</div>
+                </div>
+              </div>
+            {% endif %}
+
+            {% if plan_result and plan.status == "completed" and plan_result.routes %}
+              <div id="coappraiser-map" class="relative z-0 mt-5 w-full rounded-2xl border border-slate-200" style="height: 500px;"></div>
+            {% elif plan.status == "completed" %}
+              <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Plan completed but no routes were returned.
+              </div>
+            {% endif %}
+          </div>
+
+          {% if plan_result and plan_result.routes %}
+            <div class="space-y-4">
+              {% for route in plan_result.routes %}
+                <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-lg font-semibold text-slate-900">
+                        Route {{ route.day_number }} ({{ route.stop_count }} parcels)
+                      </h3>
+                      <p class="text-sm text-slate-600">Deterministic geographic route grouping (no stop ordering optimization yet)</p>
+                    </div>
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      {{ route.cluster_id }}
+                    </span>
+                  </div>
+                  <div
+                    id="coappraiser-cluster-map-{{ forloop.counter0 }}"
+                    data-coappraiser-cluster-map="{{ forloop.counter0 }}"
+                    class="relative z-0 mt-4 w-full rounded-2xl border border-slate-200"
+                    style="height: 20rem;"
+                  ></div>
+                  {% url 'coappraiser-route-imagery-manual-modal' plan.id route.cluster_id as route_imagery_manual_modal_url %}
+                  {% url 'coappraiser-route-imagery-manual-draft' plan.id route.cluster_id as route_imagery_manual_draft_url %}
+                  {% url 'coappraiser-route-imagery-manual-continue' plan.id route.cluster_id as route_imagery_manual_continue_url %}
+                  {% url 'coappraiser-route-listing-start' plan.id route.cluster_id as route_listing_start_url %}
+                  {% url 'coappraiser-route-listing-tick' plan.id route.cluster_id as route_listing_tick_url %}
+                  {% url 'coappraiser-route-drive-start' plan.id route.cluster_id as route_drive_start_url %}
+                  {% url 'coappraiser-route-stop-rows' plan.id route.cluster_id as route_rows_url %}
+                  {% include "openskagit/partials/coappraiser_route_scan_fragment.html" with plan=plan route=route route_index=forloop.counter0 route_imagery_manual_modal_url=route_imagery_manual_modal_url route_imagery_manual_draft_url=route_imagery_manual_draft_url route_imagery_manual_continue_url=route_imagery_manual_continue_url route_listing_start_url=route_listing_start_url route_listing_tick_url=route_listing_tick_url route_drive_start_url=route_drive_start_url route_rows_url=route_rows_url %}
+                  <div class="mt-4 max-h-64 overflow-auto rounded-2xl border border-slate-100">
+                    <table class="min-w-full text-left text-sm">
+                      <thead class="sticky top-0 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                        <tr>
+                          <th class="px-3 py-2">#</th>
+                          <th class="px-2 py-2"></th>
+                          <th class="px-3 py-2">Parcel</th>
+                          <th class="px-3 py-2">Address</th>
+                          <th class="px-3 py-2">Change</th>
+                          <th class="px-3 py-2 text-right">Move</th>
+                        </tr>
+                      </thead>
+                      <tbody id="route-stops-body-{{ route.cluster_id }}" class="divide-y divide-slate-100">
+                        {% include "openskagit/partials/coappraiser_route_stop_rows.html" with route=route route_index=forloop.counter0 %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+            <h2 class="text-xl font-semibold text-slate-900">No Route Plan Yet</h2>
+            <p class="mt-2 text-sm text-slate-600">
+              Upload a parcel CSV, then choose neighborhood or driving mode to generate geographic routes.
+            </p>
+          </div>
+        {% endif %}
+
+        {% if recent_plans %}
+          <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-900">Recent Plans For This Set</h2>
+            <ul class="mt-3 space-y-2 text-sm">
+              {% for recent_plan in recent_plans %}
+                <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                  <a class="text-slate-800 underline decoration-slate-300 hover:text-slate-950" href="?parcel_set={{ recent_plan.parcel_set_id }}&plan={{ recent_plan.id }}">
+                    {{ recent_plan.get_mode_display }} · {{ recent_plan.created_at|date:"Y-m-d H:i" }}
+                  </a>
+                  <span class="text-xs text-slate-500">{{ recent_plan.status }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if plan %}
+  <div id="coappraiser-move-modal" class="fixed inset-0 hidden items-center justify-center bg-slate-900/40 px-4 isolate" style="z-index: 3200;">
+    <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-base font-semibold text-slate-900">Move Parcel To Route</h3>
+          <p id="coappraiser-move-modal-parcel" class="mt-1 text-sm text-slate-600"></p>
+        </div>
+        <button type="button" id="coappraiser-move-modal-close" class="rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900">✕</button>
+      </div>
+      <form method="post" action="{% url 'coappraiser-move-plan-stop' plan.id %}" class="mt-4 space-y-4">
+        {% csrf_token %}
+        <input type="hidden" name="item_id" id="coappraiser-move-item-id">
+        <div>
+          <label for="coappraiser-move-target-route" class="mb-1 block text-sm font-medium text-slate-800">Destination route</label>
+          <select id="coappraiser-move-target-route" name="target_cluster_id" class="block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" required></select>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" id="coappraiser-move-cancel" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Move Parcel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="coappraiser-imagery-modal" class="fixed inset-0 hidden items-center justify-center bg-slate-900/50 px-4 isolate" style="z-index: 4000;">
+    <div class="relative z-10 w-full max-w-6xl rounded-2xl bg-white shadow-2xl">
+      <div id="coappraiser-imagery-modal-body"></div>
+    </div>
+  </div>
+{% endif %}
+
+{% if plan_map_payload %}
+  {{ plan_map_payload|json_script:"coappraiser-map-payload" }}
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script>
+    (function () {
+      const pendingPlanEl = document.getElementById("coappraiser-plan-pending");
+      if (pendingPlanEl) {
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 5000);
+      }
+
+      const payloadTag = document.getElementById("coappraiser-map-payload");
+      const mapEl = document.getElementById("coappraiser-map");
+      if (!payloadTag || !mapEl) {
+        return;
+      }
+      if (typeof L === "undefined") {
+        mapEl.innerHTML = '<div style="padding:12px;font-size:14px;color:#991b1b;background:#fef2f2;border-radius:12px;">Map library failed to load (Leaflet). Try a hard refresh or disable script-blocking extensions for openskagit.com / unpkg.com.</div>';
+        document.querySelectorAll("[data-coappraiser-cluster-map]").forEach((el) => {
+          el.innerHTML = '<div style="padding:10px;font-size:13px;color:#991b1b;background:#fef2f2;height:100%;box-sizing:border-box;">Leaflet failed to load.</div>';
+        });
+        return;
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(payloadTag.textContent);
+      } catch (err) {
+        console.error("Failed to parse coappraiser map payload", err);
+        return;
+      }
+
+      function addOsmTiles(targetMap) {
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(targetMap);
+      }
+
+      function isFiniteLngLatPair(pair) {
+        return Array.isArray(pair) &&
+          pair.length >= 2 &&
+          Number.isFinite(pair[0]) &&
+          Number.isFinite(pair[1]) &&
+          pair[0] >= -180 && pair[0] <= 180 &&
+          pair[1] >= -90 && pair[1] <= 90;
+      }
+
+      function sanitizePolygonGeoJSON(geojson) {
+        if (!geojson || typeof geojson !== "object") return null;
+        if (geojson.type !== "Polygon" || !Array.isArray(geojson.coordinates)) return null;
+        const rings = geojson.coordinates
+          .map((ring) => Array.isArray(ring) ? ring.filter(isFiniteLngLatPair) : [])
+          .filter((ring) => ring.length >= 3);
+        if (!rings.length) return null;
+        const fixedRings = rings.map((ring) => {
+          const out = ring.slice();
+          const uniqueVertexCount = new Set(out.map((pair) => `${pair[0].toFixed(7)},${pair[1].toFixed(7)}`)).size;
+          if (uniqueVertexCount < 3) {
+            return [];
+          }
+          const first = out[0];
+          const last = out[out.length - 1];
+          if (!last || first[0] !== last[0] || first[1] !== last[1]) {
+            out.push([first[0], first[1]]);
+          }
+          return out.length >= 4 ? out : [];
+        }).filter((ring) => ring.length >= 4);
+        if (!fixedRings.length) return null;
+        return { type: "Polygon", coordinates: fixedRings };
+      }
+
+      function polygonGeoJSONToLatLngRings(geojson) {
+        const polygon = sanitizePolygonGeoJSON(geojson);
+        if (!polygon) return null;
+        return polygon.coordinates.map((ring) => ring.map((pair) => [pair[1], pair[0]]));
+      }
+
+      function rectangleBoundsFromPolygonGeoJSON(geojson) {
+        const polygon = sanitizePolygonGeoJSON(geojson);
+        if (!polygon) return null;
+        const bounds = L.latLngBounds([]);
+        polygon.coordinates.forEach((ring) => {
+          ring.forEach((pair) => bounds.extend([pair[1], pair[0]]));
+        });
+        return bounds.isValid() ? bounds : null;
+      }
+
+      function drawClusterGridCells(targetMap, route, color) {
+        const localBounds = L.latLngBounds([]);
+        const cells = Array.isArray(route.cluster_grid_cells) ? route.cluster_grid_cells : [];
+        if (!cells.length) {
+          return localBounds;
+        }
+        cells.forEach((cell) => {
+          const west = Number(cell.west);
+          const south = Number(cell.south);
+          const east = Number(cell.east);
+          const north = Number(cell.north);
+          if (![west, south, east, north].every(Number.isFinite)) {
+            return;
+          }
+          if (west >= east || south >= north) {
+            return;
+          }
+          try {
+            const rectBounds = L.latLngBounds([[south, west], [north, east]]);
+            L.rectangle(rectBounds, {
+              color,
+              weight: 1,
+              opacity: 0.9,
+              fillOpacity: 0.08,
+            }).addTo(targetMap);
+            localBounds.extend(rectBounds);
+          } catch (err) {
+            console.error("Failed to draw grid cell rectangle", route.cluster_id, cell, err);
+          }
+        });
+        return localBounds;
+      }
+
+      function drawClusterPolygons(targetMap, route, color) {
+        const localBounds = L.latLngBounds([]);
+        const polygonStyle = { color, weight: 2, fillOpacity: 0.10 };
+
+        const hullRings = polygonGeoJSONToLatLngRings(route.cluster_hull_geojson);
+        if (hullRings) {
+          try {
+            const hullLayer = L.polygon(hullRings, polygonStyle).addTo(targetMap);
+            if (hullLayer.getBounds && hullLayer.getBounds().isValid()) {
+              localBounds.extend(hullLayer.getBounds());
+              return localBounds;
+            }
+          } catch (err) {
+            console.error("Failed to draw hull polygon", route.cluster_id, err);
+          }
+        }
+
+        const rectBounds = rectangleBoundsFromPolygonGeoJSON(route.cluster_bounds_geojson);
+        if (rectBounds) {
+          try {
+            L.rectangle(rectBounds, polygonStyle).addTo(targetMap);
+            localBounds.extend(rectBounds);
+          } catch (err) {
+            console.error("Failed to draw bounds rectangle", route.cluster_id, err);
+          }
+        }
+
+        return localBounds;
+      }
+
+      function drawClusterStops(targetMap, route, color, options) {
+        const localBounds = L.latLngBounds([]);
+        const markerByItemId = (options && options.collectMarkers) ? {} : null;
+        let stopCount = 0;
+
+        (route.stops || []).forEach((stop) => {
+          const lat = Number(stop.lat);
+          const lon = Number(stop.lon);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+          if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
+          stopCount += 1;
+          const marker = L.circleMarker([lat, lon], {
+            radius: 5,
+            weight: 1,
+            color: "#ffffff",
+            fillColor: color,
+            fillOpacity: 0.95
+          }).addTo(targetMap);
+          marker.bindPopup(
+            "<strong>Route " + route.day_number + " · Parcel " + stop.stop_order + "</strong><br>" +
+            (stop.parcel_number || "") + "<br>" +
+            (stop.address || "")
+          );
+          if (markerByItemId && stop.item_id !== undefined && stop.item_id !== null) {
+            markerByItemId[String(stop.item_id)] = marker;
+          }
+          localBounds.extend([lat, lon]);
+        });
+
+        return { bounds: localBounds, markerByItemId, stopCount };
+      }
+
+      function drawRouteLine(targetMap, route, color) {
+        const geojson = route && route.route_geojson;
+        if (!geojson || typeof geojson !== "object") {
+          return null;
+        }
+        try {
+          const layer = L.geoJSON(geojson, {
+            style: {
+              color,
+              weight: 3,
+              opacity: 0.9,
+            }
+          }).addTo(targetMap);
+          if (layer.getBounds && layer.getBounds().isValid()) {
+            return layer.getBounds();
+          }
+        } catch (err) {
+          console.error("Failed to draw route line", route && route.cluster_id, err);
+        }
+        return null;
+      }
+
+      const map = L.map(mapEl);
+      addOsmTiles(map);
+      const routeMapStates = {};
+
+      const colors = ["#0f766e", "#2563eb", "#dc2626", "#7c3aed", "#d97706", "#059669", "#be185d", "#1d4ed8"];
+      const bounds = L.latLngBounds([]);
+
+      (payload.routes || []).forEach((route, idx) => {
+        try {
+          const color = colors[idx % colors.length];
+          let clusterBounds = drawClusterGridCells(map, route, color);
+          if (!clusterBounds || !clusterBounds.isValid()) {
+            clusterBounds = drawClusterPolygons(map, route, color);
+          }
+          if (clusterBounds && clusterBounds.isValid()) {
+            bounds.extend(clusterBounds);
+          } else {
+            const stopRender = drawClusterStops(L.layerGroup().addTo(map), route, color);
+            if (stopRender.bounds && stopRender.bounds.isValid()) bounds.extend(stopRender.bounds);
+          }
+        } catch (err) {
+          console.error("Failed to render cluster polygon on plan map", idx, err);
+        }
+      });
+      if (bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.08));
+      } else {
+        map.setView([48.42, -122.33], 11);
+      }
+      setTimeout(() => map.invalidateSize(), 0);
+
+      document.querySelectorAll("[data-coappraiser-cluster-map]").forEach((el) => {
+        const idx = Number(el.getAttribute("data-coappraiser-cluster-map"));
+        if (!Number.isFinite(idx)) return;
+        const route = (payload.routes || [])[idx];
+        if (!route) return;
+        try {
+          const clusterMap = L.map(el);
+          addOsmTiles(clusterMap);
+          const lineBounds = drawRouteLine(clusterMap, route, colors[idx % colors.length]);
+          const stopRender = drawClusterStops(clusterMap, route, colors[idx % colors.length], { collectMarkers: true });
+          routeMapStates[String(idx)] = {
+            map: clusterMap,
+            markers: stopRender.markerByItemId || {},
+            activeMarker: null,
+            activeRow: null,
+          };
+          const clusterBounds = L.latLngBounds([]);
+          if (lineBounds && lineBounds.isValid()) {
+            clusterBounds.extend(lineBounds);
+          }
+          if (stopRender.bounds && stopRender.bounds.isValid()) {
+            clusterBounds.extend(stopRender.bounds);
+          }
+          if (clusterBounds && clusterBounds.isValid()) {
+            if (stopRender.stopCount === 1) {
+              const center = clusterBounds.getCenter();
+              clusterMap.setView(center, 17);
+            } else {
+              clusterMap.fitBounds(clusterBounds.pad(0.03));
+            }
+          } else {
+            clusterMap.setView([48.42, -122.33], 14);
+          }
+          setTimeout(() => clusterMap.invalidateSize(), 0);
+        } catch (err) {
+          console.error("Failed to render cluster detail map", idx, err);
+        }
+      });
+
+      function highlightRouteStop(routeIndex, itemId, rowEl) {
+        const state = routeMapStates[String(routeIndex)];
+        if (!state) return;
+        const marker = state.markers[String(itemId)];
+        if (!marker) return;
+
+        if (state.activeMarker && state.activeMarker !== marker) {
+          try {
+            state.activeMarker.setStyle({
+              radius: 5,
+              weight: 1,
+              color: "#ffffff",
+            });
+          } catch (err) {}
+        }
+        if (state.activeRow && state.activeRow !== rowEl) {
+          state.activeRow.classList.remove("bg-amber-50");
+        }
+
+        try {
+          marker.setStyle({
+            radius: 8,
+            weight: 2,
+            color: "#111827",
+          });
+          marker.openPopup();
+          state.map.panTo(marker.getLatLng());
+        } catch (err) {
+          console.error("Failed to highlight marker", routeIndex, itemId, err);
+        }
+
+        if (rowEl) {
+          rowEl.classList.add("bg-amber-50");
+          state.activeRow = rowEl;
+        }
+        state.activeMarker = marker;
+      }
+
+      function toggleRouteDetail(routeIndex, itemId) {
+        const selector = `[data-route-detail-row][data-route-index="${routeIndex}"][data-item-id="${itemId}"]`;
+        const detailRow = document.querySelector(selector);
+        if (!detailRow) return;
+        const state = routeMapStates[String(routeIndex)] || {};
+        if (state.activeDetailRow && state.activeDetailRow !== detailRow) {
+          state.activeDetailRow.classList.add("hidden");
+        }
+        if (detailRow.classList.contains("hidden")) {
+          detailRow.classList.remove("hidden");
+          state.activeDetailRow = detailRow;
+        } else {
+          detailRow.classList.add("hidden");
+          state.activeDetailRow = null;
+        }
+        routeMapStates[String(routeIndex)] = state;
+      }
+
+      const moveModal = document.getElementById("coappraiser-move-modal");
+      const moveModalClose = document.getElementById("coappraiser-move-modal-close");
+      const moveModalCancel = document.getElementById("coappraiser-move-cancel");
+      const moveModalParcel = document.getElementById("coappraiser-move-modal-parcel");
+      const moveItemIdInput = document.getElementById("coappraiser-move-item-id");
+      const moveTargetSelect = document.getElementById("coappraiser-move-target-route");
+
+      function closeMoveModal() {
+        if (!moveModal) return;
+        moveModal.classList.add("hidden");
+        moveModal.classList.remove("flex");
+      }
+
+      function openMoveModal(sourceRouteIndex, itemId, parcelNumber) {
+        if (!moveModal || !moveTargetSelect || !moveItemIdInput) return;
+        moveTargetSelect.innerHTML = "";
+        const routes = Array.isArray(payload.routes) ? payload.routes : [];
+        routes.forEach((route, idx) => {
+          if (!route || idx === sourceRouteIndex) return;
+          const option = document.createElement("option");
+          option.value = String(route.cluster_id || "");
+          option.textContent = `Route ${route.day_number} (${route.stop_count || 0} parcels)`;
+          moveTargetSelect.appendChild(option);
+        });
+        if (!moveTargetSelect.options.length) {
+          console.warn("No alternate routes available for move");
+          return;
+        }
+        moveItemIdInput.value = String(itemId);
+        if (moveModalParcel) {
+          moveModalParcel.textContent = parcelNumber ? `Parcel ${parcelNumber}` : "Move selected parcel";
+        }
+        moveModal.classList.remove("hidden");
+        moveModal.classList.add("flex");
+        moveTargetSelect.focus();
+      }
+
+      if (moveModal) {
+        moveModal.addEventListener("click", (event) => {
+          if (event.target === moveModal) {
+            closeMoveModal();
+          }
+        });
+      }
+      [moveModalClose, moveModalCancel].forEach((btn) => {
+        if (!btn) return;
+        btn.addEventListener("click", closeMoveModal);
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeMoveModal();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const moveButton = event.target.closest("[data-move-stop-button]");
+        if (moveButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const routeIndex = Number(moveButton.getAttribute("data-route-index"));
+          const itemId = moveButton.getAttribute("data-item-id");
+          const parcelNumber = moveButton.getAttribute("data-parcel-number") || "";
+          if (!Number.isFinite(routeIndex) || !itemId) return;
+          const rowEl = moveButton.closest("[data-route-row]");
+          if (rowEl) {
+            highlightRouteStop(routeIndex, itemId, rowEl);
+          }
+          openMoveModal(routeIndex, itemId, parcelNumber);
+          return;
+        }
+
+        const rowEl = event.target.closest("[data-route-row]");
+        if (!rowEl) return;
+        const routeIndex = Number(rowEl.getAttribute("data-route-index"));
+        const itemId = rowEl.getAttribute("data-item-id");
+        if (!Number.isFinite(routeIndex) || !itemId) return;
+        highlightRouteStop(routeIndex, itemId, rowEl);
+        toggleRouteDetail(routeIndex, itemId);
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      const modal = document.getElementById("coappraiser-imagery-modal");
+      const modalBody = document.getElementById("coappraiser-imagery-modal-body");
+      if (!modal || !modalBody) return;
+      const MAGNIFIER_SIZE_PX = 220;
+      const MAGNIFIER_ZOOM = 2.8;
+      const MAGNIFIER_OFFSET_X = 20;
+      const MAGNIFIER_OFFSET_Y = 20;
+      let detachImageryMagnifier = null;
+
+      const imageryMagnifier = document.createElement("div");
+      imageryMagnifier.setAttribute("data-imagery-magnifier", "true");
+      imageryMagnifier.style.position = "fixed";
+      imageryMagnifier.style.zIndex = "120";
+      imageryMagnifier.style.width = `${MAGNIFIER_SIZE_PX}px`;
+      imageryMagnifier.style.height = `${MAGNIFIER_SIZE_PX}px`;
+      imageryMagnifier.style.border = "2px solid rgba(15, 23, 42, 0.85)";
+      imageryMagnifier.style.borderRadius = "14px";
+      imageryMagnifier.style.boxShadow = "0 14px 38px rgba(15, 23, 42, 0.35)";
+      imageryMagnifier.style.backgroundRepeat = "no-repeat";
+      imageryMagnifier.style.backgroundColor = "#0f172a";
+      imageryMagnifier.style.pointerEvents = "none";
+      imageryMagnifier.style.display = "none";
+      imageryMagnifier.style.willChange = "transform, left, top, background-position, background-size";
+
+      function hideImageryMagnifier() {
+        imageryMagnifier.style.display = "none";
+      }
+
+      function ensureImageryMagnifierMounted() {
+        if (!imageryMagnifier.isConnected) {
+          document.body.appendChild(imageryMagnifier);
+        }
+      }
+
+      function clamp(value, minValue, maxValue) {
+        return Math.min(Math.max(value, minValue), maxValue);
+      }
+
+      function positionImageryMagnifier(clientX, clientY) {
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        if (viewportWidth <= 0 || viewportHeight <= 0) {
+          imageryMagnifier.style.left = `${clientX + MAGNIFIER_OFFSET_X}px`;
+          imageryMagnifier.style.top = `${clientY + MAGNIFIER_OFFSET_Y}px`;
+          return;
+        }
+
+        const maxLeft = Math.max(0, viewportWidth - MAGNIFIER_SIZE_PX - 8);
+        const maxTop = Math.max(0, viewportHeight - MAGNIFIER_SIZE_PX - 8);
+        const nextLeft = clamp(clientX + MAGNIFIER_OFFSET_X, 8, maxLeft);
+        const nextTop = clamp(clientY + MAGNIFIER_OFFSET_Y, 8, maxTop);
+        imageryMagnifier.style.left = `${Math.round(nextLeft)}px`;
+        imageryMagnifier.style.top = `${Math.round(nextTop)}px`;
+      }
+
+      function updateImageryMagnifier(img, clientX, clientY) {
+        if (!img || !img.isConnected) {
+          hideImageryMagnifier();
+          return;
+        }
+
+        const rect = img.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) {
+          hideImageryMagnifier();
+          return;
+        }
+
+        const localX = clientX - rect.left;
+        const localY = clientY - rect.top;
+        if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) {
+          hideImageryMagnifier();
+          return;
+        }
+
+        const src = img.currentSrc || img.getAttribute("src") || "";
+        if (!src) {
+          hideImageryMagnifier();
+          return;
+        }
+
+        ensureImageryMagnifierMounted();
+        const ratioX = rect.width > 0 ? localX / rect.width : 0.5;
+        const ratioY = rect.height > 0 ? localY / rect.height : 0.5;
+        const bgWidth = rect.width * MAGNIFIER_ZOOM;
+        const bgHeight = rect.height * MAGNIFIER_ZOOM;
+        const bgPosX = -(ratioX * bgWidth) + (MAGNIFIER_SIZE_PX / 2);
+        const bgPosY = -(ratioY * bgHeight) + (MAGNIFIER_SIZE_PX / 2);
+
+        imageryMagnifier.style.backgroundImage = `url("${src}")`;
+        imageryMagnifier.style.backgroundSize = `${bgWidth}px ${bgHeight}px`;
+        imageryMagnifier.style.backgroundPosition = `${Math.round(bgPosX)}px ${Math.round(bgPosY)}px`;
+        positionImageryMagnifier(clientX, clientY);
+        imageryMagnifier.style.display = "block";
+      }
+
+      function bindImageryMagnifier(images) {
+        if (!images || !images.length) {
+          hideImageryMagnifier();
+          return function noop() {};
+        }
+
+        const listeners = [];
+        images.forEach((img) => {
+          const onEnter = (event) => {
+            updateImageryMagnifier(img, event.clientX, event.clientY);
+          };
+          const onMove = (event) => {
+            updateImageryMagnifier(img, event.clientX, event.clientY);
+          };
+          const onLeave = () => {
+            hideImageryMagnifier();
+          };
+          img.addEventListener("mouseenter", onEnter);
+          img.addEventListener("mousemove", onMove);
+          img.addEventListener("mouseleave", onLeave);
+          listeners.push({ img, onEnter, onMove, onLeave });
+        });
+
+        const onWindowBlur = () => {
+          hideImageryMagnifier();
+        };
+        window.addEventListener("blur", onWindowBlur);
+
+        return function cleanupMagnifierListeners() {
+          listeners.forEach((entry) => {
+            entry.img.removeEventListener("mouseenter", entry.onEnter);
+            entry.img.removeEventListener("mousemove", entry.onMove);
+            entry.img.removeEventListener("mouseleave", entry.onLeave);
+          });
+          window.removeEventListener("blur", onWindowBlur);
+          hideImageryMagnifier();
+        };
+      }
+
+      function openImageryModal() {
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+        document.documentElement.classList.add("overflow-hidden");
+        document.body.classList.add("overflow-hidden");
+      }
+
+      function closeImageryModal() {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+        document.documentElement.classList.remove("overflow-hidden");
+        document.body.classList.remove("overflow-hidden");
+        hideImageryMagnifier();
+      }
+
+      function showImageryModalError(message) {
+        if (typeof detachImageryMagnifier === "function") {
+          detachImageryMagnifier();
+          detachImageryMagnifier = null;
+        }
+        const safeMessage = message || "Unable to load manual imagery review. Refresh the page and try again.";
+        modalBody.innerHTML = (
+          '<div class="max-w-2xl p-5">' +
+            '<div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">' +
+              safeMessage +
+            "</div>" +
+            '<div class="mt-3 text-right">' +
+              '<button type="button" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700" data-imagery-close>Close</button>' +
+            "</div>" +
+          "</div>"
+        );
+        openImageryModal();
+      }
+
+      function attachManualEditor(rootEl) {
+        if (!rootEl) return;
+        if (typeof detachImageryMagnifier === "function") {
+          detachImageryMagnifier();
+          detachImageryMagnifier = null;
+        }
+        const viewToggle = rootEl.querySelector("[data-imagery-view-toggle]");
+        const viewButtons = Array.from(rootEl.querySelectorAll("[data-imagery-view-mode]"));
+        const imageryPhotos = Array.from(rootEl.querySelectorAll("[data-imagery-photo]"));
+        const zoomLabels = Array.from(rootEl.querySelectorAll("[data-imagery-zoom-label]"));
+        const form = rootEl.querySelector("[data-imagery-continue-form]");
+        const flagInput = rootEl.querySelector("[data-imagery-flag]");
+        const commentWrap = rootEl.querySelector("[data-imagery-comment-wrap]");
+        const commentInput = rootEl.querySelector("[data-imagery-comment]");
+        const saveStatus = rootEl.querySelector("[data-imagery-save-status]");
+        const draftUrl = rootEl.getAttribute("data-draft-url") || "";
+        const itemId = rootEl.getAttribute("data-item-id") || "";
+        detachImageryMagnifier = bindImageryMagnifier(imageryPhotos);
+
+        function applyImageryViewMode(mode) {
+          const nextMode = mode === "tight" || mode === "wide" ? mode : "fit";
+          imageryPhotos.forEach((img) => {
+            const src = img.getAttribute(`data-${nextMode}-src`) || img.getAttribute("data-fit-src");
+            if (src && img.getAttribute("src") !== src) {
+              img.setAttribute("src", src);
+            }
+          });
+          zoomLabels.forEach((label) => {
+            const text =
+              label.getAttribute(`data-${nextMode}-label`) || label.getAttribute("data-fit-label") || "";
+            label.textContent = text;
+          });
+          viewButtons.forEach((button) => {
+            const buttonMode = button.getAttribute("data-imagery-view-mode") || "fit";
+            const isActive = buttonMode === nextMode;
+            button.setAttribute("aria-pressed", isActive ? "true" : "false");
+            button.classList.toggle("bg-slate-900", isActive);
+            button.classList.toggle("text-white", isActive);
+            button.classList.toggle("hover:bg-slate-900", isActive);
+            button.classList.toggle("text-slate-600", !isActive);
+            button.classList.toggle("hover:bg-slate-100", !isActive);
+          });
+          if (viewToggle) {
+            viewToggle.setAttribute("data-current-mode", nextMode);
+          }
+        }
+
+        if (viewButtons.length && imageryPhotos.length) {
+          const initialMode = (viewToggle && viewToggle.getAttribute("data-current-mode")) || "fit";
+          applyImageryViewMode(initialMode);
+          viewButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              const nextMode = button.getAttribute("data-imagery-view-mode") || "fit";
+              applyImageryViewMode(nextMode);
+            });
+          });
+        }
+
+        if (!form || !flagInput || !commentWrap || !commentInput || !saveStatus || !draftUrl || !itemId) {
+          return;
+        }
+
+        const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        const csrfToken = csrfInput ? csrfInput.value : "";
+        let draftTimer = null;
+
+        function syncCommentVisibility() {
+          const hasText = String(commentInput.value || "").trim().length > 0;
+          if (flagInput.checked || hasText) {
+            commentWrap.classList.remove("hidden");
+          } else {
+            commentWrap.classList.add("hidden");
+          }
+        }
+
+        function autosaveDraft() {
+          saveStatus.textContent = "Saving...";
+          const body = new URLSearchParams();
+          body.set("item_id", String(itemId));
+          body.set("flagged", flagInput.checked ? "1" : "0");
+          body.set("manual_comment", commentInput.value || "");
+          fetch(draftUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+              "X-Requested-With": "XMLHttpRequest",
+              ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
+            },
+            body: body.toString(),
+          })
+            .then((response) => response.json())
+            .then((payload) => {
+              if (payload && payload.ok) {
+                const ts = payload.saved_at_label || "";
+                saveStatus.textContent = ts ? `Saved ${ts}` : "Saved";
+              } else {
+                saveStatus.textContent = "Save failed";
+              }
+            })
+            .catch(() => {
+              saveStatus.textContent = "Save failed";
+            });
+        }
+
+        function scheduleAutosave() {
+          if (draftTimer) {
+            window.clearTimeout(draftTimer);
+          }
+          draftTimer = window.setTimeout(autosaveDraft, 350);
+        }
+
+        syncCommentVisibility();
+        flagInput.addEventListener("change", () => {
+          syncCommentVisibility();
+          scheduleAutosave();
+        });
+        commentInput.addEventListener("input", () => {
+          syncCommentVisibility();
+          scheduleAutosave();
+        });
+      }
+
+      document.body.addEventListener("htmx:beforeSwap", (event) => {
+        const detail = event.detail;
+        const target = detail && detail.target;
+        if (!target || target.id !== "coappraiser-imagery-modal-body") return;
+        if (typeof detachImageryMagnifier === "function") {
+          detachImageryMagnifier();
+          detachImageryMagnifier = null;
+        }
+        hideImageryMagnifier();
+        const xhr = detail && detail.xhr;
+        const responseText = xhr && typeof xhr.responseText === "string" ? xhr.responseText : "";
+        if (responseText.indexOf("data-imagery-manual-root") !== -1) {
+          return;
+        }
+        detail.shouldSwap = false;
+        showImageryModalError("Manual imagery modal returned unexpected content. Refresh and try again.");
+      });
+
+      document.body.addEventListener("htmx:afterSwap", (event) => {
+        const target = event.detail && event.detail.target;
+        if (!target || target.id !== "coappraiser-imagery-modal-body") return;
+        const root = target.querySelector("[data-imagery-manual-root]");
+        if (!root) {
+          showImageryModalError("Manual imagery modal could not be rendered. Refresh and try again.");
+          return;
+        }
+        openImageryModal();
+        attachManualEditor(root);
+      });
+
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closeImageryModal();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const closeBtn = event.target.closest("[data-imagery-close]");
+        if (closeBtn) {
+          closeImageryModal();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeImageryModal();
+        }
+      });
+    })();
+  </script>
+{% endblock %}

@@ -4,7 +4,10 @@ import json
 import logging
 import functools
 import operator
+import os
 import re
+import subprocess
+import sys
 import time
 from datetime import date, datetime
 from decimal import Decimal
@@ -13,12 +16,14 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import requests
 from django.conf import settings
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Q
 from django.http import Http404
+from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import APIException, ValidationError
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -37,12 +42,28 @@ from openskagit.tax import (
 from openskagit.models import (
     AgencyFinancialSnapshot,
     Assessor,
+    ExperimentRun,
     MasterParcel,
     ParcelGeometry,
     ParcelHistory,
+    RegressionPublishedModel,
     TaxingDistrictLevy,
+    YoutubeMeetingAnalysisJob,
 )
 from openskagit.neighborhood import get_neighborhood_snapshot
+from openskagit.services.regression_v1 import (
+    DEFAULT_INTERACTION_TERMS,
+    DEFAULT_PREDICTORS,
+    INTERACTION_DEFINITIONS,
+    default_regression_settings,
+    load_run_payload,
+    parse_settings,
+    predict_from_published_payload,
+)
+from openskagit.services.sedro_woolley_youtube_ingest import _extract_video_id
+from openskagit.services.youtube_meeting_analysis import (
+    build_analysis_fingerprint,
+)
 from gastronet.flavor_signals import fetch_flavor_signal_ai_messages
 
 
@@ -149,6 +170,80 @@ CIVIC_BALANCE_QUARTILE_LABELS = {
     2: "Below-average participation",
     1: "Lowest participation density",
 }
+
+SKAGIT_COMMISSIONER_LAYER_QUERY_URL = (
+    "https://gis.skagitcountywa.gov/arcgis/rest/services/"
+    "Districts/CommissionerDistrictWebMap/MapServer/5/query"
+)
+SKAGIT_COMMISSIONER_LAYER_DISTRICT_FIELD = "COMMDIST"
+
+
+@lru_cache(maxsize=8)
+def _fetch_skagit_commissioner_district_geometry(district_code: str) -> Dict[str, Any]:
+    """
+    Pull commissioner district geometry from Skagit County's ArcGIS service.
+    """
+
+    response = requests.get(
+        SKAGIT_COMMISSIONER_LAYER_QUERY_URL,
+        params={
+            "where": f"{SKAGIT_COMMISSIONER_LAYER_DISTRICT_FIELD}='{district_code}'",
+            "outFields": SKAGIT_COMMISSIONER_LAYER_DISTRICT_FIELD,
+            "outSR": 4326,
+            "f": "geojson",
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    features = payload.get("features") or []
+    if not features:
+        raise APIException(f"No commissioner district geometry found for district '{district_code}'.")
+    geometry = features[0].get("geometry")
+    if not isinstance(geometry, dict):
+        raise APIException(f"Commissioner district geometry for district '{district_code}' is invalid.")
+    return geometry
+
+
+def _load_skagit_county_boundary_geojson() -> Dict[str, Any]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT ST_AsGeoJSON(ST_Transform(geom_2926, 4326), 6)
+            FROM public.skagit_county_boundary
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+    if not row or not row[0]:
+        raise APIException("Skagit county boundary geometry is unavailable.")
+    try:
+        geometry = json.loads(row[0])
+    except json.JSONDecodeError as exc:
+        raise APIException("Skagit county boundary geometry could not be parsed.") from exc
+    if not isinstance(geometry, dict):
+        raise APIException("Skagit county boundary geometry is malformed.")
+    return geometry
+
+
+def _rows_to_geojson_features(rows: Sequence[Dict[str, Any]], *, geom_key: str = "geom_geojson") -> List[Dict[str, Any]]:
+    features: List[Dict[str, Any]] = []
+    for row in rows:
+        payload = dict(row)
+        geometry = payload.pop(geom_key, None)
+        try:
+            geometry_payload = json.loads(geometry) if geometry else None
+        except json.JSONDecodeError:
+            geometry_payload = None
+        properties = _normalize(payload)
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": geometry_payload,
+                "properties": properties,
+            }
+        )
+    return features
 
 
 class NeighborhoodStatsView(APIView):
@@ -2730,6 +2825,1017 @@ class CivicBalanceMapView(APIView):
                 "available_years": available_years,
                 "features": features,
                 "quartile_labels": CIVIC_BALANCE_QUARTILE_LABELS,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class VoteVectorDistrict3MapView(APIView):
+    permission_classes = [AllowAny]
+
+    DISTRICT_CODE = "3"
+    DISTRICT_LABEL = "Skagit Commissioner District 3"
+    NEW_CONSTRUCTION_START_YEAR = 2023
+    NEW_CONSTRUCTION_END_YEAR = 2025
+
+    def get(self, request) -> Response:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT DISTINCT election_year FROM public.fact_neighborhood_participation ORDER BY election_year DESC"
+            )
+            available_years = [int(row[0]) for row in cursor.fetchall() if row[0] is not None]
+
+        if not available_years:
+            return Response(
+                {
+                    "district": {
+                        "code": self.DISTRICT_CODE,
+                        "label": self.DISTRICT_LABEL,
+                    },
+                    "year": None,
+                    "available_years": [],
+                    "layers": {
+                        "boundary": {"type": "FeatureCollection", "features": []},
+                        "npi": {"type": "FeatureCollection", "features": []},
+                        "precincts": {"type": "FeatureCollection", "features": []},
+                        "census": {"type": "FeatureCollection", "features": []},
+                        "trends": {"type": "FeatureCollection", "features": []},
+                        "construction": {"type": "FeatureCollection", "features": []},
+                    },
+                    "summary": {
+                        "neighborhoods": 0,
+                        "precincts": 0,
+                        "census_block_groups": 0,
+                        "trend_neighborhoods": 0,
+                        "trend_year": None,
+                        "new_construction_parcels": 0,
+                        "new_construction_start_year": self.NEW_CONSTRUCTION_START_YEAR,
+                        "new_construction_end_year": self.NEW_CONSTRUCTION_END_YEAR,
+                        "party_signal_precincts": 0,
+                        "party_data_available": False,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # District 3 page intentionally pins to the most recent election year.
+        year = available_years[0]
+
+        boundary_source = "skagit_commissioner_district_arcgis"
+        boundary_warning = None
+        try:
+            district_geometry = _fetch_skagit_commissioner_district_geometry(self.DISTRICT_CODE)
+        except Exception:
+            logger.warning(
+                "Falling back to county boundary for VoteVector District 3 (commissioner layer unavailable).",
+                exc_info=True,
+            )
+            district_geometry = _load_skagit_county_boundary_geojson()
+            boundary_source = "skagit_county_boundary_fallback"
+            boundary_warning = (
+                "Commissioner District 3 boundary service is unavailable. "
+                "Showing county boundary fallback."
+            )
+
+        district_geojson_text = json.dumps(district_geometry)
+        npi_features = self._load_npi_layer(district_geojson_text=district_geojson_text, year=year)
+        precinct_features = self._load_precinct_layer(district_geojson_text=district_geojson_text, year=year)
+        census_year, census_features = self._load_census_layer(district_geojson_text=district_geojson_text)
+        trend_year, trend_features = self._load_trend_layer(district_geojson_text=district_geojson_text, year=year)
+        construction_features = self._load_new_construction_layer(district_geojson_text=district_geojson_text)
+        party_signal_precincts = sum(
+            1
+            for feature in precinct_features
+            if (
+                (feature.get("properties") or {}).get("major_party_votes") is not None
+                and (feature.get("properties") or {}).get("major_party_votes", 0) > 0
+            )
+        )
+
+        boundary_feature = {
+            "type": "Feature",
+            "geometry": district_geometry,
+            "properties": {
+                "district_code": self.DISTRICT_CODE,
+                "district_label": self.DISTRICT_LABEL,
+                "boundary_source": boundary_source,
+            },
+        }
+
+        return Response(
+            {
+                "district": {
+                    "code": self.DISTRICT_CODE,
+                    "label": self.DISTRICT_LABEL,
+                    "boundary_source": boundary_source,
+                },
+                "year": year,
+                "available_years": available_years,
+                "census_year": census_year,
+                "boundary_warning": boundary_warning,
+                "layers": {
+                    "boundary": {"type": "FeatureCollection", "features": [boundary_feature]},
+                    "npi": {"type": "FeatureCollection", "features": npi_features},
+                    "precincts": {"type": "FeatureCollection", "features": precinct_features},
+                    "census": {"type": "FeatureCollection", "features": census_features},
+                    "trends": {"type": "FeatureCollection", "features": trend_features},
+                    "construction": {"type": "FeatureCollection", "features": construction_features},
+                },
+                "summary": {
+                    "neighborhoods": len(npi_features),
+                    "precincts": len(precinct_features),
+                    "census_block_groups": len(census_features),
+                    "trend_neighborhoods": len(trend_features),
+                    "trend_year": trend_year,
+                    "new_construction_parcels": len(construction_features),
+                    "new_construction_start_year": self.NEW_CONSTRUCTION_START_YEAR,
+                    "new_construction_end_year": self.NEW_CONSTRUCTION_END_YEAR,
+                    "party_signal_precincts": party_signal_precincts,
+                    "party_data_available": party_signal_precincts > 0,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def _load_npi_layer(self, *, district_geojson_text: str, year: int) -> List[Dict[str, Any]]:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH district_boundary AS (
+                    SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), 2926) AS geom_2926
+                ),
+                clipped AS (
+                    SELECT
+                        f.neighborhood_code,
+                        COALESCE(ng.name, f.neighborhood_code) AS neighborhood_name,
+                        f.election_year,
+                        f.ballots_cast,
+                        f.residential_parcels,
+                        f.npi,
+                        f.primary_precinct_code,
+                        f.precinct_ballots_cast,
+                        f.precinct_residential_parcels,
+                        f.precinct_ppi,
+                        f.precinct_po_box_pct,
+                        f.precinct_po_box_ballots,
+                        f.assignment_coverage_precinct,
+                        f.ambiguous_ballots,
+                        c.quartile,
+                        COALESCE(c.quartile_label, 'Unclassified') AS quartile_label,
+                        ST_CollectionExtract(
+                            ST_Intersection(ST_MakeValid(f.geom_2926), db.geom_2926),
+                            3
+                        ) AS geom_clip
+                    FROM public.fact_neighborhood_participation f
+                    CROSS JOIN district_boundary db
+                    LEFT JOIN public.neighborhood_participation_classification c
+                      ON c.neighborhood_code = f.neighborhood_code
+                     AND c.election_year = f.election_year
+                    LEFT JOIN public.openskagit_neighborhoodgeom ng
+                      ON ng.code = f.neighborhood_code
+                    WHERE f.election_year = %s
+                      AND ST_Intersects(f.geom_2926, db.geom_2926)
+                )
+                SELECT
+                    neighborhood_code,
+                    neighborhood_name,
+                    election_year,
+                    ballots_cast,
+                    residential_parcels,
+                    npi,
+                    primary_precinct_code,
+                    precinct_ballots_cast,
+                    precinct_residential_parcels,
+                    precinct_ppi,
+                    precinct_po_box_pct,
+                    precinct_po_box_ballots,
+                    assignment_coverage_precinct,
+                    ambiguous_ballots,
+                    quartile,
+                    quartile_label,
+                    ST_AsGeoJSON(ST_Transform(geom_clip, 4326), 6) AS geom_geojson
+                FROM clipped
+                WHERE geom_clip IS NOT NULL
+                  AND NOT ST_IsEmpty(geom_clip)
+                ORDER BY quartile DESC NULLS LAST, npi DESC NULLS LAST, neighborhood_code
+                """,
+                [district_geojson_text, year],
+            )
+            rows = _dictfetchall(cursor)
+        return _rows_to_geojson_features(rows)
+
+    def _load_precinct_layer(self, *, district_geojson_text: str, year: int) -> List[Dict[str, Any]]:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH district_boundary AS (
+                    SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), 2926) AS geom_2926
+                ),
+                party_votes AS (
+                    SELECT
+                        rpl.prec_code,
+                        COUNT(*) FILTER (
+                            WHERE UPPER(TRIM(COALESCE(vtr.party, '')))
+                                IN ('DEMOCRAT', 'DEMOCRATIC', 'DEM', 'D')
+                        ) AS dem_votes,
+                        COUNT(*) FILTER (
+                            WHERE UPPER(TRIM(COALESCE(vtr.party, '')))
+                                IN ('REPUBLICAN', 'REP', 'R', 'GOP')
+                        ) AS rep_votes,
+                        COUNT(*) FILTER (
+                            WHERE TRIM(COALESCE(vtr.party, '')) <> ''
+                              AND UPPER(TRIM(COALESCE(vtr.party, '')))
+                                  NOT IN (
+                                      'DEMOCRAT', 'DEMOCRATIC', 'DEM', 'D',
+                                      'REPUBLICAN', 'REP', 'R', 'GOP'
+                                  )
+                        ) AS other_votes
+                    FROM public.openskagit_voterturnoutraw vtr
+                    JOIN public.openskagit_voterelection ve
+                      ON ve.id = vtr.election_id
+                    JOIN public.reference_precinct_lookup rpl
+                      ON rpl.norm_prec_name = vtr.normalized_precinct
+                     AND rpl.norm_county = 'SKAGIT'
+                    WHERE EXTRACT(YEAR FROM ve.election_date)::int = %s
+                    GROUP BY rpl.prec_code
+                ),
+                clipped AS (
+                    SELECT
+                        rvp.prec_code,
+                        COALESCE(NULLIF(rvp.prec_name, ''), rvp.prec_code::text) AS precinct_name,
+                        %s::int AS election_year,
+                        COALESCE(fpt.ballots_cast, 0) AS ballots_cast,
+                        ppi.residential_parcels,
+                        ppi.ppi AS turnout_rate,
+                        ppi.po_box_pct,
+                        ppi.po_box_ballots,
+                        COALESCE(pv.dem_votes, 0) AS dem_votes,
+                        COALESCE(pv.rep_votes, 0) AS rep_votes,
+                        COALESCE(pv.other_votes, 0) AS other_votes,
+                        CASE
+                            WHEN (COALESCE(pv.dem_votes, 0) + COALESCE(pv.rep_votes, 0)) > 0 THEN
+                                (
+                                    COALESCE(pv.dem_votes, 0)::float
+                                    - COALESCE(pv.rep_votes, 0)::float
+                                )
+                                / NULLIF(
+                                    (
+                                        COALESCE(pv.dem_votes, 0)
+                                        + COALESCE(pv.rep_votes, 0)
+                                    )::float,
+                                    0
+                                )
+                            ELSE NULL
+                        END AS dem_margin,
+                        CASE
+                            WHEN (COALESCE(pv.dem_votes, 0) + COALESCE(pv.rep_votes, 0)) = 0
+                                THEN 'No major-party signal'
+                            WHEN COALESCE(pv.dem_votes, 0) > COALESCE(pv.rep_votes, 0)
+                                THEN 'Leans Democratic'
+                            WHEN COALESCE(pv.rep_votes, 0) > COALESCE(pv.dem_votes, 0)
+                                THEN 'Leans Republican'
+                            ELSE 'Even split'
+                        END AS party_lean,
+                        ST_CollectionExtract(
+                            ST_Intersection(ST_MakeValid(rvp.geom_2926), db.geom_2926),
+                            3
+                        ) AS geom_clip
+                    FROM public.reference_votingprecinct rvp
+                    CROSS JOIN district_boundary db
+                    LEFT JOIN public.fact_precinct_turnout fpt
+                      ON fpt.prec_code = rvp.prec_code
+                     AND fpt.election_year = %s
+                    LEFT JOIN public.precinct_participation_index ppi
+                      ON ppi.prec_code = rvp.prec_code
+                     AND ppi.election_year = %s
+                    LEFT JOIN party_votes pv
+                      ON pv.prec_code = rvp.prec_code
+                    WHERE rvp.county_name = 'Skagit'
+                      AND ST_Intersects(rvp.geom_2926, db.geom_2926)
+                )
+                SELECT
+                    prec_code,
+                    precinct_name,
+                    election_year,
+                    ballots_cast,
+                    residential_parcels,
+                    turnout_rate,
+                    po_box_pct,
+                    po_box_ballots,
+                    dem_votes,
+                    rep_votes,
+                    other_votes,
+                    (COALESCE(dem_votes, 0) + COALESCE(rep_votes, 0)) AS major_party_votes,
+                    dem_margin,
+                    party_lean,
+                    ST_AsGeoJSON(ST_Transform(geom_clip, 4326), 6) AS geom_geojson
+                FROM clipped
+                WHERE geom_clip IS NOT NULL
+                  AND NOT ST_IsEmpty(geom_clip)
+                ORDER BY ballots_cast DESC NULLS LAST, prec_code
+                """,
+                [district_geojson_text, year, year, year, year],
+            )
+            rows = _dictfetchall(cursor)
+        return _rows_to_geojson_features(rows)
+
+    def _load_census_layer(self, *, district_geojson_text: str) -> Tuple[Optional[int], List[Dict[str, Any]]]:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT MAX(year) FROM public.reference_census_acs")
+            census_year_row = cursor.fetchone()
+            census_year = census_year_row[0] if census_year_row else None
+
+        if census_year is None:
+            return None, []
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH district_boundary AS (
+                    SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), 2926) AS geom_2926
+                ),
+                clipped AS (
+                    SELECT
+                        cbg.geoid,
+                        cbg.namelsad,
+                        acs.year AS census_year,
+                        acs.population,
+                        acs.median_income,
+                        acs.median_home_value,
+                        acs.median_rent,
+                        acs.edu_bachelors,
+                        acs.edu_masters,
+                        acs.edu_professional,
+                        acs.edu_doctorate,
+                        CASE
+                            WHEN acs.population > 0 THEN
+                                (
+                                    COALESCE(acs.edu_bachelors, 0)
+                                    + COALESCE(acs.edu_masters, 0)
+                                    + COALESCE(acs.edu_professional, 0)
+                                    + COALESCE(acs.edu_doctorate, 0)
+                                )::float / NULLIF(acs.population::float, 0)
+                            ELSE NULL
+                        END AS higher_ed_share,
+                        ST_CollectionExtract(
+                            ST_Intersection(ST_MakeValid(cbg.geometry), db.geom_2926),
+                            3
+                        ) AS geom_clip
+                    FROM public.reference_census_block_groups cbg
+                    CROSS JOIN district_boundary db
+                    JOIN public.reference_census_acs acs
+                      ON acs.geoid = cbg.geoid
+                     AND acs.year = %s
+                    WHERE cbg.countyfp = '057'
+                      AND ST_Intersects(cbg.geometry, db.geom_2926)
+                )
+                SELECT
+                    geoid,
+                    namelsad,
+                    census_year,
+                    population,
+                    median_income,
+                    median_home_value,
+                    median_rent,
+                    edu_bachelors,
+                    edu_masters,
+                    edu_professional,
+                    edu_doctorate,
+                    higher_ed_share,
+                    ST_AsGeoJSON(ST_Transform(geom_clip, 4326), 6) AS geom_geojson
+                FROM clipped
+                WHERE geom_clip IS NOT NULL
+                  AND NOT ST_IsEmpty(geom_clip)
+                ORDER BY population DESC NULLS LAST, geoid
+                """,
+                [district_geojson_text, census_year],
+            )
+            rows = _dictfetchall(cursor)
+        return int(census_year), _rows_to_geojson_features(rows)
+
+    def _load_new_construction_layer(self, *, district_geojson_text: str) -> List[Dict[str, Any]]:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH district_boundary AS (
+                    SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), 2926) AS geom_2926
+                ),
+                clipped AS (
+                    SELECT
+                        a.parcel_number,
+                        a.address,
+                        a.property_type,
+                        a.land_use_description,
+                        a.neighborhood_code,
+                        a.year_built::int AS year_built,
+                        a.eff_year_built::int AS eff_year_built,
+                        a.total_market_value,
+                        a.assessed_value,
+                        a.taxable_value,
+                        a.building_value,
+                        a.acres,
+                        ST_CollectionExtract(
+                            ST_Intersection(ST_MakeValid(a.geom_2926), db.geom_2926),
+                            3
+                        ) AS geom_clip
+                    FROM public.assessor a
+                    CROSS JOIN district_boundary db
+                    WHERE a.geom_2926 IS NOT NULL
+                      AND a.year_built BETWEEN %s AND %s
+                      AND ST_Intersects(a.geom_2926, db.geom_2926)
+                ),
+                points AS (
+                    SELECT
+                        parcel_number,
+                        address,
+                        property_type,
+                        land_use_description,
+                        neighborhood_code,
+                        year_built,
+                        eff_year_built,
+                        total_market_value,
+                        assessed_value,
+                        taxable_value,
+                        building_value,
+                        acres,
+                        ST_Transform(ST_PointOnSurface(geom_clip), 4326) AS centroid_4326
+                    FROM clipped
+                    WHERE geom_clip IS NOT NULL
+                      AND NOT ST_IsEmpty(geom_clip)
+                )
+                SELECT
+                    parcel_number,
+                    address,
+                    property_type,
+                    land_use_description,
+                    neighborhood_code,
+                    year_built,
+                    eff_year_built,
+                    total_market_value,
+                    assessed_value,
+                    taxable_value,
+                    building_value,
+                    acres,
+                    ST_X(centroid_4326) AS centroid_lon,
+                    ST_Y(centroid_4326) AS centroid_lat,
+                    ST_AsGeoJSON(centroid_4326, 6) AS geom_geojson
+                FROM points
+                ORDER BY year_built DESC, total_market_value DESC NULLS LAST, parcel_number
+                """,
+                [
+                    district_geojson_text,
+                    self.NEW_CONSTRUCTION_START_YEAR,
+                    self.NEW_CONSTRUCTION_END_YEAR,
+                ],
+            )
+            rows = _dictfetchall(cursor)
+        return _rows_to_geojson_features(rows)
+
+    def _load_trend_layer(
+        self,
+        *,
+        district_geojson_text: str,
+        year: int,
+    ) -> Tuple[Optional[int], List[Dict[str, Any]]]:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COALESCE(
+                    MAX(value_year) FILTER (WHERE value_year <= %s),
+                    MAX(value_year)
+                )
+                FROM public.openskagit_neighborhoodtrend
+                """,
+                [year],
+            )
+            trend_year_row = cursor.fetchone()
+            trend_year = trend_year_row[0] if trend_year_row else None
+
+        if trend_year is None:
+            return None, []
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH district_boundary AS (
+                    SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), 2926) AS geom_2926
+                ),
+                clipped AS (
+                    SELECT
+                        f.neighborhood_code,
+                        COALESCE(ng.name, f.neighborhood_code) AS neighborhood_name,
+                        nt.value_year,
+                        nt.median_market_total,
+                        nt.median_tax_amount,
+                        nt.yoy_change_total,
+                        nt.yoy_change_tax,
+                        nt.stability_score,
+                        nt.boom_bust_flag,
+                        ST_CollectionExtract(
+                            ST_Intersection(ST_MakeValid(f.geom_2926), db.geom_2926),
+                            3
+                        ) AS geom_clip
+                    FROM public.fact_neighborhood_participation f
+                    CROSS JOIN district_boundary db
+                    LEFT JOIN public.openskagit_neighborhoodtrend nt
+                      ON nt.hood_id = f.neighborhood_code
+                     AND nt.value_year = %s
+                    LEFT JOIN public.openskagit_neighborhoodgeom ng
+                      ON ng.code = f.neighborhood_code
+                    WHERE f.election_year = %s
+                      AND ST_Intersects(f.geom_2926, db.geom_2926)
+                )
+                SELECT
+                    neighborhood_code,
+                    neighborhood_name,
+                    value_year,
+                    median_market_total,
+                    median_tax_amount,
+                    yoy_change_total,
+                    yoy_change_tax,
+                    stability_score,
+                    boom_bust_flag,
+                    ST_AsGeoJSON(ST_Transform(geom_clip, 4326), 6) AS geom_geojson
+                FROM clipped
+                WHERE geom_clip IS NOT NULL
+                  AND NOT ST_IsEmpty(geom_clip)
+                ORDER BY yoy_change_total DESC NULLS LAST, neighborhood_code
+                """,
+                [district_geojson_text, trend_year, year],
+            )
+            rows = _dictfetchall(cursor)
+        return int(trend_year), _rows_to_geojson_features(rows)
+
+
+def _load_regression_v1_diagnostics(experiment: ExperimentRun) -> Optional[Dict[str, Any]]:
+    if experiment.diagnostics_path and os.path.exists(experiment.diagnostics_path):
+        try:
+            with open(experiment.diagnostics_path, "r") as handle:
+                payload = json.load(handle)
+                if isinstance(payload, dict):
+                    return payload
+        except Exception:
+            return None
+    if experiment.run_id:
+        return load_run_payload(experiment.run_id)
+    return None
+
+
+def _serialize_regression_v1_run(experiment: ExperimentRun, diagnostics: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    diagnostics = diagnostics or {}
+    cfg = experiment.full_config.get("settings", {}) if isinstance(experiment.full_config, dict) else {}
+    if not cfg and isinstance(diagnostics.get("settings"), dict):
+        cfg = diagnostics["settings"]
+
+    return {
+        "run_id": experiment.run_id or str(experiment.id),
+        "status": experiment.status,
+        "settings": cfg,
+        "segment_summary": diagnostics.get("segment_summary", []),
+        "global_metrics": diagnostics.get("global_metrics", {}),
+        "diagnostics_path": experiment.diagnostics_path or None,
+        "started_at": experiment.started_at.isoformat() if experiment.started_at else None,
+        "completed_at": experiment.completed_at.isoformat() if experiment.completed_at else None,
+        "error_message": experiment.error_message or "",
+    }
+
+
+class RegressionV1ConfigView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        defaults = default_regression_settings()
+        return Response(
+            {
+                "settings": defaults.to_dict(),
+                "predictor_catalog": list(DEFAULT_PREDICTORS),
+                "interaction_catalog": sorted(INTERACTION_DEFINITIONS.keys()),
+                "default_interactions": list(DEFAULT_INTERACTION_TERMS),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class RegressionV1RunsView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        payload = request.data if isinstance(request.data, dict) else {}
+        settings_payload = payload.get("settings", {})
+        if not isinstance(settings_payload, dict):
+            raise ValidationError({"settings": "Must be an object."})
+
+        try:
+            cfg = parse_settings(settings_payload)
+        except ValueError as exc:
+            raise ValidationError({"settings": str(exc)}) from exc
+
+        name = str(payload.get("name") or "").strip()
+        if not name:
+            stamp = timezone.localtime().strftime("%Y-%m-%d %H:%M")
+            name = f"Regression v1 SFR {stamp}"
+
+        notes = str(payload.get("notes") or "").strip()
+        tags_payload = payload.get("tags") or []
+        if isinstance(tags_payload, str):
+            tags = [token.strip() for token in tags_payload.split(",") if token.strip()]
+        elif isinstance(tags_payload, list):
+            tags = [str(token).strip() for token in tags_payload if str(token).strip()]
+        else:
+            tags = []
+
+        full_config = {
+            "pipeline": "regression_v1",
+            "settings": cfg.to_dict(),
+            "requested_by": request.user.username if request.user.is_authenticated else "",
+        }
+
+        experiment = ExperimentRun.objects.create(
+            name=name,
+            mode="sfr",
+            predictor_profile="regression_v1",
+            interaction_bundle="yakima_hybrid",
+            market_group_col="segment_key",
+            notes=notes,
+            tags=tags,
+            full_config=full_config,
+        )
+
+        command = [
+            sys.executable,
+            f"{settings.BASE_DIR}/manage.py",
+            "regression_v1",
+            "--experiment-id",
+            str(experiment.id),
+            "--settings-json",
+            json.dumps(cfg.to_dict(), separators=(",", ":")),
+        ]
+        if bool(payload.get("dry_run")):
+            command.append("--dry-run")
+
+        try:
+            subprocess.Popen(
+                command,
+                cwd=str(settings.BASE_DIR),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            experiment.status = ExperimentRun.STATUS_FAILED
+            experiment.error_message = str(exc)
+            experiment.save(update_fields=["status", "error_message"])
+            raise APIException(f"Failed to launch regression_v1 command: {exc}") from exc
+
+        run_payload = _serialize_regression_v1_run(experiment, diagnostics=None)
+        return Response(run_payload, status=status.HTTP_202_ACCEPTED)
+
+
+class RegressionV1RunDetailView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, run_id: str):
+        experiment = ExperimentRun.objects.filter(id=run_id, predictor_profile="regression_v1").first()
+        if experiment is None:
+            raise Http404("regression_v1 run not found")
+
+        diagnostics = _load_regression_v1_diagnostics(experiment)
+        payload = _serialize_regression_v1_run(experiment, diagnostics)
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class RegressionV1PromoteView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, run_id: str):
+        experiment = ExperimentRun.objects.filter(id=run_id, predictor_profile="regression_v1").first()
+        if experiment is None:
+            raise Http404("regression_v1 run not found")
+
+        if experiment.status != ExperimentRun.STATUS_COMPLETED:
+            raise ValidationError({"run_id": "Run must be completed before promotion."})
+
+        diagnostics = _load_regression_v1_diagnostics(experiment)
+        if not diagnostics:
+            raise ValidationError({"run_id": "Diagnostics payload not found for this run."})
+
+        settings_json = diagnostics.get("settings", {})
+        coefficients_json = diagnostics.get("coefficients", [])
+        segments_json = diagnostics.get("segment_summary", [])
+        global_metrics_json = diagnostics.get("global_metrics", {})
+        segment_map_json = diagnostics.get("segment_map", [])
+
+        if not isinstance(settings_json, dict):
+            raise ValidationError({"run_id": "Diagnostics settings payload is invalid."})
+
+        mode = str(settings_json.get("mode") or "sfr").lower()
+        warnings: List[str] = []
+        if not segments_json:
+            warnings.append("Promoted model has zero segments.")
+
+        with transaction.atomic():
+            RegressionPublishedModel.objects.filter(mode=mode, is_active=True).update(is_active=False)
+            published = RegressionPublishedModel.objects.create(
+                mode=mode,
+                run_id=experiment.run_id or str(experiment.id),
+                settings_json=settings_json,
+                coefficients_json=coefficients_json if isinstance(coefficients_json, list) else [],
+                segments_json=segments_json if isinstance(segments_json, list) else [],
+                global_metrics_json=global_metrics_json if isinstance(global_metrics_json, dict) else {},
+                segment_map_json=segment_map_json if isinstance(segment_map_json, list) else [],
+                is_active=True,
+                promoted_at=timezone.now(),
+                promoted_by=request.user if request.user.is_authenticated else None,
+                diagnostics_path=experiment.diagnostics_path or "",
+                notes=str(request.data.get("notes") or "").strip(),
+            )
+
+        return Response(
+            {
+                "run_id": experiment.run_id or str(experiment.id),
+                "published_model_id": published.id,
+                "promoted_at": published.promoted_at.isoformat() if published.promoted_at else None,
+                "promoted_by": request.user.username if request.user.is_authenticated else "",
+                "warnings": warnings,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class RegressionV1PredictView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        payload = request.data if isinstance(request.data, dict) else {}
+        parcel_number = str(payload.get("parcel_number") or "").strip()
+        if not parcel_number:
+            raise ValidationError({"parcel_number": "Required."})
+
+        run_id = str(payload.get("run_id") or "").strip()
+        if run_id:
+            published = RegressionPublishedModel.objects.filter(run_id=run_id).order_by("-promoted_at", "-created_at").first()
+        else:
+            published = RegressionPublishedModel.objects.filter(mode="sfr", is_active=True).order_by("-promoted_at", "-created_at").first()
+
+        if published is None:
+            raise Http404("No published regression_v1 model found.")
+
+        model_payload = {
+            "settings": published.settings_json,
+            "coefficients": published.coefficients_json,
+            "segment_summary": published.segments_json,
+            "segment_map": published.segment_map_json,
+        }
+
+        anchor_raw = str(payload.get("anchor_date") or "").strip()
+        anchor_override = None
+        if anchor_raw:
+            try:
+                anchor_override = date.fromisoformat(anchor_raw)
+            except ValueError as exc:
+                raise ValidationError({"anchor_date": "Must be YYYY-MM-DD."}) from exc
+
+        try:
+            prediction = predict_from_published_payload(
+                payload=model_payload,
+                parcel_number=parcel_number,
+                anchor_date_override=anchor_override,
+            )
+        except ValueError as exc:
+            raise ValidationError({"error": str(exc)}) from exc
+
+        prediction.update(
+            {
+                "run_id": published.run_id,
+                "published_model_id": published.id,
+            }
+        )
+        return Response(prediction, status=status.HTTP_200_OK)
+
+
+def _api_error_payload(error: str, details: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"error": error}
+    if details:
+        payload["details"] = details
+    return payload
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off", ""}:
+        return False
+    return bool(value)
+
+
+def _serialize_youtube_meeting_job(job: YoutubeMeetingAnalysisJob) -> dict[str, Any]:
+    result_payload: dict[str, Any] = {}
+    if job.status == YoutubeMeetingAnalysisJob.STATUS_SUCCEEDED and isinstance(job.result_json, dict):
+        result_payload = job.result_json
+
+    return {
+        "id": str(job.id),
+        "status": job.status,
+        "status_detail": job.status_detail,
+        "progress_stage": job.progress_stage,
+        "progress_percent": int(job.progress_percent or 0),
+        "youtube_url": job.youtube_url,
+        "youtube_video_id": job.youtube_video_id,
+        "requested_at": job.requested_at.isoformat() if job.requested_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+        "error_message": job.error_message or "",
+        "result_schema_version": job.result_schema_version,
+        "result": result_payload,
+    }
+
+
+def _launch_youtube_meeting_job(job: YoutubeMeetingAnalysisJob) -> None:
+    command = [
+        sys.executable,
+        f"{settings.BASE_DIR}/manage.py",
+        "process_youtube_meeting_job",
+        "--job-id",
+        str(job.id),
+    ]
+    subprocess.Popen(
+        command,
+        cwd=str(settings.BASE_DIR),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+class YoutubeMeetingJobsView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        payload = request.data if isinstance(request.data, dict) else {}
+
+        youtube_url = str(payload.get("youtube_url") or "").strip()
+        if not youtube_url:
+            return Response(
+                _api_error_payload("invalid_request", {"youtube_url": "Required."}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        youtube_video_id = _extract_video_id(youtube_url)
+        if not youtube_video_id:
+            return Response(
+                _api_error_payload("invalid_request", {"youtube_url": "Must be a valid YouTube URL or ID."}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        canonical_url = f"https://www.youtube.com/watch?v={youtube_video_id}"
+        force = _coerce_bool(payload.get("force"))
+        meeting_context_raw = payload.get("meeting_context")
+        meeting_context = meeting_context_raw if isinstance(meeting_context_raw, dict) else {}
+        normalized_meeting_context = {
+            "body_name": str(meeting_context.get("body_name") or "").strip() or "City Council",
+            "roll_call_hint": (
+                str(meeting_context.get("roll_call_hint") or "").strip()
+                or "Roll call usually happens at the beginning of the meeting, often in the first 2-5 minutes."
+            ),
+        }
+
+        model_name = str(getattr(settings, "YOUTUBE_MEETING_GEMINI_MODEL", "gemini-2.0-flash") or "").strip()
+        if not model_name:
+            model_name = "gemini-2.0-flash"
+
+        fingerprint = build_analysis_fingerprint(
+            youtube_video_id=youtube_video_id,
+            model_name=model_name,
+        )
+
+        in_flight = (
+            YoutubeMeetingAnalysisJob.objects.filter(
+                analysis_fingerprint=fingerprint,
+                status__in=[
+                    YoutubeMeetingAnalysisJob.STATUS_PENDING,
+                    YoutubeMeetingAnalysisJob.STATUS_RUNNING,
+                ],
+            )
+            .order_by("-requested_at")
+            .first()
+        )
+        if in_flight is not None:
+            status_url = reverse("youtube-meeting-job-detail", kwargs={"job_id": in_flight.id})
+            return Response(
+                {
+                    "ok": True,
+                    "job_id": str(in_flight.id),
+                    "status": in_flight.status,
+                    "reused": True,
+                    "status_url": status_url,
+                    "result": _serialize_youtube_meeting_job(in_flight).get("result", {}),
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        if not force:
+            latest_success = (
+                YoutubeMeetingAnalysisJob.objects.filter(
+                    analysis_fingerprint=fingerprint,
+                    status=YoutubeMeetingAnalysisJob.STATUS_SUCCEEDED,
+                )
+                .order_by("-requested_at")
+                .first()
+            )
+            if latest_success is not None:
+                status_url = reverse("youtube-meeting-job-detail", kwargs={"job_id": latest_success.id})
+                return Response(
+                    {
+                        "ok": True,
+                        "job_id": str(latest_success.id),
+                        "status": latest_success.status,
+                        "reused": True,
+                        "status_url": status_url,
+                        "result": _serialize_youtube_meeting_job(latest_success).get("result", {}),
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+        job = YoutubeMeetingAnalysisJob(
+            requested_by=request.user if request.user.is_authenticated else None,
+            youtube_url=canonical_url,
+            youtube_video_id=youtube_video_id,
+            status=YoutubeMeetingAnalysisJob.STATUS_PENDING,
+            status_detail="Queued for meeting analysis.",
+            progress_stage="queued",
+            progress_percent=0,
+            analysis_fingerprint=fingerprint,
+            model_name=model_name,
+            prompt_version="",
+            prompt_hash="",
+            result_schema_version="council_meeting_analysis.v1",
+            result_json={"_request": {"meeting_context": normalized_meeting_context}},
+            error_message="",
+        )
+        job.save()
+
+        try:
+            _launch_youtube_meeting_job(job)
+        except OSError as exc:
+            job.status = YoutubeMeetingAnalysisJob.STATUS_FAILED
+            job.status_detail = "Unable to queue background job."
+            job.progress_stage = "failed"
+            job.progress_percent = 1
+            job.error_message = str(exc).strip()[:4000]
+            job.failure_count = int(job.failure_count or 0) + 1
+            job.completed_at = timezone.now()
+            job.save(
+                update_fields=[
+                    "status",
+                    "status_detail",
+                    "progress_stage",
+                    "progress_percent",
+                    "error_message",
+                    "failure_count",
+                    "completed_at",
+                    "updated_at",
+                ]
+            )
+            return Response(
+                _api_error_payload(
+                    "internal_error",
+                    {"message": "Unable to queue meeting analysis job.", "job_id": str(job.id)},
+                ),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        status_url = reverse("youtube-meeting-job-detail", kwargs={"job_id": job.id})
+        return Response(
+            {
+                "ok": True,
+                "job_id": str(job.id),
+                "status": job.status,
+                "reused": False,
+                "status_url": status_url,
+                "result": {},
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class YoutubeMeetingJobDetailView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, job_id):
+        job = YoutubeMeetingAnalysisJob.objects.filter(id=job_id).first()
+        if job is None:
+            return Response(
+                _api_error_payload("not_found", {"job_id": "Job not found."}),
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "ok": True,
+                "job": _serialize_youtube_meeting_job(job),
             },
             status=status.HTTP_200_OK,
         )

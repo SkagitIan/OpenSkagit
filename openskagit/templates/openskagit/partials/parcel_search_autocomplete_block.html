@@ -1,7 +1,7 @@
 <div id="appeal-selection-display" class="hidden w-full"></div>
 
-<form class="space-y-3 w-full" onsubmit="return false;">
-  <label for="appeal-search" class="text-sm font-semibold text-slate-600">Property address or parcel number</label>
+<form id="appeal-search-form" class="space-y-3 w-full" onsubmit="return false;">
+  <label for="appeal-search" class="sr-only">Property address or parcel number</label>
   <div class="relative">
     <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
       <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -25,6 +25,13 @@
         const indicator = document.getElementById('search-loading');
         const results = document.getElementById('appeal-results');
         const wrapper = document.getElementById('search-results-wrapper');
+        if (window.__appealSearchSelected === true) {
+          event.detail.shouldCancel = true;
+          if (indicator) indicator.classList.add('hidden');
+          results.innerHTML = '';
+          wrapper.classList.add('hidden');
+          return;
+        }
         if (this.value.trim().length < minLen) {
           event.detail.shouldCancel = true;
           results.innerHTML = '';
@@ -39,6 +46,11 @@
         const results = document.getElementById('appeal-results');
         const indicator = document.getElementById('search-loading');
         if (indicator) indicator.classList.add('hidden');
+        if (window.__appealSearchSelected === true) {
+          results.innerHTML = '';
+          wrapper.classList.add('hidden');
+          return;
+        }
         if (results.innerHTML.trim()) {
           wrapper.classList.remove('hidden');
         } else {
@@ -80,6 +92,11 @@
 
 <script>
   (function () {
+    if (typeof window.__appealSearchSelected !== "boolean") {
+      window.__appealSearchSelected = false;
+    }
+
+    const searchFormId = "appeal-search-form";
     const inputId = "appeal-search";
     const resultsId = "appeal-results";
     const wrapperId = "search-results-wrapper";
@@ -118,11 +135,13 @@
       }
 
       const input = document.getElementById(inputId);
+      const searchForm = document.getElementById(searchFormId);
       const display = document.getElementById(selectionId);
       const results = document.getElementById(resultsId);
       const wrapper = document.getElementById(wrapperId);
+      const indicator = document.getElementById("search-loading");
 
-      if (!input || !display || !results || !wrapper) {
+      if (!input || !searchForm || !display || !results || !wrapper) {
         return;
       }
 
@@ -131,7 +150,8 @@
       const details = button.dataset.details || "";
       const neighborhood = button.dataset.neighborhood || "";
 
-      input.classList.add("hidden");
+      searchForm.classList.add("hidden");
+      window.__appealSearchSelected = true;
       display.innerHTML = `
         <div class="flex w-full flex-wrap items-center gap-4 rounded-2xl border border-sage-100 bg-sage-50/80 p-5 shadow-xl">
           <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-500 text-2xl font-semibold text-white">✓</div>
@@ -148,32 +168,45 @@
       display.classList.remove("hidden");
       results.innerHTML = "";
       wrapper.classList.add("hidden");
+      indicator?.classList.add("hidden");
       input.blur();
       dispatchSelection({ parcel, address, details, neighborhood });
     };
 
     window.appealSearchReset = function () {
       const input = document.getElementById(inputId);
+      const searchForm = document.getElementById(searchFormId);
       const display = document.getElementById(selectionId);
       const results = document.getElementById(resultsId);
       const wrapper = document.getElementById(wrapperId);
 
-      if (!input || !display || !results || !wrapper) {
+      if (!input || !searchForm || !display || !results || !wrapper) {
         return;
       }
 
       display.classList.add("hidden");
       display.textContent = "";
-      input.classList.remove("hidden");
+      searchForm.classList.remove("hidden");
+      window.__appealSearchSelected = false;
       input.value = "";
       results.innerHTML = "";
       wrapper.classList.add("hidden");
+      document.getElementById("search-loading")?.classList.add("hidden");
       document.dispatchEvent(new CustomEvent("parcel-search-reset"));
       window.setTimeout(() => input.focus(), 0);
     };
 
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById(inputId)?.focus();
-    });
+    if (!window.__appealSearchBeforeSwapBound) {
+      document.body.addEventListener("htmx:beforeSwap", (event) => {
+        if (!window.__appealSearchSelected) {
+          return;
+        }
+        if (event.target && event.target.id === resultsId) {
+          event.preventDefault();
+        }
+      });
+      window.__appealSearchBeforeSwapBound = true;
+    }
+
   })();
 </script>

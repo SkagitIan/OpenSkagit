@@ -42,10 +42,17 @@ def _has_danger(sql: str) -> Tuple[bool, str]:
 
 
 def _tables_used(tree: exp.Expression) -> Iterable[Tuple[str, str]]:
+    def _ident_to_str(value):
+        if value is None:
+            return None
+        if isinstance(value, exp.Identifier):
+            return value.name
+        return str(value).strip() or None
+
     # returns (schema, table) where schema may be None
     for t in tree.find_all(exp.Table):
-        db = (t.args.get("db") or "").strip() or None
-        name = t.name
+        db = _ident_to_str(t.args.get("db"))
+        name = _ident_to_str(t.name)
         yield db, name
 
 
@@ -82,7 +89,7 @@ def validate_and_rewrite(sql: str, cfg: GuardConfig) -> str:
     # enforce LIMIT unless it’s a single-row aggregate w/o FROM explosion
     target = root_select
     has_limit = target.args.get("limit") is not None
-    clamp_limit = exp.Limit(this=exp.Literal.number(cfg.max_limit))
+    clamp_limit = exp.Limit(expression=exp.Literal.number(cfg.max_limit))
     if not has_limit:
         target.set("limit", clamp_limit)
     else:

@@ -146,6 +146,440 @@
     color: var(--rose-600);
   }
 
+  .mode-note--loading {
+    color: #0f766e;
+    font-weight: 700;
+  }
+
+  .comparables-system-message {
+    margin-bottom: var(--space-5);
+    border-radius: var(--radius-xl);
+    border: 1px solid #f59e0b;
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .comparables-system-message__title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #92400e;
+  }
+
+  .comparables-system-message__summary {
+    margin: var(--space-2) 0 0;
+    font-size: 0.86rem;
+    color: #78350f;
+  }
+
+  .comparables-system-message__reasons {
+    margin: var(--space-3) 0 0;
+    padding-left: 1.1rem;
+    font-size: 0.84rem;
+    color: #7c2d12;
+  }
+
+  .comparables-system-message__reasons li {
+    margin-bottom: 0.3rem;
+  }
+
+  .sort-switcher {
+    position: relative;
+  }
+
+  .sort-menu {
+    position: relative;
+  }
+
+  .sort-menu > summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    background: #fff;
+    color: var(--gray-700);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .sort-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .sort-menu[open] > summary {
+    border-color: var(--dusty-grape);
+    color: var(--dusty-grape);
+  }
+
+  .sort-menu__panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.4rem);
+    min-width: 220px;
+    z-index: 20;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background: #fff;
+    box-shadow: var(--shadow-lg);
+    padding: var(--space-3);
+    animation: fadeInUp 0.18s ease;
+  }
+
+  .sort-menu__label {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    margin-bottom: 0.35rem;
+  }
+
+  .sort-menu__select {
+    width: 100%;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.45rem 0.55rem;
+    font-size: 0.875rem;
+    color: var(--gray-800);
+    background: #fff;
+  }
+
+  .advanced-support-panel {
+    margin-bottom: var(--space-5);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .advanced-support-panel__title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .advanced-support-panel__subtitle {
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+  }
+
+  .advanced-support-panel__status {
+    margin-top: var(--space-3);
+    font-size: 0.875rem;
+    color: var(--gray-800);
+  }
+
+  .advanced-support-panel__status--warning {
+    color: #a16207;
+  }
+
+  .advanced-support-panel__status--error {
+    color: #b91c1c;
+  }
+
+  .advanced-support-metrics {
+    margin-top: var(--space-3);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-2);
+  }
+
+  .advanced-support-metric {
+    min-height: 98px;
+  }
+
+  .advanced-support-flip {
+    position: relative;
+    perspective: 1200px;
+    min-height: inherit;
+  }
+
+  .advanced-support-flip__inner {
+    position: relative;
+    width: 100%;
+    min-height: inherit;
+    transform-style: preserve-3d;
+  }
+
+  .advanced-support-flip__face {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: #fff;
+    padding: var(--space-2);
+    min-height: inherit;
+    backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .advanced-support-flip__face--back {
+    position: absolute;
+    inset: 0;
+    transform: rotateY(180deg);
+    background: #f8fafc;
+    justify-content: flex-start;
+  }
+
+  .advanced-support-flip__toggle {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    border: 1px solid var(--gray-300);
+    background: #fff;
+    color: var(--gray-500);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    z-index: 5;
+  }
+
+  .advanced-support-flip__toggle:hover {
+    border-color: #94a3b8;
+    color: var(--gray-700);
+    background: #f8fafc;
+  }
+
+  .advanced-support-flip__toggle svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    stroke: currentColor;
+  }
+
+  .advanced-support-flip__toggle.is-flipped {
+    color: #0f766e;
+    border-color: #99f6e4;
+    background: #ecfeff;
+  }
+
+  .advanced-support-flip__copy {
+    margin-top: 0.15rem;
+    font-size: 0.74rem;
+    color: var(--gray-700);
+    line-height: 1.4;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .advanced-support-flip__copy p {
+    margin: 0;
+  }
+
+  .advanced-support-metric__label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+    padding-right: 1.6rem;
+  }
+
+  .advanced-support-metric__value {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .advanced-support-metric__meta {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: 0.72rem;
+    color: var(--gray-500);
+  }
+
+  .advanced-support-hints {
+    margin-top: var(--space-3);
+    padding-left: 1rem;
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .advanced-support-warnings {
+    margin-top: var(--space-3);
+    padding-left: 1rem;
+    color: #92400e;
+    font-size: 0.82rem;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .advanced-support-trust {
+    margin-top: var(--space-3);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .trust-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .trust-badge--high {
+    background: rgba(5, 150, 105, 0.12);
+    color: #047857;
+    border: 1px solid rgba(5, 150, 105, 0.25);
+  }
+
+  .trust-badge--medium {
+    background: rgba(217, 119, 6, 0.12);
+    color: #a16207;
+    border: 1px solid rgba(217, 119, 6, 0.25);
+  }
+
+  .trust-badge--low {
+    background: rgba(220, 38, 38, 0.11);
+    color: #b91c1c;
+    border: 1px solid rgba(220, 38, 38, 0.22);
+  }
+
+  .advanced-support-trust-score {
+    font-size: 0.78rem;
+    color: var(--gray-600);
+  }
+
+  .advanced-support-steps {
+    margin-top: var(--space-2);
+    padding-left: 1rem;
+    color: var(--gray-700);
+    font-size: 0.78rem;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .advanced-support-driver-grid {
+    margin-top: var(--space-3);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-2);
+  }
+
+  .advanced-support-driver {
+    min-height: 102px;
+  }
+
+  .advanced-support-driver__label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+    padding-right: 1.6rem;
+  }
+
+  .advanced-support-driver__value {
+    margin-top: 0.15rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .advanced-support-driver__meta {
+    margin-top: 0.1rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+  }
+
+  .advanced-support-gauge-grid {
+    margin-top: var(--space-3);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: var(--space-2);
+  }
+
+  .advanced-support-gauge {
+    min-height: 150px;
+  }
+
+  .advanced-support-gauge .advanced-support-flip__face {
+    text-align: center;
+  }
+
+  .advanced-support-gauge .advanced-support-flip__face--back {
+    text-align: left;
+  }
+
+  .advanced-support-gauge__label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+    padding-right: 1.6rem;
+  }
+
+  .advanced-support-gauge__arc {
+    --gauge-pct: 0%;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    margin: 0.45rem auto 0.35rem;
+    background: conic-gradient(#6B9080 var(--gauge-pct), #dbe4ee 0);
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+
+  .advanced-support-gauge__arc::before {
+    content: "";
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--gray-100);
+  }
+
+  .advanced-support-gauge__value {
+    position: absolute;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .advanced-support-gauge__status {
+    margin-top: 0.1rem;
+    font-size: 0.72rem;
+    color: var(--gray-600);
+  }
+
+  .advanced-support-explanations {
+    margin-top: var(--space-3);
+    padding-left: 1rem;
+    color: var(--gray-700);
+    font-size: 0.82rem;
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .advanced-market-note {
+    margin-top: var(--space-2);
+    font-size: 0.78rem;
+    color: var(--gray-600);
+  }
+
   .comparables-more-btn {
     display: inline-flex;
     align-items: center;
@@ -173,6 +607,164 @@
     height: 1rem;
   }
 
+  .saved-comp-tray-shell {
+    margin-bottom: var(--space-5);
+  }
+
+  .saved-comp-tray {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(180deg, rgba(247, 250, 252, 0.95), #fff);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .saved-comp-tray__header {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    align-items: flex-start;
+  }
+
+  .saved-comp-tray__eyebrow {
+    margin: 0;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--gray-500);
+  }
+
+  .saved-comp-tray__title {
+    margin: 0.2rem 0 0;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--gray-800);
+  }
+
+  .saved-comp-tray__workspace-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--dusty-grape);
+    color: var(--dusty-grape);
+    text-decoration: none;
+    padding: 0.38rem 0.85rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+  }
+
+  .saved-comp-tray__workspace-btn:hover {
+    color: #fff;
+    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
+  }
+
+  .saved-comp-tray__workspace-btn--disabled,
+  .saved-comp-tray__workspace-btn--disabled:hover {
+    border-color: var(--gray-300);
+    color: var(--gray-400);
+    background: var(--gray-100);
+    pointer-events: none;
+  }
+
+  .saved-comp-tray__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .saved-comp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px solid var(--gray-200);
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.2rem 0.25rem 0.2rem 0.6rem;
+    max-width: 100%;
+  }
+
+  .saved-comp-chip__text {
+    display: inline-flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .saved-comp-chip__parcel {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--gray-700);
+  }
+
+  .saved-comp-chip__meta {
+    font-size: 0.69rem;
+    color: var(--gray-500);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 26ch;
+  }
+
+  .saved-comp-chip__remove {
+    border: none;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .saved-comp-chip__remove:hover {
+    color: #fff;
+    background: #b91c1c;
+  }
+
+  .saved-comp-tray__empty {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--gray-600);
+  }
+
+  .comp-save-btn {
+    border: 1px solid var(--gray-300);
+    background: #fff;
+    border-radius: 999px;
+    padding: 0.28rem 0.62rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--gray-600);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.35rem;
+    transition: all var(--transition-fast);
+  }
+
+  .comp-save-btn:hover {
+    border-color: var(--dusty-grape);
+    color: var(--dusty-grape);
+  }
+
+  .comp-save-btn--saved {
+    border-color: rgba(107, 144, 128, 0.4);
+    color: #0f766e;
+    background: rgba(204, 251, 241, 0.5);
+  }
+
+  .comp-save-btn__icon {
+    width: 0.85rem;
+  }
+
   /* View Containers */
   .view-container {
     display: none;
@@ -186,6 +778,74 @@
   .comp-list {
     display: grid;
     gap: var(--space-4);
+  }
+
+  .comp-group + .comp-group {
+    margin-top: var(--space-6);
+  }
+
+  .comp-group__heading {
+    margin-bottom: var(--space-3);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-700);
+  }
+
+  .comp-group__heading--support {
+    color: #92400e;
+  }
+
+  .comp-group__note {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--gray-500);
+  }
+
+  .comp-group__details {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background: #fff;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .comp-group__summary {
+    list-style: none;
+    display: block;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 1.5rem;
+  }
+
+  .comp-group__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .comp-group__summary::after {
+    content: "▸";
+    position: absolute;
+    right: 0;
+    top: 0;
+    color: var(--gray-500);
+    transition: transform var(--transition-fast);
+  }
+
+  .comp-group__summary .comp-group__heading {
+    margin-bottom: 0;
+  }
+
+  .comp-group__details[open] .comp-group__summary::after {
+    transform: rotate(90deg);
+  }
+
+  .comp-group__details-body {
+    margin-top: var(--space-3);
   }
 
   .comp-card {
@@ -334,6 +994,56 @@
     margin-top: 0.1rem;
   }
 
+  .comp-card__adjusted-price {
+    margin-top: 0.3rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+
+  .comp-card__adjusted-label {
+    font-size: 0.7rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .comp-card__adjusted-delta {
+    margin-top: 0.1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .comp-card__adjusted-delta--up {
+    color: #047857;
+  }
+
+  .comp-card__adjusted-delta--down {
+    color: #b91c1c;
+  }
+
+  .comp-card__support-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: var(--space-2) var(--space-5) var(--space-3);
+    border-top: 1px dashed var(--gray-200);
+    background: #fffaf5;
+  }
+
+  .comp-card__support-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.55rem;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(146, 64, 14, 0.25);
+    color: #92400e;
+    background: rgba(251, 146, 60, 0.12);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
   .comp-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -365,272 +1075,64 @@
     margin-top: var(--space-1);
   }
 
-  .comp-card__adjustments {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-4);
-    align-items: center;
-    padding: var(--space-4) var(--space-5);
-    background: var(--gray-50);
-    border-bottom: 1px solid var(--gray-200);
-    font-size: 0.85rem;
-  }
-
-  .adjustments-label {
-    font-weight: 600;
-    color: var(--gray-600);
-  }
-
-  .adjustments-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    color: var(--gray-700);
-  }
-
-  .adjustment-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.85rem;
-    border-radius: var(--radius-full);
-    border: 1px solid transparent;
-    background: var(--gray-100);
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
-
-  .adjustment-badge--expandable {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.35rem;
-    padding: 0.45rem 0.9rem;
-    border-radius: var(--radius-lg);
-    border: 1px solid transparent;
-    background: var(--gray-100);
-    font-size: 0.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-    min-width: 160px;
-    position: relative;
-  }
-
-  .adjustment-badge--expandable .adjustment-badge__summary {
-    width: 100%;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    margin: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    justify-content: space-between;
-  }
-
-  .adjustment-badge--expandable .adjustment-badge__summary::-webkit-details-marker,
-  .adjustment-badge--expandable .adjustment-badge__summary::marker {
-    display: none;
-  }
-
-  .adjustment-badge__label {
-    font-size: 0.65rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--gray-600);
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .adjustment-badge__amount {
-    font-weight: 700;
-  }
-
-  .adjustment-badge__icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.2rem;
-    height: 1.2rem;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.4);
-  }
-
-  .adjustment-badge__icon i {
-    font-size: 0.85rem;
-    color: inherit;
-  }
-
-  .adjustment-badge__tooltip {
-    display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translate(-50%, -0.45rem);
-    min-width: 220px;
-    padding: var(--space-3) var(--space-3);
-    border-radius: var(--radius-lg);
-    border: 1px solid rgba(39, 39, 42, 0.1);
-    background: white;
-    color: var(--gray-600);
-    font-size: 0.75rem;
-    line-height: 1.4;
-    box-shadow: var(--shadow-2xl);
-    z-index: 1;
-  }
-
-  .adjustment-badge__tooltip p {
-    margin: 0;
-  }
-
-  .adjustment-badge__tooltip::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%) rotate(45deg);
-    width: 12px;
-    height: 12px;
-    background: white;
-    border-left: 1px solid rgba(39, 39, 42, 0.1);
-    border-top: 1px solid rgba(39, 39, 42, 0.1);
-    z-index: -1;
-  }
-
-  .adjustment-badge--expandable[open] {
-    box-shadow: var(--shadow-sm);
-  }
-
-  .adjustment-badge--expandable[open] .adjustment-badge__tooltip {
+  .comp-stat__flag {
     display: block;
+    margin-top: 0.12rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #92400e;
   }
 
-  .adjustment-badge--positive {
-    background: rgba(16, 185, 129, 0.15);
-    border-color: rgba(16, 185, 129, 0.4);
-    color: var(--success-600);
+  .comp-card__meta-flag {
+    color: #92400e;
+    font-weight: 600;
   }
 
-  .adjustment-badge--negative {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.35);
-    color: var(--error-600);
+  .comp-stat__adj {
+    display: block;
+    margin-top: 0.12rem;
+    font-size: 0.7rem;
+    font-weight: 600;
   }
 
-  .adjustment-entry {
-    font-size: 0.85rem;
-    color: var(--gray-600);
+  .comp-stat__adj--up {
+    color: #047857;
   }
 
-  .adjustment-entry--muted {
-    font-weight: 500;
+  .comp-stat__adj--down {
+    color: #b91c1c;
   }
 
-  .comp-card__adjustments--collapsible {
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .comp-card__adjustments-summary {
-    width: 100%;
+  .comp-card__adjustment-chips {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin: 0;
-    padding: 0;
-    cursor: pointer;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: var(--space-3) var(--space-4);
+    background: rgba(248, 250, 252, 0.85);
+    border-top: 1px solid var(--gray-200);
   }
 
-  .comp-card__adjustments-summary-indicator {
+  .comp-card__adjustment-chip {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 1.6rem;
-    height: 1.6rem;
+    gap: 0.2rem;
     border-radius: 999px;
-    background: rgba(99, 102, 241, 0.15);
-    transition: transform 0.25s ease;
-  }
-
-  .comp-card__adjustments-summary::-webkit-details-marker,
-  .comp-card__adjustments-summary::marker {
-    display: none;
-  }
-
-  .comp-card__adjustments--collapsible[open]
-    .comp-card__adjustments-summary-indicator {
-    transform: rotate(180deg);
-  }
-
-  .comp-card__adjustments-body {
-    width: 100%;
-    border-top: 1px solid var(--gray-200);
-    padding-top: var(--space-3);
-  }
-
-  .comp-card__adjustments-body .adjustments-badges {
-    margin-top: 0;
-  }
-
-  .comp-card__adjusted-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: var(--space-4);
-    padding: var(--space-4) var(--space-5);
-    background: white;
-  }
-
-  .comp-card__adjusted-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-
-  .comp-adjusted__label {
-    font-size: 0.65rem;
+    padding: 0.22rem 0.6rem;
+    font-size: 0.72rem;
     font-weight: 600;
-    color: var(--gray-500);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    border: 1px solid transparent;
   }
 
-  .comp-adjusted__value {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--gray-900);
+  .comp-card__adjustment-chip--up {
+    color: #065f46;
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.35);
   }
 
-  .comp-card__adjusted-delta {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--space-2);
-    min-height: 1.25rem;
-  }
-
-  .comp-adjusted__delta {
-    font-size: 0.85rem;
-    font-weight: 600;
-    margin-left: 0;
-  }
-
-  .comp-adjusted__delta--up {
-    color: var(--success-600);
-  }
-
-  .comp-adjusted__delta--down {
-    color: var(--rose-600);
-  }
-
-  .comp-adjusted__missing {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--rose-600);
+  .comp-card__adjustment-chip--down {
+    color: #991b1b;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.35);
   }
 
   .comp-similarity {
@@ -838,10 +1340,19 @@
     .comp-card__header-price {
       justify-self: flex-start;
     }
+
+    .saved-comp-tray__header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .saved-comp-tray__workspace-btn {
+      width: 100%;
+    }
   }
 </style>
 
-<div class="card comparables-section" id="appeal-comparables-root" data-fetch-url="{{ fetch_url }}" data-active-mode="{{ view_mode }}">
+<div class="card comparables-section" id="appeal-comparables-root" data-fetch-url="{{ fetch_url }}" data-active-mode="{{ view_mode }}" data-current-view="{{ current_view|default:'list' }}" data-sort-by="{{ sort_by|default:'similarity' }}" data-sort-dir="{{ sort_direction|default:'desc' }}" data-saved-comps-url="{{ saved_comps_url }}">
   <div class="section-header">
     <div class="section-title">
       <div class="section-title__icon">
@@ -858,7 +1369,7 @@
 
     <div class="section-controls">
       <div class="view-switcher">
-        <button class="view-btn view-btn--active" data-view="list" onclick="switchView('list')">
+        <button class="view-btn {% if current_view|default:'list' == 'list' %}view-btn--active{% endif %}" data-view="list" onclick="switchView('list')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="8" y1="6" x2="21" y2="6"></line>
             <line x1="8" y1="12" x2="21" y2="12"></line>
@@ -869,7 +1380,7 @@
           </svg>
           List
         </button>
-        <button class="view-btn" data-view="grid" onclick="switchView('grid')">
+        <button class="view-btn {% if current_view == 'grid' %}view-btn--active{% endif %}" data-view="grid" onclick="switchView('grid')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="7" height="7"></rect>
             <rect x="14" y="3" width="7" height="7"></rect>
@@ -878,7 +1389,7 @@
           </svg>
           Grid
         </button>
-        <button class="view-btn" data-view="map" onclick="switchView('map')">
+        <button class="view-btn {% if current_view == 'map' %}view-btn--active{% endif %}" data-view="map" onclick="switchView('map')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
             <line x1="8" y1="2" x2="8" y2="18"></line>
@@ -890,778 +1401,624 @@
       <div class="mode-switcher">
         <div class="mode-toggle">
           <button class="mode-btn {% if not advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('standard')">Standard</button>
-          <button class="mode-btn {% if advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('advanced')" disabled>Advanced</button>
+          <button class="mode-btn {% if advanced_mode %}mode-btn--active{% endif %}" type="button" onclick="handleComparablesMode('advanced')">Advanced</button>
         </div>
+        <p class="mode-note" id="comparables-mode-status" hidden></p>
         {% if advanced_error %}
           <p class="mode-note mode-note--warning">{{ advanced_error }}</p>
         {% endif %}
       </div>
 
+      <div class="sort-switcher">
+        <details class="sort-menu">
+          <summary>
+            <span>Sort:</span>
+            <span>{{ sort_label|default:"Similarity" }}</span>
+          </summary>
+          <div class="sort-menu__panel">
+            <label class="sort-menu__label" for="comparables-sort-select">Comparable ordering</label>
+            <select
+              id="comparables-sort-select"
+              class="sort-menu__select"
+              onchange="applyComparablesSort(this.value)"
+            >
+              {% for option in sort_options %}
+                <option value="{{ option.value }}" {% if option.value == sort_by %}selected{% endif %}>{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </details>
+      </div>
+
     </div>
   </div>
 
-  <!-- List View -->
-  <div id="list-view" class="view-container view-container--active">
-    <div class="comp-list">
-      {% for comp in comparables %}
-        <div class="comp-card">
-          <div class="comp-card__header">
-            {% with comp.similarity.overall|default_if_none:0 as similarity_value %}
-              <div class="comp-card__header-content">
-                <div class="comp-card__header-main">
-                  <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
-                  <div class="comp-card__meta">
-                    <span class="comp-card__meta-item">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 21s7-4.5 7-11A7 7 0 0 0 5 10c0 6.5 7 11 7 11z"></path>
-                        <circle cx="12" cy="10" r="2.5"></circle>
-                      </svg>
-                      {{ comp.distance_miles|floatformat:2 }} mi
-                    </span>
-                    <span class="comp-card__meta-item comp-card__meta-item--sold">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
-                        <line x1="16" y1="3" x2="16" y2="7"></line>
-                        <line x1="8" y1="3" x2="8" y2="7"></line>
-                        <line x1="3" y1="11" x2="21" y2="11"></line>
-                      </svg>
-                      <span class="comp-card__meta-text">
-                        <span>Sold {{ comp.sale_date|date:"M Y" }}</span>
-                        <span class="comp-card__meta-similarity">
-                          <details class="comp-similarity comp-similarity--inline" aria-label="View similarity breakdown">
-                            <summary class="comp-similarity__summary">
-                              <span class="comp-card__similarity-text">Similarity {{ similarity_value }}%</span>
-                            </summary>
-                            {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
-                          </details>
-                        </span>
-                      </span>
-                    </span>
-                  </div>
-                </div>
-                <div class="comp-price-block comp-card__header-price">
-                  <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
-                  <div class="comp-card__price-label">Sale Price</div>
-                </div>
-              </div>
-            {% endwith %}
-          </div>
-
-          <div class="comp-stats">
-            <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</div>
-              <div class="comp-stat__label">Beds</div>
-            </div>
-            <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.bathrooms|quarter_baths|default:"—" }}</div>
-              <div class="comp-stat__label">Baths</div>
-            </div>
-            <div class="comp-stat">
-              {% with sqft_value=comp.calculated_square_footage|default:comp.living_area %}
-                <div class="comp-stat__value">{{ sqft_value|default:"—"|floatformat:0|intcomma }}</div>
-              {% endwith %}
-              <div class="comp-stat__label">Sq Ft</div>
-            </div>
-            <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.year_built|default:"—" }}</div>
-              <div class="comp-stat__label">Built</div>
-            </div>
-            <div class="comp-stat">
-              <div class="comp-stat__value">${{ comp.price_per_sqft|default:"—"|floatformat:0|intcomma }}</div>
-              <div class="comp-stat__label">$/Sq Ft</div>
-            </div>
-          </div>
-
-          {% if advanced_mode %}
-            <div class="comp-card__adjustments">
-              {% if comp.adjustments %}
-                <div class="adjustments-badges">
-                  {% for item in comp.adjustments %}
-                    {% if item.amount %}
-                      {% with item.label|default:"" as label_text %}
-                        {% with label_text|lower as label_lower %}
-                          <details class="adjustment-badge adjustment-badge--expandable {% if item.amount > 0 %}adjustment-badge--positive{% else %}adjustment-badge--negative{% endif %}">
-                            <summary class="adjustment-badge__summary" aria-label="View adjustment detail for {{ label_text }}">
-                              {% if 'living' in label_lower %}
-                                <span class="adjustment-badge__icon">
-                                  <i class="fa-solid fa-house-chimney-user" aria-hidden="true"></i>
-                                </span>
-                              {% elif 'lot' in label_lower or 'land' in label_lower %}
-                                <span class="adjustment-badge__icon">
-                                  <i class="fa-solid fa-map-pin" aria-hidden="true"></i>
-                                </span>
-                              {% elif 'trend' in label_lower or 'time' in label_lower %}
-                                <span class="adjustment-badge__icon">
-                                  <i class="fa-solid fa-timeline" aria-hidden="true"></i>
-                                </span>
-                              {% elif 'age' in label_lower or 'year' in label_lower or 'built' in label_lower %}
-                                <span class="adjustment-badge__icon">
-                                  <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-                                </span>
-                              {% else %}
-                                <span class="adjustment-badge__icon">
-                                  <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                                </span>
-                              {% endif %}
-                              <span class="adjustment-badge__label">{{ label_text }}</span>
-                              <span class="adjustment-badge__amount">
-                                {% if item.amount > 0 %}+{% elif item.amount < 0 %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
-                              </span>
-                            </summary>
-                            <div class="adjustment-badge__tooltip">
-                              <p>{{ item.delta_text|default:"Adjustment detail unavailable." }}</p>
-                            </div>
-                          </details>
-                        {% endwith %}
-                      {% endwith %}
-                    {% endif %}
-                  {% endfor %}
-                </div>
-              {% elif advanced_error %}
-                <span class="adjustment-entry adjustment-entry--muted">{{ advanced_error }}</span>
-              {% else %}
-                <span class="adjustment-entry adjustment-entry--muted">Not available</span>
-              {% endif %}
-            </div>
-            <div class="comp-card__adjusted-row">
-              <div class="comp-card__adjusted-stack">
-                {% if comp.adjusted_value %}
-                  <span class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</span>
-                {% elif advanced_error %}
-                  <span class="comp-adjusted__missing">Unavailable</span>
-                {% else %}
-                  <span class="comp-adjusted__missing">Not calculated</span>
-                {% endif %}
-                <span class="comp-adjusted__label">Adjusted Value</span>
-              </div>
-              <div class="comp-card__adjusted-delta">
-                {% if comp.total_adjustment %}
-                  {% if comp.total_adjustment > 0 %}
-                    <span class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</span>
-                  {% elif comp.total_adjustment < 0 %}
-                    <span class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</span>
-                  {% endif %}
-                {% endif %}
-              </div>
-            </div>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </div>
+  <div id="appeal-saved-comps-tray" class="saved-comp-tray-shell">
+    {% include "openskagit/partials/appeal_saved_comp_tray.html" %}
   </div>
 
-  <!-- Grid View -->
-  <div id="grid-view" class="view-container">
-    <div class="comp-grid">
-      {% for comp in comparables %}
-
-        <div class="comp-card">
-          <div class="comp-card__header">
-            {% with comp.similarity.overall|default_if_none:0 as similarity_value %}
-              <div class="comp-card__header-content">
-                <div class="comp-card__header-main">
-                  <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
-                </div>
-                <div class="comp-price-block comp-card__header-price">
-                  <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
-                  <div class="comp-card__price-label">Sale Price</div>
-                  <div class="comp-card__similarity-grid">
-                    <details class="comp-similarity comp-similarity--grid" aria-label="View similarity breakdown">
-                      <summary class="comp-similarity__summary">
-                        <span class="comp-card__similarity-text">Similarity {{ similarity_value }}%</span>
-                      </summary>
-                      {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
-                    </details>
-                  </div>
-                </div>
-              </div>
-            {% endwith %}
-          </div>
-          <div class="comp-card__meta comp-card__meta--grid">
-            <span class="comp-card__meta-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 21s7-4.5 7-11A7 7 0 0 0 5 10c0 6.5 7 11 7 11z"></path>
-                <circle cx="12" cy="10" r="2.5"></circle>
-              </svg>
-              {{ comp.distance_miles|floatformat:2 }} mi
-            </span>
-            <span class="comp-card__meta-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="5" width="18" height="16" rx="2"></rect>
-                <line x1="16" y1="3" x2="16" y2="7"></line>
-                <line x1="8" y1="3" x2="8" y2="7"></line>
-                <line x1="3" y1="11" x2="21" y2="11"></line>
-              </svg>
-              Sold {{ comp.sale_date|date:"M Y" }}
-            </span>
-          </div>
-
-          <div class="comp-stats">
-            <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</div>
-              <div class="comp-stat__label">Beds</div>
-            </div>
-            <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.bathrooms|quarter_baths|default:"—" }}</div>
-              <div class="comp-stat__label">Baths</div>
-            </div>
-            <div class="comp-stat">
-              {% with sqft_value=comp.calculated_square_footage|default:comp.living_area %}
-                <div class="comp-stat__value">{{ sqft_value|default:"—"|floatformat:0|intcomma }}</div>
-              {% endwith %}
-              <div class="comp-stat__label">Sq Ft</div>
-            </div>
-            <div class="comp-stat">
-              <div class="comp-stat__value">{{ comp.year_built|default:"—" }}</div>
-              <div class="comp-stat__label">Built</div>
-            </div>
-            <div class="comp-stat">
-              <div class="comp-stat__value">${{ comp.price_per_sqft|default:"—"|floatformat:0|intcomma }}</div>
-              <div class="comp-stat__label">$/Sq Ft</div>
-            </div>
-          </div>
-          {% if advanced_mode %}
-            {% if comp.adjustments %}
-              <details class="comp-card__adjustments comp-card__adjustments--collapsible">
-                <summary class="comp-card__adjustments-summary">
-                  <span class="adjustments-label">Adjustments</span>
-                  <span class="comp-card__adjustments-summary-indicator" aria-hidden="true">
-                    <i class="fa-solid fa-chevron-down"></i>
-                  </span>
-                </summary>
-                <div class="comp-card__adjustments-body">
-                  <div class="adjustments-badges">
-                    {% for item in comp.adjustments %}
-                      {% if item.amount %}
-                        {% with item.label|default:""|lower as label_lower %}
-                          <span class="adjustment-badge {% if item.amount > 0 %}adjustment-badge--positive{% else %}adjustment-badge--negative{% endif %}">
-                            {% if 'living' in label_lower %}
-                              <span class="adjustment-badge__icon">
-                                <i class="fa-solid fa-house-chimney-user" aria-hidden="true"></i>
-                              </span>
-                            {% elif 'lot' in label_lower or 'land' in label_lower %}
-                              <span class="adjustment-badge__icon">
-                                <i class="fa-solid fa-map-pin" aria-hidden="true"></i>
-                              </span>
-                            {% elif 'trend' in label_lower or 'time' in label_lower %}
-                              <span class="adjustment-badge__icon">
-                                <i class="fa-solid fa-timeline" aria-hidden="true"></i>
-                              </span>
-                            {% elif 'age' in label_lower or 'year' in label_lower or 'built' in label_lower %}
-                              <span class="adjustment-badge__icon">
-                                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-                              </span>
-                            {% else %}
-                              <span class="adjustment-badge__icon">
-                                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                              </span>
-                            {% endif %}
-                            <span class="sr-only">{{ item.label }}</span>
-                            <span class="adjustment-badge__amount">
-                              {% if item.amount > 0 %}+{% elif item.amount < 0 %}-{% endif %}${{ item.amount|abs|floatformat:0|intcomma }}
-                            </span>
-                          </span>
-                        {% endwith %}
-                      {% endif %}
-                    {% endfor %}
-                  </div>
-                </div>
-              </details>
-            {% elif advanced_error %}
-              <span class="adjustment-entry adjustment-entry--muted">{{ advanced_error }}</span>
-            {% else %}
-              <span class="adjustment-entry adjustment-entry--muted">Not available</span>
-            {% endif %}
-            <div class="comp-card__adjusted-row">
-              <span class="comp-adjusted__label">Adjusted Value</span>
-              <div>
-                {% if comp.adjusted_value %}
-                  <span class="comp-adjusted__value">${{ comp.adjusted_value|floatformat:0|intcomma }}</span>
-                  {% if comp.total_adjustment %}
-                    {% if comp.total_adjustment > 0 %}
-                      <span class="comp-adjusted__delta comp-adjusted__delta--up">+${{ comp.total_adjustment|floatformat:0|intcomma }}</span>
-                    {% elif comp.total_adjustment < 0 %}
-                      <span class="comp-adjusted__delta comp-adjusted__delta--down">-${{ comp.total_adjustment|abs|floatformat:0|intcomma }}</span>
-                    {% endif %}
-                  {% endif %}
-                {% elif advanced_error %}
-                  <span class="comp-adjusted__missing">Unavailable</span>
-                {% else %}
-                  <span class="comp-adjusted__missing">Not calculated</span>
-                {% endif %}
-              </div>
-            </div>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- Map View -->
-  <div id="map-view" class="view-container">
-    <div class="map-container">
-      <div id="comparables-map"></div>
-    </div>
+  <div id="appeal-comparables-content">
+    {% include "openskagit/partials/appeal_comparables_content.html" %}
   </div>
 </div>
-      {% if has_more %}
-        <button
-          id="comparables-more-button"
-          class="comparables-more-btn"
-          type="button"
-          data-extended-count="{{ extended_limit }}"
-        >
-          <span class="comparables-more-label">Get more comps</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14"></path>
-            <path d="M5 12h14"></path>
-          </svg>
-        </button>
-      {% endif %}
 <script>
-  let comparablesMap = null;
-  let markersGroup = null;
-  const SUBJECT_MARKER_COLOR = '#dc2626';
-  const COMPARABLE_MARKER_COLOR = '#16a34a';
-
-  function buildHouseIcon(fillColor, extraClass = '') {
-    return L.divIcon({
-      className: `leaflet-div-icon house-marker ${extraClass}`.trim(),
-      html: `
-        <svg viewBox="0 0 36 36" width="34" height="34" aria-hidden="true" focusable="false">
-          <path d="M18 5.5L6 15.6V31h8.2v-8.2h7.6V31H30V15.6z"
-                fill="${fillColor}"
-                stroke="#ffffff"
-                stroke-width="2"
-                stroke-linejoin="round" />
-          <path d="M6 16l12-9 12 9"
-                fill="none"
-                stroke="#ffffff"
-                stroke-width="2.4"
-                stroke-linecap="round"
-                stroke-linejoin="round" />
-        </svg>
-      `,
-      iconSize: [34, 34],
-      iconAnchor: [17, 30],
-      popupAnchor: [0, -28]
-    });
-  }
-
-  function handleComparablesMode(mode) {
-    const root = document.getElementById('appeal-comparables-root');
-    if (root && root.dataset.activeMode === mode) {
+  (function () {
+    if (window.__openskagitComparablesInitialized) {
+      if (typeof window.appealComparablesDidSwap === 'function') {
+        window.appealComparablesDidSwap();
+      }
       return;
     }
-    if (root) {
-      root.dataset.activeMode = mode;
-    }
-    if (window.appealUpdateComparables) {
-      window.appealUpdateComparables(mode);
-    } else if (root && root.dataset.fetchUrl) {
-      const params = mode ? `?view_mode=${encodeURIComponent(mode)}` : "";
-      window.location.href = `${root.dataset.fetchUrl}${params}`;
-    }
-  }
+    window.__openskagitComparablesInitialized = true;
 
-  function switchView(view) {
-    // Update buttons
-    document.querySelectorAll('.view-btn').forEach(btn => {
-      btn.classList.toggle('view-btn--active', btn.dataset.view === view);
-    });
+    let comparablesMap = null;
+    let markersGroup = null;
+    const SUBJECT_MARKER_COLOR = '#dc2626';
+    const COMPARABLE_MARKER_COLOR = '#16a34a';
 
-    // Show/hide views
-    document.querySelectorAll('.view-container').forEach(container => {
-      container.classList.remove('view-container--active');
-    });
-
-    const targetView = document.getElementById(view + '-view');
-    if (targetView) {
-      targetView.classList.add('view-container--active');
+    function getRoot() {
+      return document.getElementById('appeal-comparables-root');
     }
 
-    // Initialize map if needed
-    if (view === 'map' && !comparablesMap) {
-      setTimeout(initComparablesMap, 100);
-    } else if (view === 'map' && comparablesMap) {
+    function getSavedTray() {
+      return document.getElementById('appeal-saved-comps-tray');
+    }
+
+    function getModeStatusNode() {
+      return document.getElementById('comparables-mode-status');
+    }
+
+    function setModeButtonState(mode) {
+      document.querySelectorAll('.mode-toggle .mode-btn').forEach((button) => {
+        const text = (button.textContent || '').trim().toLowerCase();
+        button.classList.toggle('mode-btn--active', text === (mode || 'standard'));
+      });
+    }
+
+    function setModeStatus(message, loading = false) {
+      const node = getModeStatusNode();
+      if (!node) return;
+      if (!message) {
+        node.textContent = '';
+        node.hidden = true;
+        node.classList.remove('mode-note--loading');
+        return;
+      }
+      node.textContent = message;
+      node.hidden = false;
+      node.classList.toggle('mode-note--loading', loading);
+    }
+
+    function getCsrfToken() {
+      const cookie = document.cookie
+        .split(';')
+        .map((entry) => entry.trim())
+        .find((entry) => entry.startsWith('csrftoken='));
+      return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
+    }
+
+    function parseJsonScript(id) {
+      const node = document.getElementById(id);
+      if (!node) return null;
+      try {
+        return JSON.parse(node.textContent || '{}');
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function mapPayload() {
+      return parseJsonScript('appeal-comparables-map-payload') || {};
+    }
+
+    function marketAreaPayload() {
+      return parseJsonScript('comparables-market-area-data');
+    }
+
+    function getSavedIdsFromTray() {
+      const tray = getSavedTray();
+      if (!tray) return [];
+      return Array.from(tray.querySelectorAll('[data-saved-chip-parcel]'))
+        .map((chip) => (chip.dataset.savedChipParcel || '').trim().toUpperCase())
+        .filter(Boolean);
+    }
+
+    function setSaveButtonState(button, isSaved) {
+      button.classList.toggle('comp-save-btn--saved', isSaved);
+      button.setAttribute('aria-pressed', isSaved ? 'true' : 'false');
+      const label = button.querySelector('[data-comp-save-label]');
+      if (label) {
+        label.textContent = isSaved ? 'Saved' : 'Save';
+      }
+      const icon = button.querySelector('[data-comp-save-icon]');
+      if (icon) {
+        icon.classList.toggle('fa-solid', isSaved);
+        icon.classList.toggle('fa-regular', !isSaved);
+      }
+    }
+
+    function syncSaveButtons(savedIds) {
+      const normalized = new Set((savedIds || []).map((id) => String(id || '').trim().toUpperCase()));
+      document.querySelectorAll('[data-comp-save-toggle]').forEach((button) => {
+        const parcel = (button.dataset.compParcel || '').trim().toUpperCase();
+        if (!parcel) return;
+        setSaveButtonState(button, normalized.has(parcel));
+      });
+    }
+
+    function destroyComparablesMap() {
+      if (comparablesMap) {
+        comparablesMap.remove();
+      }
+      comparablesMap = null;
+      markersGroup = null;
+    }
+
+    function buildHouseIcon(fillColor, extraClass = '') {
+      return L.divIcon({
+        className: `leaflet-div-icon house-marker ${extraClass}`.trim(),
+        html: `
+          <svg viewBox="0 0 36 36" width="34" height="34" aria-hidden="true" focusable="false">
+            <path d="M18 5.5L6 15.6V31h8.2v-8.2h7.6V31H30V15.6z"
+                  fill="${fillColor}"
+                  stroke="#ffffff"
+                  stroke-width="2"
+                  stroke-linejoin="round" />
+            <path d="M6 16l12-9 12 9"
+                  fill="none"
+                  stroke="#ffffff"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round" />
+          </svg>
+        `,
+        iconSize: [34, 34],
+        iconAnchor: [17, 30],
+        popupAnchor: [0, -28]
+      });
+    }
+
+    function renderComparablesMap() {
+      if (!comparablesMap || !markersGroup) return;
+      markersGroup.clearLayers();
+
+      const payload = mapPayload();
+      const subject = payload.subject || {};
+      const subjectLat = Number(subject.lat);
+      const subjectLon = Number(subject.lon);
+      if (Number.isFinite(subjectLat) && Number.isFinite(subjectLon)) {
+        const subjectMarker = L.marker([subjectLat, subjectLon], {
+          icon: buildHouseIcon(SUBJECT_MARKER_COLOR, 'house-marker--subject')
+        }).addTo(markersGroup);
+        const subjectAddress = subject.address || '';
+        subjectMarker.bindPopup(
+          `<div class="popup-content"><strong>Your Property</strong><div>${subjectAddress}</div></div>`
+        );
+      }
+
+      const comps = Array.isArray(payload.comparables) ? payload.comparables : [];
+      comps.forEach((comp) => {
+        const lat = Number(comp.lat);
+        const lon = Number(comp.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          return;
+        }
+        const marker = L.marker([lat, lon], {
+          icon: buildHouseIcon(COMPARABLE_MARKER_COLOR, 'house-marker--comp')
+        }).addTo(markersGroup);
+        const price = Number(comp.sale_price);
+        const distance = Number(comp.distance_miles);
+        const adjustedPrice = Number(comp.adjusted_price);
+        const totalAdjustment = Number(comp.total_adjustment);
+        const saleText = Number.isFinite(price) ? `$${price.toLocaleString()}` : '—';
+        const distanceText = Number.isFinite(distance) ? `${distance.toFixed(2)} mi` : '—';
+        const adjustedText = Number.isFinite(adjustedPrice)
+          ? `<div>Adjusted: $${adjustedPrice.toLocaleString()}${Number.isFinite(totalAdjustment) ? ` (${totalAdjustment > 0 ? '+' : ''}$${Math.round(totalAdjustment).toLocaleString()})` : ''}</div>`
+          : '';
+        marker.bindPopup(`
+          <div class="popup-content">
+            <strong>${comp.address || ''}</strong>
+            ${comp.parcel_number ? `<div>Parcel ${comp.parcel_number}</div>` : ''}
+            <div>Sale: ${saleText}</div>
+            <div>Date: ${comp.sale_date_display || ''}</div>
+            <div>Distance: ${distanceText}</div>
+            <div>${comp.bedrooms ?? '—'} beds, ${comp.bathrooms ?? '—'} baths</div>
+            ${comp.missing_bedrooms ? '<div>Beds: source missing</div>' : ''}
+            <div>${comp.sqft ?? '—'} sq ft</div>
+            ${adjustedText}
+          </div>
+        `);
+      });
+
+      const marketArea = marketAreaPayload();
+      if (marketArea && Array.isArray(marketArea.sample_points)) {
+        marketArea.sample_points.forEach((point) => {
+          if (!point || point.lat === undefined || point.lon === undefined) {
+            return;
+          }
+          L.circleMarker([point.lat, point.lon], {
+            radius: 3,
+            color: '#334155',
+            weight: 0,
+            fillColor: '#64748b',
+            fillOpacity: 0.18,
+          }).addTo(markersGroup);
+        });
+      }
+
+      if (marketArea && marketArea.footprint_geojson) {
+        L.geoJSON(marketArea.footprint_geojson, {
+          style: {
+            color: '#0f766e',
+            weight: 2,
+            opacity: 0.85,
+            fillColor: '#5eead4',
+            fillOpacity: 0.1,
+            dashArray: '6 5',
+          },
+        }).addTo(markersGroup);
+      }
+
+      if (markersGroup.getLayers().length && markersGroup.getBounds().isValid()) {
+        comparablesMap.fitBounds(markersGroup.getBounds(), { padding: [50, 50] });
+      }
       setTimeout(() => comparablesMap.invalidateSize(), 100);
     }
-  }
 
-  function initComparablesMap() {
-    const mapEl = document.getElementById('comparables-map');
-    if (!mapEl || comparablesMap) return;
+    function initComparablesMap() {
+      const mapEl = document.getElementById('comparables-map');
+      if (!mapEl || comparablesMap || typeof L === 'undefined') return;
 
-    // Initialize map
-    comparablesMap = L.map('comparables-map').setView([48.5, -122.5], 11);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(comparablesMap);
-
-    markersGroup = L.featureGroup().addTo(comparablesMap);
-
-    // Add subject property marker (red house icon)
-    {% if subject.latitude and subject.longitude %}
-      const subjectMarker = L.marker([{{ subject.latitude }}, {{ subject.longitude }}], {
-        icon: buildHouseIcon(SUBJECT_MARKER_COLOR, 'house-marker--subject')
-      }).addTo(markersGroup);
-
-      subjectMarker.bindPopup('<div class="popup-content"><strong>Your Property</strong><div>{{ subject.address|default:"" }}</div></div>');
-    {% endif %}
-
-    // Add comparable markers (green house icons)
-    const comparables = [
-      {% for comp in comparables %}
-        {% if comp.latitude and comp.longitude %}
-          {
-            lat: {{ comp.latitude }},
-            lon: {{ comp.longitude }},
-            address: "{{ comp.address|default:""|escapejs }}",
-            price: "{{ comp.sale_price|floatformat:0|intcomma }}",
-            date: "{{ comp.sale_date|date:"M j, Y" }}",
-            distance: "{{ comp.distance_miles|floatformat:2 }}",
-            beds: "{{ comp.bedrooms|default:"—"|floatformat:"-1" }}",
-            baths: "{{ comp.bathrooms|quarter_baths|default:"—" }}",
-            {% with sqft_value=comp.calculated_square_footage|default:comp.living_area %}
-              sqft: "{{ sqft_value|default:"—"|floatformat:0|intcomma }}",
-            {% endwith %}
-            adjusted_value: {{ comp.adjusted_value|default:"null" }},
-            total_adjustment: {{ comp.total_adjustment|default:"null" }}
-          },
-        {% endif %}
-      {% endfor %}
-    ];
-
-    comparables.forEach((comp) => {
-      const marker = L.marker([comp.lat, comp.lon], {
-        icon: buildHouseIcon(COMPARABLE_MARKER_COLOR, 'house-marker--comp')
-      }).addTo(markersGroup);
-
-      marker.bindPopup(`
-        <div class="popup-content">
-          <strong>${comp.address}</strong>
-          <div>Sale: $${comp.price}</div>
-          <div>Date: ${comp.date}</div>
-          <div>Distance: ${comp.distance} mi</div>
-          <div>${comp.beds} beds, ${comp.baths} baths</div>
-          <div>${comp.sqft} sq ft</div>
-          {% if advanced_mode %}
-            ${comp.adjusted_value !== null ? `<div>Adjusted: $${comp.adjusted_value.toLocaleString()}${comp.total_adjustment !== null && comp.total_adjustment !== 0 ? ` (${comp.total_adjustment > 0 ? '+' : ''}$${Math.abs(comp.total_adjustment).toLocaleString()})` : ''}</div>` : ''}
-          {% endif %}
-        </div>
-      `);
-    });
-
-    // Fit bounds to show all markers
-    if (markersGroup.getBounds().isValid()) {
-      comparablesMap.fitBounds(markersGroup.getBounds(), { padding: [50, 50] });
+      comparablesMap = L.map(mapEl).setView([48.5, -122.5], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(comparablesMap);
+      markersGroup = L.featureGroup().addTo(comparablesMap);
+      renderComparablesMap();
     }
 
-    setTimeout(() => comparablesMap.invalidateSize(), 100);
-  }
+    function handleComparablesMode(mode) {
+      const root = getRoot();
+      if (root && root.dataset.activeMode === mode) {
+        return;
+      }
+      if (root) {
+        root.dataset.activeMode = mode;
+      }
+      setModeButtonState(mode);
+      const currentView = (root && root.dataset.currentView) || 'list';
+      const sortBy = (root && root.dataset.sortBy) || 'similarity';
+      const sortDir = (root && root.dataset.sortDir) || 'desc';
+      if (window.appealUpdateComparables) {
+        setModeStatus(mode === 'advanced' ? 'Running advanced analysis…' : 'Switching mode…', true);
+        const updateRequest = window.appealUpdateComparables(mode, {
+          current_view: currentView,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          fragment: 'content',
+        });
+        if (updateRequest && typeof updateRequest.finally === 'function') {
+          updateRequest.finally(() => {
+            setModeStatus('', false);
+          });
+        } else {
+          setTimeout(() => setModeStatus('', false), 800);
+        }
+      } else if (root && root.dataset.fetchUrl) {
+        const search = new URLSearchParams();
+        if (mode && mode !== 'standard') {
+          search.set('view_mode', mode);
+        }
+        if (currentView) {
+          search.set('current_view', currentView);
+        }
+        if (sortBy) {
+          search.set('sort_by', sortBy);
+        }
+        if (sortDir) {
+          search.set('sort_dir', sortDir);
+        }
+        const params = search.toString();
+        window.location.href = `${root.dataset.fetchUrl}${params ? `?${params}` : ''}`;
+      }
+    }
 
-  // Auto-initialize animations
-  document.addEventListener('DOMContentLoaded', () => {
-    if (typeof anime !== 'undefined') {
+    function applyComparablesSort(sortBy) {
+      const root = getRoot();
+      if (!root) return;
+      const normalized = (sortBy || 'similarity').toLowerCase();
+      root.dataset.sortBy = normalized;
+      root.dataset.sortDir = 'desc';
+      const mode = root.dataset.activeMode || 'standard';
+      const currentView = root.dataset.currentView || 'list';
+      if (window.appealUpdateComparables) {
+        window.appealUpdateComparables(mode, {
+          current_view: currentView,
+          sort_by: normalized,
+          sort_dir: 'desc',
+          fragment: 'content',
+        });
+        return;
+      }
+      if (root.dataset.fetchUrl) {
+        const search = new URLSearchParams();
+        if (mode && mode !== 'standard') {
+          search.set('view_mode', mode);
+        }
+        if (currentView) {
+          search.set('current_view', currentView);
+        }
+        search.set('sort_by', normalized);
+        search.set('sort_dir', 'desc');
+        const params = search.toString();
+        window.location.href = `${root.dataset.fetchUrl}${params ? `?${params}` : ''}`;
+      }
+    }
+
+    function switchView(view) {
+      const root = getRoot();
+      if (root) {
+        root.dataset.currentView = view;
+      }
+
+      document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.classList.toggle('view-btn--active', btn.dataset.view === view);
+      });
+
+      document.querySelectorAll('.view-container').forEach(container => {
+        container.classList.remove('view-container--active');
+      });
+
+      const targetView = document.getElementById(view + '-view');
+      if (targetView) {
+        targetView.classList.add('view-container--active');
+      }
+
+      if (view === 'map' && !comparablesMap) {
+        setTimeout(initComparablesMap, 100);
+      } else if (view === 'map' && comparablesMap) {
+        renderComparablesMap();
+        setTimeout(() => comparablesMap.invalidateSize(), 100);
+      }
+    }
+
+    window.handleComparablesMode = handleComparablesMode;
+    window.applyComparablesSort = applyComparablesSort;
+    window.switchView = switchView;
+
+    function renderAdvancedGauges() {
+      document.querySelectorAll('[data-advanced-gauge]').forEach((gauge) => {
+        const value = parseFloat(gauge.getAttribute('data-value') || '');
+        const min = parseFloat(gauge.getAttribute('data-min') || '0');
+        const max = parseFloat(gauge.getAttribute('data-max') || '1');
+        const targetLow = parseFloat(gauge.getAttribute('data-target-low') || '');
+        const targetHigh = parseFloat(gauge.getAttribute('data-target-high') || '');
+        const arc = gauge.querySelector('.advanced-support-gauge__arc');
+        const valueNode = gauge.querySelector('.advanced-support-gauge__value');
+        if (!arc || !valueNode || Number.isNaN(value) || Number.isNaN(min) || Number.isNaN(max) || max <= min) {
+          return;
+        }
+
+        const ratio = Math.min(1, Math.max(0, (value - min) / (max - min)));
+        arc.style.setProperty('--gauge-pct', `${(ratio * 100).toFixed(1)}%`);
+
+        valueNode.textContent = Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(3);
+        if (!Number.isNaN(targetLow) && !Number.isNaN(targetHigh)) {
+          const within = value >= targetLow && value <= targetHigh;
+          valueNode.style.color = within ? '#065f46' : '#b91c1c';
+        }
+      });
+    }
+
+    function setAdvancedFlipState(card, shouldFlip, animate = true) {
+      const inner = card.querySelector('[data-advanced-flip-inner]');
+      const toggle = card.querySelector('[data-advanced-flip-toggle]');
+      if (!inner || !toggle) {
+        return;
+      }
+
+      const targetRotation = shouldFlip ? 180 : 0;
+      card.dataset.flipped = shouldFlip ? 'true' : 'false';
+      toggle.setAttribute('aria-expanded', shouldFlip ? 'true' : 'false');
+      toggle.classList.toggle('is-flipped', shouldFlip);
+
+      if (typeof anime !== 'undefined' && animate) {
+        anime.remove(inner);
+        anime({
+          targets: inner,
+          rotateY: targetRotation,
+          duration: 360,
+          easing: 'easeOutCubic',
+        });
+      } else {
+        inner.style.transform = `rotateY(${targetRotation}deg)`;
+      }
+    }
+
+    function initAdvancedSupportFlips() {
+      document.querySelectorAll('[data-advanced-flip-card]').forEach((card) => {
+        const toggle = card.querySelector('[data-advanced-flip-toggle]');
+        if (!toggle) {
+          return;
+        }
+
+        if (toggle.dataset.flipBound !== 'true') {
+          toggle.dataset.flipBound = 'true';
+          toggle.addEventListener('click', () => {
+            const isFlipped = card.dataset.flipped === 'true';
+            setAdvancedFlipState(card, !isFlipped, true);
+          });
+        }
+
+        setAdvancedFlipState(card, false, false);
+      });
+    }
+
+    function animateComparableCards() {
+      if (typeof anime === 'undefined') return;
+      anime.remove('.comp-card');
       anime({
         targets: '.comp-card',
         translateX: [20, 0],
         opacity: [0, 1],
-        delay: anime.stagger(100),
-        duration: 400,
+        delay: anime.stagger(80),
+        duration: 320,
         easing: 'easeOutQuad'
       });
     }
 
-  });
-
-  document.addEventListener('click', (event) => {
-    document.querySelectorAll('.comp-similarity[open]').forEach((details) => {
-      if (!details.contains(event.target)) {
-        details.removeAttribute('open');
-      }
-    });
-  });
-</script>
-
-<style>
-  .fairness-trigger-card {
-    margin-top: var(--space-8);
-    padding: var(--space-5);
-    border-radius: var(--radius-2xl);
-    border: 1px dashed var(--gray-300);
-    background: radial-gradient(circle at top left, #eef2ff, #f9fafb);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .fairness-trigger-header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .fairness-trigger-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--gray-900);
-  }
-
-  .fairness-trigger-subtitle {
-    font-size: 0.9rem;
-    color: var(--gray-600);
-    max-width: 36rem;
-  }
-
-  .fairness-trigger-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    align-items: center;
-  }
-
-  .fairness-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 1.1rem;
-    border-radius: 999px;
-    border: none;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    background: linear-gradient(135deg, var(--dusty-grape), var(--dusty-taupe));
-    color: #fff;
-    box-shadow: var(--shadow-md);
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
-  }
-
-  .fairness-btn[disabled] {
-    opacity: 0.7;
-    cursor: default;
-    box-shadow: none;
-  }
-
-  .fairness-btn:not([disabled]):hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .fairness-spinner {
-    width: 0.85rem;
-    height: 0.85rem;
-    border-radius: 999px;
-    border: 2px solid rgba(255,255,255,0.5);
-    border-top-color: #fff;
-    animation: fairness-spin 0.6s linear infinite;
-  }
-
-  @keyframes fairness-spin {
-    to { transform: rotate(360deg); }
-  }
-
-  .fairness-trigger-note {
-    font-size: 0.8rem;
-    color: var(--gray-600);
-  }
-
-  .fairness-trigger-note p {
-    margin: 0;
-  }
-
-  .fairness-trigger-hold-note {
-    margin-top: 0.25rem;
-    font-size: 0.75rem;
-    color: var(--gray-500);
-  }
-
-  .fairness-btn-locked {
-    opacity: 0.7;
-    transition: opacity 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .fairness-btn-ready {
-    opacity: 1;
-    box-shadow: 0 0 0 3px rgba(41, 121, 255, 0.25);
-  }
-</style>
-
-<div class="fairness-trigger-card">
-  <div class="fairness-trigger-header">
-    <div>
-      <div class="fairness-trigger-title">Run Fairness Analysis</div>
-      <p class="fairness-trigger-subtitle">
-        Bring together your subject, neighborhood metrics, and comparable sales into a single IAAO-style fairness
-        checklist. This can help you decide whether an appeal feels reasonable.
-      </p>
-    </div>
-    <div class="fairness-trigger-actions">
-      <button
-        id="fairness-analysis-button"
-        class="fairness-btn"
-        type="button"
-        data-url="{% url 'appeal-result-fairness' parcel_number %}"
-      >
-        <span>Run Fairness Analysis</span>
-        <svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 11 12 14 22 4"></polyline>
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-        </svg>
-      </button>
-      <div class="fairness-trigger-note">
-        <p>Uses anonymous neighborhood statistics and a model tuned to IAAO fairness concepts. No legal advice.</p>
-        <p class="fairness-trigger-hold-note">Hold the button down for three seconds so you really mean it before running the analysis.</p>
-      </div>
-    </div>
-  </div>
-  <div id="fairness-analysis-result"></div>
-</div>
-
-<script>
-  (function () {
-    const button = document.getElementById('fairness-analysis-button');
-    const resultContainer = document.getElementById('fairness-analysis-result');
-
-    if (!button || !resultContainer) {
-      return;
-    }
-
-    const iconMarkup =
-      '<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<polyline points="9 11 12 14 22 4"></polyline>' +
-      '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' +
-      '</svg>';
-    const defaultButtonHtml = `<span>Run Fairness Analysis</span>${iconMarkup}`;
-    const readyButtonHtml = `<span>Release to run Fairness Analysis</span>${iconMarkup}`;
-    const spinnerHtml = '<div class="fairness-spinner"></div><span>Running analysis…</span>';
-
-    const LONG_PRESS_DURATION = 3000;
-    let holdTimer = null;
-    let holdReady = false;
-
-    function cancelHoldTimer() {
-      if (holdTimer) {
-        clearTimeout(holdTimer);
-        holdTimer = null;
-      }
-    }
-
-    function enterReadyState() {
-      holdReady = true;
-      button.innerHTML = readyButtonHtml;
-      button.classList.remove('fairness-btn-locked');
-      button.classList.add('fairness-btn-ready');
-    }
-
-    function setLoading(isLoading) {
-      cancelHoldTimer();
-      holdReady = false;
-
-      button.disabled = isLoading;
-      button.setAttribute('aria-busy', isLoading ? 'true' : 'false');
-      button.innerHTML = isLoading ? spinnerHtml : defaultButtonHtml;
-      button.classList.remove('fairness-btn-ready');
-      button.classList.add('fairness-btn-locked');
-    }
-
-    button.addEventListener('pointerdown', (event) => {
-      if (event.pointerType === 'mouse' && event.button !== 0) {
+    function replaceTrayHtml(html) {
+      const tray = getSavedTray();
+      if (!tray || typeof html !== 'string') {
         return;
       }
-      if (holdReady || button.disabled) {
-        return;
+      tray.innerHTML = html;
+    }
+
+    async function postSavedAction(action, payload) {
+      const root = getRoot();
+      if (!root || !root.dataset.savedCompsUrl) {
+        throw new Error('Saved comps endpoint unavailable.');
       }
-
-      cancelHoldTimer();
-      holdTimer = window.setTimeout(() => {
-        enterReadyState();
-        holdTimer = null;
-      }, LONG_PRESS_DURATION);
-    });
-
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach((eventName) => {
-      button.addEventListener(eventName, () => {
-        if (!holdReady) {
-          cancelHoldTimer();
-        }
+      const response = await fetch(root.dataset.savedCompsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ action, ...payload }),
       });
-    });
-
-    button.addEventListener('click', () => {
-      if (!holdReady || button.disabled) {
-        return;
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Unable to update saved comps.');
       }
-
-      setLoading(true);
-      resultContainer.innerHTML = '';
-
-      fetch(button.dataset.url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Unable to run fairness analysis');
-          }
-          return response.text();
-        })
-        .then((html) => {
-          resultContainer.innerHTML = html;
-        })
-        .catch(() => {
-          resultContainer.innerHTML = '<div class="fairness-error">Unable to run the fairness analysis right now. Please try again in a few minutes.</div>';
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    });
-
-    setLoading(false);
-  })();
-</script>
-<script>
-  (function () {
-    const button = document.getElementById('comparables-more-button');
-
-    if (!button) {
-      return;
+      replaceTrayHtml(data.tray_html);
+      syncSaveButtons(Array.isArray(data.saved_ids) ? data.saved_ids : getSavedIdsFromTray());
+      return data;
     }
 
-    button.addEventListener('click', () => {
-      if (button.disabled) {
-        return;
+    async function handleSaveToggle(button) {
+      const parcel = (button.dataset.compParcel || '').trim();
+      if (!parcel || button.disabled) return;
+      const isSaved = button.classList.contains('comp-save-btn--saved');
+      button.disabled = true;
+      try {
+        await postSavedAction(isSaved ? 'remove' : 'add', { comp_parcel: parcel });
+      } catch (error) {
+        window.alert(error.message || 'Unable to update saved comps.');
+      } finally {
+        button.disabled = false;
       }
+    }
 
+    async function handleTrayRemove(button) {
+      const parcel = (button.dataset.compParcel || '').trim();
+      if (!parcel || button.disabled) return;
+      button.disabled = true;
+      try {
+        await postSavedAction('remove', { comp_parcel: parcel });
+      } catch (error) {
+        window.alert(error.message || 'Unable to remove saved comp.');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function handleLoadMore(button) {
+      if (button.disabled) return;
       button.disabled = true;
       const label = button.querySelector('.comparables-more-label');
       if (label) {
         label.textContent = 'Finding more comps…';
-      } else {
-        button.textContent = 'Finding more comps…';
       }
-
-      const root = document.getElementById('appeal-comparables-root');
+      const root = getRoot();
       const viewMode = (root && root.dataset.activeMode) || 'standard';
+      const currentView = (root && root.dataset.currentView) || 'list';
+      const sortBy = (root && root.dataset.sortBy) || 'similarity';
+      const sortDir = (root && root.dataset.sortDir) || 'desc';
       const count = button.dataset.extendedCount;
-
       if (window.appealUpdateComparables) {
-        window.appealUpdateComparables(viewMode, { count });
-        return;
+        const update = window.appealUpdateComparables(viewMode, {
+          count,
+          current_view: currentView,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          fragment: 'content',
+        });
+        if (update && typeof update.catch === 'function') {
+          update.catch(() => {
+            button.disabled = false;
+            if (label) label.textContent = 'Get more comps';
+          });
+        }
       }
+    }
 
-      if (root && root.dataset.fetchUrl) {
-        const params = new URLSearchParams();
-        if (viewMode && viewMode !== 'standard') {
-          params.set('view_mode', viewMode);
-        }
-        if (count) {
-          params.set('count', count);
-        }
-        const query = params.toString();
-        window.location.href = `${root.dataset.fetchUrl}${query ? `?${query}` : ''}`;
+    window.appealComparablesDidSwap = function () {
+      const root = getRoot();
+      if (!root) return;
+      destroyComparablesMap();
+      switchView(root.dataset.currentView || 'list');
+      const countNode = document.getElementById('appeal-comparables-content-state');
+      const subtitle = root.querySelector('.section-title__text p');
+      const count = Number(countNode ? countNode.dataset.compCount : '');
+      if (subtitle && Number.isFinite(count)) {
+        subtitle.textContent = `${count} similar properties found nearby`;
       }
-    });
+      renderAdvancedGauges();
+      initAdvancedSupportFlips();
+      syncSaveButtons(getSavedIdsFromTray());
+      animateComparableCards();
+    };
+
+    if (!window.__openskagitComparablesClickHook) {
+      window.__openskagitComparablesClickHook = true;
+      document.addEventListener('click', (event) => {
+        const saveButton = event.target.closest('[data-comp-save-toggle]');
+        if (saveButton) {
+          event.preventDefault();
+          handleSaveToggle(saveButton);
+          return;
+        }
+
+        const trayRemove = event.target.closest('[data-saved-tray-remove]');
+        if (trayRemove) {
+          event.preventDefault();
+          handleTrayRemove(trayRemove);
+          return;
+        }
+
+        const moreButton = event.target.closest('#comparables-more-button');
+        if (moreButton) {
+          event.preventDefault();
+          handleLoadMore(moreButton);
+          return;
+        }
+
+        const disabledWorkspaceLink = event.target.closest('.saved-comp-tray__workspace-btn[aria-disabled="true"]');
+        if (disabledWorkspaceLink) {
+          event.preventDefault();
+        }
+
+        document.querySelectorAll('.comp-similarity[open]').forEach((details) => {
+          if (!details.contains(event.target)) {
+            details.removeAttribute('open');
+          }
+        });
+      });
+    }
+
+    const comparablesRoot = document.getElementById('appeal-comparables-root');
+    const initialComparablesView = (comparablesRoot && comparablesRoot.dataset.currentView)
+      ? comparablesRoot.dataset.currentView
+      : 'list';
+    const initialMode = (comparablesRoot && comparablesRoot.dataset.activeMode)
+      ? comparablesRoot.dataset.activeMode
+      : 'standard';
+    setModeButtonState(initialMode);
+    switchView(initialComparablesView);
+    window.appealComparablesDidSwap();
   })();
 </script>

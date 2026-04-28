@@ -1,0 +1,20 @@
+OpenSkagit Parcel Alert Signup Confirmed
+
+Your parcel recorded-document alert has been set up.
+
+What to expect:
+- We check the public recorder index nightly.
+- You get notified only when new high-signal recorded documents are indexed.
+- This is a notification service, not insurance, legal advice, ownership verification, or fraud prevention.
+
+{% for item in parcel_subscriptions %}
+Parcel {{ item.parcel_id }}{% if item.situs_address %} - {{ item.situs_address }}{% endif %}
+{% if item.owner_name %}Owner at signup: {{ item.owner_name }}{% endif %}
+{% if item.monitored_names %}Monitored names: {{ item.monitored_names|join:", " }}{% endif %}
+Manage this alert: {{ item.manage_url }}
+Delete this alert now: {{ item.delete_url }}
+{% if item.latest_document_url %}Latest recorded document link: {{ item.latest_document_url }}{% endif %}
+Recorder index for this parcel: {{ item.recording_results_url }}
+{% endfor %}
+
+Generated: {{ generated_at|date:"Y-m-d H:i:s T" }}

@@ -1,0 +1,247 @@
+{% extends "openskagit/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<section class="bg-white border-b border-gray-200">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div class="space-y-2">
+        <p class="text-xs font-semibold tracking-wide uppercase text-gray-500">City limits</p>
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Sedro-Woolley</h1>
+        <p class="text-sm sm:text-base text-gray-600">
+          Public portal for parcels, value, sales, permits, and civic snapshot.
+        </p>
+      </div>
+      <a
+        href="{{ city_map_url|default:zoning_map_url }}"
+        class="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+      >
+        Open city map
+      </a>
+    </div>
+  </div>
+</section>
+
+{% if portal_error %}
+<section class="bg-amber-50 border-b border-amber-200">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <p class="text-sm text-amber-800">{{ portal_error }}</p>
+  </div>
+</section>
+{% endif %}
+
+<section class="bg-gray-50 py-8">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="rounded-2xl border border-gray-200 bg-white p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500">Parcels</p>
+      <p class="mt-1 text-2xl font-semibold text-gray-900">{{ portal.overview.parcel_count|intcomma }}</p>
+    </div>
+    <div class="rounded-2xl border border-gray-200 bg-white p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500">Total assessed</p>
+      <p class="mt-1 text-2xl font-semibold text-gray-900">${{ portal.overview.total_assessed_value|floatformat:0|intcomma }}</p>
+    </div>
+    <div class="rounded-2xl border border-gray-200 bg-white p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500">Total taxable</p>
+      <p class="mt-1 text-2xl font-semibold text-gray-900">${{ portal.overview.total_taxable_value|floatformat:0|intcomma }}</p>
+    </div>
+    <div class="rounded-2xl border border-gray-200 bg-white p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500">City acres</p>
+      <p class="mt-1 text-2xl font-semibold text-gray-900">{{ portal.overview.city_acres|floatformat:1|intcomma }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="bg-white py-8 border-t border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
+    <div class="flex items-end justify-between gap-3">
+      <h2 class="text-xl font-semibold text-gray-900">Permits</h2>
+      <p class="text-xs text-gray-500">{{ portal.permits.first_permit_date|date:"Y" }} to {{ portal.permits.last_permit_date|date:"Y" }}</p>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div class="rounded-xl border border-gray-200 p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Total</p>
+        <p class="text-lg font-semibold text-gray-900">{{ portal.permits.permit_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Last 12 months</p>
+        <p class="text-lg font-semibold text-gray-900">{{ portal.permits.permits_last_12m|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Significant</p>
+        <p class="text-lg font-semibold text-gray-900">{{ portal.permits.significant_permit_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Significant 12 months</p>
+        <p class="text-lg font-semibold text-gray-900">{{ portal.permits.significant_last_12m|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Permit fees total</p>
+        <p class="text-lg font-semibold text-gray-900">${{ portal.permits.total_fees|floatformat:0|intcomma }}</p>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-5">
+      <div class="rounded-2xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100 text-gray-700">
+            <tr>
+              <th class="text-left px-3 py-2 font-semibold">Year</th>
+              <th class="text-right px-3 py-2 font-semibold">Permits</th>
+              <th class="text-right px-3 py-2 font-semibold">Significant</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in portal.permits.timeline_years %}
+            <tr class="border-t border-gray-100">
+              <td class="px-3 py-2 text-gray-700">{{ row.permit_year }}</td>
+              <td class="px-3 py-2 text-right text-gray-900">{{ row.permit_count|intcomma }}</td>
+              <td class="px-3 py-2 text-right text-gray-900">{{ row.significant_count|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="px-3 py-3 text-gray-500">No permit timeline rows.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="rounded-2xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100 text-gray-700">
+            <tr>
+              <th class="text-left px-3 py-2 font-semibold">Significant type</th>
+              <th class="text-right px-3 py-2 font-semibold">Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in portal.permits.significant_types %}
+            <tr class="border-t border-gray-100">
+              <td class="px-3 py-2 text-gray-700">{{ row.permit_type }}</td>
+              <td class="px-3 py-2 text-right text-gray-900">{{ row.permit_count|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2" class="px-3 py-3 text-gray-500">No significant permit types found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 p-4">
+      <p class="text-sm text-gray-700">
+        Blank status rows: <strong>{{ portal.permits.status_blank_count|intcomma }}</strong>
+        {% if portal.permits.status_nonblank_count %}
+        | Non-blank status rows: <strong>{{ portal.permits.status_nonblank_count|intcomma }}</strong>
+        {% endif %}
+      </p>
+      {% if portal.permits.status_counts %}
+      <div class="mt-3 flex flex-wrap gap-2">
+        {% for row in portal.permits.status_counts %}
+        <span class="inline-flex items-center rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-700">
+          {{ row.status }}: {{ row.permit_count|intcomma }}
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="bg-gray-50 py-8 border-t border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
+    <div class="flex items-end justify-between gap-3">
+      <h2 class="text-xl font-semibold text-gray-900">Sales</h2>
+      <p class="text-xs text-gray-500">{{ portal.sales.first_sale_date|date:"Y" }} to {{ portal.sales.last_sale_date|date:"Y" }}</p>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div class="rounded-xl border border-gray-200 bg-white p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Valid sales</p>
+        <p class="text-lg font-semibold text-gray-900">{{ portal.sales.valid_sale_count|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Last 12 months</p>
+        <p class="text-lg font-semibold text-gray-900">{{ portal.sales.sales_last_12m|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Median price</p>
+        <p class="text-lg font-semibold text-gray-900">${{ portal.sales.median_sale_price|floatformat:0|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Average price</p>
+        <p class="text-lg font-semibold text-gray-900">${{ portal.sales.avg_sale_price|floatformat:0|intcomma }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-3">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Median $/sqft</p>
+        <p class="text-lg font-semibold text-gray-900">${{ portal.sales.median_price_per_sqft|floatformat:0|intcomma }}</p>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="text-left px-3 py-2 font-semibold">Year</th>
+            <th class="text-right px-3 py-2 font-semibold">Sales</th>
+            <th class="text-right px-3 py-2 font-semibold">Median price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in portal.sales.timeline_years %}
+          <tr class="border-t border-gray-100">
+            <td class="px-3 py-2 text-gray-700">{{ row.sale_year }}</td>
+            <td class="px-3 py-2 text-right text-gray-900">{{ row.sale_count|intcomma }}</td>
+            <td class="px-3 py-2 text-right text-gray-900">${{ row.median_sale_price|floatformat:0|intcomma }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="px-3 py-3 text-gray-500">No sales timeline rows.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="bg-white py-8 border-t border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-5">
+    <div class="rounded-2xl border border-gray-200 p-4 space-y-3">
+      <h2 class="text-lg font-semibold text-gray-900">Civic snapshot</h2>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-gray-500">Election year</p>
+          <p class="text-base font-semibold text-gray-900">{{ portal.civic.election_year|default:"-" }}</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-wide text-gray-500">Precincts</p>
+          <p class="text-base font-semibold text-gray-900">{{ portal.civic.precinct_count|intcomma }}</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-wide text-gray-500">Ballots cast</p>
+          <p class="text-base font-semibold text-gray-900">{{ portal.civic.ballots_cast|intcomma }}</p>
+        </div>
+        <div>
+          <p class="text-xs uppercase tracking-wide text-gray-500">Residential parcels</p>
+          <p class="text-base font-semibold text-gray-900">{{ portal.civic.residential_parcels|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 p-4 space-y-3">
+      <h2 class="text-lg font-semibold text-gray-900">Restaurants by reviews</h2>
+      <p class="text-sm text-gray-600">
+        Active Sedro restaurants: <strong>{{ portal.restaurants.restaurant_count|intcomma }}</strong>
+        {% if portal.restaurants.avg_rating %}
+        | Avg rating: <strong>{{ portal.restaurants.avg_rating|floatformat:2 }}</strong>
+        {% endif %}
+      </p>
+      <div class="space-y-2">
+        {% for row in portal.restaurants.top_restaurants %}
+        <div class="flex items-center justify-between gap-3 text-sm">
+          <span class="text-gray-800">{{ row.name }}</span>
+          <span class="text-gray-600">{{ row.review_count|intcomma }} reviews</span>
+        </div>
+        {% empty %}
+        <p class="text-sm text-gray-500">Restaurant module queued.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

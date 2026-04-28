@@ -33,4 +33,16 @@ urlpatterns = [
     ),
     path("flavor-signals/ai/", views.FlavorSignalAiView.as_view(), name="flavor-signals-ai"),
     path("civic-balance-map/", views.CivicBalanceMapView.as_view(), name="civic-balance-map"),
+    path("votevector/district3-map/", views.VoteVectorDistrict3MapView.as_view(), name="votevector-district3-map"),
+    path("regression/v1/config/", views.RegressionV1ConfigView.as_view(), name="regression-v1-config"),
+    path("regression/v1/runs/", views.RegressionV1RunsView.as_view(), name="regression-v1-runs"),
+    path("regression/v1/runs/<uuid:run_id>/", views.RegressionV1RunDetailView.as_view(), name="regression-v1-run-detail"),
+    path("regression/v1/runs/<uuid:run_id>/promote/", views.RegressionV1PromoteView.as_view(), name="regression-v1-promote"),
+    path("regression/v1/predict/", views.RegressionV1PredictView.as_view(), name="regression-v1-predict"),
+    path("meetings/youtube/jobs/", views.YoutubeMeetingJobsView.as_view(), name="youtube-meeting-jobs"),
+    path(
+        "meetings/youtube/jobs/<uuid:job_id>/",
+        views.YoutubeMeetingJobDetailView.as_view(),
+        name="youtube-meeting-job-detail",
+    ),
 ]

@@ -1,0 +1,27 @@
+OpenSkagit Recorded Document Alert
+
+{{ document_count }} new high-signal recorded document{{ document_count|pluralize }} matched your tracked parcel{{ parcel_alerts|length|pluralize }}.
+
+This service reports newly indexed public recorded documents. It does not determine fraud, ownership validity, or legal status.
+
+Generated: {{ generated_at|date:"Y-m-d H:i:s T" }}
+
+{% for alert in parcel_alerts %}
+Parcel {{ alert.parcel_id }}{% if alert.situs_address %} - {{ alert.situs_address }}{% endif %}
+{% if alert.owner_name %}Baseline owner at signup: {{ alert.owner_name }}{% endif %}
+Edit alert details: {{ alert.manage_url|default:alert.unsubscribe_url }}
+Delete this alert: {{ alert.delete_url|default:alert.unsubscribe_url }}
+
+{% for doc in alert.documents %}
+- {{ doc.document_type|default:"Document" }} | Recording {{ doc.recording_number }} | Recorded {{ doc.recorded_date|default:"-" }}
+  Risk: {{ doc.risk_level|default:"-" }} ({{ doc.risk_score|default:"-" }}){% if doc.is_high_priority %} [HIGH PRIORITY]{% endif %}
+  Parcel: {{ doc.parcel_id|default:alert.parcel_id }}
+  {% if doc.grantor %}Grantor: {{ doc.grantor }}{% endif %}
+  {% if doc.grantee %}Grantee: {{ doc.grantee }}{% endif %}
+  {% if doc.filer %}Filer: {{ doc.filer }}{% endif %}
+  {% if doc.risk_reasons %}Signals: {{ doc.risk_reasons|join:"; " }}{% endif %}
+  {% if doc.comment and doc.comment != "-" %}Comment: {{ doc.comment }}{% endif %}
+  {% if doc.document_url %}Recorded document link: {{ doc.document_url }}{% else %}Recorder index link: {{ doc.source_url }}{% endif %}
+{% endfor %}
+
+{% endfor %}

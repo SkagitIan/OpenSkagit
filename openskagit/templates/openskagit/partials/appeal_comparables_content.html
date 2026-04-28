@@ -1,0 +1,528 @@
+{% load humanize formatting %}
+<div id="appeal-comparables-content-state" data-comp-count="{{ comparables|length }}" hidden></div>
+
+  {% if no_comp_diagnostics %}
+    <section class="comparables-system-message" role="status" aria-live="polite">
+      <p class="comparables-system-message__title">No comparable sales were returned automatically for this parcel.</p>
+      <p class="comparables-system-message__summary">
+        System check used {{ no_comp_diagnostics.months }} months and up to {{ no_comp_diagnostics.max_radius_m|floatformat:0|intcomma }} meters.
+      </p>
+      {% if no_comp_diagnostics.reasons %}
+        <ul class="comparables-system-message__reasons">
+          {% for reason in no_comp_diagnostics.reasons %}
+            <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if advanced_mode %}
+    <section class="advanced-support-panel">
+      <div class="advanced-support-panel__title">Adjustment Support v1 (Experimental)</div>
+      <p class="advanced-support-panel__subtitle">
+        This is support analysis only. It does not produce an automatic value conclusion.
+      </p>
+
+      {% if advanced_error %}
+        <p class="advanced-support-panel__status advanced-support-panel__status--error">
+          Error: {{ advanced_error }}
+        </p>
+      {% elif advanced_summary.status == "not_enough_sales" %}
+        <p class="advanced-support-panel__status advanced-support-panel__status--warning">
+          Not enough sales after fallback steps ({{ advanced_summary.regression_sample_size }} found).
+        </p>
+      {% elif advanced_summary.status == "suppressed" %}
+        <p class="advanced-support-panel__status advanced-support-panel__status--warning">
+          Model suppressed: {{ advanced_summary.suppression_reason|default:"quality checks not met" }}.
+        </p>
+      {% elif advanced_summary.status == "ready" %}
+        <p class="advanced-support-panel__status">
+          Ready. Sample {{ advanced_summary.regression_sample_size }} sales across {{ advanced_summary.months_used }} months
+          using {{ advanced_summary.geography_context.level|default:"market context" }}.
+        </p>
+      {% else %}
+        <p class="advanced-support-panel__status">Analysis state: {{ advanced_summary.status|default:"unavailable" }}.</p>
+      {% endif %}
+
+      {% if advanced_summary.trust_state %}
+        <div class="advanced-support-trust">
+          <span class="trust-badge trust-badge--{{ advanced_summary.trust_state|default:'low' }}">
+            Trust {{ advanced_summary.trust_state_label|default:advanced_summary.trust_state|title }}
+          </span>
+          {% if advanced_summary.trust_score is not None %}
+            <span class="advanced-support-trust-score">Score {{ advanced_summary.trust_score }}/100</span>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="advanced-support-metrics">
+        <div class="advanced-support-metric">
+          <div class="advanced-support-flip" data-advanced-flip-card>
+            <button
+              type="button"
+              class="advanced-support-flip__toggle"
+              data-advanced-flip-toggle
+              aria-label="Flip sample size explanation"
+              aria-expanded="false"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+            <div class="advanced-support-flip__inner" data-advanced-flip-inner>
+              <div class="advanced-support-flip__face advanced-support-flip__face--front">
+                <span class="advanced-support-metric__label">Sample Size</span>
+                <span class="advanced-support-metric__value">{{ advanced_summary.iaao_metrics.sample_size|default:0 }}</span>
+              </div>
+              <div class="advanced-support-flip__face advanced-support-flip__face--back">
+                <span class="advanced-support-metric__label">Sample Size</span>
+                <div class="advanced-support-flip__copy">
+                  <p>This is the number of sold homes used to train this run.</p>
+                  {% with final_sample=advanced_summary.iaao_metrics.sample_size|default:advanced_summary.regression_sample_size first_step=advanced_summary.widening_steps.0 %}
+                    {% if first_step and first_step.count and final_sample and final_sample > first_step.count %}
+                      <p>We started with {{ first_step.count }} sales, then widened the search to reach {{ final_sample }} sales.</p>
+                    {% elif first_step and first_step.count %}
+                      <p>We started with {{ first_step.count }} sales and kept that set for this run.</p>
+                    {% elif final_sample %}
+                      <p>This run settled on {{ final_sample }} sales.</p>
+                    {% else %}
+                      <p>Sales count was not available.</p>
+                    {% endif %}
+                  {% endwith %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="advanced-support-metric">
+          <div class="advanced-support-flip" data-advanced-flip-card>
+            <button
+              type="button"
+              class="advanced-support-flip__toggle"
+              data-advanced-flip-toggle
+              aria-label="Flip months used explanation"
+              aria-expanded="false"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+            <div class="advanced-support-flip__inner" data-advanced-flip-inner>
+              <div class="advanced-support-flip__face advanced-support-flip__face--front">
+                <span class="advanced-support-metric__label">Months Used</span>
+                <span class="advanced-support-metric__value">{{ advanced_summary.months_used|default:"—" }}</span>
+              </div>
+              <div class="advanced-support-flip__face advanced-support-flip__face--back">
+                <span class="advanced-support-metric__label">Months Used</span>
+                <div class="advanced-support-flip__copy">
+                  <p>This is how far back we looked at sales dates.</p>
+                  {% with first_step=advanced_summary.widening_steps.0 final_sample=advanced_summary.iaao_metrics.sample_size|default:advanced_summary.regression_sample_size %}
+                    {% if first_step and first_step.months and advanced_summary.months_used and advanced_summary.months_used > first_step.months %}
+                      <p>We first tried {{ first_step.months }} months and got {{ first_step.count|default:0 }} sales.</p>
+                      <p>That was too thin, so we widened to {{ advanced_summary.months_used }} months and landed on {{ final_sample|default:0 }} sales.</p>
+                    {% elif advanced_summary.months_used %}
+                      <p>We used {{ advanced_summary.months_used }} months because that window already had enough sales.</p>
+                    {% else %}
+                      <p>Lookback months were not available for this run.</p>
+                    {% endif %}
+                  {% endwith %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="advanced-support-metric">
+          <div class="advanced-support-flip" data-advanced-flip-card>
+            <button
+              type="button"
+              class="advanced-support-flip__toggle"
+              data-advanced-flip-toggle
+              aria-label="Flip market context explanation"
+              aria-expanded="false"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+            <div class="advanced-support-flip__inner" data-advanced-flip-inner>
+              <div class="advanced-support-flip__face advanced-support-flip__face--front">
+                <span class="advanced-support-metric__label">Market Context</span>
+                <span class="advanced-support-metric__value">{{ advanced_summary.geography_context.level|default:"—"|replace:"_, "|title }}</span>
+                {% if advanced_summary.geography_context.strategy and advanced_summary.geography_context.strategy != advanced_summary.geography_context.level %}
+                  <span class="advanced-support-metric__meta">{{ advanced_summary.geography_context.strategy|replace:"_, "|title }}</span>
+                {% endif %}
+              </div>
+              <div class="advanced-support-flip__face advanced-support-flip__face--back">
+                <span class="advanced-support-metric__label">Market Context</span>
+                <div class="advanced-support-flip__copy">
+                  <p>This is the area where we pulled similar sales.</p>
+                  {% with first_level=advanced_summary.widening_steps.0.strategy final_level=advanced_summary.geography_context.level %}
+                    {% if first_level and final_level and first_level != final_level %}
+                      <p>We started at {{ first_level|replace:"_, "|title }}, then widened to {{ final_level|replace:"_, "|title }} to get enough sales.</p>
+                    {% elif final_level %}
+                      <p>We stayed at {{ final_level|replace:"_, "|title }} because sales coverage was already strong enough.</p>
+                    {% else %}
+                      <p>Market context details were not available.</p>
+                    {% endif %}
+                  {% endwith %}
+                  <p>Final run used {{ advanced_summary.months_used|default:"—" }} months of sales.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if advanced_summary.status == "ready" and advanced_summary.suggested_adjustment_hints %}
+        <div class="advanced-support-driver-grid">
+          {% for hint in advanced_summary.suggested_adjustment_hints %}
+            <div class="advanced-support-driver">
+              <div class="advanced-support-flip" data-advanced-flip-card>
+                <button
+                  type="button"
+                  class="advanced-support-flip__toggle"
+                  data-advanced-flip-toggle
+                  aria-label="Flip {{ hint.factor|default:'adjustment'|replace:'_, ' }} explanation"
+                  aria-expanded="false"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                </button>
+                <div class="advanced-support-flip__inner" data-advanced-flip-inner>
+                  <div class="advanced-support-flip__face advanced-support-flip__face--front">
+                    <div class="advanced-support-driver__label">{{ hint.factor|default:"factor"|replace:"_, "|title }}</div>
+                    <div class="advanced-support-driver__value">
+                      {% if hint.estimate is not None %}
+                        {% if hint.estimate > 0 %}+{% endif %}${{ hint.estimate|floatformat:0|intcomma }}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </div>
+                    <div class="advanced-support-driver__meta">{{ hint.unit|default:"support estimate"|replace:"_, " }}</div>
+                  </div>
+                  <div class="advanced-support-flip__face advanced-support-flip__face--back">
+                    <div class="advanced-support-driver__label">{{ hint.factor|default:"factor"|replace:"_, "|title }}</div>
+                    <div class="advanced-support-flip__copy">
+                      {% if hint.factor == "living_area" %}
+                        <p>This is the value change for each 1 sq ft difference in living area.</p>
+                        {% if hint.estimate is not None %}
+                          <p>At {% if hint.estimate > 0 %}+{% endif %}${{ hint.estimate|floatformat:0|intcomma }} per sq ft, a 200 sq ft gap shifts value by about ${{ hint.estimate|multiply:200|abs|floatformat:0|intcomma }}.</p>
+                        {% endif %}
+                      {% elif hint.factor == "garage" %}
+                        <p>This is a yes/no adjustment for having a garage.</p>
+                        {% if hint.estimate is not None %}
+                          <p>If one home has a garage and the other does not, this run uses about {% if hint.estimate > 0 %}+{% endif %}${{ hint.estimate|floatformat:0|intcomma }}.</p>
+                        {% endif %}
+                      {% elif hint.factor == "effective_age" %}
+                        <p>This is the value change for each 1-year difference in effective age.</p>
+                        {% if hint.estimate is not None %}
+                          <p>A 10-year age gap shifts value by about ${{ hint.estimate|multiply:10|abs|floatformat:0|intcomma }} in this run.</p>
+                        {% endif %}
+                      {% elif hint.factor == "time" %}
+                        <p>This is the time trend from sale date to today, measured per month.</p>
+                        {% if hint.estimate is not None %}
+                          <p>A 12-month timing gap shifts value by about ${{ hint.estimate|multiply:12|abs|floatformat:0|intcomma }} in this run.</p>
+                        {% endif %}
+                      {% else %}
+                        <p>This factor helps align each comp to your subject property.</p>
+                        {% if hint.estimate is not None %}
+                          <p>Current run effect: {% if hint.estimate > 0 %}+{% endif %}${{ hint.estimate|floatformat:0|intcomma }} {{ hint.unit|default:"per step"|replace:"_, " }}.</p>
+                        {% endif %}
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="advanced-support-gauge-grid">
+        <div class="advanced-support-gauge advanced-support-flip" data-advanced-flip-card>
+          <button
+            type="button"
+            class="advanced-support-flip__toggle"
+            data-advanced-flip-toggle
+            aria-label="Flip COD explanation"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+          <div class="advanced-support-flip__inner" data-advanced-flip-inner>
+            <div class="advanced-support-flip__face advanced-support-flip__face--front">
+              <div data-advanced-gauge data-value="{{ advanced_summary.iaao_metrics.cod|default_if_none:'' }}" data-min="0" data-max="30" data-target-low="5" data-target-high="15">
+                <div class="advanced-support-gauge__label">COD</div>
+                <div class="advanced-support-gauge__arc"><span class="advanced-support-gauge__value">—</span></div>
+                <div class="advanced-support-gauge__status">Uniformity target 5–15</div>
+              </div>
+            </div>
+            <div class="advanced-support-flip__face advanced-support-flip__face--back">
+              <div class="advanced-support-gauge__label">COD</div>
+              <div class="advanced-support-flip__copy">
+                <p>COD shows how spread out the sales ratios are in this sample.</p>
+                <p>Target range is 5 to 15.</p>
+                {% if advanced_summary.iaao_metrics.cod is not None %}
+                  {% if advanced_summary.iaao_metrics.cod >= 5 and advanced_summary.iaao_metrics.cod <= 15 %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.cod|floatformat:2 }}, which is inside target.</p>
+                  {% elif advanced_summary.iaao_metrics.cod < 5 %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.cod|floatformat:2 }}, which is tighter than target.</p>
+                  {% else %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.cod|floatformat:2 }}, which is above target and more spread out.</p>
+                  {% endif %}
+                {% else %}
+                  <p>COD was not available for this run.</p>
+                {% endif %}
+                <p>Based on {{ advanced_summary.iaao_metrics.sample_size|default:advanced_summary.regression_sample_size|default:0 }} sales across {{ advanced_summary.months_used|default:"—" }} months.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="advanced-support-gauge advanced-support-flip" data-advanced-flip-card>
+          <button
+            type="button"
+            class="advanced-support-flip__toggle"
+            data-advanced-flip-toggle
+            aria-label="Flip PRD explanation"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+          <div class="advanced-support-flip__inner" data-advanced-flip-inner>
+            <div class="advanced-support-flip__face advanced-support-flip__face--front">
+              <div data-advanced-gauge data-value="{{ advanced_summary.iaao_metrics.prd|default_if_none:'' }}" data-min="0.9" data-max="1.1" data-target-low="0.98" data-target-high="1.03">
+                <div class="advanced-support-gauge__label">PRD</div>
+                <div class="advanced-support-gauge__arc"><span class="advanced-support-gauge__value">—</span></div>
+                <div class="advanced-support-gauge__status">Vertical equity target 0.98–1.03</div>
+              </div>
+            </div>
+            <div class="advanced-support-flip__face advanced-support-flip__face--back">
+              <div class="advanced-support-gauge__label">PRD</div>
+              <div class="advanced-support-flip__copy">
+                <p>PRD checks if high-value and lower-value homes are treated about the same.</p>
+                <p>Target range is 0.98 to 1.03.</p>
+                {% if advanced_summary.iaao_metrics.prd is not None %}
+                  {% if advanced_summary.iaao_metrics.prd >= 0.98 and advanced_summary.iaao_metrics.prd <= 1.03 %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.prd|floatformat:3 }}, which is in range.</p>
+                  {% elif advanced_summary.iaao_metrics.prd > 1.03 %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.prd|floatformat:3 }}, which is above range.</p>
+                    <p>That can mean lower-priced homes are carrying a bit more load.</p>
+                  {% else %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.prd|floatformat:3 }}, which is below range.</p>
+                    <p>That can mean higher-priced homes are carrying a bit more load.</p>
+                  {% endif %}
+                {% else %}
+                  <p>PRD was not available for this run.</p>
+                {% endif %}
+                <p>Computed from {{ advanced_summary.iaao_metrics.sample_size|default:advanced_summary.regression_sample_size|default:0 }} sales.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="advanced-support-gauge advanced-support-flip" data-advanced-flip-card>
+          <button
+            type="button"
+            class="advanced-support-flip__toggle"
+            data-advanced-flip-toggle
+            aria-label="Flip median ratio explanation"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+          <div class="advanced-support-flip__inner" data-advanced-flip-inner>
+            <div class="advanced-support-flip__face advanced-support-flip__face--front">
+              <div data-advanced-gauge data-value="{{ advanced_summary.iaao_metrics.median_ratio|default_if_none:'' }}" data-min="0.7" data-max="1.3" data-target-low="0.90" data-target-high="1.10">
+                <div class="advanced-support-gauge__label">Median Ratio</div>
+                <div class="advanced-support-gauge__arc"><span class="advanced-support-gauge__value">—</span></div>
+                <div class="advanced-support-gauge__status">Level target 0.90–1.10</div>
+              </div>
+            </div>
+            <div class="advanced-support-flip__face advanced-support-flip__face--back">
+              <div class="advanced-support-gauge__label">Median Ratio</div>
+              <div class="advanced-support-flip__copy">
+                <p>This is assessed value divided by sale price at the middle of the sample.</p>
+                <p>Target range is 0.90 to 1.10.</p>
+                {% if advanced_summary.iaao_metrics.median_ratio is not None %}
+                  {% if advanced_summary.iaao_metrics.median_ratio >= 0.90 and advanced_summary.iaao_metrics.median_ratio <= 1.10 %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.median_ratio|floatformat:3 }}, which is in range.</p>
+                  {% elif advanced_summary.iaao_metrics.median_ratio > 1.10 %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.median_ratio|floatformat:3 }}, above range.</p>
+                    <p>That points to a higher assessment level than target.</p>
+                  {% else %}
+                    <p>This run landed at {{ advanced_summary.iaao_metrics.median_ratio|floatformat:3 }}, below range.</p>
+                    <p>That points to a lower assessment level than target.</p>
+                  {% endif %}
+                {% else %}
+                  <p>Median ratio was not available for this run.</p>
+                {% endif %}
+                <p>Sample context: {{ advanced_summary.geography_context.level|default:"market context"|replace:"_, "|title }}.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if advanced_summary.warnings and not advanced_summary.warning_explanations %}
+        <ul class="advanced-support-warnings">
+          {% for warning in advanced_summary.warnings %}
+            <li>{{ warning }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if advanced_summary.warning_explanations %}
+        <ul class="advanced-support-explanations">
+          {% for explanation in advanced_summary.warning_explanations %}
+            <li>{{ explanation }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if advanced_summary.trust_reasons %}
+        <ul class="advanced-support-explanations">
+          {% for reason in advanced_summary.trust_reasons %}
+            <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if advanced_summary.widening_steps %}
+        <ul class="advanced-support-steps">
+          {% for step in advanced_summary.widening_steps %}
+            <li>
+              Step {{ step.step }}: {{ step.strategy|default:"context"|cut:"_"|title }} · {{ step.months }} months · {{ step.count }} sales
+              {% if step.selected %}(selected){% endif %}
+              {% if step.notes %}
+                {% for note in step.notes %} · {{ note }}{% endfor %}
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% if advanced_summary.market_area %}
+        <p class="advanced-market-note">
+          Derived market area uses {{ advanced_summary.market_area.point_count|default:0 }} valid-sale parcel points.
+          Switch to map view to see the footprint and sampled sale locations.
+        </p>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <!-- List View -->
+  <div id="list-view" class="view-container {% if current_view|default:'list' == 'list' %}view-container--active{% endif %}">
+    <div class="comp-list">
+      {% if show_comp_groups %}
+        <section class="comp-group">
+          <h4 class="comp-group__heading">
+            Primary Comparables ({{ primary_comparables|length }})
+          </h4>
+          {% for comp in primary_comparables %}
+            {% include "openskagit/partials/comparable_card_list.html" %}
+          {% endfor %}
+        </section>
+        {% if support_comparables %}
+          <section class="comp-group">
+            <details class="comp-group__details">
+              <summary class="comp-group__summary">
+                <h4 class="comp-group__heading comp-group__heading--support">
+                  Support Comparables ({{ support_comparables|length }})
+                  <span class="comp-group__note">Higher adjustment stress; useful context but secondary weight.</span>
+                </h4>
+              </summary>
+              <div class="comp-group__details-body">
+                {% for comp in support_comparables %}
+                  {% include "openskagit/partials/comparable_card_list.html" %}
+                {% endfor %}
+              </div>
+            </details>
+          </section>
+        {% endif %}
+      {% else %}
+        {% for comp in comparables %}
+          {% include "openskagit/partials/comparable_card_list.html" %}
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Grid View -->
+  <div id="grid-view" class="view-container {% if current_view == 'grid' %}view-container--active{% endif %}">
+    {% if show_comp_groups %}
+      <section class="comp-group">
+        <h4 class="comp-group__heading">
+          Primary Comparables ({{ primary_comparables|length }})
+        </h4>
+        <div class="comp-grid">
+          {% for comp in primary_comparables %}
+            {% include "openskagit/partials/comparable_card_grid.html" %}
+          {% endfor %}
+        </div>
+      </section>
+      {% if support_comparables %}
+        <section class="comp-group">
+          <details class="comp-group__details">
+            <summary class="comp-group__summary">
+              <h4 class="comp-group__heading comp-group__heading--support">
+                Support Comparables ({{ support_comparables|length }})
+                <span class="comp-group__note">Higher adjustment stress; useful context but secondary weight.</span>
+              </h4>
+            </summary>
+            <div class="comp-group__details-body">
+              <div class="comp-grid">
+                {% for comp in support_comparables %}
+                  {% include "openskagit/partials/comparable_card_grid.html" %}
+                {% endfor %}
+              </div>
+            </div>
+          </details>
+        </section>
+      {% endif %}
+    {% else %}
+      <div class="comp-grid">
+        {% for comp in comparables %}
+          {% include "openskagit/partials/comparable_card_grid.html" %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Map View -->
+  <div id="map-view" class="view-container {% if current_view == 'map' %}view-container--active{% endif %}">
+    <div class="map-container">
+      <div id="comparables-map"></div>
+    </div>
+  </div>
+      {% if has_more %}
+        <button
+          id="comparables-more-button"
+          class="comparables-more-btn"
+          type="button"
+          data-extended-count="{{ extended_limit }}"
+        >
+          <span class="comparables-more-label">Get more comps</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+        </button>
+      {% endif %}
+{{ map_payload|json_script:"appeal-comparables-map-payload" }}
+{% if market_area_payload %}
+  {{ market_area_payload|json_script:"comparables-market-area-data" }}
+{% endif %}

@@ -1,0 +1,14 @@
+OpenSkagit Weekly Citizen Survey
+
+A new weekly survey question is live.
+
+Week of {{ week_start_date|date:"F j, Y" }}
+Question: {{ question_prompt }}
+
+Respond now:
+{{ survey_url }}
+
+Unsubscribe from weekly survey reminder emails:
+{{ unsubscribe_url }}
+
+You are receiving this because you subscribed at {{ site_url }}.

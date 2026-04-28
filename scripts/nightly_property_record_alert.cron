@@ -1,0 +1,5 @@
+# Install with:
+# crontab /home/django/django_project/scripts/nightly_property_record_alert.cron
+#
+# Runs every night at 05:10 server local time.
+10 5 * * * /bin/bash /home/django/django_project/scripts/nightly_property_record_alert.sh

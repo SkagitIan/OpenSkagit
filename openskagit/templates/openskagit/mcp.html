@@ -1,0 +1,100 @@
+{% extends "openskagit/base.html" %}
+{% load formatting %}
+
+{% block content %}
+{% mcp_openapi_summary as mcp_openapi_live %}
+<section class="relative overflow-hidden bg-slate-950 text-slate-100 py-16 sm:py-20">
+  <div class="absolute inset-0 opacity-30" style="background-image: linear-gradient(to right, rgba(148,163,184,0.14) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.14) 1px, transparent 1px); background-size: 32px 32px;"></div>
+  <div class="absolute inset-0 bg-gradient-to-br from-cyan-400/20 via-slate-950 to-teal-400/10"></div>
+  <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="space-y-6">
+      <p class="text-xs font-semibold uppercase tracking-[0.32em] text-cyan-200">OpenSkagit MCP</p>
+      <h1 class="text-4xl sm:text-5xl font-bold leading-tight">SkagitMCP Endpoint Reference</h1>
+      <p class="text-lg text-slate-200">{{ mcp_openapi_live.description }}</p>
+      <p class="text-sm text-slate-300">
+        This page documents every tool operation from <span class="font-mono">{{ mcp_openapi_live.spec_source }}</span>, primarily
+        <span class="font-mono">{{ mcp_openapi_live.server_url }}/agent/*</span> plus selected companion endpoints.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <a href="{{ mcp_custom_gpt_url }}" target="_blank" rel="noopener" class="inline-flex items-center px-5 py-3 bg-cyan-400 text-slate-950 font-semibold rounded-xl shadow hover:bg-cyan-300 transition">
+          Open in ChatGPT
+          <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </a>
+        <a href="{% url 'mcp-openapi-json' %}" target="_blank" rel="noopener" class="inline-flex items-center px-5 py-3 border border-cyan-200/60 text-cyan-100 font-semibold rounded-xl hover:bg-slate-900/60 transition">
+          OpenAPI JSON
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-12 sm:py-16 bg-slate-100 border-y border-slate-200">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+    <div class="space-y-2">
+      <h2 class="text-2xl sm:text-3xl font-bold text-slate-900">Endpoint Matrix</h2>
+      <p class="text-sm sm:text-base text-slate-600">
+        Operation-level view generated from {{ mcp_openapi_live.spec_source }}{% if mcp_openapi_live.spec_updated_at %} (updated {{ mcp_openapi_live.spec_updated_at }}){% endif %}.
+      </p>
+    </div>
+    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50">
+          <tr class="text-left text-xs uppercase tracking-wide text-slate-600">
+            <th class="px-4 py-3">Method</th>
+            <th class="px-4 py-3">Path</th>
+            <th class="px-4 py-3">Operation</th>
+            <th class="px-4 py-3">Inputs</th>
+            <th class="px-4 py-3">Responses</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+          {% for endpoint in mcp_openapi_live.endpoint_rows %}
+          <tr>
+            <td class="px-4 py-4 align-top">
+              <span class="inline-flex items-center px-2 py-1 rounded-md border text-xs font-mono {% if endpoint.method == 'POST' %}bg-emerald-50 text-emerald-700 border-emerald-200{% elif endpoint.method == 'GET' %}bg-cyan-50 text-cyan-700 border-cyan-200{% else %}bg-indigo-50 text-indigo-700 border-indigo-200{% endif %}">
+                {{ endpoint.method }}
+              </span>
+            </td>
+            <td class="px-4 py-4 align-top">
+              <code class="text-xs text-slate-700 break-all">{{ endpoint.path }}</code>
+            </td>
+            <td class="px-4 py-4 align-top space-y-1">
+              <p class="text-xs font-mono text-cyan-700 break-all">{{ endpoint.operation_id }}</p>
+              <p class="text-xs text-slate-600">{{ endpoint.summary }}</p>
+            </td>
+            <td class="px-4 py-4 align-top space-y-1">
+              <div class="flex flex-wrap gap-1">
+                {% for field in endpoint.required_inputs %}
+                <span class="px-1.5 py-0.5 rounded border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-mono">{{ field }}*</span>
+                {% endfor %}
+              </div>
+              <div class="flex flex-wrap gap-1">
+                {% for field in endpoint.optional_inputs %}
+                <span class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-100 text-slate-700 text-[11px] font-mono">{{ field }}</span>
+                {% endfor %}
+              </div>
+              {% if not endpoint.required_inputs and not endpoint.optional_inputs %}
+              <p class="text-xs text-slate-500">No input parameters</p>
+              {% endif %}
+            </td>
+            <td class="px-4 py-4 align-top">
+              <div class="flex flex-wrap gap-1">
+                {% for code in endpoint.responses %}
+                <span class="px-1.5 py-0.5 rounded border border-slate-300 bg-slate-100 text-slate-700 text-[11px] font-mono">{{ code }}</span>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="px-4 py-6 text-sm text-slate-500">No endpoint data available from OpenAPI.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

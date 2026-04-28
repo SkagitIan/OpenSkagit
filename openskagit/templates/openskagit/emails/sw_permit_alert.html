@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;color:#111827;">
+  <div style="max-width:760px;margin:0 auto;padding:20px;">
+    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+      <div style="padding:18px 20px;border-bottom:1px solid #e5e7eb;background:#fafafa;">
+        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;">Sedro-Woolley</div>
+        <h1 style="margin:6px 0 4px;font-size:22px;line-height:1.2;">Important Permit Alert</h1>
+        <p style="margin:0;font-size:14px;color:#4b5563;">
+          {% if permit_count %}{{ permit_count }} new important permit{{ permit_count|pluralize }}{% else %}No new important permits{% endif %}
+        </p>
+      </div>
+
+      <div style="padding:16px 20px;font-size:14px;line-height:1.45;">
+        <p style="margin:0 0 10px;color:#374151;">
+          {% if permit_date_start or permit_date_end %}
+          <strong>Permit date filter:</strong>
+          {% if permit_date_start and permit_date_end and permit_date_start == permit_date_end %}
+          {{ permit_date_start|date:"Y-m-d" }}
+          {% else %}
+          {{ permit_date_start|date:"Y-m-d" }} to {{ permit_date_end|date:"Y-m-d" }}
+          {% endif %}
+          <br>
+          {% endif %}
+          <strong>Window:</strong>
+          {% if watermark_from %}after {{ watermark_from|date:"Y-m-d H:i:s T" }}{% else %}from beginning{% endif %}
+          through {{ watermark_to|date:"Y-m-d H:i:s T" }}
+        </p>
+        <p style="margin:0 0 14px;">
+          <a href="{{ portal_url }}" style="color:#111827;">Portal</a>
+          &nbsp;|&nbsp;
+          <a href="{{ zoning_map_url }}" style="color:#111827;">Zoning map</a>
+        </p>
+
+        {% if permits %}
+        <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Permit</th>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Type</th>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Date</th>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Address</th>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Parcel</th>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Work</th>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Status</th>
+              <th align="left" style="font-size:12px;color:#6b7280;text-transform:uppercase;padding:8px;border-bottom:1px solid #e5e7eb;">Link</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for permit in permits %}
+            <tr>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">
+                <a href="{{ permit.detail_url }}" style="color:#111827;text-decoration:none;">
+                  {{ permit.permit_number|default:permit.external_id }}
+                </a>
+              </td>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">{{ permit.permit_type|default:"-" }}</td>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">{% if permit.permit_date %}{{ permit.permit_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">{{ permit.site_address|default:"-" }}</td>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">{{ permit.parcel_number|default:"" }}</td>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">{{ permit.work_description_short|default:"" }}</td>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">{{ permit.status|default:"" }}</td>
+              <td style="padding:10px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;">
+                <a href="{{ permit.detail_url }}" style="color:#111827;">Open</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p style="margin:0;color:#374151;">No new important permits in this window.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

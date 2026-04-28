@@ -1,0 +1,35 @@
+{% extends "openskagit/base.html" %}
+
+{% block content %}
+<section class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div class="flex items-center justify-between gap-3">
+      <h1 class="text-2xl font-bold text-slate-900">New GIS Source Submission</h1>
+      <a href="{% url 'gis:submission-list' %}" class="text-sm font-semibold text-slate-600 hover:text-slate-900">Back to list</a>
+    </div>
+    <p class="mt-2 text-sm text-slate-600">Paste an ArcGIS service/layer URL, Hub page, item page, or public map URL. Inspection runs immediately.</p>
+
+    <form method="post" class="mt-6 space-y-4">
+      {% csrf_token %}
+      <div>
+        <label for="{{ form.submitted_url.id_for_label }}" class="text-sm font-semibold text-slate-800">Source URL</label>
+        {{ form.submitted_url }}
+        {% for error in form.submitted_url.errors %}
+          <p class="mt-1 text-xs text-rose-700">{{ error }}</p>
+        {% endfor %}
+      </div>
+      <div>
+        <label for="{{ form.notes.id_for_label }}" class="text-sm font-semibold text-slate-800">Notes (optional)</label>
+        {{ form.notes }}
+        {% for error in form.notes.errors %}
+          <p class="mt-1 text-xs text-rose-700">{{ error }}</p>
+        {% endfor %}
+      </div>
+
+      <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
+        Submit and Inspect
+      </button>
+    </form>
+  </div>
+</section>
+{% endblock %}

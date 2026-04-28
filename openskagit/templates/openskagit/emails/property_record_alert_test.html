@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
+  <div style="max-width:720px;margin:0 auto;padding:20px;">
+    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
+      <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">OpenSkagit</div>
+        <h1 style="margin:6px 0 4px;font-size:22px;line-height:1.25;">Parcel Recorded Document Alert (Test)</h1>
+        <p style="margin:0;font-size:14px;color:#475569;">This is a manual test notification.</p>
+      </div>
+
+      <div style="padding:16px 20px;font-size:14px;line-height:1.5;">
+        <p style="margin:0 0 10px;color:#334155;">
+          Use this message to verify template rendering and email delivery for parcel recorded-document alerts.
+        </p>
+        <p style="margin:0 0 14px;color:#64748b;">
+          Recipient {{ recipient_email }}<br>
+          Generated {{ generated_at|date:"Y-m-d H:i:s T" }}
+        </p>
+
+        <div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+          <p style="margin:0 0 4px;font-size:15px;font-weight:700;color:#0f172a;">Parcel {{ parcel_id }}</p>
+          <p style="margin:0 0 4px;color:#475569;">Address: {{ situs_address|default:"-" }}</p>
+          <p style="margin:0 0 10px;color:#475569;">Owner: {{ owner_name|default:"-" }}</p>
+
+          <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Type</th>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Recording #</th>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Recorded</th>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">{{ document_type }}</td>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">{{ recording_number }}</td>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">{{ recorded_date }}</td>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">
+                  <a href="{{ document_url }}" style="color:#0f172a;">Open source</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

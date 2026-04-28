@@ -3,14 +3,14 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 
 from . import cma
-from .models import ComparableCache
 from .neighborhood import get_neighborhood_snapshot
+from .services.sales_comps import DEFAULT_LOOKBACK_MONTHS, build_sales_comps_v2
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,6 @@ PRIMARY_RADIUS_M = 3218  # meters (~2 miles)
 SECONDARY_RADIUS_M = 4828  # meters (~3 miles)
 INITIAL_COMPARABLE_LIMIT = 7
 EXTENDED_COMPARABLE_LIMIT = 15
-COMPARABLES_CACHE_TTL = 5 * 60
 
 
 def _decimal_to_str(value: Optional[Decimal]) -> Optional[str]:
@@ -242,11 +241,6 @@ def _comparable_from_payload(payload: Dict[str, Any]) -> cma.ComparableResult:
     )
 
 
-def _cache_entry_valid(entry: ComparableCache) -> bool:
-    expires_at = entry.last_refreshed + dt.timedelta(seconds=COMPARABLES_CACHE_TTL)
-    return timezone.now() < expires_at
-
-
 def _coerce_percent(value: Any) -> Optional[float]:
     try:
         if value is None:
@@ -338,116 +332,41 @@ def get_subject_neighborhood_snapshot(subject: cma.PropertySnapshot) -> Dict[str
     return _resolve_neighborhood_context(raw_code)
 
 
-def _months_ago(months: int) -> dt.date:
-    today = dt.date.today()
-    year = today.year
-    month = max(1, today.month - months)
-    # naive month subtraction; adequate for our filter window
-    return dt.date(year if month <= today.month else year - 1, month, 1)
-
-
-def _cached_comparables(subject: cma.PropertySnapshot, radius_meters: float, limit: int) -> List[cma.ComparableResult]:
-    roll_year = timezone.now().year
-    entry = ComparableCache.objects.filter(
-        parcel_number=subject.parcel_number,
-        roll_year=roll_year,
-        radius_meters=int(radius_meters),
-        limit=limit,
-    ).first()
-    if entry and _cache_entry_valid(entry):
-        stored = entry.comparables or []
-        if not stored:
-            return []
-        deserialized: List[cma.ComparableResult] = []
-        for payload in stored:
-            if not isinstance(payload, dict):
-                continue
-            try:
-                deserialized.append(_comparable_from_payload(payload))
-            except Exception:
-                deserialized = []
-                break
-        if deserialized:
-            return deserialized
-    comps = choose_citizen_comps(subject, radius_meters=radius_meters, limit=limit)
-    payload_list = [_comparable_payload(comp) for comp in comps]
-    ComparableCache.objects.update_or_create(
-        parcel_number=subject.parcel_number,
-        roll_year=roll_year,
-        radius_meters=int(radius_meters),
-        limit=limit,
-        defaults={"comparables": payload_list},
-    )
-    return comps
-
-
-def _comparable_key(comp: cma.ComparableResult) -> str:
-    snapshot = getattr(comp, "snapshot", None)
-    if snapshot is not None:
-        parcel_number = getattr(snapshot, "parcel_number", None)
-        if parcel_number:
-            return f"parcel:{parcel_number}"
-
-    sale_date = getattr(comp, "sale_date", None)
-    sale_price = getattr(comp, "sale_price", None)
-
-    date_text = None
-    if sale_date is not None:
-        date_text = sale_date.isoformat() if hasattr(sale_date, "isoformat") else str(sale_date)
-    price_text = str(sale_price) if sale_price is not None else "no-price"
-    return f"sale:{date_text or 'no-date'}:{price_text}"
-
-
 def _comparable_candidates(subject: cma.PropertySnapshot, limit: int) -> Tuple[List[cma.ComparableResult], float]:
-    seen: Set[str] = set()
-    results: List[cma.ComparableResult] = []
-    radius_used = PRIMARY_RADIUS_M
-    for radius in (PRIMARY_RADIUS_M, SECONDARY_RADIUS_M):
-        radius_used = radius
-        batch = _cached_comparables(subject, radius, limit)
-        for comp in batch:
-            key = _comparable_key(comp)
-            if key in seen:
-                continue
-            seen.add(key)
-            results.append(comp)
-            if len(results) >= limit:
-                return results[:limit], radius_used
-    return results[:limit], radius_used
+    result = build_sales_comps_v2(
+        subject,
+        limit=limit,
+        months=DEFAULT_LOOKBACK_MONTHS,
+        base_radius_m=PRIMARY_RADIUS_M,
+        max_radius_m=SECONDARY_RADIUS_M,
+    )
+    return result.comparables, result.radius_meters_used
 
 
 def choose_citizen_comps(
     subject: cma.PropertySnapshot,
     *,
-    months: int = 6,
+    months: int = DEFAULT_LOOKBACK_MONTHS,
     limit: int = 5,
     radius_meters: float = 8000,
 ) -> List[cma.ComparableResult]:
     """
     Reuse the existing CMA pipeline but default to very simple, citizen-friendly constraints:
-      • last N months (default 6)
+      • last N months (default 18)
       • closest by distance
       • take top 3–5 results
 
     Post-filter to prefer comps within ~1 mile when distance is available.
     """
 
-    filters = cma.CmaFilters(
-        sale_date_min=_months_ago(months),
-        sale_date_max=None,
-        property_type=None,
-    )
-    comp = cma.build_comparables(
-        subject=subject,
-        filters=filters,
-        excluded=[],
-        sort_field="distance",
-        sort_direction="asc",
+    result = build_sales_comps_v2(
+        subject,
         limit=max(limit, 8),  # fetch a few extra to allow post-filtering
-        radius_meters=radius_meters,
-        load_improvements=False,
+        months=months,
+        base_radius_m=radius_meters,
+        max_radius_m=radius_meters,
     )
-    comps = comp.comparables
+    comps = result.comparables
 
     within_one_mile = [c for c in comps if (c.distance_miles or Decimal("0")) <= Decimal("1.0")]
     shortlisted = within_one_mile[:limit] if len(within_one_mile) >= 3 else comps[:limit]

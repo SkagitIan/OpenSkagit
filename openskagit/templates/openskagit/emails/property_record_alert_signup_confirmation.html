@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
+  <div style="max-width:760px;margin:0 auto;padding:20px;">
+    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
+      <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">OpenSkagit</div>
+        <h1 style="margin:6px 0 4px;font-size:22px;line-height:1.25;">Parcel Alert Signup Confirmed</h1>
+        <p style="margin:0;font-size:14px;color:#475569;">Your recorded-document alert is active.</p>
+      </div>
+
+      <div style="padding:16px 20px;font-size:14px;line-height:1.45;">
+        <p style="margin:0 0 8px;color:#334155;">
+          We check the public recorder index nightly and email you when new high-signal documents are indexed.
+        </p>
+        <p style="margin:0 0 12px;color:#64748b;">
+          This is a notification service, not insurance, legal advice, ownership verification, or fraud prevention.
+        </p>
+
+        {% for item in parcel_subscriptions %}
+          <div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:0 0 14px;">
+            <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a;">
+              Parcel {{ item.parcel_id }}{% if item.situs_address %} - {{ item.situs_address }}{% endif %}
+            </p>
+            {% if item.owner_name %}
+              <p style="margin:0 0 8px;color:#475569;">Owner at signup: {{ item.owner_name }}</p>
+            {% endif %}
+            {% if item.monitored_names %}
+              <p style="margin:0 0 8px;color:#475569;">Monitored names: {{ item.monitored_names|join:", " }}</p>
+            {% endif %}
+            <p style="margin:0 0 6px;">
+              <a href="{{ item.manage_url }}" style="color:#0f172a;">Edit alert details</a>
+              &nbsp;|&nbsp;
+              <a href="{{ item.delete_url }}" style="color:#0f172a;">Delete this alert</a>
+            </p>
+            {% if item.latest_document_url %}
+              <p style="margin:0 0 4px;color:#334155;">
+                Latest recorded document link:
+                <a href="{{ item.latest_document_url }}" style="color:#0f172a;">Open document</a>
+              </p>
+            {% endif %}
+            <p style="margin:0;color:#334155;">
+              Recorder index for parcel:
+              <a href="{{ item.recording_results_url }}" style="color:#0f172a;">Open index</a>
+            </p>
+          </div>
+        {% endfor %}
+
+        <p style="margin:0;color:#64748b;">Generated {{ generated_at|date:"Y-m-d H:i:s T" }}</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

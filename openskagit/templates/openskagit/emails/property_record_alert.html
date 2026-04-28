@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;">
+  <div style="max-width:760px;margin:0 auto;padding:20px;">
+    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
+      <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;">OpenSkagit</div>
+        <h1 style="margin:6px 0 4px;font-size:22px;line-height:1.25;">Parcel Recorded Document Alert</h1>
+        <p style="margin:0;font-size:14px;color:#475569;">
+          {{ document_count }} new high-signal recorded document{{ document_count|pluralize }}
+        </p>
+      </div>
+
+      <div style="padding:16px 20px;font-size:14px;line-height:1.45;">
+        <p style="margin:0 0 10px;color:#334155;">
+          This service reports newly indexed public recorded documents. It does not determine fraud, ownership validity, or legal status.
+        </p>
+        <p style="margin:0 0 14px;color:#64748b;">
+          Generated {{ generated_at|date:"Y-m-d H:i:s T" }}
+        </p>
+
+        {% for alert in parcel_alerts %}
+        <div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:0 0 14px;">
+          <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#0f172a;">
+            Parcel {{ alert.parcel_id }}{% if alert.situs_address %} - {{ alert.situs_address }}{% endif %}
+          </p>
+          {% if alert.owner_name %}
+          <p style="margin:0 0 6px;color:#475569;">Baseline owner at signup: {{ alert.owner_name }}</p>
+          {% endif %}
+          <p style="margin:0 0 10px;">
+            <a href="{{ alert.manage_url|default:alert.unsubscribe_url }}" style="color:#0f172a;">Edit alert details</a>
+            &nbsp;|&nbsp;
+            <a href="{{ alert.delete_url|default:alert.unsubscribe_url }}" style="color:#0f172a;">Delete this alert</a>
+          </p>
+
+          <table cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Type</th>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Recording #</th>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Recorded</th>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Parties</th>
+                <th align="left" style="font-size:11px;color:#64748b;text-transform:uppercase;padding:6px;border-bottom:1px solid #e2e8f0;">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for doc in alert.documents %}
+              <tr>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">{{ doc.document_type|default:"Document" }}</td>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">{{ doc.recording_number }}</td>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">
+                  {{ doc.recorded_date|default:"-" }}<br>
+                  <span style="color:#334155;font-size:12px;">
+                    Risk {{ doc.risk_level|default:"-" }} ({{ doc.risk_score|default:"-" }}){% if doc.is_high_priority %} · HIGH PRIORITY{% endif %}
+                  </span>
+                </td>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">
+                  {% if doc.grantor %}Grantor: {{ doc.grantor }}<br>{% endif %}
+                  {% if doc.grantee %}Grantee: {{ doc.grantee }}<br>{% endif %}
+                  {% if doc.filer %}Filer: {{ doc.filer }}<br>{% endif %}
+                  {% if doc.risk_reasons %}<span style="color:#475569;font-size:12px;">{{ doc.risk_reasons|join:"; " }}</span>{% endif %}
+                </td>
+                <td style="padding:8px 6px;border-bottom:1px solid #f1f5f9;vertical-align:top;">
+                  {% if doc.document_url %}
+                    <a href="{{ doc.document_url }}" style="color:#0f172a;">Recorded document</a>
+                  {% else %}
+                    <a href="{{ doc.source_url }}" style="color:#0f172a;">Recorder index</a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

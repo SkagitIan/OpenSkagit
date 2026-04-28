@@ -1,0 +1,132 @@
+{% load humanize formatting %}
+<div class="comp-card">
+  <div class="comp-card__header">
+    {% with comp.similarity.overall|default_if_none:0 as similarity_value %}
+      <div class="comp-card__header-content">
+        <div class="comp-card__header-main">
+          <div class="comp-card__title">{{ comp.address|default:"Address unavailable" }}</div>
+          {% if comp.parcel_number %}
+            <div class="comp-card__meta comp-card__meta--grid">
+              <span class="comp-card__meta-item">Parcel {{ comp.parcel_number }}</span>
+            </div>
+          {% endif %}
+        </div>
+        <div class="comp-price-block comp-card__header-price">
+          {% if comp.parcel_number %}
+            <button
+              type="button"
+              class="comp-save-btn {% if comp.is_saved %}comp-save-btn--saved{% endif %}"
+              data-comp-save-toggle
+              data-comp-parcel="{{ comp.parcel_number }}"
+              aria-pressed="{% if comp.is_saved %}true{% else %}false{% endif %}"
+              aria-label="{% if comp.is_saved %}Remove {{ comp.parcel_number }} from saved comps{% else %}Save {{ comp.parcel_number }} to workspace{% endif %}"
+              title="{% if comp.is_saved %}Remove from working file{% else %}Save to working file{% endif %}"
+            >
+              <i class="{% if comp.is_saved %}fa-solid{% else %}fa-regular{% endif %} fa-bookmark comp-save-btn__icon" data-comp-save-icon aria-hidden="true"></i>
+              <span data-comp-save-label>{% if comp.is_saved %}Saved{% else %}Save{% endif %}</span>
+            </button>
+          {% endif %}
+          <div class="comp-card__price">${{ comp.sale_price|floatformat:0|intcomma }}</div>
+          <div class="comp-card__price-label">Sale Price</div>
+          {% if advanced_mode and comp.adjusted_price %}
+            <div class="comp-card__adjusted-price">${{ comp.adjusted_price|floatformat:0|intcomma }}</div>
+            <div class="comp-card__adjusted-label">Adjusted Price</div>
+            {% if comp.total_adjustment %}
+              <div class="comp-card__adjusted-delta {% if comp.total_adjustment > 0 %}comp-card__adjusted-delta--up{% else %}comp-card__adjusted-delta--down{% endif %}">
+                {% if comp.total_adjustment > 0 %}+{% endif %}${{ comp.total_adjustment|floatformat:0|intcomma }}
+              </div>
+            {% endif %}
+          {% endif %}
+          <div class="comp-card__similarity-grid">
+            <details class="comp-similarity comp-similarity--grid" aria-label="View similarity breakdown">
+              <summary class="comp-similarity__summary">
+                <span class="comp-card__similarity-text">Similarity {{ similarity_value }}%</span>
+              </summary>
+              {% include "openskagit/partials/comp_similarity_tooltip.html" with similarity=comp.similarity %}
+            </details>
+          </div>
+        </div>
+      </div>
+    {% endwith %}
+  </div>
+  <div class="comp-card__meta comp-card__meta--grid">
+    <span class="comp-card__meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 21s7-4.5 7-11A7 7 0 0 0 5 10c0 6.5 7 11 7 11z"></path>
+        <circle cx="12" cy="10" r="2.5"></circle>
+      </svg>
+      {{ comp.distance_miles|floatformat:2 }} mi
+    </span>
+    <span class="comp-card__meta-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+        <line x1="16" y1="3" x2="16" y2="7"></line>
+        <line x1="8" y1="3" x2="8" y2="7"></line>
+        <line x1="3" y1="11" x2="21" y2="11"></line>
+      </svg>
+      Sold {{ comp.sale_date|date:"M Y" }}
+    </span>
+    {% if advanced_mode and comp.adjustment_by_key.time %}
+      <span class="comp-card__meta-item">
+        Time adj {% if comp.adjustment_by_key.time > 0 %}+{% endif %}${{ comp.adjustment_by_key.time|floatformat:0|intcomma }}
+      </span>
+    {% endif %}
+  </div>
+
+  <div class="comp-stats">
+    <div class="comp-stat">
+      <div class="comp-stat__value">{{ comp.bedrooms|default:"—"|floatformat:"-1" }}</div>
+      {% if comp.missing_bedrooms %}
+        <span class="comp-stat__flag">source missing</span>
+      {% endif %}
+      <div class="comp-stat__label">Beds</div>
+    </div>
+    <div class="comp-stat">
+      <div class="comp-stat__value">{{ comp.bathrooms|quarter_baths|default:"—" }}</div>
+      <div class="comp-stat__label">Baths</div>
+    </div>
+    <div class="comp-stat">
+      {% with sqft_value=comp.calculated_square_footage|default:comp.living_area %}
+        <div class="comp-stat__value">{{ sqft_value|default:"—"|floatformat:0|intcomma }}</div>
+      {% endwith %}
+      {% if advanced_mode and comp.adjustment_by_key.living_area %}
+        <span class="comp-stat__adj {% if comp.adjustment_by_key.living_area > 0 %}comp-stat__adj--up{% else %}comp-stat__adj--down{% endif %}">
+          {% if comp.adjustment_by_key.living_area > 0 %}+{% endif %}${{ comp.adjustment_by_key.living_area|floatformat:0|intcomma }}
+        </span>
+      {% endif %}
+      <div class="comp-stat__label">Sq Ft</div>
+    </div>
+    <div class="comp-stat">
+      <div class="comp-stat__value">{{ comp.year_built|default:"—" }}</div>
+      {% if advanced_mode and comp.adjustment_by_key.age %}
+        <span class="comp-stat__adj {% if comp.adjustment_by_key.age > 0 %}comp-stat__adj--up{% else %}comp-stat__adj--down{% endif %}">
+          {% if comp.adjustment_by_key.age > 0 %}+{% endif %}${{ comp.adjustment_by_key.age|floatformat:0|intcomma }}
+        </span>
+      {% endif %}
+      <div class="comp-stat__label">Built</div>
+    </div>
+    <div class="comp-stat">
+      <div class="comp-stat__value">${{ comp.price_per_sqft|default:"—"|floatformat:0|intcomma }}</div>
+      <div class="comp-stat__label">$/Sq Ft</div>
+    </div>
+  </div>
+
+  {% if advanced_mode and comp.adjustments %}
+    <div class="comp-card__adjustment-chips">
+      {% for item in comp.adjustments %}
+        <span class="comp-card__adjustment-chip {% if item.amount > 0 %}comp-card__adjustment-chip--up{% else %}comp-card__adjustment-chip--down{% endif %}">
+          {{ item.label }}
+          {% if item.amount > 0 %}+{% endif %}${{ item.amount|floatformat:0|intcomma }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if advanced_mode and comp.comp_group == "support" and comp.support_reasons %}
+    <div class="comp-card__support-reasons">
+      {% for reason in comp.support_reasons %}
+        <span class="comp-card__support-chip">{{ reason }}</span>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

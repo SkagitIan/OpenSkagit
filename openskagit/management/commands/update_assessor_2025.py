@@ -120,6 +120,8 @@ COLUMN_MAP_SALES = {
     "sale_id": "sale_id",
     "parcel_number": "parcel_number",
     "account_number": "account_number",
+    "seller_name": "seller_name",
+    "buyer_name": "buyer_name",
     "sale_price": "sale_price",
     "sale_date": "sale_date",
     "sale_type": "sale_type",

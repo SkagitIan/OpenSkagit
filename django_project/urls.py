@@ -18,23 +18,151 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
+from openskagit import coappraiser_views
+from openskagit import parcelalert as parcelalert_views
 from openskagit import survey as survey_views
 from openskagit import views as openskagit_views
 from openskagit.neighborhood import neighborhood_snapshot_view
 
 urlpatterns = [
+    path("robots.txt", openskagit_views.robots_txt, name="robots-txt"),
+    path("favicon.ico", openskagit_views.favicon_ico, name="favicon-ico"),
     path('', openskagit_views.home, name='home'),
-    path('kids/', include('openskagit.kidslab.urls')),
     path('flavor/', openskagit_views.flavor_index, name='flavor-index'),
     path('flavor/build/', openskagit_views.build_skagit_dish, name='flavor-build-skagit-dish'),
     path('documents/upload/', openskagit_views.documents_upload, name='documents-upload'),
-    path('survey/', survey_views.citizen_survey, name='citizen-survey'),
-    path('survey/respond/', survey_views.survey_response, name='citizen-survey-response'),
+    path("survey/", survey_views.citizen_survey, name="citizen-survey"),
+    path("survey/respond/", survey_views.survey_response, name="citizen-survey-response"),
+    path("survey/interests/", survey_views.survey_interest_toggle, name="citizen-survey-interest"),
+    path("survey/reminders/", survey_views.survey_reminder_subscribe, name="citizen-survey-reminder"),
+    path(
+        "survey/reminders/unsubscribe/",
+        survey_views.survey_reminder_unsubscribe,
+        name="citizen-survey-reminder-unsubscribe",
+    ),
+    path("staff/image-generator/", openskagit_views.staff_image_generator, name="staff-image-generator"),
+    path("staff/image-generator/start/", openskagit_views.staff_image_generator_start, name="staff-image-generator-start"),
+    path(
+        "staff/tax-foreclosure-report/",
+        openskagit_views.staff_tax_foreclosure_report,
+        name="staff-tax-foreclosure-report",
+    ),
+    path(
+        "staff/image-generator/jobs/<uuid:job_id>/",
+        openskagit_views.staff_image_generator_status,
+        name="staff-image-generator-status",
+    ),
+    path(
+        "staff/image-generator/jobs/<uuid:job_id>/cancel/",
+        openskagit_views.staff_image_generator_cancel,
+        name="staff-image-generator-cancel",
+    ),
+    path('sw/', openskagit_views.sw_hub, name='sw-hub'),
+    path("sedro-woolley/", openskagit_views.sedro_woolley_portal, name="sedro-woolley-portal"),
+    path("maps/sedro-woolley/", openskagit_views.sedro_woolley_zoning_map, name="sedro-woolley-zoning-map"),
+    path(
+        "maps/sedro-woolley/zoning/",
+        RedirectView.as_view(pattern_name="sedro-woolley-zoning-map", permanent=True, query_string=True),
+    ),
     path('about/', openskagit_views.about_view, name='about'),
-    path('consult/', openskagit_views.consult_view, name='consult'),
+    path(
+        'consult/',
+        RedirectView.as_view(pattern_name='home', permanent=True, query_string=True),
+        name='consult',
+    ),
     path('contact/', openskagit_views.contact_view, name='contact'),
+    path('coappraiser/', coappraiser_views.coappraiser_page, name='coappraiser-upload'),
+    path(
+        'coappraiser/<uuid:parcel_set_id>/generate/',
+        coappraiser_views.coappraiser_generate_plan,
+        name='coappraiser-generate-plan',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/export.csv',
+        coappraiser_views.coappraiser_export_plan_csv,
+        name='coappraiser-export-plan-csv',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/move-stop/',
+        coappraiser_views.coappraiser_move_plan_stop,
+        name='coappraiser-move-plan-stop',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/route/<str:cluster_id>/imagery/manual/modal/',
+        coappraiser_views.coappraiser_route_imagery_manual_modal,
+        name='coappraiser-route-imagery-manual-modal',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/route/<str:cluster_id>/imagery/manual/draft/',
+        coappraiser_views.coappraiser_route_imagery_manual_draft,
+        name='coappraiser-route-imagery-manual-draft',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/route/<str:cluster_id>/imagery/manual/continue/',
+        coappraiser_views.coappraiser_route_imagery_manual_continue,
+        name='coappraiser-route-imagery-manual-continue',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/route/<str:cluster_id>/listing/start/',
+        coappraiser_views.coappraiser_route_listing_start,
+        name='coappraiser-route-listing-start',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/route/<str:cluster_id>/listing/tick/',
+        coappraiser_views.coappraiser_route_listing_tick,
+        name='coappraiser-route-listing-tick',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/route/<str:cluster_id>/drive/start/',
+        coappraiser_views.coappraiser_route_drive_start,
+        name='coappraiser-route-drive-start',
+    ),
+    path(
+        'coappraiser/plan/<uuid:plan_id>/route/<str:cluster_id>/rows/',
+        coappraiser_views.coappraiser_route_stop_rows,
+        name='coappraiser-route-stop-rows',
+    ),
+    path(
+        'coappraiser',
+        RedirectView.as_view(pattern_name='coappraiser-upload', permanent=True, query_string=True),
+    ),
+    path('mcp/', openskagit_views.mcp_view, name='mcp'),
+    path("mcp/openapi.json", openskagit_views.mcp_openapi_json, name="mcp-openapi-json"),
+    path('privacy/', openskagit_views.privacy_policy_view, name='privacy-policy'),
     path('votevector/', openskagit_views.votevector_view, name='votevector'),
+    path('votevector/district3/', openskagit_views.votevector_district3_view, name='votevector-district3'),
     path('partner/', openskagit_views.partner_view, name='partner'),
+    path("alert/", parcelalert_views.property_record_alert_page, name="property-record-alert"),
+    path(
+        "alert/subscribe/",
+        parcelalert_views.property_record_alert_subscribe,
+        name="property-record-alert-subscribe",
+    ),
+    path(
+        "alert/parcel-preview/",
+        parcelalert_views.property_record_alert_parcel_preview,
+        name="property-record-alert-parcel-preview",
+    ),
+    path(
+        "alert/unsubscribe/<str:token>/",
+        parcelalert_views.property_record_alert_unsubscribe,
+        name="property-record-alert-unsubscribe",
+    ),
+    path(
+        "alert/manage/<str:token>/",
+        parcelalert_views.property_record_alert_manage,
+        name="property-record-alert-manage",
+    ),
+    path(
+        "alert/manage/<str:token>/api/",
+        parcelalert_views.property_record_alert_manage_api,
+        name="property-record-alert-manage-api",
+    ),
+    path(
+        "alert/delete/<str:token>/",
+        parcelalert_views.property_record_alert_delete,
+        name="property-record-alert-delete",
+    ),
     path('dashboard/', openskagit_views.newsletter_dashboard, name='newsletter-dashboard'),
     path('newsletter/unsubscribe/<str:token>/', openskagit_views.newsletter_unsubscribe, name='newsletter-unsubscribe'),
     path('briefing/subscribe/', openskagit_views.subscribe_briefing, name='briefing-subscribe'),
@@ -42,6 +170,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/dashboard/", openskagit_views.api_dashboard, name="api-dashboard"),
     path("api/live-activity/", openskagit_views.live_activity_feed, name="live-activity-feed"),
+    path(
+        "api/maps/sedro-woolley/zoning-parcels/",
+        openskagit_views.sedro_woolley_zoning_data,
+        name="sedro-woolley-zoning-data",
+    ),
     path("api/docs/", openskagit_views.api_docs, name="api-docs"),
     path("api/sales/top25/", openskagit_views.top_sales_widget, name="top-sales-partial"),
     path("api/sales/top25/<str:parcel_number>/", openskagit_views.parcel_modal, name="parcel-modal-partial"),
@@ -69,13 +202,16 @@ urlpatterns = [
     path("cma/share/<uuid:share_uuid>/", openskagit_views.cma_share, name="cma-share"),
     path("cma/<str:parcel_number>/", openskagit_views.cma_dashboard_view, name="cma-detail"),
     path("api/", include("openskagit.api.urls")),
-    path("api/gastronet/", include("gastronet.urls")),
+    path("api/gastronet/", include(("gastronet.urls", "gastronet"), namespace="gastronet-api")),
     path("agent/", include("mcp_agent.urls")),
     path("agent/", include("agent.urls")),
-    path("gastronet/", include("gastronet.urls")),
+    path("gastronet/", include(("gastronet.urls", "gastronet"), namespace="gastronet")),
     path("planning/", include("planning.urls")),
+    path("staff/gis/", include(("gis.urls", "gis"), namespace="gis")),
     path("neighborhoods/<str:code>/", neighborhood_snapshot_view, name="neighborhood-snapshot"),
+    path("regression", openskagit_views.regression_control_center),
     path("methodology/", openskagit_views.methodology_view, name="methodology"),
+    path("regression/", openskagit_views.regression_control_center, name="regression_control"),
     path("faq/", openskagit_views.faq_view, name="faq"),
     path("hood-trends/", openskagit_views.hood_trend_list, name="hood_trend_list"),
     path("hood-trends/<str:hood_id>/", openskagit_views.hood_trend_detail, name="hood_trend_detail"),
@@ -112,6 +248,26 @@ urlpatterns = [
         "parcel/result/<str:parcel_number>/comparables/",
         openskagit_views.appeal_result_comparables,
         name="appeal-result-comparables",
+    ),
+    path(
+        "parcel/result/<str:parcel_number>/saved-comps/",
+        openskagit_views.appeal_saved_comps,
+        name="appeal-saved-comps",
+    ),
+    path(
+        "parcel/result/<str:parcel_number>/workspace/",
+        openskagit_views.appeal_comp_workspace,
+        name="appeal-comp-workspace",
+    ),
+    path(
+        "parcel/result/<str:parcel_number>/workspace/board/",
+        openskagit_views.appeal_comp_workspace_board,
+        name="appeal-comp-workspace-board",
+    ),
+    path(
+        "parcel/result/<str:parcel_number>/neighborhood-analysis/",
+        openskagit_views.appeal_result_neighborhood_analysis,
+        name="appeal-result-neighborhood-analysis",
     ),
     path(
         "parcel/result/<str:parcel_number>/fairness/",

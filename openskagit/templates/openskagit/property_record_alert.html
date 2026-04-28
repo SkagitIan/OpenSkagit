@@ -1,0 +1,823 @@
+{% extends "openskagit/base.html" %}
+
+{% block head_extra %}
+{{ block.super }}
+<style>
+  .share-badge-gold {
+    border-color: #fdb913;
+    background-color: #fff5cc;
+    color: #7a4b00;
+  }
+
+  .share-badge-gold:hover {
+    background-color: #fde9a3;
+  }
+
+  .share-badge-gold:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #fdb913;
+  }
+</style>
+<meta name="keywords" content="Skagit County parcel alerts, recorded document alerts, property record monitoring, quitclaim deed alert, lien alert, deed alert">
+<meta name="author" content="OpenSkagit">
+<meta property="og:site_name" content="OpenSkagit">
+<meta property="og:locale" content="en_US">
+<meta name="geo.region" content="US-WA">
+<meta name="geo.placename" content="Skagit County">
+{% with seo_url=canonical_url|default:"https://openskagit.com/alert/" %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "Skagit County Parcel Alerts",
+  "description": "Free parcel monitoring for Skagit County recorded-document updates, including deeds, liens, releases, and powers of attorney.",
+  "url": "{{ seo_url }}",
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "OpenSkagit",
+    "url": "https://openskagit.com/"
+  },
+  "about": [
+    { "@type": "Thing", "name": "Parcel monitoring" },
+    { "@type": "Thing", "name": "Recorded documents" },
+    { "@type": "AdministrativeArea", "name": "Skagit County, Washington" }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What does this alert do?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We watch county recorder updates for the parcel numbers you pick and email you when new important filings show up."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What kinds of filings can send an email?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Mostly deeds, quitclaim deeds, liens, lien releases, and powers of attorney."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How often do you check for changes?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Once each night. If something important is new, we send an email."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Will I get emails about old records from before I signed up?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. We start from when you sign up and alert you on newer filings."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How many parcels can I track?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You can track up to {{ max_active_watches }} parcels per email address."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I edit, pause, or delete my alerts?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Use the Manage, Unsubscribe, or Delete links in any alert email we send you."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is this the county government or legal advice?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. OpenSkagit is independent. This tool shares public-record updates and does not provide legal advice."
+      }
+    }
+  ]
+}
+</script>
+{% endwith %}
+{% endblock %}
+
+{% block content %}
+<section class="bg-gradient-to-b from-slate-50 to-white px-4 py-6 sm:px-6 sm:py-6">
+  <div class="mx-auto flex min-h-[calc(100vh-9rem)] w-full max-w-4xl items-center justify-center">
+    <article class="w-full rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-10 lg:p-12">
+      <header class="w-full space-y-3 text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">OpenSkagit Alerts</p>
+        <h1 class="text-2xl font-extrabold text-slate-900 sm:text-3xl">Skagit County Parcel Recorded Document Alerts</h1>
+        <p class="mx-auto max-w-2xl text-sm text-slate-600">
+          Free parcel monitoring with nightly recorded document verification & notificiations.
+          <button
+            id="property-record-alert-share"
+            type="button"
+            class="share-badge-gold ml-2 lh-3 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 align-middle text-xs font-semibold transition focus:outline-none"
+            aria-label="Share this alert page"
+          >
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="18" cy="5" r="3"></circle>
+              <circle cx="6" cy="12" r="3"></circle>
+              <circle cx="18" cy="19" r="3"></circle>
+              <path d="m8.59 13.51 6.83 3.98"></path>
+              <path d="m15.41 6.51-6.82 3.98"></path>
+            </svg>
+            <span id="property-record-alert-share-label">Share</span>
+          </button>
+        </p>
+      </header>
+
+      <div class="mt-8">
+        <div class="mt-4">
+          {% include "openskagit/partials/parcel_search_autocomplete_block.html" with search_source="alert" %}
+        </div>
+      </div>
+
+      <div id="property-record-alert-selected-panel" class="mt-6 hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+        <ul id="property-record-alert-selected-list" class="space-y-2"></ul>
+      </div>
+
+      <div id="property-record-alert-confirm-panel" class="mt-6 hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+        <h2 class="text-base font-semibold text-slate-900">Current Parcel + Ownership</h2>
+        <div id="property-record-alert-confirm-loading" class="mt-3 hidden items-center gap-2 text-sm text-slate-600">
+          <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700"></span>
+          Gathering parcel ownership and recorder context...
+        </div>
+        <div id="property-record-alert-confirm-content" class="mt-3 hidden space-y-2 text-sm text-slate-700">
+          <p><span class="font-semibold text-slate-900">Parcel:</span> <span id="property-record-alert-confirm-parcel">-</span></p>
+          <p><span class="font-semibold text-slate-900">Address:</span> <span id="property-record-alert-confirm-address">-</span></p>
+          <p><span class="font-semibold text-slate-900">Owner:</span> <span id="property-record-alert-confirm-owner">-</span></p>
+        </div>
+        <p id="property-record-alert-confirm-question" class="mt-4 hidden text-sm font-semibold text-slate-900">Is this correct?</p>
+        <div id="property-record-alert-confirm-actions" class="mt-3 hidden flex flex-col gap-2 sm:flex-row">
+          <button
+            id="property-record-alert-yes-continue"
+            type="button"
+            class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          >
+            Yes, continue to signup
+          </button>
+          <button
+            id="property-record-alert-add-another-top"
+            type="button"
+            class="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            + another parcel
+          </button>
+        </div>
+      </div>
+
+      <div id="property-record-alert-signup-panel" class="mt-6 hidden rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+        <div class="mb-3 flex justify-end">
+          <button
+            id="property-record-alert-add-another"
+            type="button"
+            class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            + another parcel
+          </button>
+        </div>
+
+        <h2 class="text-base font-semibold text-slate-900">Alert delivery details</h2>
+        <form id="property-record-alert-signup-form" class="space-y-4">
+          {% csrf_token %}
+          <div>
+            <label for="property-record-alert-email" class="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <input
+              id="property-record-alert-email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div>
+            <label for="property-record-alert-monitored-names" class="mb-1 block text-sm font-medium text-slate-700">
+              Also monitor these names (optional)
+            </label>
+            <textarea
+              id="property-record-alert-monitored-names"
+              name="monitored_names"
+              rows="3"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              placeholder="Spouse name, trust name, LLC name, maiden name (comma or newline separated)"
+            ></textarea>
+          </div>
+
+          <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+            <input
+              id="property-record-alert-weekly-briefing"
+              name="subscribe_weekly_briefing"
+              type="checkbox"
+              value="1"
+              checked
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+            />
+            <span>
+              Sign me up for additional OpenSkagit emails about new features and tools for locals.
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+            <input
+              id="property-record-alert-terms"
+              name="accept_terms"
+              type="checkbox"
+              value="1"
+              required
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+            />
+            <span>
+              I understand this is a public-record notification service, not insurance, fraud prevention, legal advice, or ownership verification.
+              Alerts report recorded document index changes and may be delayed or incomplete.
+            </span>
+          </label>
+
+          <button
+            id="property-record-alert-submit"
+            type="submit"
+            class="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+          >
+            <span id="property-record-alert-submit-label">Create alerts</span>
+            <span id="property-record-alert-submit-loading" class="hidden items-center gap-2">
+              <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-white"></span>
+              Saving alerts...
+            </span>
+          </button>
+
+          <p id="property-record-alert-submit-status" class="hidden text-sm text-slate-600">
+            Saving your alert configuration. This usually takes a few seconds.
+          </p>
+        </form>
+      </div>
+
+      <p id="property-record-alert-message" class="mt-6 hidden rounded-xl border px-3 py-2 text-sm"></p>
+
+      <div class="mt-8 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-cyan-50/40 to-emerald-50/40 p-4 sm:p-6">
+        <h2 class="text-lg font-semibold text-slate-900">How it Works</h2>
+        <div class="mt-4 grid gap-3 sm:grid-cols-3">
+          <article class="rounded-xl border border-sky-200 bg-white p-4">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">1</span>
+              <svg class="h-5 w-5 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
+            </div>
+            <p class="mt-2 text-sm font-semibold text-slate-900">Pick your parcel</p>
+            <p class="mt-1 text-sm text-slate-700">Search by parcel number or address, then confirm the owner + address look right.</p>
+          </article>
+          <article class="rounded-xl border border-emerald-200 bg-white p-4">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">2</span>
+              <svg class="h-5 w-5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M3 12h18"></path>
+                <path d="m13 4 8 8-8 8"></path>
+              </svg>
+            </div>
+            <p class="mt-2 text-sm font-semibold text-slate-900">Nightly county scan</p>
+            <p class="mt-1 text-sm text-slate-700">We check county recorder updates and compare new filings to your tracked parcel baseline.</p>
+          </article>
+          <article class="rounded-xl border border-amber-200 bg-white p-4">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">3</span>
+              <svg class="h-5 w-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </div>
+            <p class="mt-2 text-sm font-semibold text-slate-900">Email when it matters</p>
+            <p class="mt-1 text-sm text-slate-700">If we detect high-signal document types like deeds, liens, or POA filings, we email you.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+        <details>
+          <summary class="cursor-pointer text-base font-semibold text-slate-900">Frequently asked questions</summary>
+          <dl class="mt-3 space-y-3 text-sm text-slate-700">
+            <div>
+              <dt class="font-semibold text-slate-900">What does this alert do?</dt>
+              <dd class="mt-1">We watch county recorder updates for the parcel numbers you pick and email you when new important filings show up.</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-900">What kinds of filings can send an email?</dt>
+              <dd class="mt-1">Mostly deeds, quitclaim deeds, liens, lien releases, and powers of attorney.</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-900">How often do you check for changes?</dt>
+              <dd class="mt-1">Once each night. If something important is new, we send an email.</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-900">Will I get emails about old records from before I signed up?</dt>
+              <dd class="mt-1">No. We start from when you sign up and alert you on newer filings.</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-900">How many parcels can I track?</dt>
+              <dd class="mt-1">You can track up to {{ max_active_watches }} parcels per email address.</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-900">How do I edit, pause, or delete my alerts?</dt>
+              <dd class="mt-1">Use the Manage, Unsubscribe, or Delete links in any alert email we send you.</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-900">Is this the county government or legal advice?</dt>
+              <dd class="mt-1">No. OpenSkagit is independent. This tool shares public-record updates and does not provide legal advice.</dd>
+            </div>
+          </dl>
+        </details>
+      </div>
+    </article>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+<script>
+  (function () {
+    const selectedPanel = document.getElementById("property-record-alert-selected-panel");
+    const selectedList = document.getElementById("property-record-alert-selected-list");
+
+    const confirmPanel = document.getElementById("property-record-alert-confirm-panel");
+    const confirmLoading = document.getElementById("property-record-alert-confirm-loading");
+    const confirmContent = document.getElementById("property-record-alert-confirm-content");
+    const confirmQuestion = document.getElementById("property-record-alert-confirm-question");
+    const confirmActions = document.getElementById("property-record-alert-confirm-actions");
+    const confirmParcel = document.getElementById("property-record-alert-confirm-parcel");
+    const confirmAddress = document.getElementById("property-record-alert-confirm-address");
+    const confirmOwner = document.getElementById("property-record-alert-confirm-owner");
+    const yesContinueButton = document.getElementById("property-record-alert-yes-continue");
+    const addAnotherTopButton = document.getElementById("property-record-alert-add-another-top");
+
+    const signupPanel = document.getElementById("property-record-alert-signup-panel");
+    const form = document.getElementById("property-record-alert-signup-form");
+    const addAnotherButton = document.getElementById("property-record-alert-add-another");
+    const emailInput = document.getElementById("property-record-alert-email");
+    const monitoredNamesInput = document.getElementById("property-record-alert-monitored-names");
+    const weeklyBriefingInput = document.getElementById("property-record-alert-weekly-briefing");
+    const termsInput = document.getElementById("property-record-alert-terms");
+    const messageBox = document.getElementById("property-record-alert-message");
+    const submitButton = document.getElementById("property-record-alert-submit");
+    const submitLabel = document.getElementById("property-record-alert-submit-label");
+    const submitLoading = document.getElementById("property-record-alert-submit-loading");
+    const submitStatus = document.getElementById("property-record-alert-submit-status");
+    const shareButton = document.getElementById("property-record-alert-share");
+    const shareLabel = document.getElementById("property-record-alert-share-label");
+    const searchLoadingIndicator = document.getElementById("search-loading");
+    const searchResultsWrapper = document.getElementById("search-results-wrapper");
+    const searchResults = document.getElementById("appeal-results");
+
+    const selectedParcels = [];
+    const sharePageUrl = "{{ canonical_url|default:'https://openskagit.com/alert/'|escapejs }}";
+    const shareTitle = "Skagit County Parcel Recorded Document Alerts";
+    const shareText = "Free parcel monitoring for Skagit County recorded-document updates.";
+    const defaultShareLabel = "Share";
+    let currentPreviewParcel = null;
+    let previewRequestCounter = 0;
+    let previewAbortController = null;
+    let shareResetTimer = null;
+
+    function csrfToken() {
+      const csrfInput = document.querySelector("#property-record-alert-signup-form input[name='csrfmiddlewaretoken']");
+      if (csrfInput && csrfInput.value) {
+        return csrfInput.value;
+      }
+      const cookie = document.cookie
+        .split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith("csrftoken="));
+      return cookie ? decodeURIComponent(cookie.split("=")[1]) : "";
+    }
+
+    async function parseJsonSafe(response) {
+      try {
+        return await response.json();
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function showMessage(text, tone) {
+      const tones = {
+        success: "border-emerald-200 bg-emerald-50 text-emerald-800",
+        error: "border-rose-200 bg-rose-50 text-rose-800",
+        info: "border-slate-200 bg-slate-50 text-slate-700",
+      };
+      messageBox.className = "mt-4 rounded-xl border px-3 py-2 text-sm " + (tones[tone] || tones.info);
+      messageBox.textContent = text;
+      messageBox.classList.remove("hidden");
+    }
+
+    function clearMessage() {
+      messageBox.classList.add("hidden");
+      messageBox.textContent = "";
+    }
+
+    function setShareLabel(text) {
+      if (!shareLabel) {
+        return;
+      }
+      shareLabel.textContent = text || defaultShareLabel;
+      if (shareResetTimer) {
+        window.clearTimeout(shareResetTimer);
+      }
+      if (text && text !== defaultShareLabel) {
+        shareResetTimer = window.setTimeout(function () {
+          if (shareLabel) {
+            shareLabel.textContent = defaultShareLabel;
+          }
+        }, 2200);
+      }
+    }
+
+    async function copyTextToClipboard(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const helper = document.createElement("textarea");
+      helper.value = text;
+      helper.setAttribute("readonly", "");
+      helper.style.position = "absolute";
+      helper.style.left = "-9999px";
+      document.body.appendChild(helper);
+      helper.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(helper);
+      if (!copied) {
+        throw new Error("Clipboard copy failed");
+      }
+    }
+
+    function getSelectedParcelIds() {
+      return selectedParcels.map((entry) => entry.parcel_id);
+    }
+
+    function setConfirmLoading(loading) {
+      yesContinueButton.disabled = loading;
+      addAnotherTopButton.disabled = loading;
+      if (loading) {
+        confirmLoading.classList.remove("hidden");
+        confirmLoading.classList.add("flex");
+        confirmContent.classList.add("hidden");
+        confirmQuestion.classList.add("hidden");
+        confirmActions.classList.add("hidden");
+        return;
+      }
+      confirmLoading.classList.add("hidden");
+      confirmLoading.classList.remove("flex");
+      confirmContent.classList.remove("hidden");
+      confirmQuestion.classList.remove("hidden");
+      confirmActions.classList.remove("hidden");
+    }
+
+    function setSubmitLoading(loading) {
+      submitButton.disabled = loading;
+      if (loading) {
+        submitLabel.classList.add("hidden");
+        submitLoading.classList.remove("hidden");
+        submitLoading.classList.add("inline-flex");
+        submitStatus.classList.remove("hidden");
+        return;
+      }
+      submitLoading.classList.add("hidden");
+      submitLoading.classList.remove("inline-flex");
+      submitLabel.classList.remove("hidden");
+      submitStatus.classList.add("hidden");
+    }
+
+    function hideConfirmPanel() {
+      confirmPanel.classList.add("hidden");
+      setConfirmLoading(true);
+      currentPreviewParcel = null;
+      previewRequestCounter += 1;
+      if (previewAbortController) {
+        previewAbortController.abort();
+        previewAbortController = null;
+      }
+    }
+
+    function openSearch() {
+      if (typeof window.appealSearchReset === "function") {
+        window.appealSearchReset();
+      }
+      const searchInput = document.getElementById("appeal-search");
+      if (searchInput) {
+        window.setTimeout(() => searchInput.focus(), 0);
+      }
+    }
+
+    function renderSelectedParcels() {
+      if (!selectedParcels.length) {
+        selectedPanel.classList.add("hidden");
+        selectedList.innerHTML = "";
+        signupPanel.classList.add("hidden");
+        return;
+      }
+
+      selectedPanel.classList.remove("hidden");
+      selectedList.innerHTML = selectedParcels
+        .map(
+          (entry) => `
+            <li class="rounded-xl border border-slate-200 bg-white p-3">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p class="text-sm font-semibold text-slate-900">Parcel ${escapeHtml(entry.parcel_id)}</p>
+                  <p class="text-sm text-slate-700">${escapeHtml(entry.situs_address || "Address unavailable")}</p>
+                  <p class="text-sm text-slate-600">Owner: ${escapeHtml(entry.owner_name || "Owner unavailable")}</p>
+                </div>
+                <button
+                  type="button"
+                  data-remove-parcel="${escapeHtml(entry.parcel_id)}"
+                  class="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Remove
+                </button>
+              </div>
+            </li>
+          `
+        )
+        .join("");
+    }
+
+    function addOrUpdateSelectedParcel(parcel) {
+      if (!parcel || !parcel.parcel_id) {
+        return;
+      }
+
+      const existingIndex = selectedParcels.findIndex((entry) => entry.parcel_id === parcel.parcel_id);
+      if (existingIndex >= 0) {
+        selectedParcels[existingIndex] = parcel;
+      } else {
+        selectedParcels.push(parcel);
+      }
+      renderSelectedParcels();
+    }
+
+    function removeSelectedParcel(parcelId) {
+      const index = selectedParcels.findIndex((entry) => entry.parcel_id === parcelId);
+      if (index < 0) {
+        return;
+      }
+      selectedParcels.splice(index, 1);
+      renderSelectedParcels();
+    }
+
+    function buildFallbackPreview(parcelId) {
+      return {
+        parcel_id: parcelId,
+        situs_address: "Address unavailable",
+        owner_name: "Owner unavailable",
+      };
+    }
+
+    async function fetchParcelPreview(parcelId) {
+      const requestId = ++previewRequestCounter;
+      if (previewAbortController) {
+        previewAbortController.abort();
+      }
+      previewAbortController = new AbortController();
+      if (searchLoadingIndicator) {
+        searchLoadingIndicator.classList.add("hidden");
+      }
+      if (searchResults) {
+        searchResults.innerHTML = "";
+      }
+      if (searchResultsWrapper) {
+        searchResultsWrapper.classList.add("hidden");
+      }
+
+      confirmPanel.classList.remove("hidden");
+      setConfirmLoading(true);
+      clearMessage();
+
+      try {
+        const response = await fetch("{% url 'property-record-alert-parcel-preview' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken(),
+          },
+          signal: previewAbortController.signal,
+          body: JSON.stringify({ parcel_id: parcelId }),
+        });
+        const payload = await parseJsonSafe(response);
+        if (requestId !== previewRequestCounter) {
+          return;
+        }
+
+        if (!response.ok) {
+          currentPreviewParcel = buildFallbackPreview(parcelId);
+          const details = payload && payload.details ? Object.values(payload.details).join(" ") : "";
+          const errorText = payload && payload.error ? payload.error : "Could not load parcel details.";
+          confirmParcel.textContent = currentPreviewParcel.parcel_id;
+          confirmAddress.textContent = currentPreviewParcel.situs_address;
+          confirmOwner.textContent = currentPreviewParcel.owner_name;
+          setConfirmLoading(false);
+          showMessage(details ? `${errorText} ${details}` : `${errorText} You can still continue.`, "error");
+          return;
+        }
+
+        const parcelData = payload.parcel || {};
+        currentPreviewParcel = {
+          parcel_id: String(parcelData.parcel_id || parcelId),
+          situs_address: String(parcelData.situs_address || "Address unavailable"),
+          owner_name: String(parcelData.owner_name || "Owner unavailable"),
+        };
+        confirmParcel.textContent = currentPreviewParcel.parcel_id;
+        confirmAddress.textContent = currentPreviewParcel.situs_address;
+        confirmOwner.textContent = currentPreviewParcel.owner_name;
+        setConfirmLoading(false);
+      } catch (error) {
+        if (error && error.name === "AbortError") {
+          return;
+        }
+        if (requestId !== previewRequestCounter) {
+          return;
+        }
+        currentPreviewParcel = buildFallbackPreview(parcelId);
+        confirmParcel.textContent = currentPreviewParcel.parcel_id;
+        confirmAddress.textContent = currentPreviewParcel.situs_address;
+        confirmOwner.textContent = currentPreviewParcel.owner_name;
+        setConfirmLoading(false);
+        showMessage("Could not load parcel details. You can still continue.", "error");
+      } finally {
+        if (requestId === previewRequestCounter) {
+          previewAbortController = null;
+        }
+      }
+    }
+
+    function confirmCurrentPreview(showSignup) {
+      if (!currentPreviewParcel || !currentPreviewParcel.parcel_id) {
+        showMessage("Select a parcel before continuing.", "error");
+        return;
+      }
+
+      addOrUpdateSelectedParcel(currentPreviewParcel);
+      hideConfirmPanel();
+      openSearch();
+
+      if (showSignup) {
+        signupPanel.classList.remove("hidden");
+        emailInput.focus();
+      }
+    }
+
+    selectedList.addEventListener("click", function (event) {
+      const removeButton = event.target.closest("[data-remove-parcel]");
+      if (!removeButton) {
+        return;
+      }
+      const parcelId = removeButton.getAttribute("data-remove-parcel") || "";
+      removeSelectedParcel(parcelId);
+      if (!selectedParcels.length) {
+        showMessage("All selected parcels removed.", "info");
+      }
+    });
+
+    document.addEventListener("parcel-search-selected", function (event) {
+      const detail = event.detail || {};
+      const parcel = String(detail.parcel || "").trim();
+      if (!parcel) {
+        return;
+      }
+      fetchParcelPreview(parcel);
+    });
+
+    yesContinueButton.addEventListener("click", function () {
+      confirmCurrentPreview(true);
+    });
+
+    addAnotherTopButton.addEventListener("click", function () {
+      confirmCurrentPreview(false);
+    });
+
+    addAnotherButton.addEventListener("click", function () {
+      openSearch();
+    });
+
+    if (shareButton) {
+      shareButton.addEventListener("click", async function () {
+        const shareData = {
+          title: shareTitle,
+          text: shareText,
+          url: sharePageUrl,
+        };
+
+        const canNativeShare = navigator.share && (!navigator.canShare || navigator.canShare(shareData));
+        if (canNativeShare) {
+          try {
+            await navigator.share(shareData);
+            setShareLabel("Shared");
+            return;
+          } catch (error) {
+            if (error && error.name === "AbortError") {
+              return;
+            }
+          }
+        }
+
+        try {
+          await copyTextToClipboard(sharePageUrl);
+          setShareLabel("Link copied");
+        } catch (error) {
+          setShareLabel("Copy failed");
+          showMessage("Could not open native share. Copy the page URL from your browser.", "error");
+        }
+      });
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const email = (emailInput.value || "").trim();
+      const parcelIds = getSelectedParcelIds();
+
+      if (!parcelIds.length) {
+        showMessage("Select at least one parcel before submitting.", "error");
+        return;
+      }
+      if (!email) {
+        showMessage("Enter an email address.", "error");
+        return;
+      }
+      if (!termsInput.checked) {
+        showMessage("Accept the terms to continue.", "error");
+        return;
+      }
+
+      setSubmitLoading(true);
+
+      try {
+        const response = await fetch("{% url 'property-record-alert-subscribe' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken(),
+          },
+          body: JSON.stringify({
+            email: email,
+            parcel_ids: parcelIds,
+            parcel_contexts: selectedParcels.map((entry) => ({
+              parcel_id: entry.parcel_id,
+              owner_name: entry.owner_name || "",
+              situs_address: entry.situs_address || "",
+            })),
+            monitored_names: monitoredNamesInput ? monitoredNamesInput.value : "",
+            subscribe_weekly_briefing: weeklyBriefingInput ? weeklyBriefingInput.checked : false,
+            accept_terms: true,
+          }),
+        });
+        const payload = await parseJsonSafe(response);
+
+        if (!response.ok) {
+          const details = payload && payload.details ? Object.values(payload.details).join(" ") : "";
+          const errorText = payload && payload.error ? payload.error : "Could not save your subscription.";
+          showMessage(details ? `${errorText} ${details}` : errorText, "error");
+          return;
+        }
+
+        if (payload && payload.already_exists && payload.manage_url) {
+          window.location.href = payload.manage_url;
+          return;
+        }
+
+        showMessage("Thank you all done.", "success");
+        selectedParcels.splice(0, selectedParcels.length);
+        renderSelectedParcels();
+        form.reset();
+        hideConfirmPanel();
+        openSearch();
+      } catch (error) {
+        showMessage("Could not submit right now. Please try again.", "error");
+      } finally {
+        setSubmitLoading(false);
+      }
+    });
+  })();
+</script>
+{% endblock %}

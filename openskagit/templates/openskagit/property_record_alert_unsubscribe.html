@@ -1,0 +1,39 @@
+{% extends "openskagit/base.html" %}
+
+{% block content %}
+<section class="flex min-h-[60vh] items-center justify-center bg-gradient-to-b from-slate-50 to-white px-6 py-12">
+  <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white px-8 py-10 text-center shadow-sm">
+    {% if status == "invalid" %}
+      <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Parcel Alerts</p>
+      <h1 class="mt-4 text-3xl font-bold text-slate-900">Link expired or invalid</h1>
+      <p class="mt-3 text-slate-600">
+        This unsubscribe link is no longer valid. You can sign up again at <a class="font-semibold text-slate-900" href="{% url 'property-record-alert' %}">/alert</a>.
+      </p>
+    {% elif status == "success" %}
+      <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Parcel Alerts</p>
+      <h1 class="mt-4 text-3xl font-bold text-slate-900">Unsubscribed</h1>
+      <p class="mt-3 text-slate-600">
+        {{ subscription.email }} will no longer receive alerts for parcel {{ subscription.parcel_id }}.
+      </p>
+      <p class="mt-2 text-sm text-slate-500">
+        Other parcel subscriptions for this email remain active.
+      </p>
+    {% else %}
+      <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500">Parcel Alerts</p>
+      <h1 class="mt-4 text-3xl font-bold text-slate-900">Confirm unsubscribe</h1>
+      <p class="mt-3 text-slate-600">
+        Stop recorded document alerts for parcel <strong>{{ subscription.parcel_id }}</strong> sent to <strong>{{ subscription.email }}</strong>.
+      </p>
+      <form method="post" class="mt-6">
+        {% csrf_token %}
+        <button
+          type="submit"
+          class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+        >
+          Unsubscribe this parcel
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

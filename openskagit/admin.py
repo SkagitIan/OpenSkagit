@@ -5,6 +5,12 @@ from .models import (
     AssessmentRoll,
     AgencyFinancialSnapshot,
     AgencyLevyMap,
+    CitizenSurveyOption,
+    CitizenSurveyParticipant,
+    CitizenSurveyQuestion,
+    CitizenSurveyReminder,
+    CitizenSurveyReminderSend,
+    CitizenSurveyResponse,
     ContactSubmission,
     Improvements,
     Land,
@@ -14,10 +20,17 @@ from .models import (
     NeighborhoodProfile,
     NeighborhoodTrend,
     ParcelHistory,
+    ParcelOwner,
+    PropertyRecordAlertSubscription,
+    ParcelPlanningFacts,
     ParcelWaterfacts,
     RegressionAdjustment,
     RegressionResult,
     Sales,
+    SedroWoolleyCrawlDocument,
+    SedroWoolleyCrawlRun,
+    SurveyConversation,
+    SurveyInteraction,
     TaxationWithoutRepresentation,
     VoterElection,
     VoterParcelMatch,
@@ -60,9 +73,23 @@ class ParcelDevelopmentProfileAdmin(admin.ModelAdmin):
 
 @admin.register(ParcelHistory)
 class ParcelHistoryAdmin(admin.ModelAdmin):
-    list_display = ("parcel_number", "scraped_at", "row_count","taxes")
+    list_display = (
+        "parcel_number",
+        "scraped_at",
+        "row_count",
+        "recording_latest_number",
+        "recording_latest_recorded_date",
+        "recording_checked_at",
+        "recording_last_error_short",
+    )
     search_fields = ("parcel_number",)
-    readonly_fields = ("scraped_at",)
+    readonly_fields = (
+        "scraped_at",
+        "recording_checked_at",
+        "recording_latest_number",
+        "recording_latest_recorded_date",
+        "recording_last_error",
+    )
     list_filter = ("scraped_at",)
     ordering = ("parcel_number",)
 
@@ -71,11 +98,68 @@ class ParcelHistoryAdmin(admin.ModelAdmin):
         return len(obj.rows)
     row_count.short_description = "Row Count"
 
+    def recording_last_error_short(self, obj):
+        if not obj.recording_last_error:
+            return ""
+        return obj.recording_last_error[:80]
+    recording_last_error_short.short_description = "Recording Error"
+
 @admin.register(MasterParcel)
 class MasterParcelAdmin(admin.ModelAdmin):
     list_display = ("parcel_number", "situs_address", "total_market_value", "final_living_area", "final_year_built")
     search_fields = ("parcel_number", "situs_address", "hood_code", "land_use_code")
     list_filter = ("proptype", "hasseptic", "land_use_code", "hood_code")
+
+
+@admin.register(ParcelOwner)
+class ParcelOwnerAdmin(admin.ModelAdmin):
+    list_display = (
+        "parcel",
+        "owner_name",
+        "owner_city",
+        "owner_state",
+        "owner_zip",
+        "source_roll",
+        "updated_at",
+    )
+    search_fields = (
+        "parcel__parcel_number",
+        "owner_name",
+        "owner_add_1",
+        "owner_city",
+        "owner_state",
+        "owner_zip",
+    )
+    list_filter = ("owner_state", "source_roll")
+    raw_id_fields = ("parcel", "source_roll", "source_assessor")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("parcel__parcel_number",)
+    list_per_page = 100
+
+
+@admin.register(ParcelPlanningFacts)
+class ParcelPlanningFactsAdmin(admin.ModelAdmin):
+    list_display = (
+        "parcel",
+        "zone_code",
+        "zoning_jurisdiction",
+        "public_sewer_available",
+        "in_sfha",
+        "in_floodway",
+        "last_updated",
+    )
+    search_fields = ("parcel__parcel_number", "zone_code", "zoning_jurisdiction")
+    list_filter = (
+        "zoning_jurisdiction",
+        "public_sewer_available",
+        "in_sfha",
+        "in_floodway",
+        "in_shoreline_jurisdiction",
+    )
+    readonly_fields = ("last_updated",)
+    raw_id_fields = ("parcel",)
+    ordering = ("parcel__parcel_number",)
+    list_per_page = 50
 
 
 @admin.register(AdjustmentCoefficient)
@@ -101,15 +185,6 @@ admin.site.register(AssessmentRoll)
 admin.site.register(ParcelWaterfacts)
 
 
-@admin.register(AgencyFinancialSnapshot)
-class AgencyFinancialSnapshotAdmin(admin.ModelAdmin):
-    list_display = ("mcag", "name", "year", "gov_type_desc", "dataset_source")
-    list_filter = ("year", "gov_type_code", "dataset_source")
-    search_fields = ("mcag", "name", "legal_name")
-    readonly_fields = ("created_at", "updated_at")
-    ordering = ("mcag", "-year")
-
-
 @admin.register(WeeklyBriefingSubscriber)
 class WeeklyBriefingSubscriberAdmin(admin.ModelAdmin):
     list_display = ("email", "created_at")
@@ -118,59 +193,29 @@ class WeeklyBriefingSubscriberAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
 
 
-@admin.register(AgencyLevyMap)
-class AgencyLevyMapAdmin(admin.ModelAdmin):
-    list_display = ("tdcode", "district_name", "mcag", "agency_name", "agency_type", "is_primary")
-    list_filter = ("agency_type", "is_primary")
-    search_fields = ("tdcode", "mcag", "agency_name")
-    list_editable = ("mcag", "agency_name", "agency_type", "is_primary")
-    ordering = ("tdcode", "mcag")
-    list_per_page = 50
+@admin.register(PropertyRecordAlertSubscription)
+class PropertyRecordAlertSubscriptionAdmin(admin.ModelAdmin):
+    list_display = (
+        "email",
+        "parcel_id_display",
+        "is_active",
+        "baseline_recording_number",
+        "last_notified_recording_number",
+        "last_checked_at",
+        "last_alert_sent_at",
+        "created_at",
+    )
+    search_fields = ("email", "parcel__parcel_number")
+    list_filter = ("is_active", "created_at", "last_alert_sent_at")
+    ordering = ("-created_at",)
+    raw_id_fields = ("parcel",)
+    list_select_related = ("parcel",)
+    readonly_fields = ("created_at", "updated_at")
 
-    actions = ("mark_primary", "mark_not_primary")
+    @admin.display(description="Parcel")
+    def parcel_id_display(self, obj):
+        return obj.parcel_id
 
-    _tdcode_cache = None
-    _tdcode_cache_year = None
-
-    def mark_primary(self, request, queryset):
-        updated = queryset.update(is_primary=True)
-        self.message_user(request, f"Marked {updated} rows as primary.")
-
-    def mark_not_primary(self, request, queryset):
-        updated = queryset.update(is_primary=False)
-        self.message_user(request, f"Marked {updated} rows as not primary.")
-
-    mark_primary.short_description = "Mark selected rows as primary"
-    mark_not_primary.short_description = "Mark selected rows as not primary"
-
-    def _load_tdcode_cache(self):
-        if self._tdcode_cache is not None:
-            return
-        from django.db import connection
-
-        with connection.cursor() as cur:
-            cur.execute("SELECT MAX(assessment_year) FROM taxing_district_levy")
-            row = cur.fetchone()
-            year = row[0] if row else None
-            self._tdcode_cache_year = year
-            if year is None:
-                self._tdcode_cache = {}
-                return
-            cur.execute(
-                """
-                SELECT tdcode, district_name
-                FROM taxing_district_levy
-                WHERE assessment_year = %s
-                """,
-                [year],
-            )
-            self._tdcode_cache = {r[0]: r[1] for r in cur.fetchall()}
-
-    def district_name(self, obj):
-        self._load_tdcode_cache()
-        return self._tdcode_cache.get(obj.tdcode) if self._tdcode_cache else None
-
-    district_name.short_description = "Levy district name"
 
 
 @admin.register(NeighborhoodMetrics)
@@ -233,6 +278,8 @@ class RegressionResultAdmin(admin.ModelAdmin):
     search_fields = ("model_type", "notes")
     ordering = ("-run_date",)
     readonly_fields = ("run_date",)
+
+
     list_per_page = 25
 
     fieldsets = (
@@ -285,9 +332,6 @@ class NeighborhoodProfileAdmin(admin.ModelAdmin):
     # Keeps the form simple and predictable.
     fields = ("hood_id", "name", "city", "json_data", "updated_at","ai_summary")
 
-from .models import NeighborhoodTrend, SurveyConversation, SurveyInteraction
-
-
 @admin.register(NeighborhoodTrend)
 class NeighborhoodTrendAdmin(admin.ModelAdmin):
     # Columns you see in the changelist
@@ -320,6 +364,77 @@ class NeighborhoodTrendAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     list_per_page = 50
+
+
+class CitizenSurveyOptionInline(admin.TabularInline):
+    model = CitizenSurveyOption
+    extra = 0
+    fields = ("label", "sort_order", "created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("sort_order", "id")
+
+
+@admin.register(CitizenSurveyQuestion)
+class CitizenSurveyQuestionAdmin(admin.ModelAdmin):
+    list_display = ("week_start_date", "short_prompt", "source_id", "is_published", "created_at", "updated_at")
+    list_filter = ("is_published", "week_start_date", "created_at")
+    search_fields = ("prompt",)
+    ordering = ("-week_start_date",)
+    readonly_fields = ("created_at", "updated_at")
+    inlines = [CitizenSurveyOptionInline]
+
+    @admin.display(description="Prompt")
+    def short_prompt(self, obj):
+        prompt = (obj.prompt or "").strip()
+        return f"{prompt[:100]}…" if len(prompt) > 100 else prompt
+
+    @admin.display(description="Source ID")
+    def source_id(self, obj):
+        return (obj.metadata or {}).get("source_id")
+
+
+@admin.register(CitizenSurveyResponse)
+class CitizenSurveyResponseAdmin(admin.ModelAdmin):
+    list_display = ("question", "option", "focused_city", "is_staff_debug", "participant", "created_at")
+    list_filter = ("question__week_start_date", "option", "focused_city", "is_staff_debug", "created_at")
+    search_fields = ("question__prompt", "option__label", "focused_city", "participant__participant_id", "comment")
+    ordering = ("-created_at",)
+    readonly_fields = ("created_at",)
+    list_select_related = ("question", "option", "participant")
+
+
+@admin.register(CitizenSurveyParticipant)
+class CitizenSurveyParticipantAdmin(admin.ModelAdmin):
+    list_display = ("participant_id", "topic_count", "city_count", "updated_at")
+    search_fields = ("participant_id",)
+    ordering = ("-updated_at",)
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Topics")
+    def topic_count(self, obj):
+        return len(obj.civic_topic_interests or [])
+
+    @admin.display(description="Cities")
+    def city_count(self, obj):
+        return len(obj.city_interests or [])
+
+
+@admin.register(CitizenSurveyReminder)
+class CitizenSurveyReminderAdmin(admin.ModelAdmin):
+    list_display = ("email", "created_at", "updated_at")
+    search_fields = ("email",)
+    ordering = ("-updated_at",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(CitizenSurveyReminderSend)
+class CitizenSurveyReminderSendAdmin(admin.ModelAdmin):
+    list_display = ("reminder", "question", "sent_at")
+    list_filter = ("question__week_start_date", "sent_at")
+    search_fields = ("reminder__email", "question__prompt")
+    ordering = ("-sent_at",)
+    readonly_fields = ("sent_at",)
+    list_select_related = ("reminder", "question")
 
 
 @admin.register(SurveyConversation)
@@ -576,3 +691,409 @@ class ContactSubmissionAdmin(admin.ModelAdmin):
     @admin.display(description="Message")
     def short_message(self, obj):
         return f"{obj.message[:80]}…" if len(obj.message) > 80 else obj.message
+
+
+@admin.register(SedroWoolleyCrawlRun)
+class SedroWoolleyCrawlRunAdmin(admin.ModelAdmin):
+    list_display = (
+        "run_id",
+        "started_at",
+        "finished_at",
+        "records_written",
+        "html_pages",
+        "files",
+        "failure_count",
+        "dry_run",
+    )
+    list_filter = ("dry_run", "resumed", "started_at")
+    search_fields = ("run_id", "start_url", "manifest_path")
+    ordering = ("-started_at",)
+    readonly_fields = (
+        "run_id",
+        "start_url",
+        "allowed_domains",
+        "max_depth",
+        "max_pages",
+        "resumed",
+        "dry_run",
+        "started_at",
+        "finished_at",
+        "duration_seconds",
+        "urls_processed",
+        "urls_seen",
+        "records_written",
+        "html_pages",
+        "files",
+        "failure_count",
+        "by_resource_type",
+        "by_extension",
+        "tag_counts",
+        "failures",
+        "manifest_path",
+        "run_summary_path",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 50
+
+
+@admin.register(SedroWoolleyCrawlDocument)
+class SedroWoolleyCrawlDocumentAdmin(admin.ModelAdmin):
+    list_display = (
+        "run",
+        "resource_type",
+        "title",
+        "short_url",
+        "extension",
+        "size_bytes",
+        "status_code",
+        "fetched_at",
+    )
+    list_filter = ("resource_type", "extension", "status_code", "fetched_at")
+    search_fields = ("url", "title", "sha256")
+    raw_id_fields = ("run",)
+    ordering = ("-fetched_at",)
+    readonly_fields = (
+        "run",
+        "url",
+        "url_hash",
+        "source_url",
+        "depth",
+        "resource_type",
+        "title",
+        "tags",
+        "status_code",
+        "content_type",
+        "extension",
+        "size_bytes",
+        "sha256",
+        "fetched_at",
+        "media_path",
+        "raw_html_path",
+        "text_path",
+        "created_at",
+    )
+    list_per_page = 100
+
+    @admin.display(description="URL")
+    def short_url(self, obj):
+        return obj.url[:90] + "..." if len(obj.url) > 90 else obj.url
+
+
+from .models import (
+    MountVernonPermit,
+    MountVernonPermitSyncRun,
+    SedroWoolleyPermit,
+    SedroWoolleyPermitSyncRun,
+    SedroWoolleyYoutubeChunk,
+    SedroWoolleyYoutubeVideo,
+    YoutubeMeetingAnalysisJob,
+)
+
+
+@admin.register(SedroWoolleyPermitSyncRun)
+class SedroWoolleyPermitSyncRunAdmin(admin.ModelAdmin):
+    list_display = (
+        "run_id",
+        "mode",
+        "start_date",
+        "end_date",
+        "permits_seen",
+        "permits_new",
+        "permits_updated",
+        "permit_failures",
+        "started_at",
+        "finished_at",
+        "dry_run",
+    )
+    list_filter = ("mode", "dry_run", "started_at", "end_date")
+    search_fields = ("run_id",)
+    ordering = ("-started_at",)
+    readonly_fields = (
+        "run_id",
+        "mode",
+        "start_date",
+        "end_date",
+        "chunk_months",
+        "dry_run",
+        "started_at",
+        "finished_at",
+        "duration_seconds",
+        "list_pages_fetched",
+        "detail_pages_fetched",
+        "permits_seen",
+        "permits_new",
+        "permits_updated",
+        "permits_unchanged",
+        "permit_failures",
+        "failures",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 100
+
+
+@admin.register(SedroWoolleyPermit)
+class SedroWoolleyPermitAdmin(admin.ModelAdmin):
+    list_display = (
+        "permit_number",
+        "permit_date",
+        "permit_type",
+        "status",
+        "site_address",
+        "parcel",
+        "owner",
+        "uploaded_file_count",
+        "updated_at",
+    )
+    list_filter = ("permit_type", "status", "permit_date", "updated_at")
+    search_fields = (
+        "external_id",
+        "permit_number",
+        "site_address",
+        "parcel__parcel_number",
+        "owner__owner_name",
+    )
+    ordering = ("-permit_date", "-updated_at")
+    readonly_fields = (
+        "external_id",
+        "detail_url",
+        "source_list_url",
+        "permit_number",
+        "permit_date",
+        "primary_contractor",
+        "permit_type",
+        "site_address",
+        "work_description",
+        "status",
+        "parcel",
+        "owner",
+        "total_fees",
+        "amount_due",
+        "notes_text",
+        "uploaded_file_count",
+        "source_start_date",
+        "source_end_date",
+        "content_hash",
+        "raw_payload",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 100
+
+
+@admin.register(MountVernonPermitSyncRun)
+class MountVernonPermitSyncRunAdmin(admin.ModelAdmin):
+    list_display = (
+        "run_id",
+        "dry_run",
+        "list_pages_fetched",
+        "detail_pages_fetched",
+        "permits_seen",
+        "permits_new",
+        "permits_updated",
+        "permit_failures",
+        "started_at",
+        "finished_at",
+    )
+    list_filter = ("dry_run", "started_at", "finished_at")
+    search_fields = ("run_id",)
+    ordering = ("-started_at",)
+    readonly_fields = (
+        "run_id",
+        "dry_run",
+        "max_pages",
+        "workers",
+        "delay_ms",
+        "started_at",
+        "finished_at",
+        "duration_seconds",
+        "list_pages_fetched",
+        "detail_pages_fetched",
+        "permits_seen",
+        "permits_new",
+        "permits_updated",
+        "permits_unchanged",
+        "permit_failures",
+        "failures",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 100
+
+
+@admin.register(MountVernonPermit)
+class MountVernonPermitAdmin(admin.ModelAdmin):
+    list_display = (
+        "case_number",
+        "case_type",
+        "status",
+        "status_date",
+        "site_address_line1",
+        "primary_contact",
+        "primary_contractor",
+        "parcel_number",
+        "updated_at",
+    )
+    list_filter = ("case_type", "status", "status_date", "updated_at")
+    search_fields = (
+        "external_id",
+        "case_number",
+        "reference_number",
+        "site_address_line1",
+        "parcel_number",
+    )
+    ordering = ("-status_date", "-updated_at")
+    readonly_fields = (
+        "external_id",
+        "detail_url",
+        "source_list_url",
+        "source_page_number",
+        "case_number",
+        "reference_number",
+        "case_type",
+        "status",
+        "status_text",
+        "status_date",
+        "site_address_line1",
+        "site_city_state_postal",
+        "primary_contact",
+        "primary_contractor",
+        "parcel_number",
+        "parcel_url",
+        "created_on",
+        "submitted_on",
+        "approved_on",
+        "issued_on",
+        "closed_on",
+        "application_expires_on",
+        "project_name",
+        "project_description",
+        "latitude",
+        "longitude",
+        "content_hash",
+        "summary_payload",
+        "detail_payload",
+        "map_points_payload",
+        "summary_html",
+        "detail_html",
+        "last_synced_at",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 100
+
+
+@admin.register(SedroWoolleyYoutubeVideo)
+class SedroWoolleyYoutubeVideoAdmin(admin.ModelAdmin):
+    list_display = (
+        "video_id",
+        "status",
+        "title",
+        "upload_date",
+        "chunk_count",
+        "failure_count",
+        "updated_at",
+    )
+    list_filter = ("status", "upload_date", "channel_title")
+    search_fields = ("video_id", "title", "video_url", "channel_title")
+    ordering = ("-upload_date", "-updated_at")
+    readonly_fields = (
+        "video_id",
+        "video_url",
+        "channel_url",
+        "channel_id",
+        "channel_title",
+        "title",
+        "description",
+        "upload_date",
+        "duration_seconds",
+        "transcript_language",
+        "transcript_segment_count",
+        "transcript_char_count",
+        "chunk_count",
+        "whisper_model",
+        "embedding_model",
+        "status",
+        "failure_count",
+        "last_error",
+        "metadata",
+        "started_at",
+        "completed_at",
+        "last_seen_at",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 100
+
+
+@admin.register(SedroWoolleyYoutubeChunk)
+class SedroWoolleyYoutubeChunkAdmin(admin.ModelAdmin):
+    list_display = (
+        "video",
+        "chunk_index",
+        "start_time",
+        "end_time",
+        "token_count",
+        "embedding_model",
+        "created_at",
+    )
+    list_filter = ("embedding_model", "created_at")
+    search_fields = ("video__video_id", "video__title", "chunk_text", "content_hash")
+    raw_id_fields = ("video",)
+    ordering = ("video", "chunk_index")
+    readonly_fields = (
+        "video",
+        "chunk_index",
+        "chunk_text",
+        "start_time",
+        "end_time",
+        "token_count",
+        "content_hash",
+        "embedding_model",
+        "embedding",
+        "metadata",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 100
+
+
+@admin.register(YoutubeMeetingAnalysisJob)
+class YoutubeMeetingAnalysisJobAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "status",
+        "youtube_video_id",
+        "result_schema_version",
+        "model_name",
+        "requested_at",
+        "completed_at",
+    )
+    list_filter = ("status", "result_schema_version", "model_name", "requested_at")
+    search_fields = ("id", "youtube_video_id", "youtube_url", "analysis_fingerprint")
+    ordering = ("-requested_at",)
+    raw_id_fields = ("requested_by", "transcript_video")
+    readonly_fields = (
+        "requested_by",
+        "youtube_url",
+        "youtube_video_id",
+        "status",
+        "status_detail",
+        "progress_stage",
+        "progress_percent",
+        "analysis_fingerprint",
+        "model_name",
+        "prompt_version",
+        "prompt_hash",
+        "result_schema_version",
+        "result_json",
+        "error_message",
+        "failure_count",
+        "transcript_video",
+        "requested_at",
+        "started_at",
+        "completed_at",
+        "updated_at",
+    )
+    list_per_page = 100

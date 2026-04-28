@@ -1,0 +1,28 @@
+Sedro-Woolley Important Permit Alert
+
+{% if permit_count %}{{ permit_count }} new important permit{{ permit_count|pluralize }} found.{% else %}No new important permits found.{% endif %}
+
+Permit date filter:
+{% if permit_date_start and permit_date_end and permit_date_start == permit_date_end %}
+{{ permit_date_start|date:"Y-m-d" }}
+{% else %}
+{{ permit_date_start|date:"Y-m-d" }} to {{ permit_date_end|date:"Y-m-d" }}
+{% endif %}
+
+Window:
+{% if watermark_from %}After {{ watermark_from|date:"Y-m-d H:i:s T" }}{% else %}From beginning{% endif %}
+Through {{ watermark_to|date:"Y-m-d H:i:s T" }}
+
+Portal: {{ portal_url }}
+Zoning map: {{ zoning_map_url }}
+
+{% for permit in permits %}
+- {{ permit.permit_number|default:permit.external_id }} | {{ permit.permit_type|default:"(no type)" }}
+  Date: {% if permit.permit_date %}{{ permit.permit_date|date:"Y-m-d" }}{% else %}-{% endif %}
+  Address: {{ permit.site_address|default:"-" }}
+  Parcel: {{ permit.parcel_number|default:"" }}
+  Work: {{ permit.work_description|default:"" }}
+  {% if permit.status %}Status: {{ permit.status }}{% endif %}
+  {% if permit.total_fees %}Fees: ${{ permit.total_fees }}{% endif %}
+  Permit page: {{ permit.detail_url }}
+{% endfor %}

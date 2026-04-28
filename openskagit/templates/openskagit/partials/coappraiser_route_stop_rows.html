@@ -1,0 +1,139 @@
+{% for stop in route.stops %}
+  {% with change=stop.imagery_change listing=stop.listing_check %}
+    <tr
+      class="cursor-pointer hover:bg-slate-50"
+      data-route-row
+      data-route-index="{{ route_index }}"
+      data-item-id="{{ stop.item_id }}"
+    >
+      <td class="px-3 py-2 text-slate-600">{{ stop.stop_order }}</td>
+      <td class="px-2 py-2 text-xs font-medium text-slate-500">{{ stop.land_use_code|default:"" }}</td>
+      <td class="px-3 py-2 font-medium text-slate-900">{{ stop.parcel_number }}</td>
+      <td class="px-3 py-2 text-slate-700">{{ stop.address|default:"" }}</td>
+      <td class="px-3 py-2 text-xs">
+        <div class="flex flex-wrap items-center gap-1">
+          {% if change %}
+            {% if change.status == "draft" %}
+              <span class="inline-flex rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-800">Img: Draft</span>
+            {% elif change.status == "done" and change.flagged %}
+              <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">Img: Flagged</span>
+            {% elif change.status == "done" %}
+              <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">Img: Clear</span>
+            {% elif change.status == "error" %}
+              <span class="inline-flex rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700">Img: Error</span>
+            {% endif %}
+          {% endif %}
+          {% if listing %}
+            {% if listing.status == "done" and listing.flagged %}
+              <span class="inline-flex rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">List: Flagged</span>
+            {% elif listing.status == "skipped" %}
+              <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">List: Skipped</span>
+            {% elif listing.status == "done" %}
+              <span class="inline-flex rounded-full bg-slate-200 px-2 py-0.5 font-semibold text-slate-700">List: Clear</span>
+            {% elif listing.status == "error" %}
+              <span class="inline-flex rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700">List: Error</span>
+            {% endif %}
+          {% endif %}
+          {% if not change and not listing %}
+            <span class="text-slate-400">-</span>
+          {% endif %}
+        </div>
+      </td>
+      <td class="px-3 py-2 text-right">
+        <button
+          type="button"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+          title="Move to another route"
+          aria-label="Move parcel to another route"
+          data-move-stop-button
+          data-route-index="{{ route_index }}"
+          data-item-id="{{ stop.item_id }}"
+          data-parcel-number="{{ stop.parcel_number }}"
+        >
+          ↔
+        </button>
+      </td>
+    </tr>
+    <tr
+      class="hidden bg-slate-50"
+      data-route-detail-row
+      data-route-index="{{ route_index }}"
+      data-item-id="{{ stop.item_id }}"
+    >
+      <td colspan="6" class="px-4 py-3 text-xs text-slate-700">
+        <div class="space-y-2">
+          <div>
+            <div class="font-semibold text-slate-900">Imagery Check</div>
+            {% if change and change.review_mode == "manual" %}
+              {% if change.status == "done" and change.flagged %}
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                  <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">Flagged</span>
+                  <span class="text-slate-700">Manual review complete.</span>
+                </div>
+              {% elif change.status == "done" %}
+                <div class="mt-1 text-emerald-700">Manual review complete (clear).</div>
+              {% elif change.status == "draft" %}
+                <div class="mt-1 text-sky-700">Manual draft saved.</div>
+              {% elif change.status == "error" %}
+                <div class="mt-1 text-rose-700">Manual review error.</div>
+              {% endif %}
+              {% if change.manual_comment %}
+                <div class="mt-1 text-slate-700">{{ change.manual_comment|truncatechars:190 }}</div>
+              {% elif change.brief_notes %}
+                <div class="mt-1 text-slate-600">{{ change.brief_notes|truncatechars:140 }}</div>
+              {% endif %}
+            {% else %}
+              {% if change and change.status == "done" and change.flagged %}
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                  <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">Flagged</span>
+                  <span class="text-slate-700">Roof: {% if change.roof_change %}possible change{% else %}no change{% endif %}</span>
+                  <span class="text-slate-700">Addition/outbuilding: {% if change.addition_change %}possible change{% else %}no change{% endif %}</span>
+                </div>
+                <div class="mt-1 text-slate-700">{{ change.brief_notes|default:"Possible imagery change detected."|truncatechars:190 }}</div>
+              {% elif change and change.status == "done" %}
+                <div class="mt-1 text-emerald-700">No visible imagery change flagged.</div>
+                {% if change.brief_notes %}
+                  <div class="mt-1 text-slate-600">{{ change.brief_notes|truncatechars:140 }}</div>
+                {% endif %}
+              {% elif change and change.status == "error" %}
+                <div class="mt-1 text-rose-700">Imagery scan error: {{ change.brief_notes|default:"Unknown error."|truncatechars:140 }}</div>
+              {% else %}
+                <div class="mt-1 text-slate-500">Not reviewed yet.</div>
+              {% endif %}
+            {% endif %}
+          </div>
+
+          <div>
+            <div class="font-semibold text-slate-900">Listing Check</div>
+            {% if listing and listing.status == "done" and listing.flagged %}
+              <div class="mt-1 flex flex-wrap items-center gap-2">
+                <span class="inline-flex rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">Flagged</span>
+                <span class="text-slate-700">Status: {{ listing.listing_status|default:"unknown" }}</span>
+                {% if listing.source_site %}
+                  <span class="text-slate-700">Source: {{ listing.source_site }}</span>
+                {% endif %}
+              </div>
+              <div class="mt-1 text-slate-700">{{ listing.summary|default:"Listing signals found."|truncatechars:190 }}</div>
+              {% if listing.source_url %}
+                <div class="mt-1">
+                  <a class="text-violet-700 underline decoration-violet-300 hover:text-violet-900" href="{{ listing.source_url }}" target="_blank" rel="noopener">Open listing source</a>
+                </div>
+              {% endif %}
+            {% elif listing and listing.status == "done" %}
+              <div class="mt-1 text-slate-700">No listing change signals flagged.</div>
+              {% if listing.summary %}
+                <div class="mt-1 text-slate-600">{{ listing.summary|truncatechars:140 }}</div>
+              {% endif %}
+            {% elif listing and listing.status == "skipped" %}
+              <div class="mt-1 text-slate-600">{{ listing.summary|default:"Skipped listing check."|truncatechars:140 }}</div>
+            {% elif listing and listing.status == "error" %}
+              <div class="mt-1 text-rose-700">Listing check error: {{ listing.summary|default:"Unknown error."|truncatechars:140 }}</div>
+            {% else %}
+              <div class="mt-1 text-slate-500">Not checked yet.</div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+  {% endwith %}
+{% endfor %}

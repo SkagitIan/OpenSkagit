@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.gis.db import models as gis_models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GistIndex
+from django.core.files.storage import default_storage
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from pgvector.django import VectorField
 from django.db import models
@@ -215,6 +216,8 @@ class MasterParcel(models.Model):
     final_year_built = models.IntegerField(null=True, blank=True)
     final_garage_area = models.FloatField(null=True, blank=True)
     final_eff_yr_blt = models.IntegerField(null=True, blank=True)
+    tax_status = models.CharField(max_length=40, null=True, blank=True, db_index=True)
+    tax_status_updated_at = models.DateTimeField(null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -228,6 +231,53 @@ class MasterParcel(models.Model):
 
     def __str__(self):
         return self.parcel_number
+
+
+class ParcelOwner(models.Model):
+    parcel = models.OneToOneField(
+        "MasterParcel",
+        to_field="parcel_number",
+        db_column="parcel_id",
+        on_delete=models.CASCADE,
+        related_name="owner",
+    )
+    owner_name = models.TextField(blank=True, null=True)
+    owner_add_1 = models.TextField(blank=True, null=True)
+    owner_add_2 = models.TextField(blank=True, null=True)
+    owner_add_3 = models.TextField(blank=True, null=True)
+    owner_city = models.TextField(blank=True, null=True)
+    owner_state = models.TextField(blank=True, null=True)
+    owner_zip = models.TextField(blank=True, null=True)
+
+    source_roll = models.ForeignKey(
+        "AssessmentRoll",
+        on_delete=models.SET_NULL,
+        related_name="parcel_owners",
+        blank=True,
+        null=True,
+    )
+    source_assessor = models.ForeignKey(
+        "Assessor",
+        on_delete=models.SET_NULL,
+        related_name="parcel_owners",
+        db_constraint=False,
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "parcel_owner"
+        indexes = [
+            models.Index(fields=["owner_name"]),
+            models.Index(fields=["owner_city", "owner_state"]),
+            models.Index(fields=["source_roll"]),
+        ]
+
+    def __str__(self):
+        return f"{self.parcel_id}: {self.owner_name or 'Unknown owner'}"
+
 
 class ParcelGeometry(models.Model):
     parcel = models.OneToOneField(
@@ -589,6 +639,55 @@ class ExperimentRun(models.Model):
 
     def get_absolute_url(self):
         return reverse("experiment_detail", kwargs={"experiment_id": self.id})
+
+
+class RegressionPublishedModel(models.Model):
+    """
+    Stores manually promoted regression_v1 runs for AVM production use.
+    """
+
+    mode = models.CharField(max_length=50, default="sfr", db_index=True)
+    run_id = models.CharField(max_length=100, db_index=True)
+
+    settings_json = models.JSONField(default=dict)
+    coefficients_json = models.JSONField(default=list)
+    segments_json = models.JSONField(default=list)
+    global_metrics_json = models.JSONField(default=dict)
+    segment_map_json = models.JSONField(default=list)
+
+    is_active = models.BooleanField(default=False, db_index=True)
+    promoted_at = models.DateTimeField(null=True, blank=True)
+    promoted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="regression_published_models",
+    )
+
+    diagnostics_path = models.CharField(max_length=500, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["mode", "is_active"]),
+            models.Index(fields=["run_id"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mode"],
+                condition=models.Q(is_active=True),
+                name="openskagit_regpub_unique_active_mode",
+            )
+        ]
+
+    def __str__(self):
+        status = "active" if self.is_active else "inactive"
+        return f"{self.mode}:{self.run_id} ({status})"
+
 
 class NeighborhoodMetrics(models.Model):
     neighborhood_code = models.CharField(max_length=20, db_index=True)
@@ -1090,6 +1189,11 @@ class ParcelHistory(models.Model):
     parcel_number = models.CharField(max_length=20, unique=True)
     rows = models.JSONField(default=list)      # list of dicts (history rows)
     taxes = models.JSONField(default=dict)     # current taxes payload (separate schema)
+    recording_documents = models.JSONField(default=list, blank=True)
+    recording_latest_number = models.CharField(max_length=40, blank=True, default="")
+    recording_latest_recorded_date = models.DateField(blank=True, null=True)
+    recording_checked_at = models.DateTimeField(blank=True, null=True)
+    recording_last_error = models.TextField(blank=True, default="")
     scraped_at = models.DateTimeField(auto_now=True)
     neighborhood_code = models.CharField(
         max_length=20, blank=True, null=True, db_index=True
@@ -1629,6 +1733,90 @@ class WeeklyBriefingSubscriber(models.Model):
         return WeeklyBriefingSubscriber.objects.filter(email=email).first()
 
 
+class PropertyRecordAlertSubscription(models.Model):
+    email = models.EmailField()
+    parcel = models.ForeignKey(
+        "MasterParcel",
+        to_field="parcel_number",
+        db_column="parcel_id",
+        on_delete=models.CASCADE,
+        related_name="record_alert_subscriptions",
+        db_index=False,
+    )
+    baseline_owner_name = models.CharField(max_length=255, blank=True, default="")
+    baseline_situs_address = models.CharField(max_length=300, blank=True, default="")
+    monitored_names = models.JSONField(default=list, blank=True)
+    baseline_legal_fragment = models.CharField(max_length=255, blank=True, default="")
+    baseline_recording_number = models.CharField(max_length=40, blank=True, default="")
+    baseline_recorded_date = models.DateField(blank=True, null=True)
+    last_notified_recording_number = models.CharField(max_length=40, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    last_checked_at = models.DateTimeField(blank=True, null=True)
+    last_alert_sent_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email", "parcel"],
+                name="property_record_alert_email_parcel_uniq",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["email"], name="prop_rec_alert_email_idx"),
+            models.Index(fields=["parcel"], name="prop_rec_alert_parcel_idx"),
+            models.Index(fields=["is_active"], name="prop_rec_alert_active_idx"),
+        ]
+
+    def __str__(self) -> str:
+        status = "active" if self.is_active else "inactive"
+        return f"{self.email} -> {self.parcel_id} ({status})"
+
+    def unsubscribe_token(self) -> str:
+        signer = TimestampSigner(salt="property-record-alert-unsubscribe")
+        return signer.sign(f"{self.email}|{self.parcel_id}")
+
+    def manage_token(self) -> str:
+        signer = TimestampSigner(salt="property-record-alert-manage")
+        return signer.sign(str(self.pk))
+
+    @staticmethod
+    def from_unsubscribe_token(
+        token: str,
+        max_age: int = 60 * 60 * 24 * 365,
+    ) -> Optional["PropertyRecordAlertSubscription"]:
+        signer = TimestampSigner(salt="property-record-alert-unsubscribe")
+        try:
+            signed_value = signer.unsign(token, max_age=max_age)
+        except (BadSignature, SignatureExpired):
+            return None
+        email, separator, parcel_id = signed_value.partition("|")
+        if not separator or not email or not parcel_id:
+            return None
+        return PropertyRecordAlertSubscription.objects.filter(
+            email=email.strip().lower(),
+            parcel_id=parcel_id.strip().upper(),
+        ).first()
+
+    @staticmethod
+    def from_manage_token(
+        token: str,
+        max_age: int = 60 * 60 * 24 * 365,
+    ) -> Optional["PropertyRecordAlertSubscription"]:
+        signer = TimestampSigner(salt="property-record-alert-manage")
+        try:
+            signed_value = signer.unsign(token, max_age=max_age)
+        except (BadSignature, SignatureExpired):
+            return None
+        try:
+            subscription_id = int(str(signed_value).strip())
+        except (TypeError, ValueError):
+            return None
+        return PropertyRecordAlertSubscription.objects.filter(pk=subscription_id).first()
+
+
 class WeeklyBriefingTemplate(models.Model):
     subject = models.CharField(max_length=200, default="Weekly Briefing · OpenSkagit")
     preheader = models.CharField(max_length=255, blank=True, default="County data, stories, and updates curated for you.")
@@ -1760,6 +1948,147 @@ class SurveyInteraction(models.Model):
     def __str__(self) -> str:
         prefix = "Bot" if self.role == self.ROLE_BOT else "User"
         return f"{prefix} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class CitizenSurveyQuestion(models.Model):
+    prompt = models.TextField()
+    week_start_date = models.DateField(
+        unique=True,
+        db_index=True,
+        help_text="Sunday date for this weekly survey question (Pacific Time week).",
+    )
+    is_published = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-week_start_date"]
+        indexes = [
+            models.Index(fields=["is_published", "week_start_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Week of {self.week_start_date:%Y-%m-%d}"
+
+
+class CitizenSurveyOption(models.Model):
+    question = models.ForeignKey(
+        CitizenSurveyQuestion,
+        on_delete=models.CASCADE,
+        related_name="options",
+    )
+    label = models.CharField(max_length=120)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["question", "sort_order"],
+                name="citizen_survey_option_order_uniq",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.question.week_start_date:%Y-%m-%d}: {self.label}"
+
+
+class CitizenSurveyParticipant(models.Model):
+    participant_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    civic_topic_interests = models.JSONField(default=list, blank=True)
+    city_interests = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return str(self.participant_id)
+
+
+class CitizenSurveyResponse(models.Model):
+    question = models.ForeignKey(
+        CitizenSurveyQuestion,
+        on_delete=models.CASCADE,
+        related_name="responses",
+    )
+    option = models.ForeignKey(
+        CitizenSurveyOption,
+        on_delete=models.CASCADE,
+        related_name="responses",
+    )
+    participant = models.ForeignKey(
+        CitizenSurveyParticipant,
+        on_delete=models.CASCADE,
+        related_name="survey_responses",
+    )
+    comment = models.TextField(blank=True)
+    focused_city = models.CharField(max_length=64, blank=True, default="")
+    is_staff_debug = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["question", "participant"],
+                condition=models.Q(is_staff_debug=False),
+                name="citizen_survey_one_response_per_question",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["question", "option"]),
+            models.Index(fields=["question", "focused_city"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.question.week_start_date:%Y-%m-%d} · {self.participant.participant_id}"
+
+
+class CitizenSurveyReminder(models.Model):
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return self.email
+
+
+class CitizenSurveyReminderSend(models.Model):
+    question = models.ForeignKey(
+        CitizenSurveyQuestion,
+        on_delete=models.CASCADE,
+        related_name="reminder_sends",
+    )
+    reminder = models.ForeignKey(
+        CitizenSurveyReminder,
+        on_delete=models.CASCADE,
+        related_name="sends",
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-sent_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["question", "reminder"],
+                name="citizen_survey_reminder_send_uniq",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["question", "sent_at"]),
+            models.Index(fields=["reminder", "sent_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.reminder.email} · {self.question.week_start_date:%Y-%m-%d}"
 
 
 class AgencyFinancialSnapshot(models.Model):
@@ -1912,3 +2241,803 @@ class CodeSetActivationRule(models.Model):
 
     class Meta:
         db_table = "code_set_activation_rule"
+
+
+class SedroWoolleyCrawlRun(models.Model):
+    """
+    Metadata for each Sedro-Woolley crawl execution.
+    Mirrors the JSON summary written to media/sedro_woolley/runs/*.json.
+    """
+
+    run_id = models.CharField(max_length=32, unique=True, db_index=True)
+    start_url = models.URLField(max_length=1000)
+    allowed_domains = models.JSONField(default=list, blank=True)
+
+    max_depth = models.PositiveIntegerField(default=0)
+    max_pages = models.PositiveIntegerField(default=0)
+    resumed = models.BooleanField(default=False)
+    dry_run = models.BooleanField(default=False)
+
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True)
+
+    urls_processed = models.PositiveIntegerField(default=0)
+    urls_seen = models.PositiveIntegerField(default=0)
+    records_written = models.PositiveIntegerField(default=0)
+    html_pages = models.PositiveIntegerField(default=0)
+    files = models.PositiveIntegerField(default=0)
+    failure_count = models.PositiveIntegerField(default=0)
+
+    by_resource_type = models.JSONField(default=dict, blank=True)
+    by_extension = models.JSONField(default=dict, blank=True)
+    tag_counts = models.JSONField(default=dict, blank=True)
+    failures = models.JSONField(default=list, blank=True)
+
+    manifest_path = models.CharField(max_length=500, blank=True)
+    run_summary_path = models.CharField(max_length=500, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["-started_at"]),
+            models.Index(fields=["dry_run", "-started_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.run_id} ({self.records_written} records)"
+
+
+class SedroWoolleyCrawlDocument(models.Model):
+    """
+    One crawled resource (page/file) linked to a specific crawl run.
+    """
+
+    run = models.ForeignKey(
+        SedroWoolleyCrawlRun,
+        on_delete=models.CASCADE,
+        related_name="documents",
+    )
+    url = models.URLField(max_length=1000, db_index=True)
+    url_hash = models.CharField(max_length=64, db_index=True)
+    source_url = models.URLField(max_length=1000, null=True, blank=True)
+    depth = models.PositiveIntegerField(default=0)
+
+    resource_type = models.CharField(max_length=32)
+    title = models.CharField(max_length=500, blank=True)
+    tags = models.JSONField(default=list, blank=True)
+    status_code = models.PositiveIntegerField(null=True, blank=True)
+    content_type = models.CharField(max_length=255, blank=True)
+    extension = models.CharField(max_length=20, blank=True)
+    size_bytes = models.BigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, blank=True)
+    fetched_at = models.DateTimeField()
+
+    media_path = models.CharField(max_length=800, blank=True)
+    raw_html_path = models.CharField(max_length=800, blank=True)
+    text_path = models.CharField(max_length=800, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fetched_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["run", "url_hash"], name="uniq_sw_crawl_doc_run_urlhash"),
+        ]
+        indexes = [
+            models.Index(fields=["run", "-fetched_at"]),
+            models.Index(fields=["resource_type"]),
+            models.Index(fields=["extension"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.title or self.url
+
+
+class SedroWoolleyPermitSyncRun(models.Model):
+    MODE_BACKFILL = "backfill"
+    MODE_SYNC = "sync"
+
+    MODE_CHOICES = [
+        (MODE_BACKFILL, "Backfill"),
+        (MODE_SYNC, "Sync"),
+    ]
+
+    run_id = models.CharField(max_length=40, unique=True, db_index=True)
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, default=MODE_SYNC, db_index=True)
+
+    start_date = models.DateField()
+    end_date = models.DateField()
+    chunk_months = models.PositiveIntegerField(default=0)
+    dry_run = models.BooleanField(default=False)
+
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True)
+
+    list_pages_fetched = models.PositiveIntegerField(default=0)
+    detail_pages_fetched = models.PositiveIntegerField(default=0)
+
+    permits_seen = models.PositiveIntegerField(default=0)
+    permits_new = models.PositiveIntegerField(default=0)
+    permits_updated = models.PositiveIntegerField(default=0)
+    permits_unchanged = models.PositiveIntegerField(default=0)
+    permit_failures = models.PositiveIntegerField(default=0)
+
+    failures = models.JSONField(default=list, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["mode", "-started_at"]),
+            models.Index(fields=["start_date", "end_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.run_id} ({self.mode})"
+
+
+class SedroWoolleyPermitAlertRun(models.Model):
+    run_id = models.CharField(max_length=40, unique=True, db_index=True)
+    job_name = models.CharField(max_length=50, default="nightly_sw_permit_alert", db_index=True)
+    dry_run = models.BooleanField(default=False)
+    sync_attempted = models.BooleanField(default=True)
+    sync_run = models.ForeignKey(
+        "SedroWoolleyPermitSyncRun",
+        on_delete=models.SET_NULL,
+        related_name="alert_runs",
+        blank=True,
+        null=True,
+    )
+
+    watermark_from = models.DateTimeField(blank=True, null=True)
+    watermark_to = models.DateTimeField(blank=True, null=True)
+
+    permit_count = models.PositiveIntegerField(default=0)
+    recipient_count = models.PositiveIntegerField(default=0)
+    sent_count = models.PositiveIntegerField(default=0)
+    recipients = models.JSONField(default=list, blank=True)
+    permit_external_ids = models.JSONField(default=list, blank=True)
+
+    subject = models.CharField(max_length=255, blank=True)
+    success = models.BooleanField(default=False, db_index=True)
+    error_message = models.TextField(blank=True)
+
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["job_name", "-started_at"]),
+            models.Index(fields=["success", "-started_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.run_id} ({'ok' if self.success else 'pending'})"
+
+
+class SedroWoolleyPermit(models.Model):
+    class ProjectType(models.TextChoices):
+        NEW_SFR = "new_sfr", "New SFR"
+        NEW_MF = "new_mf", "New MF"
+        ADU = "adu", "ADU"
+        ADDITION = "addition", "Addition"
+        REMODEL = "remodel", "Remodel"
+        DEMO = "demo", "Demo"
+        SITE_CIVIL = "site_civil", "Site / Civil"
+        UTILITY = "utility", "Utility"
+        OTHER = "other", "Other"
+
+    class TaxabilityClass(models.TextChoices):
+        HIGH_TAXABLE = "high_taxable", "High Taxable"
+        MEDIUM_TAXABLE = "medium_taxable", "Medium Taxable"
+        LOW_TAXABLE = "low_taxable", "Low Taxable"
+        NON_TAXABLE = "non_taxable", "Non-Taxable"
+        UNKNOWN = "unknown", "Unknown"
+
+    class ScopeIntensity(models.TextChoices):
+        MAJOR = "major", "Major"
+        MODERATE = "moderate", "Moderate"
+        MINOR = "minor", "Minor"
+        ADMIN_ONLY = "admin_only", "Admin Only"
+
+    external_id = models.CharField(max_length=32, unique=True, db_index=True)
+    detail_url = models.URLField(max_length=1000)
+    source_list_url = models.URLField(max_length=1000, blank=True)
+
+    permit_number = models.CharField(max_length=64, blank=True, db_index=True)
+    permit_date = models.DateField(null=True, blank=True, db_index=True)
+    primary_contractor = models.CharField(max_length=255, blank=True)
+    permit_type = models.CharField(max_length=255, blank=True, db_index=True)
+    site_address = models.CharField(max_length=500, blank=True)
+    work_description = models.TextField(blank=True)
+    status = models.CharField(max_length=120, blank=True, db_index=True)
+
+    parcel = models.ForeignKey(
+        "MasterParcel",
+        to_field="parcel_number",
+        on_delete=models.SET_NULL,
+        related_name="sedro_woolley_permits",
+        blank=True,
+        null=True,
+    )
+    owner = models.ForeignKey(
+        "ParcelOwner",
+        on_delete=models.SET_NULL,
+        related_name="sedro_woolley_permits",
+        blank=True,
+        null=True,
+    )
+
+    total_fees = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    amount_due = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    notes_text = models.TextField(blank=True)
+    uploaded_file_count = models.PositiveIntegerField(default=0)
+
+    project_type_normalized = models.CharField(
+        max_length=32,
+        choices=ProjectType.choices,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    taxability_class = models.CharField(
+        max_length=20,
+        choices=TaxabilityClass.choices,
+        default=TaxabilityClass.UNKNOWN,
+        db_index=True,
+    )
+    scope_intensity = models.CharField(
+        max_length=20,
+        choices=ScopeIntensity.choices,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    lifecycle_stage_inferred = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    completion_confidence = models.DecimalField(max_digits=4, decimal_places=3, null=True, blank=True)
+    data_quality_flags = models.JSONField(default=list, blank=True)
+
+    source_start_date = models.DateField(null=True, blank=True)
+    source_end_date = models.DateField(null=True, blank=True)
+
+    content_hash = models.CharField(max_length=64, db_index=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-permit_date", "-updated_at"]
+        indexes = [
+            models.Index(fields=["-permit_date"]),
+            models.Index(fields=["status", "permit_type"]),
+            models.Index(fields=["parcel", "-permit_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.permit_number or self.external_id
+
+
+class MountVernonPermitSyncRun(models.Model):
+    run_id = models.CharField(max_length=40, unique=True, db_index=True)
+    dry_run = models.BooleanField(default=False)
+    max_pages = models.PositiveIntegerField(null=True, blank=True)
+    workers = models.PositiveIntegerField(default=1)
+    delay_ms = models.PositiveIntegerField(default=250)
+
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.FloatField(null=True, blank=True)
+
+    list_pages_fetched = models.PositiveIntegerField(default=0)
+    detail_pages_fetched = models.PositiveIntegerField(default=0)
+
+    permits_seen = models.PositiveIntegerField(default=0)
+    permits_new = models.PositiveIntegerField(default=0)
+    permits_updated = models.PositiveIntegerField(default=0)
+    permits_unchanged = models.PositiveIntegerField(default=0)
+    permit_failures = models.PositiveIntegerField(default=0)
+
+    failures = models.JSONField(default=list, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["-started_at"]),
+            models.Index(fields=["finished_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.run_id
+
+
+class MountVernonPermit(models.Model):
+    external_id = models.CharField(max_length=36, unique=True, db_index=True)
+    detail_url = models.URLField(max_length=1000)
+    source_list_url = models.URLField(max_length=1000, blank=True)
+    source_page_number = models.PositiveIntegerField(default=0)
+
+    case_number = models.CharField(max_length=64, blank=True, db_index=True)
+    reference_number = models.CharField(max_length=64, blank=True, db_index=True)
+    case_type = models.CharField(max_length=255, blank=True, db_index=True)
+
+    status = models.CharField(max_length=120, blank=True, db_index=True)
+    status_text = models.CharField(max_length=255, blank=True)
+    status_date = models.DateField(null=True, blank=True, db_index=True)
+
+    site_address_line1 = models.CharField(max_length=500, blank=True)
+    site_city_state_postal = models.CharField(max_length=255, blank=True)
+    primary_contact = models.CharField(max_length=255, blank=True)
+    primary_contractor = models.CharField(max_length=255, blank=True)
+
+    parcel_number = models.CharField(max_length=120, blank=True, db_index=True)
+    parcel_url = models.URLField(max_length=1000, blank=True)
+
+    created_on = models.DateField(null=True, blank=True, db_index=True)
+    submitted_on = models.DateField(null=True, blank=True, db_index=True)
+    approved_on = models.DateField(null=True, blank=True, db_index=True)
+    issued_on = models.DateField(null=True, blank=True, db_index=True)
+    closed_on = models.DateField(null=True, blank=True, db_index=True)
+    application_expires_on = models.DateField(null=True, blank=True, db_index=True)
+
+    project_name = models.TextField(blank=True)
+    project_description = models.TextField(blank=True)
+
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+
+    content_hash = models.CharField(max_length=64, db_index=True)
+
+    summary_payload = models.JSONField(default=dict, blank=True)
+    detail_payload = models.JSONField(default=dict, blank=True)
+    map_points_payload = models.JSONField(default=dict, blank=True)
+
+    summary_html = models.TextField(blank=True)
+    detail_html = models.TextField(blank=True)
+
+    last_synced_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-status_date", "-updated_at"]
+        indexes = [
+            models.Index(fields=["case_number", "status"]),
+            models.Index(fields=["status", "-status_date"]),
+            models.Index(fields=["parcel_number", "-status_date"]),
+            models.Index(fields=["-last_synced_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.case_number or self.external_id
+
+
+class SedroWoolleyYoutubeVideo(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_PROCESSING = "processing"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_SKIPPED, "Skipped"),
+    ]
+
+    video_id = models.CharField(max_length=32, unique=True, db_index=True)
+    video_url = models.URLField(max_length=1000, unique=True)
+    channel_url = models.URLField(max_length=1000, blank=True)
+    channel_id = models.CharField(max_length=128, blank=True)
+    channel_title = models.CharField(max_length=500, blank=True)
+
+    title = models.CharField(max_length=500, blank=True)
+    description = models.TextField(blank=True)
+    upload_date = models.DateField(null=True, blank=True)
+    duration_seconds = models.PositiveIntegerField(null=True, blank=True)
+    transcript_language = models.CharField(max_length=20, blank=True)
+
+    transcript_segment_count = models.PositiveIntegerField(default=0)
+    transcript_char_count = models.PositiveIntegerField(default=0)
+    chunk_count = models.PositiveIntegerField(default=0)
+
+    whisper_model = models.CharField(max_length=100, blank=True)
+    embedding_model = models.CharField(max_length=100, blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    failure_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-upload_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-updated_at"]),
+            models.Index(fields=["channel_id", "-upload_date"]),
+            models.Index(fields=["-upload_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.video_id} ({self.status})"
+
+
+class SedroWoolleyYoutubeChunk(models.Model):
+    video = models.ForeignKey(
+        SedroWoolleyYoutubeVideo,
+        on_delete=models.CASCADE,
+        related_name="chunks",
+    )
+    chunk_index = models.PositiveIntegerField(default=0)
+    chunk_text = models.TextField()
+    start_time = models.FloatField(default=0)
+    end_time = models.FloatField(default=0)
+    token_count = models.PositiveIntegerField(default=0)
+
+    content_hash = models.CharField(max_length=64, db_index=True)
+    embedding_model = models.CharField(max_length=100)
+    embedding = VectorField(dimensions=384, null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["video", "chunk_index", "embedding_model"],
+                name="uniq_sw_youtube_chunk_video_model_idx",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["video", "chunk_index"]),
+            models.Index(fields=["embedding_model"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.video.video_id} chunk {self.chunk_index}"
+
+
+class CoAppraiserParcelSet(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_READY = "ready"
+    STATUS_PARTIAL = "partial"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_READY, "Ready"),
+        (STATUS_PARTIAL, "Partial"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, blank=True)
+    source_filename = models.CharField(max_length=255)
+    upload_file = models.FileField(upload_to="coappraiser/uploads/%Y/%m/%d/")
+    parcel_id_column = models.CharField(max_length=128, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    mode_last_used = models.CharField(max_length=20, blank=True)
+
+    total_rows = models.PositiveIntegerField(default=0)
+    parsed_rows = models.PositiveIntegerField(default=0)
+    unique_parcel_count = models.PositiveIntegerField(default=0)
+    found_count = models.PositiveIntegerField(default=0)
+    missing_count = models.PositiveIntegerField(default=0)
+    missing_geometry_count = models.PositiveIntegerField(default=0)
+    duplicate_count = models.PositiveIntegerField(default=0)
+
+    upload_notes = models.JSONField(default=dict, blank=True)
+    created_by_ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "coappraiser_parcel_set"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source_filename} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+class CoAppraiserParcelSetItem(models.Model):
+    STATUS_READY = "ready"
+    STATUS_MISSING = "missing"
+    STATUS_MISSING_GEOMETRY = "missing_geometry"
+
+    STATUS_CHOICES = [
+        (STATUS_READY, "Ready"),
+        (STATUS_MISSING, "Missing Parcel"),
+        (STATUS_MISSING_GEOMETRY, "Missing Geometry"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    parcel_set = models.ForeignKey(
+        CoAppraiserParcelSet,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    source_row = models.PositiveIntegerField(default=0)
+    parcel_number_raw = models.CharField(max_length=128, blank=True)
+    parcel_number_normalized = models.CharField(max_length=64, db_index=True)
+    duplicate_instances = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_READY, db_index=True)
+
+    parcel = models.ForeignKey(
+        "MasterParcel",
+        on_delete=models.SET_NULL,
+        related_name="coappraiser_set_items",
+        null=True,
+        blank=True,
+        db_constraint=False,
+    )
+    situs_address = models.CharField(max_length=300, null=True, blank=True)
+
+    point_geog = gis_models.PointField(srid=4326, null=True, blank=True)
+    point_2926 = gis_models.PointField(srid=2926, null=True, blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    x_2926 = models.FloatField(null=True, blank=True)
+    y_2926 = models.FloatField(null=True, blank=True)
+
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "coappraiser_parcel_set_item"
+        ordering = ["source_row", "parcel_number_normalized"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parcel_set", "parcel_number_normalized"],
+                name="uniq_coappraiser_parcel_set_item_norm",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["parcel_set", "status"]),
+            models.Index(fields=["parcel_set", "source_row"]),
+            GistIndex(fields=["point_geog"]),
+            GistIndex(fields=["point_2926"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.parcel_set_id}: {self.parcel_number_normalized}"
+
+
+class CoAppraiserRoutePlan(models.Model):
+    MODE_NEIGHBORHOOD = "neighborhood"
+    MODE_DRIVING = "driving"
+
+    MODE_CHOICES = [
+        (MODE_NEIGHBORHOOD, "Neighborhood (walkable / dense)"),
+        (MODE_DRIVING, "Driving (house-to-house)"),
+    ]
+
+    STATUS_PENDING = "pending"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    parcel_set = models.ForeignKey(
+        CoAppraiserParcelSet,
+        on_delete=models.CASCADE,
+        related_name="route_plans",
+    )
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, db_index=True)
+    routing_profile = models.CharField(max_length=20, default="driving")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+
+    target_stops = models.PositiveIntegerField(default=35)
+    min_stops = models.PositiveIntegerField(default=30)
+    max_stops = models.PositiveIntegerField(default=45)
+    grid_cell_size_m = models.PositiveIntegerField(default=1800)
+
+    depot_name = models.CharField(max_length=255, blank=True)
+    depot_lat = models.FloatField()
+    depot_lon = models.FloatField()
+    depot_point_geog = gis_models.PointField(srid=4326, null=True, blank=True)
+
+    cluster_count = models.PositiveIntegerField(default=0)
+    routed_stop_count = models.PositiveIntegerField(default=0)
+    excluded_stop_count = models.PositiveIntegerField(default=0)
+
+    summary = models.JSONField(default=dict, blank=True)
+    result = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "coappraiser_route_plan"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["parcel_set", "-created_at"]),
+            models.Index(fields=["status", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_mode_display()} {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class StaffImageGenerationJob(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_SUCCEEDED = "succeeded"
+    STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_SUCCEEDED, "Succeeded"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="staff_image_generation_jobs",
+        null=True,
+        blank=True,
+    )
+    prompt = models.TextField()
+    init_image = models.FileField(upload_to="generated_images/init/%Y/%m/%d/", null=True, blank=True)
+    steps = models.PositiveIntegerField(default=28)
+    guidance_scale = models.FloatField(default=3.5)
+    width = models.PositiveIntegerField(default=1024)
+    height = models.PositiveIntegerField(default=1024)
+    seed = models.BigIntegerField(default=42)
+
+    cancel_requested = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    status_detail = models.CharField(max_length=255, blank=True)
+    error_message = models.TextField(blank=True)
+    result_image_path = models.CharField(max_length=500, blank=True)
+
+    requested_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "staff_image_generation_job"
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["status", "-requested_at"]),
+            models.Index(fields=["created_by", "-requested_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.id} ({self.status})"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in {
+            self.STATUS_SUCCEEDED,
+            self.STATUS_FAILED,
+            self.STATUS_CANCELLED,
+        }
+
+    @property
+    def result_image_url(self) -> Optional[str]:
+        if not self.result_image_path:
+            return None
+        return default_storage.url(self.result_image_path)
+
+
+class YoutubeMeetingAnalysisJob(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_RUNNING = "running"
+    STATUS_SUCCEEDED = "succeeded"
+    STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_RUNNING, "Running"),
+        (STATUS_SUCCEEDED, "Succeeded"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="youtube_meeting_analysis_jobs",
+        null=True,
+        blank=True,
+    )
+    youtube_url = models.URLField(max_length=1000)
+    youtube_video_id = models.CharField(max_length=32, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    status_detail = models.CharField(max_length=255, blank=True)
+    progress_stage = models.CharField(max_length=32, default="queued")
+    progress_percent = models.PositiveSmallIntegerField(default=0)
+
+    analysis_fingerprint = models.CharField(max_length=64, db_index=True)
+    model_name = models.CharField(max_length=120, blank=True)
+    prompt_version = models.CharField(max_length=120, blank=True)
+    prompt_hash = models.CharField(max_length=128, blank=True)
+    result_schema_version = models.CharField(max_length=120, default="council_meeting_analysis.v1")
+    result_json = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    failure_count = models.PositiveIntegerField(default=0)
+
+    transcript_video = models.ForeignKey(
+        "SedroWoolleyYoutubeVideo",
+        on_delete=models.SET_NULL,
+        related_name="meeting_analysis_jobs",
+        null=True,
+        blank=True,
+    )
+
+    requested_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "youtube_meeting_analysis_job"
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["status", "-requested_at"]),
+            models.Index(fields=["youtube_video_id", "-requested_at"]),
+            models.Index(fields=["analysis_fingerprint", "-requested_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.id} ({self.status})"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in {
+            self.STATUS_SUCCEEDED,
+            self.STATUS_FAILED,
+            self.STATUS_CANCELLED,
+        }
